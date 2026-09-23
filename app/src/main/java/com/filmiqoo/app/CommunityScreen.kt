@@ -60,7 +60,7 @@ fun CommunityScreen(
     Column(Modifier.fillMaxSize()) {
         BrandTopBar()
         Row(
-            Modifier.fillMaxWidth().padding(horizontal=16.dp,bottom=8.dp),
+            Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,bottom=8.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
