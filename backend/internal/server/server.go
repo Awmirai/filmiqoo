@@ -136,6 +136,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/watch/progress", s.saveProgress)
 			r.Get("/watch/continue", s.continueWatching)
 			r.Get("/watch/history", s.history)
+			r.Post("/watch/history/clear", s.clearHistory)
+			r.Post("/watch/history/{versionID}/remove", s.removeHistoryItem)
 			r.Get("/library/favorites", s.favorites)
 			r.Post("/library/favorites/{id}/toggle", s.toggleFavorite)
 			r.Get("/library/stats", s.libraryStats)

@@ -42,6 +42,7 @@ fun ConnectedProfileScreen(
     onPlay: (PlaybackTarget) -> Unit,
     onCommunity: () -> Unit,
     onDownloads: () -> Unit,
+    onHistory: () -> Unit,
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
     onSettings: () -> Unit,
@@ -141,8 +142,8 @@ fun ConnectedProfileScreen(
                     ProfileActionRow(
                         icon=Icons.Default.History,
                         title="تاریخچه تماشا",
-                        subtitle="تا ۱۰۰ مورد اخیر روی سرور نگه‌داری می‌شود",
-                        onClick={}
+                        subtitle="Resume، کامل‌شده‌ها و مدیریت تاریخچه",
+                        onClick=onHistory
                     )
                     ProfileActionRow(
                         icon=Icons.Default.Download,

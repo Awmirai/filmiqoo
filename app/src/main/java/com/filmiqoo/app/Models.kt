@@ -90,6 +90,7 @@ sealed interface OverlayRoute {
     data class Player(val target: PlaybackTarget) : OverlayRoute
     data class Room(val roomId: String, val title: String) : OverlayRoute
     data object Downloads : OverlayRoute
+    data object History : OverlayRoute
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
     data object Releases : OverlayRoute

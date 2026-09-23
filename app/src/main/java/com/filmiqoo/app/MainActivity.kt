@@ -117,6 +117,13 @@ fun FilmiqooApp() {
                     onBack=closeOverlay,
                     onPlay={overlay=OverlayRoute.Player(it)}
                 )
+                OverlayRoute.History -> WatchHistoryScreen(
+                    backend=backend,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onPlay={overlay=OverlayRoute.Player(it)},
+                    onMedia={overlay=OverlayRoute.Detail(it)}
+                )
                 is OverlayRoute.Room -> ConnectedRoomScreen(
                     roomId=route.roomId,
                     title=route.title,
@@ -280,6 +287,7 @@ fun FilmiqooApp() {
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onCommunity={tab=3},
                                     onDownloads={overlay=OverlayRoute.Downloads},
+                                    onHistory={overlay=OverlayRoute.History},
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},
                                     onSettings={overlay=OverlayRoute.Settings},

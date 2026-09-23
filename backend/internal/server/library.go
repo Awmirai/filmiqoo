@@ -189,3 +189,21 @@ func (s *Server) libraryStats(w http.ResponseWriter,r *http.Request) {
 		"favorites":favoritesCount,
 	})
 }
+
+
+func (s *Server) removeHistoryItem(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	versionID:=chi.URLParam(r,"versionID")
+	_,err:=s.db.Exec(r.Context(),
+		"DELETE FROM watch_progress WHERE user_id=$1 AND media_version_id=$2",
+		userID,versionID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) clearHistory(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	_,err:=s.db.Exec(r.Context(),"DELETE FROM watch_progress WHERE user_id=$1",userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	w.WriteHeader(http.StatusNoContent)
+}
