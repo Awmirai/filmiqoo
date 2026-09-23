@@ -407,7 +407,7 @@ private fun PremiumDetailHero(
         }
 
         Column(
-            Modifier.align(Alignment.BottomStart).padding(horizontal=18.dp,bottom=18.dp)
+            Modifier.align(Alignment.BottomStart).padding(start=18.dp,end=18.dp,bottom=18.dp)
         ) {
             Row(verticalAlignment=Alignment.Bottom) {
                 RemoteImage(
