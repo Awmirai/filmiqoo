@@ -78,6 +78,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 		r.Get("/catalog/home", s.catalogHome)
 		r.Get("/catalog/{id}", s.catalogDetail)
+		r.Get("/search", s.universalSearch)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/feed", s.socialFeed)
 		r.Get("/social/stories", s.stories)

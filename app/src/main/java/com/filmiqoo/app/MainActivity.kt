@@ -76,9 +76,16 @@ fun FilmiqooApp() {
         }
 
         when {
-            showSearch -> SearchScreen(
+            showSearch -> PremiumSearchScreen(
                 repository=repository,
-                onMedia={ overlay=OverlayRoute.Detail(it); showSearch=false }
+                backend=backend,
+                onBack={showSearch=false},
+                onMedia={ overlay=OverlayRoute.Detail(it); showSearch=false },
+                onCreator={ overlay=OverlayRoute.CreatorPage(it); showSearch=false },
+                onOpenReels={
+                    showSearch=false
+                    tab=1
+                }
             )
             overlay != null -> when(val route=overlay!!) {
                 is OverlayRoute.Detail -> PremiumDetailScreen(
