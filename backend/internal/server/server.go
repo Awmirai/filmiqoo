@@ -59,6 +59,13 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	})
 
 	r.Route("/v1", func(r chi.Router) {
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", s.register)
+			r.Post("/login", s.login)
+			r.Post("/refresh", s.refresh)
+			r.Post("/logout", s.logout)
+		})
+
 		r.Get("/catalog/home", s.catalogHome)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/channels", s.channels)
@@ -71,6 +78,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/channels/{id}/follow", s.followChannel)
 			r.Post("/watch/progress", s.saveProgress)
 			r.Post("/playback/token", s.playbackToken)
+			r.Get("/me", s.me)
 		})
 	})
 

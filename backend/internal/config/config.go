@@ -25,6 +25,8 @@ type Config struct {
 	PublicAPIBaseURL string
 	PlaybackTokenTTLSeconds int
 	TelegramStreamHashLength int
+	AuthAccessTTLMinutes int
+	AuthRefreshTTLDays int
 }
 
 func Load() Config {
@@ -47,6 +49,8 @@ func Load() Config {
 		PublicAPIBaseURL: env("PUBLIC_API_BASE_URL", "http://localhost:8080"),
 		PlaybackTokenTTLSeconds: envInt("PLAYBACK_TOKEN_TTL_SECONDS", 300),
 		TelegramStreamHashLength: envInt("TELEGRAM_STREAM_HASH_LENGTH", 6),
+		AuthAccessTTLMinutes: envInt("AUTH_ACCESS_TTL_MINUTES", 15),
+		AuthRefreshTTLDays: envInt("AUTH_REFRESH_TTL_DAYS", 30),
 	}
 }
 
