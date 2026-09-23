@@ -34,9 +34,12 @@ class MainActivity : ComponentActivity() {
 fun FilmiqooApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { TmdbRepository(context.applicationContext) }
+    val backend = remember { BackendRepository(context.applicationContext) }
     val store = remember { LocalStore(context.applicationContext) }
 
-    var configured by remember { mutableStateOf(repository.hasApiKey()) }
+    var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
+    var previewMode by remember { mutableStateOf(false) }
+    var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by remember { mutableIntStateOf(0) }
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
     var showSearch by remember { mutableStateOf(false) }
@@ -51,12 +54,22 @@ fun FilmiqooApp() {
     }
 
     Surface(Modifier.fillMaxSize(),color=FqBg) {
-        if (!configured) {
+        if (!authenticated && !previewMode && overlay !is OverlayRoute.Auth) {
+            AuthScreen(
+                backend=backend,
+                onSuccess={ authenticated=true },
+                onPreview={ previewMode=true }
+            )
+            return@Surface
+        }
+
+        if (previewMode && !configuredPreview && !authenticated) {
             TmdbSetupScreen(
                 onSave = { value ->
                     repository.setApiKey(value)
-                    configured = repository.hasApiKey()
-                }
+                    configuredPreview = repository.hasApiKey()
+                },
+                onSkip = { configuredPreview=true }
             )
             return@Surface
         }
@@ -70,11 +83,35 @@ fun FilmiqooApp() {
                 is OverlayRoute.Detail -> DetailScreen(
                     media=route.media,
                     repository=repository,
+                    backend=backend,
                     store=store,
                     onBack=closeOverlay,
                     onMedia={ overlay=OverlayRoute.Detail(it) },
                     onChat={ overlay=OverlayRoute.Chat("روم رسمی " + it.title,it) },
-                    onWatchParty={ overlay=OverlayRoute.WatchParty(it) }
+                    onWatchParty={ overlay=OverlayRoute.WatchParty(it) },
+                    onPlay={ target ->
+                        if (backend.session.isLoggedIn) {
+                            overlay=OverlayRoute.Player(target)
+                        } else {
+                            overlay=OverlayRoute.Auth
+                        }
+                    }
+                )
+                is OverlayRoute.Player -> FilmiqooPlayerScreen(
+                    target=route.target,
+                    backend=backend,
+                    onBack=closeOverlay
+                )
+                is OverlayRoute.Auth -> AuthScreen(
+                    backend=backend,
+                    onSuccess={
+                        authenticated=true
+                        overlay=null
+                    },
+                    onPreview={
+                        previewMode=true
+                        overlay=null
+                    }
                 )
                 is OverlayRoute.Story -> StoryViewer(
                     media=route.media,
@@ -211,9 +248,11 @@ private fun FilmiqooBottomBar(
     }
 }
 
-
 @Composable
-private fun TmdbSetupScreen(onSave: (String) -> Unit) {
+private fun TmdbSetupScreen(
+    onSave: (String) -> Unit,
+    onSkip: () -> Unit
+) {
     var value by remember { mutableStateOf("") }
     var showHelp by remember { mutableStateOf(false) }
 
@@ -236,7 +275,7 @@ private fun TmdbSetupScreen(onSave: (String) -> Unit) {
                 Icon(Icons.Default.PlayArrow,null,tint=Color.Black,modifier=Modifier.size(54.dp))
             }
             Text("FILMIQOO",color=FqGold,fontSize=30.sp,modifier=Modifier.padding(top=14.dp))
-            Text("راه‌اندازی Preview",color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))
+            Text("Preview Mode",color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))
 
             Surface(
                 color=FqSurface,
@@ -244,9 +283,9 @@ private fun TmdbSetupScreen(onSave: (String) -> Unit) {
                 modifier=Modifier.fillMaxWidth().padding(top=28.dp)
             ) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("اتصال به TMDB",fontSize=18.sp)
+                    Text("TMDB برای حالت Preview",fontSize=18.sp)
                     Text(
-                        "API Key یا Read Access Token خودت را وارد کن. این مقدار فقط روی همین گوشی ذخیره می‌شود.",
+                        "اگر Backend Filmiqoo را اجرا نمی‌کنی، می‌توانی برای نمایش محتوای نمونه کلید TMDB را وارد کنی.",
                         color=FqMuted,
                         fontSize=11.sp,
                         lineHeight=18.sp,
@@ -268,17 +307,17 @@ private fun TmdbSetupScreen(onSave: (String) -> Unit) {
                         shape=RoundedCornerShape(14.dp),
                         modifier=Modifier.fillMaxWidth().padding(top=12.dp)
                     ) {
-                        Text("ورود به Filmiqoo")
+                        Text("فعال‌کردن Preview")
                     }
                     TextButton(
                         onClick={showHelp=!showHelp},
                         modifier=Modifier.align(Alignment.CenterHorizontally)
                     ) {
-                        Text("کدام مقدار را وارد کنم؟",color=FqGold)
+                        Text("راهنما",color=FqGold)
                     }
                     if(showHelp) {
                         Text(
-                            "از صفحه TMDB همان مقدار API-Schlüssel را کپی کن. Read Access Token بلند هم پشتیبانی می‌شود.",
+                            "در حالت Production کلید TMDB داخل APK قرار نمی‌گیرد و Backend Filmiqoo آن را مدیریت می‌کند.",
                             color=FqMuted,
                             fontSize=10.sp,
                             lineHeight=17.sp,
@@ -286,6 +325,9 @@ private fun TmdbSetupScreen(onSave: (String) -> Unit) {
                         )
                     }
                 }
+            }
+            TextButton(onClick=onSkip,modifier=Modifier.padding(top=8.dp)) {
+                Text("رد کردن",color=FqMuted)
             }
         }
     }

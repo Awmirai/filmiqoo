@@ -12,10 +12,14 @@ data class MediaItem(
     val backdropPath: String? = null,
     val vote: Double = 0.0,
     val date: String = "",
-    val popularity: Double = 0.0
+    val popularity: Double = 0.0,
+    val backendId: String? = null,
+    val mediaVersionId: String? = null,
+    val streamReady: Boolean = false,
+    val quality: String = ""
 ) {
     val year: String get() = date.take(4)
-    val key: String get() = type.name + "_" + id
+    val key: String get() = backendId ?: (type.name + "_" + id)
 }
 
 data class CastMember(
@@ -78,6 +82,8 @@ sealed interface OverlayRoute {
     data class Chat(val title: String, val media: MediaItem? = null) : OverlayRoute
     data class CreatorPage(val creator: Creator) : OverlayRoute
     data class WatchParty(val media: MediaItem? = null) : OverlayRoute
+    data class Player(val target: PlaybackTarget) : OverlayRoute
+    data object Auth : OverlayRoute
     data object Create : OverlayRoute
     data object Notifications : OverlayRoute
 }

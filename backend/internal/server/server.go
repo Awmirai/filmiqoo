@@ -67,6 +67,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		})
 
 		r.Get("/catalog/home", s.catalogHome)
+		r.Get("/catalog/{id}", s.catalogDetail)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/channels", s.channels)
 		r.Get("/realtime", s.realtime)
@@ -122,23 +123,41 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(r.Context(),
-		"SELECT id::text, kind, title, original_title, year, poster_url, backdrop_url, rating " +
-		"FROM media_titles WHERE visibility='public' ORDER BY created_at DESC LIMIT 40")
+	rows, err := s.db.Query(r.Context(), `
+		SELECT mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,mt.year,
+		       mt.poster_url,mt.backdrop_url,mt.rating,
+		       mv.id::text,mv.quality_label,mv.stream_ready
+		  FROM media_titles mt
+		  LEFT JOIN LATERAL (
+			SELECT id,quality_label,stream_ready
+			  FROM media_versions
+			 WHERE media_title_id=mt.id
+			 ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+			 LIMIT 1
+		  ) mv ON true
+		 WHERE mt.visibility='public'
+		 ORDER BY mt.created_at DESC
+		 LIMIT 60
+	`)
 	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
 	defer rows.Close()
 
 	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id, kind, title, originalTitle, posterURL, backdropURL string
+		var id,kind,title,originalTitle,overview,posterURL,backdropURL string
+		var tmdbID *int64
 		var year int
 		var rating *float64
-		if err := rows.Scan(&id,&kind,&title,&originalTitle,&year,&posterURL,&backdropURL,&rating); err != nil {
+		var versionID,quality *string
+		var ready *bool
+		if err := rows.Scan(&id,&tmdbID,&kind,&title,&originalTitle,&overview,&year,&posterURL,&backdropURL,&rating,
+			&versionID,&quality,&ready); err != nil {
 			writeError(w, http.StatusInternalServerError, err); return
 		}
 		items = append(items, map[string]any{
-			"id":id,"kind":kind,"title":title,"originalTitle":originalTitle,"year":year,
-			"posterUrl":posterURL,"backdropUrl":backdropURL,"rating":rating,
+			"id":id,"tmdbId":tmdbID,"kind":kind,"title":title,"originalTitle":originalTitle,
+			"overview":overview,"year":year,"posterUrl":posterURL,"backdropUrl":backdropURL,
+			"rating":rating,"mediaVersionId":versionID,"quality":quality,"streamReady":ready,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items":items})

@@ -4,14 +4,13 @@
         android:allowBackup="true"
         android:label="Filmiqoo"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         android:icon="@drawable/ic_filmiqoo"
         android:roundIcon="@drawable/ic_filmiqoo"
         android:theme="@style/Theme.Filmiqoo">
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:screenOrientation="portrait">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

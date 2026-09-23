@@ -136,11 +136,13 @@ private sealed interface DetailLoad {
 fun DetailScreen(
     media: MediaItem,
     repository: TmdbRepository,
+    backend: BackendRepository,
     store: LocalStore,
     onBack: () -> Unit,
     onMedia: (MediaItem) -> Unit,
     onChat: (MediaItem) -> Unit,
-    onWatchParty: (MediaItem) -> Unit
+    onWatchParty: (MediaItem) -> Unit,
+    onPlay: (PlaybackTarget) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -148,10 +150,15 @@ fun DetailScreen(
     var favorite by remember(media.key) { mutableStateOf(store.contains("favorites",media.key)) }
     var downloaded by remember(media.key) { mutableStateOf(store.contains("downloads",media.key)) }
     var tab by remember(media.key) { mutableIntStateOf(0) }
+    var platformDetail by remember(media.key) { mutableStateOf<PlatformDetail?>(null) }
+    var downloadError by remember(media.key) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(media.key) {
         state = runCatching { DetailLoad.Ready(repository.detail(media)) }
             .getOrElse { DetailLoad.Error(it.message ?: "خطا") }
+        if (!media.backendId.isNullOrBlank()) {
+            platformDetail = runCatching { backend.detail(media.backendId) }.getOrNull()
+        }
     }
 
     when(val s=state) {
@@ -230,19 +237,43 @@ fun DetailScreen(
                                     }
                                 }
                             }
+                            val directVersion = platformDetail?.versions
+                                ?.firstOrNull { it.streamReady && it.preferred }
+                                ?: platformDetail?.versions?.firstOrNull { it.streamReady }
+                            val playableVersion = directVersion?.id ?: d.media.mediaVersionId
+                            val canPlay = !playableVersion.isNullOrBlank() && (d.media.streamReady || directVersion?.streamReady == true)
+
                             Row(Modifier.padding(top=15.dp)) {
                                 Button(
                                     onClick={
-                                        d.trailerKey?.let { openYoutube(context,it) }
+                                        if (canPlay) {
+                                            onPlay(
+                                                PlaybackTarget(
+                                                    mediaVersionId = playableVersion!!,
+                                                    title = d.media.title,
+                                                    subtitle = listOf(d.media.year, directVersion?.quality ?: d.media.quality)
+                                                        .filter { it.isNotBlank() }
+                                                        .joinToString(" • "),
+                                                    posterUrl = repository.poster(d.media.posterPath)
+                                                )
+                                            )
+                                        } else {
+                                            d.trailerKey?.let { openYoutube(context,it) }
+                                        }
                                     },
-                                    enabled=d.trailerKey!=null,
+                                    enabled=canPlay || d.trailerKey!=null,
                                     colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                                     shape=RoundedCornerShape(13.dp),
                                     modifier=Modifier.weight(1f)
                                 ) {
                                     Icon(Icons.Default.PlayArrow,null)
                                     Spacer(Modifier.width(5.dp))
-                                    Text(if(d.trailerKey!=null)"پخش تریلر" else "تریلر موجود نیست")
+                                    Text(
+                                        if(canPlay) {
+                                            val q = directVersion?.quality ?: d.media.quality
+                                            if(q.isBlank()) "تماشا" else "تماشا • " + q
+                                        } else if(d.trailerKey!=null) "پخش تریلر" else "نسخه پخش موجود نیست"
+                                    )
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 FilledTonalIconButton(
@@ -254,13 +285,39 @@ fun DetailScreen(
                             }
                             Row(Modifier.padding(top=8.dp)) {
                                 OutlinedButton(
-                                    onClick={downloaded=store.toggle("downloads",media.key)},
+                                    onClick={
+                                        if(canPlay && backend.session.isLoggedIn) {
+                                            scope.launch {
+                                                runCatching {
+                                                    backend.enqueueDownload(
+                                                        context,
+                                                        PlaybackTarget(
+                                                            mediaVersionId=playableVersion!!,
+                                                            title=d.media.title,
+                                                            subtitle=directVersion?.quality ?: d.media.quality,
+                                                            posterUrl=repository.poster(d.media.posterPath)
+                                                        )
+                                                    )
+                                                }.onSuccess {
+                                                    downloaded=true
+                                                    store.toggle("downloads",media.key)
+                                                }.onFailure {
+                                                    downloadError=it.message
+                                                }
+                                            }
+                                        } else {
+                                            downloaded=store.toggle("downloads",media.key)
+                                        }
+                                    },
                                     modifier=Modifier.weight(1f),
                                     shape=RoundedCornerShape(12.dp)
                                 ) {
                                     Icon(if(downloaded)Icons.Default.DownloadDone else Icons.Default.Download,null)
                                     Spacer(Modifier.width(5.dp))
-                                    Text(if(downloaded)"برای دانلود ذخیره شد" else "دانلود")
+                                    Text(
+                                        if(downloaded) "دانلود در صف" else
+                                            if(canPlay && !backend.session.isLoggedIn) "ورود برای دانلود" else "دانلود"
+                                    )
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 OutlinedButton(
@@ -272,6 +329,9 @@ fun DetailScreen(
                                     Spacer(Modifier.width(5.dp))
                                     Text("Watch Party")
                                 }
+                            }
+                            downloadError?.let {
+                                Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(top=6.dp))
                             }
                         }
                     }
@@ -330,9 +390,20 @@ fun DetailScreen(
                         }
                     }
                     d.media.type==MediaType.TV && tab==1 -> {
-                        item { SectionHeader("فصل‌ها",d.seasons.size.toString()+" فصل ثبت شده") }
-                        items(d.seasons,key={it.number}) { season ->
-                            SeasonRow(season,repository)
+                        val platformSeasons = platformDetail?.seasons.orEmpty()
+                        if(platformSeasons.isNotEmpty()) {
+                            item { SectionHeader("قسمت‌ها",platformSeasons.size.toString()+" فصل آماده در Filmiqoo") }
+                            item {
+                                PlatformSeasonsPanel(
+                                    seasons=platformSeasons,
+                                    onPlay=onPlay
+                                )
+                            }
+                        } else {
+                            item { SectionHeader("فصل‌ها",d.seasons.size.toString()+" فصل ثبت شده") }
+                            items(d.seasons,key={it.number}) { season ->
+                                SeasonRow(season,repository)
+                            }
                         }
                     }
                     (d.media.type==MediaType.TV && tab==2) || (d.media.type==MediaType.MOVIE && tab==1) -> {
@@ -374,6 +445,80 @@ fun DetailScreen(
                     }
                 }
                 item { Spacer(Modifier.height(40.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlatformSeasonsPanel(
+    seasons: List<PlatformSeason>,
+    onPlay: (PlaybackTarget) -> Unit
+) {
+    var selectedSeason by remember(seasons) { mutableIntStateOf(seasons.firstOrNull()?.number ?: 0) }
+    val season = seasons.firstOrNull { it.number==selectedSeason } ?: seasons.firstOrNull()
+
+    Column(Modifier.fillMaxWidth()) {
+        LazyRow(
+            contentPadding=PaddingValues(horizontal=16.dp),
+            horizontalArrangement=Arrangement.spacedBy(8.dp)
+        ) {
+            items(seasons,key={it.id}) { s ->
+                FilterChip(
+                    selected=s.number==selectedSeason,
+                    onClick={selectedSeason=s.number},
+                    label={Text(if(s.number==0)"ویژه" else "فصل "+s.number)}
+                )
+            }
+        }
+        season?.episodes?.forEach { ep ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)
+                    .clip(RoundedCornerShape(16.dp)).background(FqSurface).padding(10.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                RemoteImage(
+                    ep.stillUrl.takeIf(String::isNotBlank),
+                    Modifier.width(112.dp).height(68.dp).clip(RoundedCornerShape(10.dp)),
+                    ContentScale.Crop
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        ep.name.ifBlank { "قسمت "+ep.number },
+                        fontSize=12.sp,
+                        maxLines=1,
+                        overflow=TextOverflow.Ellipsis
+                    )
+                    Text(
+                        listOf(
+                            "قسمت "+ep.number,
+                            ep.runtimeMinutes.takeIf { it>0 }?.let { it.toString()+" دقیقه" }.orEmpty(),
+                            ep.quality.orEmpty()
+                        ).filter { it.isNotBlank() }.joinToString(" • "),
+                        color=FqMuted,fontSize=8.sp,modifier=Modifier.padding(top=4.dp)
+                    )
+                }
+                if(ep.streamReady && !ep.mediaVersionId.isNullOrBlank()) {
+                    FilledIconButton(
+                        onClick={
+                            onPlay(
+                                PlaybackTarget(
+                                    mediaVersionId=ep.mediaVersionId,
+                                    title=ep.name.ifBlank { "قسمت "+ep.number },
+                                    subtitle="S"+season.number.toString().padStart(2,'0')+
+                                        "E"+ep.number.toString().padStart(2,'0')+
+                                        if(ep.quality.isNullOrBlank())"" else " • "+ep.quality
+                                )
+                            )
+                        },
+                        colors=IconButtonDefaults.filledIconButtonColors(containerColor=FqGold)
+                    ) {
+                        Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
+                    }
+                } else {
+                    Icon(Icons.Default.Schedule,null,tint=FqMuted)
+                }
             }
         }
     }

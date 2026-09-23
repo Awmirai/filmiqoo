@@ -13,6 +13,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class TmdbRepository(private val context: Context) {
+    private val backend = BackendRepository(context.applicationContext)
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -110,6 +111,22 @@ class TmdbRepository(private val context: Context) {
     }
 
     suspend fun home(): HomeBundle = coroutineScope {
+        val platform = runCatching {
+            if (backend.health()) backend.catalogHome() else emptyList()
+        }.getOrDefault(emptyList())
+        if (platform.isNotEmpty()) {
+            val movies = platform.filter { it.type == MediaType.MOVIE }
+            val tv = platform.filter { it.type == MediaType.TV }
+            return@coroutineScope HomeBundle(
+                trending = platform,
+                popularMovies = movies,
+                popularTv = tv,
+                iranian = platform.filter { it.originalTitle.contains("ایران", ignoreCase = true) }.ifEmpty { movies.take(10) },
+                korean = tv.take(10),
+                bollywood = movies.drop(3).take(10),
+                anime = tv.drop(3).take(10)
+            )
+        }
         val trending = async {
             parseList(get("trending/all/day", mapOf("language" to "fa-IR")), MediaType.MOVIE)
                 .filter { it.type == MediaType.MOVIE || it.type == MediaType.TV }
@@ -184,6 +201,9 @@ class TmdbRepository(private val context: Context) {
     }
 
     suspend fun trending(): List<MediaItem> {
+        if (!hasApiKey()) {
+            return runCatching { backend.catalogHome() }.getOrDefault(emptyList())
+        }
         return parseList(
             get("trending/all/week", mapOf("language" to "fa-IR")),
             MediaType.MOVIE
@@ -192,6 +212,15 @@ class TmdbRepository(private val context: Context) {
 
     suspend fun search(query: String): List<MediaItem> {
         if (query.isBlank()) return emptyList()
+        if (!hasApiKey()) {
+            return runCatching { backend.catalogHome() }
+                .getOrDefault(emptyList())
+                .filter {
+                    it.title.contains(query, ignoreCase = true) ||
+                        it.originalTitle.contains(query, ignoreCase = true) ||
+                        it.overview.contains(query, ignoreCase = true)
+                }
+        }
         return parseList(
             get("search/multi", mapOf(
                 "language" to "fa-IR",
@@ -204,6 +233,28 @@ class TmdbRepository(private val context: Context) {
     }
 
     suspend fun detail(media: MediaItem): MediaDetail {
+        if (!hasApiKey() && !media.backendId.isNullOrBlank()) {
+            val platform = backend.detail(media.backendId)
+            return MediaDetail(
+                media = media.copy(overview = platform.overview.ifBlank { media.overview }),
+                tagline = "",
+                genres = emptyList(),
+                runtime = 0,
+                status = "available",
+                cast = emptyList(),
+                trailerKey = null,
+                recommendations = emptyList(),
+                seasons = platform.seasons.map {
+                    SeasonInfo(
+                        number = it.number,
+                        name = it.name.ifBlank { "فصل " + it.number },
+                        episodes = it.episodes.size,
+                        posterPath = it.posterUrl.takeIf(String::isNotBlank),
+                        airDate = ""
+                    )
+                }
+            )
+        }
         val typePath = if (media.type == MediaType.MOVIE) "movie" else "tv"
         var obj = get(
             typePath + "/" + media.id,
@@ -244,7 +295,11 @@ class TmdbRepository(private val context: Context) {
                 MediaType.MOVIE -> obj.optString("release_date").ifBlank { media.date }
                 MediaType.TV -> obj.optString("first_air_date").ifBlank { media.date }
             },
-            popularity = obj.optDouble("popularity", media.popularity)
+            popularity = obj.optDouble("popularity", media.popularity),
+            backendId = media.backendId,
+            mediaVersionId = media.mediaVersionId,
+            streamReady = media.streamReady,
+            quality = media.quality
         )
 
         val genresArray = obj.optJSONArray("genres") ?: JSONArray()
@@ -320,7 +375,7 @@ class TmdbRepository(private val context: Context) {
         )
     }
 
-    fun poster(path: String?): String? = path?.let { imageW500 + it }
-    fun backdrop(path: String?): String? = path?.let { imageW1280 + it }
-    fun profile(path: String?): String? = path?.let { imageW500 + it }
+    fun poster(path: String?): String? = path?.let { if (it.startsWith("http")) it else imageW500 + it }
+    fun backdrop(path: String?): String? = path?.let { if (it.startsWith("http")) it else imageW1280 + it }
+    fun profile(path: String?): String? = path?.let { if (it.startsWith("http")) it else imageW500 + it }
 }
