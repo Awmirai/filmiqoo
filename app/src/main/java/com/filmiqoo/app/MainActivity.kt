@@ -81,7 +81,7 @@ fun FilmiqooApp() {
                 onMedia={ overlay=OverlayRoute.Detail(it); showSearch=false }
             )
             overlay != null -> when(val route=overlay!!) {
-                is OverlayRoute.Detail -> DetailScreen(
+                is OverlayRoute.Detail -> PremiumDetailScreen(
                     media=route.media,
                     repository=repository,
                     backend=backend,
