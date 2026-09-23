@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +30,7 @@ fun CommunityScreen(
     loggedIn: Boolean,
     onOpenRoom: (SocialRoom) -> Unit,
     onCreator: (Creator) -> Unit,
+    onStory: (List<SocialStory>, Int) -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -41,7 +43,6 @@ fun CommunityScreen(
     var channels by remember { mutableStateOf<List<SocialChannel>>(emptyList()) }
     var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
-    var activeStory by remember { mutableStateOf<SocialStory?>(null) }
 
     LaunchedEffect(tab,refresh) {
         loading=true
@@ -148,12 +149,11 @@ fun CommunityScreen(
                     LazyColumn(contentPadding=PaddingValues(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         item {
                             LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                                items(stories,key={it.id}) { story ->
+                                itemsIndexed(stories,key={_,item->item.id}) { index,story ->
                                     Column(
                                         horizontalAlignment=Alignment.CenterHorizontally,
                                         modifier=Modifier.width(82.dp).clickable {
-                                            activeStory=story
-                                            if(loggedIn) scope.launch { runCatching { social.markStoryViewed(story.id) } }
+                                            onStory(stories,index)
                                         }
                                     ) {
                                         Box(
@@ -176,11 +176,11 @@ fun CommunityScreen(
                                 }
                             }
                         }
-                        items(stories,key={it.id}) { story ->
+                        itemsIndexed(stories,key={_,item->item.id}) { index,story ->
                             Surface(
                                 color=FqSurface,
                                 shape=RoundedCornerShape(18.dp),
-                                modifier=Modifier.fillMaxWidth().clickable { activeStory=story }
+                                modifier=Modifier.fillMaxWidth().clickable { onStory(stories,index) }
                             ) {
                                 Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
                                     RemoteImage(
@@ -299,28 +299,6 @@ fun CommunityScreen(
         )
     }
 
-    activeStory?.let { story ->
-        AlertDialog(
-            onDismissRequest={activeStory=null},
-            confirmButton={TextButton(onClick={activeStory=null}){Text("بستن")}},
-            title={Text(story.author.displayName)},
-            text={
-                Column {
-                    if(story.mediaUrl.isNotBlank() || story.thumbnailUrl.isNotBlank()) {
-                        RemoteImage(
-                            story.mediaUrl.ifBlank { story.thumbnailUrl },
-                            Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(16.dp)),
-                            ContentScale.Crop
-                        )
-                    }
-                    Text(story.caption,modifier=Modifier.padding(top=10.dp))
-                    story.media?.title?.let {
-                        AssistChip(onClick={},label={Text("🎬 "+it)})
-                    }
-                }
-            }
-        )
-    }
 }
 
 @Composable

@@ -15,8 +15,30 @@ data class SocialAuthor(
 data class SocialMediaRef(
     val id: String?,
     val title: String?,
-    val posterUrl: String?
-)
+    val posterUrl: String?,
+    val tmdbId: Int? = null,
+    val type: MediaType? = null,
+    val originalTitle: String? = null,
+    val backdropUrl: String? = null,
+    val year: Int? = null,
+    val rating: Double? = null
+) {
+    fun asMediaItem(): MediaItem? {
+        val backendId=id ?: return null
+        val safeTitle=title ?: return null
+        return MediaItem(
+            id=tmdbId ?: 0,
+            type=type ?: MediaType.MOVIE,
+            title=safeTitle,
+            originalTitle=originalTitle.orEmpty(),
+            posterPath=posterUrl,
+            backdropPath=backdropUrl,
+            vote=rating ?: 0.0,
+            date=year?.toString().orEmpty(),
+            backendId=backendId
+        )
+    }
+}
 
 data class SocialPost(
     val id: String,
@@ -371,6 +393,21 @@ class SocialRepository(
         backend.postJson("/v1/social/stories/"+id+"/view",JSONObject(),authorized=true)
     }
 
+    suspend fun reactToStory(id: String,reaction: String): String =
+        backend.postJson(
+            "/v1/social/stories/"+id+"/reaction",
+            JSONObject().put("reaction",reaction),
+            authorized=true
+        ).optString("reaction")
+
+    suspend fun replyToStory(id: String,body: String): String =
+        backend.postJson(
+            "/v1/social/stories/"+id+"/reply",
+            JSONObject().put("body",body),
+            authorized=true
+        ).getString("id")
+
+
     suspend fun toggleUserFollow(id: String): Boolean =
         backend.postJson("/v1/social/users/"+id+"/follow",JSONObject(),authorized=true)
             .optBoolean("following")
@@ -475,9 +512,22 @@ class SocialRepository(
         verified=o.optBoolean("verified")
     )
 
-    private fun parseMedia(o: JSONObject)=SocialMediaRef(
-        id=o.optString("id").takeIf(String::isNotBlank),
-        title=o.optString("title").takeIf(String::isNotBlank),
-        posterUrl=o.optString("posterUrl").takeIf(String::isNotBlank)
-    )
+    private fun parseMedia(o: JSONObject): SocialMediaRef {
+        val kind=o.optString("kind")
+        return SocialMediaRef(
+            id=o.optString("id").takeIf(String::isNotBlank),
+            title=o.optString("title").takeIf(String::isNotBlank),
+            posterUrl=o.optString("posterUrl").takeIf(String::isNotBlank),
+            tmdbId=if(o.isNull("tmdbId")) null else o.optInt("tmdbId"),
+            type=when(kind) {
+                "movie" -> MediaType.MOVIE
+                "tv" -> MediaType.TV
+                else -> null
+            },
+            originalTitle=o.optString("originalTitle").takeIf(String::isNotBlank),
+            backdropUrl=o.optString("backdropUrl").takeIf(String::isNotBlank),
+            year=if(o.isNull("year")) null else o.optInt("year"),
+            rating=if(o.isNull("rating")) null else o.optDouble("rating")
+        )
+    }
 }

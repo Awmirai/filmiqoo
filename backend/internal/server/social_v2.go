@@ -44,7 +44,11 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 			"id":id,"type":postType,"body":body,"spoiler":spoiler,
 			"likes":likes,"comments":comments,"saves":saves,"shares":shares,"publishedAt":publishedAt,
 			"author":map[string]any{"id":authorID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
-			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
+			"media":map[string]any{
+				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
+				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
+				"year":year,"rating":rating,
+			},
 		})
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
@@ -276,7 +280,8 @@ func (s *Server) stories(w http.ResponseWriter,r *http.Request) {
 		SELECT st.id::text,st.story_type,st.media_url,st.thumbnail_url,st.caption,st.spoiler,
 		       st.view_count,st.created_at,st.expires_at,
 		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
-		       mt.id::text,mt.title,mt.poster_url
+		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,
+		       mt.backdrop_url,mt.year,mt.rating
 		  FROM stories st
 		  JOIN profiles p ON p.user_id=st.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=st.media_title_id
@@ -292,9 +297,13 @@ func (s *Server) stories(w http.ResponseWriter,r *http.Request) {
 		var spoiler,verified bool
 		var views int64
 		var created,expires time.Time
-		var mediaID,title,poster *string
+		var mediaID,kind,title,originalTitle,poster,backdrop *string
+		var tmdbID *int64
+		var year *int
+		var rating *float64
 		if err:=rows.Scan(&id,&typ,&mediaURL,&thumb,&caption,&spoiler,&views,&created,&expires,
-			&userID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster); err!=nil { continue }
+			&userID,&username,&displayName,&avatar,&verified,
+			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating); err!=nil { continue }
 		items=append(items,map[string]any{
 			"id":id,"type":typ,"mediaUrl":mediaURL,"thumbnailUrl":thumb,"caption":caption,
 			"spoiler":spoiler,"views":views,"createdAt":created,"expiresAt":expires,

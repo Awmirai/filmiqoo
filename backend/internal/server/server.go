@@ -107,6 +107,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/channels/{id}/follow", s.toggleChannelFollow)
 			r.Post("/social/stories", s.createStory)
 			r.Post("/social/stories/{id}/view", s.markStoryView)
+			r.Post("/social/stories/{id}/reaction", s.reactToStory)
+			r.Post("/social/stories/{id}/reply", s.replyToStory)
 			r.Post("/social/users/{id}/follow", s.toggleUserFollow)
 			r.Post("/rooms", s.createRoom)
 			r.Post("/rooms/{id}/messages", s.sendRoomMessage)

@@ -140,6 +140,15 @@ fun FilmiqooApp() {
                     onClose=closeOverlay,
                     onMedia={ overlay=OverlayRoute.Detail(it) }
                 )
+                is OverlayRoute.SocialStories -> SocialStoryViewerScreen(
+                    stories=route.stories,
+                    startIndex=route.index,
+                    social=social,
+                    loggedIn=backend.session.isLoggedIn,
+                    onRequireAuth={overlay=OverlayRoute.Auth},
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onClose=closeOverlay
+                )
                 is OverlayRoute.Chat -> ChatRoomScreen(
                     title=route.title,
                     media=route.media,
@@ -205,6 +214,7 @@ fun FilmiqooApp() {
                             loggedIn=backend.session.isLoggedIn,
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                            onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         else -> {
