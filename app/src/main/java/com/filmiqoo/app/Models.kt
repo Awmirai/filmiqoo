@@ -83,6 +83,7 @@ sealed interface OverlayRoute {
     data class CreatorPage(val creator: Creator) : OverlayRoute
     data class WatchParty(val media: MediaItem? = null) : OverlayRoute
     data class Player(val target: PlaybackTarget) : OverlayRoute
+    data class Room(val roomId: String, val title: String) : OverlayRoute
     data object Auth : OverlayRoute
     data object Create : OverlayRoute
     data object Notifications : OverlayRoute

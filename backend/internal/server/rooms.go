@@ -9,6 +9,33 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func (s *Server) roomsList(w http.ResponseWriter,r *http.Request) {
+	rows,err:=s.db.Query(r.Context(),`
+		SELECT rm.id::text,rm.name,rm.topic,rm.room_type,rm.visibility,rm.member_count,
+		       mt.id::text,mt.title,mt.poster_url
+		  FROM rooms rm
+		  LEFT JOIN media_titles mt ON mt.id=rm.media_title_id
+		 WHERE rm.visibility='public'
+		 ORDER BY rm.member_count DESC,rm.created_at DESC
+		 LIMIT 100
+	`)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	items:=make([]map[string]any,0)
+	for rows.Next() {
+		var id,name,topic,typ,visibility string
+		var members int64
+		var mediaID,title,poster *string
+		if err:=rows.Scan(&id,&name,&topic,&typ,&visibility,&members,&mediaID,&title,&poster); err!=nil { continue }
+		items=append(items,map[string]any{
+			"id":id,"name":name,"topic":topic,"type":typ,"visibility":visibility,"members":members,
+			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+}
+
 func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
 	roomID:=chi.URLParam(r,"id")
 	rows,err:=s.db.Query(r.Context(),`

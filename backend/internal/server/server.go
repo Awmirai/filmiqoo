@@ -76,6 +76,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/social/channels/{id}/posts", s.channelPosts)
 		r.Get("/social/posts/{id}/comments", s.postComments)
 		r.Get("/social/reels/{id}/comments", s.reelComments)
+		r.Get("/rooms", s.roomsList)
 		r.Get("/rooms/{id}/messages", s.roomMessages)
 		r.Get("/realtime", s.realtime)
 		r.Get("/playback/{versionID}", s.playback)

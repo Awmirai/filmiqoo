@@ -65,6 +65,13 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 		match.PosterURL,match.BackdropURL,match.Rating,match.OriginalLanguage).Scan(&mediaTitleID)
 	if err!=nil { return err }
 
+	// Every title gets a first-class community room automatically.
+	_,_ = tx.Exec(ctx,`
+		INSERT INTO rooms (media_title_id,name,topic,room_type,visibility)
+		VALUES ($1,$2,$3,'community','public')
+		ON CONFLICT DO NOTHING
+	`,mediaTitleID,match.Title+" • Community","گفت‌وگوی رسمی "+match.Title)
+
 	var episodeID *string
 	if kind=="series" || kind=="anime" {
 		if season==nil || episode==nil {
@@ -105,6 +112,14 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 			nullableInt64(epMeta.TMDBEpisodeID)).Scan(&epID)
 		if err!=nil { return err }
 		episodeID=&epID
+
+		// Episode rooms make spoiler-safe discussion possible at episode granularity.
+		_,_ = tx.Exec(ctx,`
+			INSERT INTO rooms (media_title_id,episode_id,name,topic,room_type,visibility)
+			VALUES ($1,$2,$3,$4,'episode','public')
+			ON CONFLICT DO NOTHING
+		`,mediaTitleID,epID,match.Title+" • "+fmt.Sprintf("S%02dE%02d",*season,*episode),
+			"بحث قسمت "+fmt.Sprintf("%d",*episode))
 	}
 
 	container:=strings.TrimPrefix(strings.ToLower(filepath.Ext(fileName)),".")

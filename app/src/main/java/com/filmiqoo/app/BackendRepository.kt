@@ -331,10 +331,10 @@ class BackendRepository(context: Context) {
         }
     }
 
-    private suspend fun getJson(path: String, authorized: Boolean): JSONObject =
+    internal suspend fun getJson(path: String, authorized: Boolean): JSONObject =
         executeJson(Request.Builder().url(session.baseUrl + path).get(), authorized)
 
-    private suspend fun postJson(path: String, body: JSONObject, authorized: Boolean): JSONObject =
+    internal suspend fun postJson(path: String, body: JSONObject, authorized: Boolean): JSONObject =
         executeJson(
             Request.Builder()
                 .url(session.baseUrl + path)

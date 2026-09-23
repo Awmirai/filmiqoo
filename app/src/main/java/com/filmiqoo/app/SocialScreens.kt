@@ -589,25 +589,36 @@ fun WatchPartyScreen(
 }
 
 @Composable
-fun CreateHubScreen(onBack:()->Unit) {
+fun CreateHubScreen(
+    social: SocialRepository,
+    loggedIn: Boolean,
+    onRequireAuth: () -> Unit,
+    onBack:()->Unit
+) {
+    val scope=rememberCoroutineScope()
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var composer by remember { mutableStateOf<String?>(null) }
     var caption by remember { mutableStateOf("") }
+    var channelSlug by remember { mutableStateOf("") }
+    var channelBio by remember { mutableStateOf("") }
+    var spoiler by remember { mutableStateOf(false) }
     var published by remember { mutableStateOf(false) }
+    var publishMessage by remember { mutableStateOf("") }
+    var publishing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     val picker=rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         selectedUri=uri
-        if(uri!=null) composer="Reel"
     }
 
     if(published) {
         AlertDialog(
             onDismissRequest={published=false},
             confirmButton={TextButton(onClick={published=false}){Text("باشه")}},
-            title={Text("منتشر شد")},
-            text={Text("این Preview محتوا را محلی ثبت می‌کند؛ در نسخه سرور، همین جریان برای همه کاربران Publish می‌شود.")}
+            title={Text("انجام شد")},
+            text={Text(publishMessage)}
         )
     }
 
@@ -615,7 +626,7 @@ fun CreateHubScreen(onBack:()->Unit) {
         item {
             Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically) {
                 IconButton(onClick=onBack) { Icon(Icons.Default.Close,null) }
-                Text("ساخت محتوا",fontSize=22.sp)
+                Text("Filmiqoo Studio",fontSize=22.sp)
             }
         }
         item {
@@ -623,13 +634,13 @@ fun CreateHubScreen(onBack:()->Unit) {
         }
         items(
             listOf(
-                Triple(Icons.Default.AutoStories,"استوری","عکس، ویدیو، نظرسنجی و سؤال"),
+                Triple(Icons.Default.AutoStories,"استوری","عکس، ویدیو، متن و Spoiler Shield"),
                 Triple(Icons.Default.VideoLibrary,"Reel","ویدیوی کوتاه برای اکسپلور"),
-                Triple(Icons.Default.PostAdd,"پست","متن، عکس یا ویدیو"),
+                Triple(Icons.Default.PostAdd,"پست","متن و محتوای Community"),
                 Triple(Icons.Default.RateReview,"Review فیلم/سریال","نقد و امتیاز"),
                 Triple(Icons.Default.Poll,"نظرسنجی","از جامعه نظر بپرس"),
                 Triple(Icons.Default.LiveTv,"لایو","پخش زنده برای دنبال‌کننده‌ها"),
-                Triple(Icons.Default.Campaign,"ساخت کانال","جامعه و رسانه خودت")
+                Triple(Icons.Default.Campaign,"ساخت کانال","رسانه و Community خودت")
             )
         ) { option ->
             Row(
@@ -637,6 +648,7 @@ fun CreateHubScreen(onBack:()->Unit) {
                     .clip(RoundedCornerShape(18.dp)).background(FqSurface)
                     .clickable {
                         composer=option.second
+                        error=null
                         if(option.second=="Reel" || option.second=="استوری") {
                             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                         }
@@ -654,10 +666,12 @@ fun CreateHubScreen(onBack:()->Unit) {
                 Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
             }
         }
+
         if(composer!=null) {
             item {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Text("در حال ساخت: "+composer,fontSize=14.sp,color=FqGold)
+
                     selectedUri?.let { uri ->
                         AsyncImage(
                             model=uri,
@@ -666,29 +680,144 @@ fun CreateHubScreen(onBack:()->Unit) {
                             modifier=Modifier.fillMaxWidth().height(230.dp).padding(top=10.dp).clip(RoundedCornerShape(18.dp))
                         )
                     }
-                    OutlinedTextField(
-                        value=caption,
-                        onValueChange={caption=it},
-                        label={Text("کپشن")},
-                        placeholder={Text("درباره محتوایت بنویس...")},
-                        minLines=3,
-                        shape=RoundedCornerShape(16.dp),
-                        modifier=Modifier.fillMaxWidth().padding(top=10.dp)
-                    )
-                    Row(Modifier.padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        AssistChip(onClick={},label={Text("#فیلمیکو")},leadingIcon={Icon(Icons.Default.Tag,null)})
-                        AssistChip(onClick={},label={Text("تگ فیلم")},leadingIcon={Icon(Icons.Default.Movie,null)})
-                        AssistChip(onClick={},label={Text("اسپویلر")},leadingIcon={Icon(Icons.Default.Warning,null)})
+
+                    if(composer=="ساخت کانال") {
+                        OutlinedTextField(
+                            value=caption,
+                            onValueChange={caption=it},
+                            label={Text("نام کانال")},
+                            singleLine=true,
+                            shape=RoundedCornerShape(16.dp),
+                            modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                        )
+                        OutlinedTextField(
+                            value=channelSlug,
+                            onValueChange={channelSlug=it.lowercase().replace(" ","")},
+                            label={Text("آیدی کانال")},
+                            prefix={Text("@")},
+                            singleLine=true,
+                            shape=RoundedCornerShape(16.dp),
+                            modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                        )
+                        OutlinedTextField(
+                            value=channelBio,
+                            onValueChange={channelBio=it},
+                            label={Text("معرفی کانال")},
+                            minLines=2,
+                            shape=RoundedCornerShape(16.dp),
+                            modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value=caption,
+                            onValueChange={caption=it},
+                            label={Text(if(composer=="Review فیلم/سریال")"متن نقد" else "کپشن")},
+                            placeholder={Text("درباره محتوایت بنویس...")},
+                            minLines=3,
+                            shape=RoundedCornerShape(16.dp),
+                            modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                        )
+                        Row(Modifier.padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            AssistChip(onClick={},label={Text("#فیلمیکو")},leadingIcon={Icon(Icons.Default.Tag,null)})
+                            AssistChip(onClick={},label={Text("تگ فیلم")},leadingIcon={Icon(Icons.Default.Movie,null)})
+                            FilterChip(
+                                selected=spoiler,
+                                onClick={spoiler=!spoiler},
+                                label={Text("اسپویلر")},
+                                leadingIcon={Icon(Icons.Default.Warning,null)}
+                            )
+                        }
                     }
+
+                    if((composer=="Reel" || composer=="استوری") && selectedUri!=null) {
+                        Surface(
+                            color=FqGold.copy(alpha=.08f),
+                            shape=RoundedCornerShape(14.dp),
+                            modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                        ) {
+                            Text(
+                                "انتخاب فایل فعال است. مرحله بعدی Media Pipeline فایل را مستقیم به Object Storage می‌فرستد، Transcode می‌کند و بعد Publish می‌شود.",
+                                color=FqGoldSoft,fontSize=9.sp,lineHeight=16.sp,modifier=Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    error?.let {
+                        Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(top=8.dp))
+                    }
+
                     Button(
-                        onClick={published=true},
+                        enabled=!publishing && when(composer) {
+                            "ساخت کانال" -> caption.length>=2 && channelSlug.length>=3
+                            "لایو","Reel" -> false
+                            else -> caption.isNotBlank()
+                        },
+                        onClick={
+                            if(!loggedIn) {
+                                onRequireAuth()
+                            } else {
+                                publishing=true
+                                error=null
+                                scope.launch {
+                                    runCatching {
+                                        when(composer) {
+                                            "پست" -> {
+                                                social.createPost(caption.trim(),"post",spoiler)
+                                                "پست روی Community منتشر شد."
+                                            }
+                                            "Review فیلم/سریال" -> {
+                                                social.createPost(caption.trim(),"review",spoiler)
+                                                "Review روی Community منتشر شد."
+                                            }
+                                            "نظرسنجی" -> {
+                                                social.createPost(caption.trim(),"poll",spoiler)
+                                                "نظرسنجی منتشر شد؛ گزینه‌های Poll در مرحله Editor اضافه می‌شوند."
+                                            }
+                                            "استوری" -> {
+                                                if(selectedUri!=null) {
+                                                    "فایل استوری انتخاب شد؛ Publish رسانه بعد از اتصال Media Upload فعال می‌شود."
+                                                } else {
+                                                    social.createTextStory(caption.trim(),spoiler)
+                                                    "استوری متنی برای ۲۴ ساعت منتشر شد."
+                                                }
+                                            }
+                                            "ساخت کانال" -> {
+                                                social.createChannel(caption.trim(),channelSlug.trim(),channelBio.trim())
+                                                "کانال @"+channelSlug.trim()+" ساخته شد."
+                                            }
+                                            else -> "این نوع محتوا وارد Media Pipeline مرحله بعد می‌شود."
+                                        }
+                                    }.onSuccess { message ->
+                                        publishMessage=message
+                                        published=true
+                                        if(composer!="استوری" || selectedUri==null) {
+                                            caption=""
+                                            spoiler=false
+                                        }
+                                    }.onFailure {
+                                        error=it.message ?: "انتشار ناموفق بود"
+                                    }
+                                    publishing=false
+                                }
+                            }
+                        },
                         colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                         shape=RoundedCornerShape(14.dp),
                         modifier=Modifier.fillMaxWidth().padding(top=12.dp)
                     ) {
-                        Icon(Icons.Default.Publish,null)
+                        if(publishing) {
+                            CircularProgressIndicator(color=Color.Black,strokeWidth=2.dp,modifier=Modifier.size(17.dp))
+                        } else {
+                            Icon(Icons.Default.Publish,null)
+                        }
                         Spacer(Modifier.width(6.dp))
-                        Text("انتشار")
+                        Text(
+                            when(composer) {
+                                "Reel" -> "Media Pipeline در حال ساخت"
+                                "لایو" -> "Live Engine در مرحله بعد"
+                                else -> "انتشار"
+                            }
+                        )
                     }
                 }
             }
@@ -696,3 +825,4 @@ fun CreateHubScreen(onBack:()->Unit) {
         item { Spacer(Modifier.height(30.dp)) }
     }
 }
+

@@ -35,6 +35,7 @@ fun FilmiqooApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { TmdbRepository(context.applicationContext) }
     val backend = remember { BackendRepository(context.applicationContext) }
+    val social = remember { SocialRepository(backend) }
     val store = remember { LocalStore(context.applicationContext) }
 
     var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
@@ -102,6 +103,14 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                is OverlayRoute.Room -> ConnectedRoomScreen(
+                    roomId=route.roomId,
+                    title=route.title,
+                    social=social,
+                    loggedIn=backend.session.isLoggedIn,
+                    onRequireAuth={overlay=OverlayRoute.Auth},
+                    onBack=closeOverlay
+                )
                 is OverlayRoute.Auth -> AuthScreen(
                     backend=backend,
                     onSuccess={
@@ -138,7 +147,7 @@ fun FilmiqooApp() {
                     repository=repository,
                     onBack=closeOverlay
                 )
-                OverlayRoute.Create -> CreateHubScreen(onBack=closeOverlay)
+                OverlayRoute.Create -> CreateHubScreen(social=social,loggedIn=backend.session.isLoggedIn,onRequireAuth={overlay=OverlayRoute.Auth},onBack=closeOverlay)
                 OverlayRoute.Notifications -> NotificationsScreen(onBack=closeOverlay)
             }
             else -> Scaffold(
@@ -173,9 +182,12 @@ fun FilmiqooApp() {
                             onChat={overlay=OverlayRoute.Chat("گفت‌وگو درباره " + it.title,it)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)}
                         )
-                        3 -> MessagesScreen(
-                            onChat={overlay=OverlayRoute.Chat(it,null)},
-                            onWatchParty={overlay=OverlayRoute.WatchParty(null)}
+                        3 -> CommunityScreen(
+                            social=social,
+                            loggedIn=backend.session.isLoggedIn,
+                            onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
+                            onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                            onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         else -> ProfileScreen(
                             repository=repository,
@@ -205,7 +217,7 @@ private fun FilmiqooBottomBar(
         Triple(Icons.Default.Home,"خانه",0),
         Triple(Icons.Default.Explore,"اکسپلور",1),
         Triple(Icons.Default.Add,"",2),
-        Triple(Icons.Default.ChatBubbleOutline,"پیام‌ها",3),
+        Triple(Icons.Default.Groups,"اجتماعی",3),
         Triple(Icons.Default.PersonOutline,"پروفایل",4)
     )
 
