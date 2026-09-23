@@ -42,6 +42,7 @@ fun PremiumHomeScreen(
     onStory: (MediaItem, Int) -> Unit,
     onSearch: () -> Unit,
     onNotifications: () -> Unit,
+    onReleases: () -> Unit,
     onWatchParty: (MediaItem?) -> Unit
 ) {
     var reload by remember { mutableIntStateOf(0) }
@@ -72,6 +73,7 @@ fun PremiumHomeScreen(
             onStory=onStory,
             onSearch=onSearch,
             onNotifications=onNotifications,
+            onReleases=onReleases,
             onWatchParty=onWatchParty,
             onRefresh={reload++}
         )
@@ -89,6 +91,7 @@ private fun PremiumHomeContent(
     onStory: (MediaItem, Int) -> Unit,
     onSearch: () -> Unit,
     onNotifications: () -> Unit,
+    onReleases: () -> Unit,
     onWatchParty: (MediaItem?) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -136,7 +139,7 @@ private fun PremiumHomeContent(
                 item { PremiumChip(Icons.Default.Tv,"سریال"){} }
                 item { PremiumChip(Icons.Default.Animation,"انیمه"){} }
                 item { PremiumChip(Icons.Default.Language,"ایرانی"){} }
-                item { PremiumChip(Icons.Default.CalendarMonth,"انتشارها"){} }
+                item { PremiumChip(Icons.Default.CalendarMonth,"انتشارها",false,onReleases) }
             }
         }
 

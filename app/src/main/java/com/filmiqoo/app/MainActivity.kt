@@ -200,6 +200,12 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                OverlayRoute.Releases -> ReleaseCenterScreen(
+                    backend=backend,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)}
+                )
                 is OverlayRoute.WatchParty -> ConnectedWatchPartyScreen(
                     media=route.media,
                     initialPartyId=route.partyId,
@@ -243,6 +249,7 @@ fun FilmiqooApp() {
                             onStory={m,i->overlay=OverlayRoute.Story(m,i)},
                             onSearch={showSearch=true},
                             onNotifications={overlay=OverlayRoute.Notifications},
+                            onReleases={overlay=OverlayRoute.Releases},
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)}
                         )
                         1 -> ConnectedExploreScreen(
