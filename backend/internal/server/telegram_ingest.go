@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/Awmirai/filmiqoo/backend/internal/ingest"
 )
 
@@ -12,6 +14,7 @@ type telegramIngestRequest struct {
 	ChatID int64 `json:"chatId"`
 	MessageID int64 `json:"messageId"`
 	FileID string `json:"fileId"`
+	FileNumericID int64 `json:"fileNumericId"`
 	FileName string `json:"fileName"`
 	FileSizeBytes int64 `json:"fileSizeBytes"`
 	MimeType string `json:"mimeType"`
@@ -40,13 +43,14 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 	var id string
 	err := s.db.QueryRow(r.Context(),
 		`INSERT INTO telegram_ingest_items (
-			telegram_chat_id,telegram_message_id,telegram_file_id,file_name,file_size_bytes,
+			telegram_chat_id,telegram_message_id,telegram_file_id,telegram_file_numeric_id,file_name,file_size_bytes,
 			mime_type,caption,stream_hash,parsed_kind,parsed_title,parsed_season,parsed_episode,
 			parsed_year,parsed_quality,parsed_source,parsed_codec,updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now())
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now())
 		ON CONFLICT (telegram_chat_id,telegram_message_id)
 		DO UPDATE SET
 			telegram_file_id=EXCLUDED.telegram_file_id,
+			telegram_file_numeric_id=EXCLUDED.telegram_file_numeric_id,
 			file_name=EXCLUDED.file_name,
 			file_size_bytes=EXCLUDED.file_size_bytes,
 			mime_type=EXCLUDED.mime_type,
@@ -62,7 +66,7 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 			parsed_codec=EXCLUDED.parsed_codec,
 			updated_at=now()
 		RETURNING id::text`,
-		body.ChatID,body.MessageID,body.FileID,body.FileName,body.FileSizeBytes,
+		body.ChatID,body.MessageID,body.FileID,body.FileNumericID,body.FileName,body.FileSizeBytes,
 		body.MimeType,body.Caption,body.StreamHash,parsed.Kind,parsed.Title,parsed.Season,
 		parsed.Episode,parsed.Year,parsed.Quality,parsed.Source,parsed.Codec,
 	).Scan(&id)
@@ -71,9 +75,18 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	status := "pending_metadata"
+	if s.tmdb != nil && s.tmdb.Enabled() {
+		if err := s.retryTelegramResolve(r.Context(), id); err == nil {
+			status = "ready"
+		} else {
+			status = "failed"
+		}
+	}
+
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"ingestId":id,
-		"status":"pending_metadata",
+		"status":status,
 		"parsed":parsed,
 	})
 }
@@ -122,4 +135,26 @@ func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) validIngestSecret(value string) bool {
 	expected := strings.TrimSpace(s.cfg.TelegramIngestSecret)
 	return expected != "" && value == expected
+}
+
+
+func (s *Server) resolveTelegramIngestNow(w http.ResponseWriter, r *http.Request) {
+	if !s.validIngestSecret(r.Header.Get("X-Filmiqoo-Ingest-Secret")) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid ingest secret"})
+		return
+	}
+	id := strings.TrimSpace(chi.URLParam(r,"id"))
+	if id=="" {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"ingest id is required"})
+		return
+	}
+	if s.tmdb==nil || !s.tmdb.Enabled() {
+		writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"TMDB token is not configured on backend"})
+		return
+	}
+	if err:=s.retryTelegramResolve(r.Context(),id); err!=nil {
+		writeJSON(w,http.StatusUnprocessableEntity,map[string]string{"error":err.Error()})
+		return
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"id":id,"status":"ready"})
 }

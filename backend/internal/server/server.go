@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Awmirai/filmiqoo/backend/internal/config"
+	"github.com/Awmirai/filmiqoo/backend/internal/tmdb"
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -23,6 +24,7 @@ type Server struct {
 	redis *redis.Client
 	http  *http.Server
 	upstreamClient *http.Client
+	tmdb *tmdb.Client
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
@@ -30,6 +32,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		cfg: cfg,
 		db: db,
 		redis: redisClient,
+		tmdb: tmdb.New(cfg.TMDBToken),
 		upstreamClient: &http.Client{
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
@@ -52,6 +55,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	r.Route("/internal", func(r chi.Router) {
 		r.Post("/telegram/ingest", s.telegramIngest)
 		r.Get("/telegram/pending", s.pendingTelegramIngest)
+		r.Post("/telegram/{id}/resolve", s.resolveTelegramIngestNow)
 	})
 
 	r.Route("/v1", func(r chi.Router) {
