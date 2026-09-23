@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +37,9 @@ fun FilmiqooApp() {
     val repository = remember { TmdbRepository(context.applicationContext) }
     val backend = remember { BackendRepository(context.applicationContext) }
     val social = remember { SocialRepository(backend) }
+    val messaging = remember { MessagingRepository(backend) }
     val store = remember { LocalStore(context.applicationContext) }
+    val appScope = rememberCoroutineScope()
 
     var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
     var previewMode by remember { mutableStateOf(false) }
@@ -168,11 +171,30 @@ fun FilmiqooApp() {
                         overlay=null
                         tab=1
                     },
+                    onStartDm={userId,title->
+                        if(!backend.session.isLoggedIn) {
+                            overlay=OverlayRoute.Auth
+                        } else {
+                            appScope.launch {
+                                runCatching { messaging.ensureDm(userId) }
+                                    .onSuccess { dm->
+                                        overlay=OverlayRoute.Room(dm.id,dm.title.ifBlank { title })
+                                    }
+                            }
+                        }
+                    },
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 OverlayRoute.CreatorStudio -> CreatorStudioScreen(
                     backend=backend,
                     onBack=closeOverlay
+                )
+                OverlayRoute.Inbox -> InboxScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onOpenRoom={conversation->
+                        overlay=OverlayRoute.Room(conversation.id,conversation.title)
+                    }
                 )
                 is OverlayRoute.WatchParty -> WatchPartyScreen(
                     media=route.media,
@@ -180,7 +202,12 @@ fun FilmiqooApp() {
                     onBack=closeOverlay
                 )
                 OverlayRoute.Create -> CreateHubScreen(social=social,loggedIn=backend.session.isLoggedIn,onRequireAuth={overlay=OverlayRoute.Auth},onBack=closeOverlay)
-                OverlayRoute.Notifications -> NotificationsScreen(onBack=closeOverlay)
+                OverlayRoute.Notifications -> ConnectedNotificationsScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
+                    onOpenCreator={overlay=OverlayRoute.CreatorPage(it)}
+                )
             }
             else -> Scaffold(
                 containerColor=FqBg,
@@ -226,6 +253,7 @@ fun FilmiqooApp() {
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
+                            onInbox={overlay=OverlayRoute.Inbox},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         else -> {
@@ -238,6 +266,7 @@ fun FilmiqooApp() {
                                     onCommunity={tab=3},
                                     onDownloads={overlay=OverlayRoute.Downloads},
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
+                                    onInbox={overlay=OverlayRoute.Inbox},
                                     onLoggedOut={
                                         authenticated=false
                                         previewMode=false

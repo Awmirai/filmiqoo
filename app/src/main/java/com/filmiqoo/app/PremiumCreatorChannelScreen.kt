@@ -56,6 +56,7 @@ fun PremiumCreatorChannelScreen(
     onOpenRoom: (SocialRoom) -> Unit,
     onStory: (List<SocialStory>, Int) -> Unit,
     onOpenReels: () -> Unit,
+    onStartDm: (String, String) -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val repo=remember { CreatorChannelRepository(backend) }
@@ -135,6 +136,7 @@ fun PremiumCreatorChannelScreen(
                 onBack=onBack,
                 onRefresh={refresh++},
                 onTab={tab=it},
+                onMessage={onStartDm(p.id,p.displayName)},
                 onFollow={
                     if(!backend.session.isLoggedIn) {
                         onRequireAuth()
@@ -229,6 +231,7 @@ private fun CreatorEntityScaffold(
     onRefresh: () -> Unit,
     onTab: (Int) -> Unit,
     onFollow: () -> Unit,
+    onMessage: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Column(Modifier.fillMaxSize().background(FqBg)) {
@@ -319,27 +322,44 @@ private fun CreatorEntityScaffold(
                     CreatorCountCard(compactCreatorCount(reelsCount),"Reel",Modifier.weight(1f))
                 }
 
-                Button(
-                    onClick=onFollow,
-                    enabled=!followBusy,
-                    colors=ButtonDefaults.buttonColors(
-                        containerColor=if(followed)FqSurface2 else FqGold,
-                        contentColor=if(followed)Color.White else Color.Black
-                    ),
-                    shape=RoundedCornerShape(14.dp),
-                    modifier=Modifier.fillMaxWidth().padding(top=11.dp)
+                Row(
+                    Modifier.fillMaxWidth().padding(top=11.dp),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
-                    if(followBusy) {
-                        CircularProgressIndicator(strokeWidth=2.dp,modifier=Modifier.size(18.dp))
-                    } else {
-                        Icon(
-                            if(followed)Icons.Default.Check else Icons.Default.PersonAdd,
-                            null,
-                            modifier=Modifier.size(18.dp)
-                        )
+                    Button(
+                        onClick=onFollow,
+                        enabled=!followBusy,
+                        colors=ButtonDefaults.buttonColors(
+                            containerColor=if(followed)FqSurface2 else FqGold,
+                            contentColor=if(followed)Color.White else Color.Black
+                        ),
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.weight(1f)
+                    ) {
+                        if(followBusy) {
+                            CircularProgressIndicator(strokeWidth=2.dp,modifier=Modifier.size(18.dp))
+                        } else {
+                            Icon(
+                                if(followed)Icons.Default.Check else Icons.Default.PersonAdd,
+                                null,
+                                modifier=Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text(if(followed)"دنبال می‌کنی" else "دنبال کردن")
                     }
-                    Spacer(Modifier.width(6.dp))
-                    Text(if(followed)"دنبال می‌کنی" else "دنبال کردن")
+
+                    if(onMessage!=null) {
+                        OutlinedButton(
+                            onClick=onMessage,
+                            shape=RoundedCornerShape(14.dp),
+                            modifier=Modifier.weight(.72f)
+                        ) {
+                            Icon(Icons.Default.ChatBubbleOutline,null,modifier=Modifier.size(17.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("پیام")
+                        }
+                    }
                 }
             }
         }

@@ -106,6 +106,20 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 	raw,_:=json.Marshal(payload)
 	_ = s.redis.Publish(r.Context(),"room:"+roomID,raw).Err()
 
+	var roomType string
+	if s.db.QueryRow(r.Context(),"SELECT room_type FROM rooms WHERE id=$1",roomID).Scan(&roomType)==nil && roomType=="dm" {
+		preview:=body.Body
+		if len([]rune(preview))>120 { preview=string([]rune(preview)[:120])+"…" }
+		_,_=s.db.Exec(r.Context(),`
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
+			)
+			SELECT member.user_id,$2,'dm_message','room',$1,'پیام جدید', $3
+			  FROM room_members member
+			 WHERE member.room_id=$1 AND member.user_id<>$2
+		`,roomID,userID,preview)
+	}
+
 	writeJSON(w,http.StatusCreated,payload["message"])
 }
 

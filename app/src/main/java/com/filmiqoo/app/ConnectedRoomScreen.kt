@@ -40,6 +40,7 @@ fun ConnectedRoomScreen(
     var syncing by remember { mutableStateOf(true) }
     var realtimeConnected by remember { mutableStateOf(false) }
     val realtime=remember(backend) { RoomRealtimeClient(backend.session) }
+    val messaging=remember(backend) { MessagingRepository(backend) }
 
     suspend fun refresh() {
         runCatching { social.roomMessages(roomId) }
@@ -47,6 +48,9 @@ fun ConnectedRoomScreen(
                 val changed=it.size!=messages.size
                 messages=it
                 syncing=false
+                if(loggedIn) {
+                    runCatching { messaging.markRoomRead(roomId) }
+                }
                 if(changed && it.isNotEmpty()) {
                     scope.launch { listState.animateScrollToItem(it.lastIndex) }
                 }

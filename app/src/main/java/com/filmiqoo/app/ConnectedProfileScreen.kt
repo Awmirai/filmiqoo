@@ -43,6 +43,7 @@ fun ConnectedProfileScreen(
     onCommunity: () -> Unit,
     onDownloads: () -> Unit,
     onCreatorStudio: () -> Unit,
+    onInbox: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -123,6 +124,12 @@ fun ConnectedProfileScreen(
                         title="Creator Studio",
                         subtitle="Analytics، Reels، Stories و عملکرد کانال‌ها",
                         onClick=onCreatorStudio
+                    )
+                    ProfileActionRow(
+                        icon=Icons.Default.MarkChatUnread,
+                        title="پیام‌ها",
+                        subtitle="DM، گروه‌ها، Roomها و پیام‌های خوانده‌نشده",
+                        onClick=onInbox
                     )
                     ProfileActionRow(
                         icon=Icons.Default.Groups,
