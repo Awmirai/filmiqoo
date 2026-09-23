@@ -1,5 +1,7 @@
 package com.filmiqoo.app
 
+import android.content.Context
+import android.net.Uri
 import org.json.JSONObject
 
 data class SocialAuthor(
@@ -227,6 +229,43 @@ class SocialRepository(
     suspend fun toggleChannelFollow(id: String): Boolean =
         backend.postJson("/v1/social/channels/"+id+"/follow",JSONObject(),authorized=true)
             .optBoolean("following")
+
+    suspend fun uploadMedia(context: Context, uri: Uri, kind: String): UploadTicket =
+        backend.uploadMedia(context,uri,kind)
+
+    suspend fun createReel(
+        uploadId: String,
+        caption: String,
+        spoiler: Boolean=false,
+        allowComments: Boolean=true,
+        mediaTitleId: String?=null
+    ): String {
+        val body=JSONObject()
+            .put("uploadId",uploadId)
+            .put("caption",caption)
+            .put("spoiler",spoiler)
+            .put("allowComments",allowComments)
+            .put("durationMs",0)
+        if(!mediaTitleId.isNullOrBlank()) body.put("mediaTitleId",mediaTitleId)
+        return backend.postJson("/v1/social/reels",body,authorized=true).getString("id")
+    }
+
+    suspend fun createMediaStory(
+        ticket: UploadTicket,
+        caption: String,
+        spoiler: Boolean=false,
+        mediaTitleId: String?=null
+    ): String {
+        val type=if(ticket.mimeType.startsWith("video/")) "video" else "image"
+        val body=JSONObject()
+            .put("type",type)
+            .put("mediaUrl",ticket.mediaUrl)
+            .put("thumbnailUrl",if(type=="image")ticket.mediaUrl else "")
+            .put("caption",caption)
+            .put("spoiler",spoiler)
+        if(!mediaTitleId.isNullOrBlank()) body.put("mediaTitleId",mediaTitleId)
+        return backend.postJson("/v1/social/stories",body,authorized=true).getString("id")
+    }
 
     suspend fun createTextStory(
         caption: String,

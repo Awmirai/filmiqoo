@@ -14,6 +14,7 @@ type Config struct {
 	JWTSecret string
 	TMDBToken string
 	ObjectStorageEndpoint string
+	ObjectStoragePublicEndpoint string
 	ObjectStorageBucket string
 	ObjectStorageKey string
 	ObjectStorageSecret string
@@ -38,6 +39,7 @@ func Load() Config {
 		JWTSecret: env("JWT_SECRET", "dev-only-change-me"),
 		TMDBToken: strings.TrimSpace(os.Getenv("TMDB_TOKEN")),
 		ObjectStorageEndpoint: env("OBJECT_STORAGE_ENDPOINT", "http://localhost:9000"),
+		ObjectStoragePublicEndpoint: env("OBJECT_STORAGE_PUBLIC_ENDPOINT", "http://10.0.2.2:9000"),
 		ObjectStorageBucket: env("OBJECT_STORAGE_BUCKET", "filmiqoo-media"),
 		ObjectStorageKey: env("OBJECT_STORAGE_KEY", "filmiqoo"),
 		ObjectStorageSecret: env("OBJECT_STORAGE_SECRET", "filmiqoo-dev-secret"),

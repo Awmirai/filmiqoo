@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -596,6 +597,7 @@ fun CreateHubScreen(
     onBack:()->Unit
 ) {
     val scope=rememberCoroutineScope()
+    val context=LocalContext.current
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var composer by remember { mutableStateOf<String?>(null) }
     var caption by remember { mutableStateOf("") }
@@ -736,7 +738,7 @@ fun CreateHubScreen(
                             modifier=Modifier.fillMaxWidth().padding(top=10.dp)
                         ) {
                             Text(
-                                "انتخاب فایل فعال است. مرحله بعدی Media Pipeline فایل را مستقیم به Object Storage می‌فرستد، Transcode می‌کند و بعد Publish می‌شود.",
+                                "فایل انتخاب شده مستقیم با URL امضاشده به Media Storage فرستاده می‌شود و بعد از ثبت روی Filmiqoo منتشر می‌شود.",
                                 color=FqGoldSoft,fontSize=9.sp,lineHeight=16.sp,modifier=Modifier.padding(10.dp)
                             )
                         }
@@ -749,7 +751,9 @@ fun CreateHubScreen(
                     Button(
                         enabled=!publishing && when(composer) {
                             "ساخت کانال" -> caption.length>=2 && channelSlug.length>=3
-                            "لایو","Reel" -> false
+                            "لایو" -> false
+                            "Reel" -> selectedUri!=null
+                            "استوری" -> selectedUri!=null || caption.isNotBlank()
                             else -> caption.isNotBlank()
                         },
                         onClick={
@@ -775,25 +779,31 @@ fun CreateHubScreen(
                                             }
                                             "استوری" -> {
                                                 if(selectedUri!=null) {
-                                                    "فایل استوری انتخاب شد؛ Publish رسانه بعد از اتصال Media Upload فعال می‌شود."
+                                                    val ticket=social.uploadMedia(context,selectedUri!!,"story")
+                                                    social.createMediaStory(ticket,caption.trim(),spoiler)
+                                                    "استوری رسانه‌ای برای ۲۴ ساعت منتشر شد."
                                                 } else {
                                                     social.createTextStory(caption.trim(),spoiler)
                                                     "استوری متنی برای ۲۴ ساعت منتشر شد."
                                                 }
                                             }
+                                            "Reel" -> {
+                                                val ticket=social.uploadMedia(context,selectedUri!!,"reel")
+                                                social.createReel(ticket.uploadId,caption.trim(),spoiler)
+                                                "Reel روی Explore منتشر شد."
+                                            }
                                             "ساخت کانال" -> {
                                                 social.createChannel(caption.trim(),channelSlug.trim(),channelBio.trim())
                                                 "کانال @"+channelSlug.trim()+" ساخته شد."
                                             }
-                                            else -> "این نوع محتوا وارد Media Pipeline مرحله بعد می‌شود."
+                                            else -> "این نوع محتوا در نسخه بعدی Studio فعال می‌شود."
                                         }
                                     }.onSuccess { message ->
                                         publishMessage=message
                                         published=true
-                                        if(composer!="استوری" || selectedUri==null) {
-                                            caption=""
-                                            spoiler=false
-                                        }
+                                        caption=""
+                                        spoiler=false
+                                        selectedUri=null
                                     }.onFailure {
                                         error=it.message ?: "انتشار ناموفق بود"
                                     }
@@ -813,7 +823,8 @@ fun CreateHubScreen(
                         Spacer(Modifier.width(6.dp))
                         Text(
                             when(composer) {
-                                "Reel" -> "Media Pipeline در حال ساخت"
+                                "Reel" -> "آپلود و انتشار Reel"
+                                "استوری" -> "انتشار Story"
                                 "لایو" -> "Live Engine در مرحله بعد"
                                 else -> "انتشار"
                             }

@@ -3,15 +3,19 @@ package com.filmiqoo.app
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.Environment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import okio.BufferedSink
 
 data class AuthUser(
     val id: String,
@@ -25,6 +29,16 @@ data class AuthResult(
     val accessToken: String,
     val refreshToken: String,
     val expiresIn: Long
+)
+
+data class UploadTicket(
+    val uploadId: String,
+    val uploadUrl: String,
+    val objectKey: String,
+    val mediaUrl: String,
+    val mimeType: String,
+    val fileName: String,
+    val sizeBytes: Long
 )
 
 data class PlaybackTarget(
@@ -286,6 +300,72 @@ class BackendRepository(context: Context) {
             versions = versions,
             seasons = seasons
         )
+    }
+
+    suspend fun uploadMedia(
+        context: Context,
+        uri: Uri,
+        kind: String
+    ): UploadTicket = withContext(Dispatchers.IO) {
+        val resolver=context.contentResolver
+        val mime=resolver.getType(uri).orEmpty().ifBlank { "application/octet-stream" }
+        var name="upload.bin"
+        var size=-1L
+        resolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE),null,null,null)?.use { cursor ->
+            if(cursor.moveToFirst()) {
+                val nameIndex=cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex=cursor.getColumnIndex(OpenableColumns.SIZE)
+                if(nameIndex>=0) name=cursor.getString(nameIndex) ?: name
+                if(sizeIndex>=0 && !cursor.isNull(sizeIndex)) size=cursor.getLong(sizeIndex)
+            }
+        }
+        if(size<=0) {
+            resolver.openAssetFileDescriptor(uri,"r")?.use { size=it.length }
+        }
+        if(size<=0) throw IllegalStateException("اندازه فایل قابل تشخیص نیست")
+
+        val ticketJson=postJson(
+            "/v1/uploads/presign",
+            JSONObject()
+                .put("kind",kind)
+                .put("mimeType",mime)
+                .put("fileName",name)
+                .put("sizeBytes",size),
+            authorized=true
+        )
+
+        val ticket=UploadTicket(
+            uploadId=ticketJson.getString("uploadId"),
+            uploadUrl=ticketJson.getString("uploadUrl"),
+            objectKey=ticketJson.getString("objectKey"),
+            mediaUrl=ticketJson.getString("mediaUrl"),
+            mimeType=mime,
+            fileName=name,
+            sizeBytes=size
+        )
+
+        val body=object: RequestBody() {
+            override fun contentType()=mime.toMediaTypeOrNull()
+            override fun contentLength()=size
+            override fun writeTo(sink: BufferedSink) {
+                resolver.openInputStream(uri)?.use { input ->
+                    val buffer=ByteArray(DEFAULT_BUFFER_SIZE)
+                    while(true) {
+                        val read=input.read(buffer)
+                        if(read<0) break
+                        sink.write(buffer,0,read)
+                    }
+                } ?: throw IllegalStateException("فایل قابل خواندن نیست")
+            }
+        }
+
+        val put=Request.Builder().url(ticket.uploadUrl).put(body).build()
+        client.newCall(put).execute().use { res ->
+            if(!res.isSuccessful) throw IllegalStateException("آپلود فایل ناموفق بود ("+res.code+")")
+        }
+
+        postJson("/v1/uploads/"+ticket.uploadId+"/complete",JSONObject(),authorized=true)
+        ticket
     }
 
     suspend fun playbackUrl(mediaVersionId: String, download: Boolean = false): String =

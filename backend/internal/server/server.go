@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Awmirai/filmiqoo/backend/internal/config"
+	"github.com/Awmirai/filmiqoo/backend/internal/objectstore"
 	"github.com/Awmirai/filmiqoo/backend/internal/tmdb"
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
@@ -25,14 +26,23 @@ type Server struct {
 	http  *http.Server
 	upstreamClient *http.Client
 	tmdb *tmdb.Client
+	objects *objectstore.Store
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
+	objects, _ := objectstore.New(
+		cfg.ObjectStorageEndpoint,
+		cfg.ObjectStoragePublicEndpoint,
+		cfg.ObjectStorageKey,
+		cfg.ObjectStorageSecret,
+		cfg.ObjectStorageBucket,
+	)
 	s := &Server{
 		cfg: cfg,
 		db: db,
 		redis: redisClient,
 		tmdb: tmdb.New(cfg.TMDBToken),
+		objects: objects,
 		upstreamClient: &http.Client{
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
@@ -80,9 +90,11 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/rooms/{id}/messages", s.roomMessages)
 		r.Get("/realtime", s.realtime)
 		r.Get("/playback/{versionID}", s.playback)
+		r.Get("/media/{key}", s.mediaRedirect)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.auth)
+			r.Post("/social/reels", s.createReel)
 			r.Post("/social/reels/{id}/like", s.toggleReelLike)
 			r.Post("/social/reels/{id}/save", s.toggleReelSave)
 			r.Post("/social/reels/{id}/view", s.markReelView)
@@ -100,6 +112,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/realtime/rooms/{id}", s.roomRealtime)
 			r.Post("/watch/progress", s.saveProgress)
 			r.Post("/playback/token", s.playbackToken)
+			r.Post("/uploads/presign", s.presignUpload)
+			r.Post("/uploads/{id}/complete", s.completeUpload)
 			r.Get("/me", s.me)
 		})
 	})
