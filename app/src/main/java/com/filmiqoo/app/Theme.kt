@@ -2,6 +2,7 @@ package com.filmiqoo.app
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,13 +14,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 
-val FqBg = Color(0xFF07080B)
-val FqSurface = Color(0xFF101319)
-val FqSurface2 = Color(0xFF171B23)
-val FqSurface3 = Color(0xFF202630)
-val FqGold = Color(0xFFFFB800)
-val FqGoldSoft = Color(0xFFFFCD57)
+val FqBg = Color(0xFF06070A)
+val FqSurface = Color(0xFF0F1218)
+val FqSurface2 = Color(0xFF171C25)
+val FqSurface3 = Color(0xFF222A36)
+val FqGold = Color(0xFFFFBE1A)
+val FqGoldSoft = Color(0xFFFFD76D)
 val FqText = Color(0xFFF7F7F8)
 val FqMuted = Color(0xFFA7ADB8)
 val FqDanger = Color(0xFFFF5263)
@@ -62,10 +64,21 @@ fun FilmiqooTheme(content: @Composable () -> Unit) {
         error = FqDanger
     )
 
+    val shapes = remember {
+        Shapes(
+            extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+            medium = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+            large = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(30.dp)
+        )
+    }
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         MaterialTheme(
             colorScheme = colors,
             typography = typography,
+            shapes = shapes,
             content = content
         )
     }

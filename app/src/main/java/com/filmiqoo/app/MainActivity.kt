@@ -168,7 +168,7 @@ fun FilmiqooApp() {
             ) { padding ->
                 Box(Modifier.padding(padding)) {
                     when(tab) {
-                        0 -> HomeScreen(
+                        0 -> PremiumHomeScreen(
                             repository=repository,
                             backend=backend,
                             loggedIn=backend.session.isLoggedIn,
