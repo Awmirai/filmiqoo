@@ -272,7 +272,7 @@ private fun CreatorEntityScaffold(
             }
 
             Column(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal=18.dp,bottom=10.dp)
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start=18.dp,end=18.dp,bottom=10.dp)
             ) {
                 Row(verticalAlignment=Alignment.Bottom) {
                     Box(
