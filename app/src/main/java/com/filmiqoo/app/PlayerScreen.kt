@@ -69,6 +69,7 @@ fun FilmiqooPlayerScreen(
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
     val scope=rememberCoroutineScope()
+    val initialSettings=remember { AppPreferences(context.applicationContext).read() }
 
     var currentTarget by remember(target.mediaVersionId) { mutableStateOf(target) }
     var currentVersionId by remember(target.mediaVersionId) { mutableStateOf(target.mediaVersionId) }
@@ -85,14 +86,14 @@ fun FilmiqooPlayerScreen(
     var locked by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
-    var playbackSpeed by remember { mutableFloatStateOf(1f) }
+    var playbackSpeed by remember { mutableFloatStateOf(initialSettings.defaultPlaybackSpeed) }
     var trackRevision by remember { mutableIntStateOf(0) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var seekFraction by remember { mutableFloatStateOf(0f) }
     var isScrubbing by remember { mutableStateOf(false) }
     var downloadQueued by remember { mutableStateOf(false) }
-    var autoPlayNext by remember { mutableStateOf(true) }
+    var autoPlayNext by remember { mutableStateOf(initialSettings.autoplayNext) }
     var gestureLabel by remember { mutableStateOf<String?>(null) }
     var gestureValue by remember { mutableFloatStateOf(0f) }
 
@@ -241,6 +242,16 @@ fun FilmiqooPlayerScreen(
             durationMs=player.duration.coerceAtLeast(0L)
             if(!isScrubbing && durationMs>0) {
                 seekFraction=(positionMs.toFloat()/durationMs.toFloat()).coerceIn(0f,1f)
+            }
+            if(initialSettings.skipRecap) {
+                currentTarget.recapEndMs?.let { end ->
+                    if(positionMs in 1 until end) player.seekTo(end)
+                }
+            }
+            if(initialSettings.skipIntro) {
+                currentTarget.introEndMs?.let { end ->
+                    if(positionMs in 1 until end) player.seekTo(end)
+                }
             }
         }
     }

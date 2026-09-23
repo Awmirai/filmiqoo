@@ -196,6 +196,10 @@ fun FilmiqooApp() {
                         overlay=OverlayRoute.Room(conversation.id,conversation.title)
                     }
                 )
+                OverlayRoute.Settings -> SettingsScreen(
+                    backend=backend,
+                    onBack=closeOverlay
+                )
                 is OverlayRoute.WatchParty -> WatchPartyScreen(
                     media=route.media,
                     repository=repository,
@@ -267,6 +271,7 @@ fun FilmiqooApp() {
                                     onDownloads={overlay=OverlayRoute.Downloads},
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},
+                                    onSettings={overlay=OverlayRoute.Settings},
                                     onLoggedOut={
                                         authenticated=false
                                         previewMode=false

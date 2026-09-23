@@ -44,6 +44,7 @@ fun ConnectedProfileScreen(
     onDownloads: () -> Unit,
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
+    onSettings: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -156,10 +157,10 @@ fun ConnectedProfileScreen(
                         onClick={}
                     )
                     ProfileActionRow(
-                        icon=Icons.Default.Security,
-                        title="حریم خصوصی و امنیت",
-                        subtitle="Sessionها، حساب خصوصی، Block و کنترل‌ها",
-                        onClick={}
+                        icon=Icons.Default.Settings,
+                        title="تنظیمات",
+                        subtitle="پخش، دانلود، زیرنویس، اعلان‌ها و حریم خصوصی",
+                        onClick=onSettings
                     )
                 }
 
