@@ -399,18 +399,18 @@ fun PremiumDetailScreen(
                     ) { Text(it) }
                 }
             }
-        }
 
-        if(showCollections) {
-            CollectionPickerSheet(
-                backend=backend,
-                media=d.media,
-                onDismiss={showCollections=false},
-                onMessage={
-                    message=it
-                    showCollections=false
-                }
-            )
+            if(showCollections) {
+                CollectionPickerSheet(
+                    backend=backend,
+                    media=d.media,
+                    onDismiss={showCollections=false},
+                    onMessage={
+                        message=it
+                        showCollections=false
+                    }
+                )
+            }
         }
     }
 }
