@@ -44,11 +44,7 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 			"id":id,"type":postType,"body":body,"spoiler":spoiler,
 			"likes":likes,"comments":comments,"saves":saves,"shares":shares,"publishedAt":publishedAt,
 			"author":map[string]any{"id":authorID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
-			"media":map[string]any{
-				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
-				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
-				"year":year,"rating":rating,
-			},
+			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
 		})
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
@@ -308,7 +304,11 @@ func (s *Server) stories(w http.ResponseWriter,r *http.Request) {
 			"id":id,"type":typ,"mediaUrl":mediaURL,"thumbnailUrl":thumb,"caption":caption,
 			"spoiler":spoiler,"views":views,"createdAt":created,"expiresAt":expires,
 			"author":map[string]any{"id":userID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
-			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
+			"media":map[string]any{
+				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
+				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
+				"year":year,"rating":rating,
+			},
 		})
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"items":items})
