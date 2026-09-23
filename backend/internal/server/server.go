@@ -22,31 +22,51 @@ type Server struct {
 	db    *pgxpool.Pool
 	redis *redis.Client
 	http  *http.Server
+	upstreamClient *http.Client
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
-	s := &Server{cfg: cfg, db: db, redis: redisClient}
+	s := &Server{
+		cfg: cfg,
+		db: db,
+		redis: redisClient,
+		upstreamClient: &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				MaxIdleConns: 100,
+				MaxIdleConnsPerHost: 20,
+				IdleConnTimeout: 90 * time.Second,
+				ResponseHeaderTimeout: 20 * time.Second,
+			},
+		},
+	}
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(20 * time.Second))
 	r.Use(cors)
 
 	r.Get("/healthz", s.health)
 	r.Get("/readyz", s.ready)
+
+	r.Route("/internal", func(r chi.Router) {
+		r.Post("/telegram/ingest", s.telegramIngest)
+		r.Get("/telegram/pending", s.pendingTelegramIngest)
+	})
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/catalog/home", s.catalogHome)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/channels", s.channels)
 		r.Get("/realtime", s.realtime)
+		r.Get("/playback/{versionID}", s.playback)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.auth)
 			r.Post("/social/reels/{id}/like", s.likeReel)
 			r.Post("/social/channels/{id}/follow", s.followChannel)
 			r.Post("/watch/progress", s.saveProgress)
+			r.Post("/playback/token", s.playbackToken)
 		})
 	})
 
@@ -251,7 +271,7 @@ func userIDFromContext(ctx context.Context) string {
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Filmiqoo-Ingest-Secret")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions { w.WriteHeader(http.StatusNoContent); return }
 		next.ServeHTTP(w, r)
