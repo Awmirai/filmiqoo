@@ -7,11 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
@@ -28,23 +25,11 @@ val FqMuted = Color(0xFFA7ADB8)
 val FqDanger = Color(0xFFFF5263)
 val FqGreen = Color(0xFF4CD57B)
 
-@OptIn(ExperimentalTextApi::class)
 @Composable
 fun FilmiqooTheme(content: @Composable () -> Unit) {
-    val context = LocalContext.current
-    val family = remember {
-        runCatching {
-            FontFamily(
-                Font(
-                    path = "iransans.ttf",
-                    assetManager = context.assets,
-                    weight = FontWeight.Bold
-                )
-            )
-        }.getOrElse { FontFamily.SansSerif }
-    }
+    val family = FontFamily.SansSerif
 
-    val typography = remember(family) {
+    val typography = remember {
         Typography(
             displayLarge = TextStyle(fontFamily=family,fontSize=44.sp,fontWeight=FontWeight.Bold),
             displayMedium = TextStyle(fontFamily=family,fontSize=36.sp,fontWeight=FontWeight.Bold),
@@ -55,9 +40,9 @@ fun FilmiqooTheme(content: @Composable () -> Unit) {
             titleLarge = TextStyle(fontFamily=family,fontSize=20.sp,fontWeight=FontWeight.Bold),
             titleMedium = TextStyle(fontFamily=family,fontSize=16.sp,fontWeight=FontWeight.Bold),
             titleSmall = TextStyle(fontFamily=family,fontSize=14.sp,fontWeight=FontWeight.Bold),
-            bodyLarge = TextStyle(fontFamily=family,fontSize=16.sp,fontWeight=FontWeight.Bold),
-            bodyMedium = TextStyle(fontFamily=family,fontSize=14.sp,fontWeight=FontWeight.Bold),
-            bodySmall = TextStyle(fontFamily=family,fontSize=12.sp,fontWeight=FontWeight.Bold),
+            bodyLarge = TextStyle(fontFamily=family,fontSize=16.sp,fontWeight=FontWeight.Medium),
+            bodyMedium = TextStyle(fontFamily=family,fontSize=14.sp,fontWeight=FontWeight.Medium),
+            bodySmall = TextStyle(fontFamily=family,fontSize=12.sp,fontWeight=FontWeight.Medium),
             labelLarge = TextStyle(fontFamily=family,fontSize=14.sp,fontWeight=FontWeight.Bold),
             labelMedium = TextStyle(fontFamily=family,fontSize=12.sp,fontWeight=FontWeight.Bold),
             labelSmall = TextStyle(fontFamily=family,fontSize=10.sp,fontWeight=FontWeight.Bold)
