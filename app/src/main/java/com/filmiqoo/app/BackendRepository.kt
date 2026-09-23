@@ -41,11 +41,25 @@ data class UploadTicket(
     val sizeBytes: Long
 )
 
+data class PlaybackVariant(
+    val mediaVersionId: String,
+    val label: String,
+    val codec: String = "",
+    val hdr: String = ""
+)
+
 data class PlaybackTarget(
     val mediaVersionId: String,
     val title: String,
     val subtitle: String = "",
-    val posterUrl: String? = null
+    val posterUrl: String? = null,
+    val startPositionMs: Long = 0L,
+    val variants: List<PlaybackVariant> = emptyList(),
+    val introEndMs: Long? = null,
+    val recapEndMs: Long? = null,
+    val nextMediaVersionId: String? = null,
+    val nextTitle: String? = null,
+    val nextSubtitle: String? = null
 )
 
 data class AccountProfile(
@@ -449,7 +463,8 @@ class BackendRepository(context: Context) {
                             mediaVersionId=versionId,
                             title=media.title,
                             subtitle=label,
-                            posterUrl=media.posterPath
+                            posterUrl=media.posterPath,
+                            startPositionMs=x.optLong("positionMs")
                         ),
                         media=media.copy(
                             mediaVersionId=versionId,

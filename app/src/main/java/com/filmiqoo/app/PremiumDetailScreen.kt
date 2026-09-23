@@ -121,7 +121,15 @@ fun PremiumDetailScreen(
                                                 append(quality)
                                             }
                                         },
-                                        posterUrl=repository.poster(d.media.posterPath)
+                                        posterUrl=repository.poster(d.media.posterPath),
+                                        variants=versions.map {
+                                            PlaybackVariant(
+                                                mediaVersionId=it.id,
+                                                label=it.quality.ifBlank { "Auto" },
+                                                codec=it.codec,
+                                                hdr=it.hdr
+                                            )
+                                        }
                                     )
                                 )
                             },
@@ -864,11 +872,28 @@ private fun PremiumSeriesPanel(
             }
         }
 
-        season?.episodes?.forEach { ep ->
+        val allEpisodes=seasons
+            .sortedBy { it.number }
+            .flatMap { currentSeason ->
+                currentSeason.episodes.sortedBy { it.number }.map { ep ->
+                    currentSeason.number to ep
+                }
+            }
+
+        season?.episodes?.sortedBy { it.number }?.forEach { ep ->
+            val currentIndex=allEpisodes.indexOfFirst { it.second.id==ep.id }
+            val next=if(currentIndex>=0) {
+                allEpisodes.drop(currentIndex+1).firstOrNull {
+                    it.second.streamReady && !it.second.mediaVersionId.isNullOrBlank()
+                }
+            } else null
+
             EpisodeCard(
                 title=title,
                 seasonNumber=season.number,
                 episode=ep,
+                nextSeasonNumber=next?.first,
+                nextEpisode=next?.second,
                 onPlay=onPlay,
                 onDownload=onDownload
             )
@@ -881,6 +906,8 @@ private fun EpisodeCard(
     title: String,
     seasonNumber: Int,
     episode: PlatformEpisode,
+    nextSeasonNumber: Int?,
+    nextEpisode: PlatformEpisode?,
     onPlay: (PlaybackTarget) -> Unit,
     onDownload: (PlatformEpisode) -> Unit
 ) {
@@ -927,7 +954,16 @@ private fun EpisodeCard(
                                         title=episode.name.ifBlank { title+" • قسمت "+episode.number },
                                         subtitle="S"+seasonNumber.toString().padStart(2,'0')+
                                             "E"+episode.number.toString().padStart(2,'0')+
-                                            if(episode.quality.isNullOrBlank())"" else " • "+episode.quality
+                                            if(episode.quality.isNullOrBlank())"" else " • "+episode.quality,
+                                        nextMediaVersionId=nextEpisode?.mediaVersionId,
+                                        nextTitle=nextEpisode?.name?.ifBlank {
+                                            title+" • قسمت "+nextEpisode.number
+                                        },
+                                        nextSubtitle=if(nextEpisode!=null && nextSeasonNumber!=null) {
+                                            "S"+nextSeasonNumber.toString().padStart(2,'0')+
+                                                "E"+nextEpisode.number.toString().padStart(2,'0')+
+                                                if(nextEpisode.quality.isNullOrBlank())"" else " • "+nextEpisode.quality
+                                        } else null
                                     )
                                 )
                             },
