@@ -174,7 +174,7 @@ private fun DownloadsHero(
         Column(
             Modifier.align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(horizontal=18.dp,bottom=20.dp)
+                .padding(start=18.dp,end=18.dp,bottom=20.dp)
         ) {
             Text("دانلودهای آفلاین",fontSize=28.sp,fontWeight=FontWeight.Black)
             Text(
