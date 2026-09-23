@@ -35,6 +35,7 @@ fun FilmiqooApp() {
     val repository = remember { TmdbRepository(context.applicationContext) }
     val store = remember { LocalStore(context.applicationContext) }
 
+    var configured by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by remember { mutableIntStateOf(0) }
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
     var showSearch by remember { mutableStateOf(false) }
@@ -49,6 +50,16 @@ fun FilmiqooApp() {
     }
 
     Surface(Modifier.fillMaxSize(),color=FqBg) {
+        if (!configured) {
+            TmdbSetupScreen(
+                onSave = { value ->
+                    repository.setApiKey(value)
+                    configured = repository.hasApiKey()
+                }
+            )
+            return@Surface
+        }
+
         when {
             showSearch -> SearchScreen(
                 repository=repository,
@@ -194,6 +205,86 @@ private fun FilmiqooBottomBar(
                         unselectedTextColor=FqMuted
                     )
                 )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun TmdbSetupScreen(onSave: (String) -> Unit) {
+    var value by remember { mutableStateOf("") }
+    var showHelp by remember { mutableStateOf(false) }
+
+    Box(
+        Modifier.fillMaxSize().background(
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                listOf(Color(0xFF111722), FqBg)
+            )
+        ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier.size(76.dp).clip(RoundedCornerShape(22.dp)).background(FqGold),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.PlayArrow,null,tint=Color.Black,modifier=Modifier.size(54.dp))
+            }
+            Text("FILMIQOO",color=FqGold,fontSize=30.sp,modifier=Modifier.padding(top=14.dp))
+            Text("راه‌اندازی Preview",color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))
+
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(20.dp),
+                modifier=Modifier.fillMaxWidth().padding(top=28.dp)
+            ) {
+                Column(Modifier.padding(18.dp)) {
+                    Text("اتصال به TMDB",fontSize=18.sp)
+                    Text(
+                        "API Key یا Read Access Token خودت را وارد کن. این مقدار فقط روی همین گوشی ذخیره می‌شود.",
+                        color=FqMuted,
+                        fontSize=11.sp,
+                        lineHeight=18.sp,
+                        modifier=Modifier.padding(top=7.dp)
+                    )
+                    OutlinedTextField(
+                        value=value,
+                        onValueChange={value=it},
+                        label={Text("TMDB API Key / Token")},
+                        singleLine=false,
+                        minLines=2,
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.fillMaxWidth().padding(top=14.dp)
+                    )
+                    Button(
+                        onClick={if(value.trim().length>=20){{onSave(value.trim())}} else {{} } },
+                        enabled=value.trim().length>=20,
+                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.fillMaxWidth().padding(top=12.dp)
+                    ) {
+                        Text("ورود به Filmiqoo")
+                    }
+                    TextButton(
+                        onClick={showHelp=!showHelp},
+                        modifier=Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text("کدام مقدار را وارد کنم؟",color=FqGold)
+                    }
+                    if(showHelp) {
+                        Text(
+                            "از صفحه TMDB همان مقدار API-Schlüssel را کپی کن. Read Access Token بلند هم پشتیبانی می‌شود.",
+                            color=FqMuted,
+                            fontSize=10.sp,
+                            lineHeight=17.sp,
+                            modifier=Modifier.padding(top=4.dp)
+                        )
+                    }
+                }
             }
         }
     }
