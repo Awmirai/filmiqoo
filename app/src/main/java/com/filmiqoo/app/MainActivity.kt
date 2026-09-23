@@ -223,6 +223,11 @@ fun FilmiqooApp() {
                         overlay=null
                     }
                 )
+                OverlayRoute.Safety -> SafetyCenterScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)}
+                )
                 OverlayRoute.EditProfile -> EditProfileScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -299,6 +304,7 @@ fun FilmiqooApp() {
                         )
                         3 -> CommunityScreen(
                             social=social,
+                            backend=backend,
                             loggedIn=backend.session.isLoggedIn,
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
@@ -321,6 +327,7 @@ fun FilmiqooApp() {
                                     onInbox={overlay=OverlayRoute.Inbox},
                                     onSettings={overlay=OverlayRoute.Settings},
                                     onSecurity={overlay=OverlayRoute.Security},
+                                    onSafety={overlay=OverlayRoute.Safety},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onLoggedOut={
                                         authenticated=false

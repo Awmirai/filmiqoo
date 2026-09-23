@@ -111,6 +111,24 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 	if len([]rune(body.Body))>4000 {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is too long"}); return
 	}
+
+	var dmBlocked bool
+	_=s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1
+			  FROM rooms rm
+			  JOIN room_members other ON other.room_id=rm.id AND other.user_id<>$2
+			  JOIN blocks b ON (
+			       (b.blocker_user_id=$2 AND b.blocked_user_id=other.user_id)
+			    OR (b.blocker_user_id=other.user_id AND b.blocked_user_id=$2)
+			  )
+			 WHERE rm.id=$1 AND rm.room_type='dm'
+		)
+	`,roomID,userID).Scan(&dmBlocked)
+	if dmBlocked {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"direct messages are unavailable because one of these accounts has blocked the other"}); return
+	}
+
 	attachment,_:=json.Marshal(body.Attachment)
 	var id string
 	var created time.Time

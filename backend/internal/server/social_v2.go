@@ -416,6 +416,17 @@ func (s *Server) toggleUserFollow(w http.ResponseWriter,r *http.Request) {
 	if userID==targetID {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"cannot follow yourself"}); return
 	}
+	var blocked bool
+	_ = s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1 FROM blocks
+			 WHERE (blocker_user_id=$1 AND blocked_user_id=$2)
+			    OR (blocker_user_id=$2 AND blocked_user_id=$1)
+		)
+	`,userID,targetID).Scan(&blocked)
+	if blocked {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"follow unavailable because one of these accounts has blocked the other"}); return
+	}
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer tx.Rollback(r.Context())

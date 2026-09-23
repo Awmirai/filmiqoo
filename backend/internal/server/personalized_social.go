@@ -1,0 +1,181 @@
+package server
+
+import (
+	"net/http"
+	"time"
+)
+
+func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	rows,err:=s.db.Query(r.Context(),`
+		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
+		       p.save_count,p.share_count,p.published_at,
+		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
+		       mt.id::text,mt.title,mt.poster_url
+		  FROM posts p
+		  JOIN profiles pr ON pr.user_id=p.author_user_id
+		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
+		 WHERE p.status='published'
+		   AND NOT EXISTS (
+		     SELECT 1 FROM blocks b
+		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=p.author_user_id)
+		         OR (b.blocker_user_id=p.author_user_id AND b.blocked_user_id=$1)
+		   )
+		   AND NOT EXISTS (
+		     SELECT 1 FROM user_mutes m
+		      WHERE m.muter_user_id=$1 AND m.muted_user_id=p.author_user_id
+		   )
+		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
+		 LIMIT 50
+	`,userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	items:=make([]map[string]any,0)
+	for rows.Next() {
+		var id,postType,body,authorID,username,displayName,avatar string
+		var spoiler,verified bool
+		var likes,comments,saves,shares int64
+		var publishedAt *time.Time
+		var mediaID,title,poster *string
+		if err:=rows.Scan(
+			&id,&postType,&body,&spoiler,&likes,&comments,&saves,&shares,&publishedAt,
+			&authorID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster,
+		); err!=nil { continue }
+		items=append(items,map[string]any{
+			"id":id,"type":postType,"body":body,"spoiler":spoiler,
+			"likes":likes,"comments":comments,"saves":saves,"shares":shares,
+			"publishedAt":publishedAt,
+			"author":map[string]any{
+				"id":authorID,"username":username,"displayName":displayName,
+				"avatarUrl":avatar,"verified":verified,
+			},
+			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
+}
+
+func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	rows,err:=s.db.Query(r.Context(),`
+		SELECT rl.id::text,rl.caption,rl.playback_url,rl.cover_url,rl.duration_ms,
+		       rl.like_count,rl.comment_count,rl.save_count,rl.share_count,rl.view_count,rl.spoiler,
+		       p.user_id::text,p.display_name,p.username::text,p.avatar_url,p.verified,
+		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,mt.backdrop_url,
+		       mt.year,mt.rating
+		  FROM reels rl
+		  JOIN profiles p ON p.user_id=rl.creator_user_id
+		  LEFT JOIN media_titles mt ON mt.id=rl.media_title_id
+		 WHERE rl.status='published'
+		   AND NOT EXISTS (
+		     SELECT 1 FROM blocks b
+		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=rl.creator_user_id)
+		         OR (b.blocker_user_id=rl.creator_user_id AND b.blocked_user_id=$1)
+		   )
+		   AND NOT EXISTS (
+		     SELECT 1 FROM user_mutes m
+		      WHERE m.muter_user_id=$1 AND m.muted_user_id=rl.creator_user_id
+		   )
+		 ORDER BY rl.published_at DESC NULLS LAST,rl.created_at DESC
+		 LIMIT 60
+	`,userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	items:=make([]map[string]any,0)
+	for rows.Next() {
+		var id,caption,playbackURL,coverURL,authorID,displayName,username,avatar string
+		var duration int
+		var likes,comments,saves,shares,views int64
+		var spoiler,verified bool
+		var mediaID,kind,title,originalTitle,poster,backdrop *string
+		var tmdbID *int64
+		var year *int
+		var rating *float64
+		if err:=rows.Scan(
+			&id,&caption,&playbackURL,&coverURL,&duration,
+			&likes,&comments,&saves,&shares,&views,&spoiler,
+			&authorID,&displayName,&username,&avatar,&verified,
+			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
+		); err!=nil { continue }
+
+		items=append(items,map[string]any{
+			"id":id,"caption":caption,"playbackUrl":playbackURL,"coverUrl":coverURL,
+			"durationMs":duration,"likes":likes,"comments":comments,"saves":saves,
+			"shares":shares,"views":views,"spoiler":spoiler,
+			"author":map[string]any{
+				"id":authorID,"displayName":displayName,"username":username,
+				"avatarUrl":avatar,"verified":verified,
+			},
+			"media":map[string]any{
+				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
+				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
+				"year":year,"rating":rating,
+			},
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
+}
+
+func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	rows,err:=s.db.Query(r.Context(),`
+		SELECT st.id::text,st.story_type,st.media_url,st.thumbnail_url,st.caption,st.spoiler,
+		       st.view_count,st.created_at,st.expires_at,
+		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
+		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,
+		       mt.backdrop_url,mt.year,mt.rating
+		  FROM stories st
+		  JOIN profiles p ON p.user_id=st.author_user_id
+		  LEFT JOIN media_titles mt ON mt.id=st.media_title_id
+		 WHERE st.expires_at>now()
+		   AND st.close_friends_only=false
+		   AND NOT EXISTS (
+		     SELECT 1 FROM blocks b
+		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=st.author_user_id)
+		         OR (b.blocker_user_id=st.author_user_id AND b.blocked_user_id=$1)
+		   )
+		   AND NOT EXISTS (
+		     SELECT 1 FROM user_mutes m
+		      WHERE m.muter_user_id=$1 AND m.muted_user_id=st.author_user_id
+		   )
+		 ORDER BY st.created_at DESC
+		 LIMIT 100
+	`,userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	items:=make([]map[string]any,0)
+	for rows.Next() {
+		var id,typ,mediaURL,thumb,caption,userID2,username,displayName,avatar string
+		var spoiler,verified bool
+		var views int64
+		var created,expires time.Time
+		var mediaID,kind,title,originalTitle,poster,backdrop *string
+		var tmdbID *int64
+		var year *int
+		var rating *float64
+		if err:=rows.Scan(
+			&id,&typ,&mediaURL,&thumb,&caption,&spoiler,&views,&created,&expires,
+			&userID2,&username,&displayName,&avatar,&verified,
+			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
+		); err!=nil { continue }
+
+		items=append(items,map[string]any{
+			"id":id,"type":typ,"mediaUrl":mediaURL,"thumbnailUrl":thumb,
+			"caption":caption,"spoiler":spoiler,"views":views,
+			"createdAt":created,"expiresAt":expires,
+			"author":map[string]any{
+				"id":userID2,"username":username,"displayName":displayName,
+				"avatarUrl":avatar,"verified":verified,
+			},
+			"media":map[string]any{
+				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
+				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
+				"year":year,"rating":rating,
+			},
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+}

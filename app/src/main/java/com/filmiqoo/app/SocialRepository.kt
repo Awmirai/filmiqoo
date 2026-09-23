@@ -173,7 +173,11 @@ class SocialRepository(
     private val backend: BackendRepository
 ) {
     suspend fun reels(): List<ReelFeedItem> {
-        val root=backend.getJson("/v1/social/reels",authorized=false)
+        val loggedIn=backend.session.isLoggedIn
+        val root=backend.getJson(
+            if(loggedIn)"/v1/social/reels/personalized" else "/v1/social/reels",
+            authorized=loggedIn
+        )
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
@@ -216,7 +220,11 @@ class SocialRepository(
     }
 
     suspend fun feed(): List<SocialPost> {
-        val root=backend.getJson("/v1/social/feed",authorized=false)
+        val loggedIn=backend.session.isLoggedIn
+        val root=backend.getJson(
+            if(loggedIn)"/v1/social/feed/personalized" else "/v1/social/feed",
+            authorized=loggedIn
+        )
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
@@ -243,7 +251,11 @@ class SocialRepository(
     }
 
     suspend fun stories(): List<SocialStory> {
-        val root=backend.getJson("/v1/social/stories",authorized=false)
+        val loggedIn=backend.session.isLoggedIn
+        val root=backend.getJson(
+            if(loggedIn)"/v1/social/stories/personalized" else "/v1/social/stories",
+            authorized=loggedIn
+        )
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {

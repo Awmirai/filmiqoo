@@ -68,6 +68,10 @@ fun PremiumCreatorChannelScreen(
     var followed by remember(creator.id) { mutableStateOf(false) }
     var followBusy by remember { mutableStateOf(false) }
     var tab by remember { mutableIntStateOf(0) }
+    var safetyTargetType by remember { mutableStateOf<String?>(null) }
+    var safetyTargetId by remember { mutableStateOf<String?>(null) }
+    var safetyUserId by remember { mutableStateOf<String?>(null) }
+    var safetyLabel by remember { mutableStateOf("") }
 
     BackHandler { onBack() }
 
@@ -136,6 +140,16 @@ fun PremiumCreatorChannelScreen(
                 onBack=onBack,
                 onRefresh={refresh++},
                 onTab={tab=it},
+                onMore={
+                    if(!backend.session.isLoggedIn) {
+                        onRequireAuth()
+                    } else {
+                        safetyTargetType="user"
+                        safetyTargetId=p.id
+                        safetyUserId=p.id
+                        safetyLabel=p.displayName
+                    }
+                },
                 onMessage={onStartDm(p.id,p.displayName)},
                 onFollow={
                     if(!backend.session.isLoggedIn) {
@@ -185,6 +199,16 @@ fun PremiumCreatorChannelScreen(
                 onBack=onBack,
                 onRefresh={refresh++},
                 onTab={tab=it},
+                onMore={
+                    if(!backend.session.isLoggedIn) {
+                        onRequireAuth()
+                    } else {
+                        safetyTargetType="channel"
+                        safetyTargetId=p.id
+                        safetyUserId=null
+                        safetyLabel=p.name
+                    }
+                },
                 onFollow={
                     if(!backend.session.isLoggedIn) {
                         onRequireAuth()
@@ -207,6 +231,24 @@ fun PremiumCreatorChannelScreen(
                 }
             }
         }
+    }
+
+    val targetType=safetyTargetType
+    val targetId=safetyTargetId
+    if(targetType!=null && targetId!=null) {
+        SafetyActionSheet(
+            backend=backend,
+            targetType=targetType,
+            targetId=targetId,
+            targetLabel=safetyLabel,
+            userTargetId=safetyUserId,
+            onDismiss={
+                safetyTargetType=null
+                safetyTargetId=null
+                safetyUserId=null
+            },
+            onChanged={refresh++}
+        )
     }
 }
 
@@ -231,6 +273,7 @@ private fun CreatorEntityScaffold(
     onRefresh: () -> Unit,
     onTab: (Int) -> Unit,
     onFollow: () -> Unit,
+    onMore: () -> Unit,
     onMessage: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
@@ -269,7 +312,7 @@ private fun CreatorEntityScaffold(
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                 ) { Icon(Icons.Default.Refresh,null) }
                 IconButton(
-                    onClick={},
+                    onClick=onMore,
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                 ) { Icon(Icons.Default.MoreVert,null) }
             }

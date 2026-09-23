@@ -80,6 +80,19 @@ func (s *Server) ensureDM(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
+	var blocked bool
+	_ = s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1 FROM blocks
+			 WHERE (blocker_user_id=$1 AND blocked_user_id=$2)
+			    OR (blocker_user_id=$2 AND blocked_user_id=$1)
+		)
+	`,userID,targetID).Scan(&blocked)
+	if blocked {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"direct messages are unavailable because one of these accounts has blocked the other"})
+		return
+	}
+
 	var displayName string
 	if err:=s.db.QueryRow(r.Context(),
 		"SELECT display_name FROM profiles WHERE user_id=$1",

@@ -164,6 +164,13 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/security/sessions", s.securitySessions)
 			r.Post("/security/sessions/revoke-others", s.revokeOtherSessions)
 			r.Post("/security/sessions/{id}/revoke", s.revokeSession)
+			r.Post("/moderation/report", s.submitReport)
+			r.Get("/moderation/safety", s.safetyState)
+			r.Post("/social/users/{id}/block", s.toggleUserBlock)
+			r.Post("/social/users/{id}/mute", s.toggleUserMute)
+			r.Get("/social/feed/personalized", s.personalizedFeed)
+			r.Get("/social/reels/personalized", s.personalizedReels)
+			r.Get("/social/stories/personalized", s.personalizedStories)
 		})
 	})
 

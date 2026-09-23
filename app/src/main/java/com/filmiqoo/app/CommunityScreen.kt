@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun CommunityScreen(
     social: SocialRepository,
+    backend: BackendRepository,
     loggedIn: Boolean,
     onOpenRoom: (SocialRoom) -> Unit,
     onCreator: (Creator) -> Unit,
@@ -44,6 +45,7 @@ fun CommunityScreen(
     var channels by remember { mutableStateOf<List<SocialChannel>>(emptyList()) }
     var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
+    var safetyPost by remember { mutableStateOf<SocialPost?>(null) }
 
     LaunchedEffect(tab,refresh) {
         loading=true
@@ -130,6 +132,9 @@ fun CommunityScreen(
                                     }
                                 },
                                 onComments={commentsFor=post},
+                                onSafety={
+                                    if(!loggedIn) onRequireAuth() else safetyPost=post
+                                },
                                 onCreator={
                                     onCreator(
                                         Creator(
@@ -319,6 +324,21 @@ fun CommunityScreen(
         )
     }
 
+    safetyPost?.let { post ->
+        SafetyActionSheet(
+            backend=backend,
+            targetType="post",
+            targetId=post.id,
+            targetLabel="Post از "+post.author.displayName,
+            userTargetId=post.author.id,
+            onDismiss={safetyPost=null},
+            onChanged={
+                safetyPost=null
+                refresh++
+            }
+        )
+    }
+
 }
 
 @Composable
@@ -329,6 +349,7 @@ private fun SocialPostCard(
     onRequireAuth: () -> Unit,
     onLike: () -> Unit,
     onComments: () -> Unit,
+    onSafety: () -> Unit,
     onCreator: () -> Unit
 ) {
     var revealed by remember(post.id) { mutableStateOf(!post.spoiler) }
@@ -352,6 +373,9 @@ private fun SocialPostCard(
                         when(post.type){"review"->"Review";"poll"->"Poll";"announcement"->"خبر";else->"Post"},
                         color=FqGold,fontSize=8.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
+                }
+                IconButton(onClick=onSafety) {
+                    Icon(Icons.Default.MoreVert,null,tint=FqMuted)
                 }
             }
 
