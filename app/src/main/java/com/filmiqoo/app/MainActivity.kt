@@ -170,7 +170,10 @@ fun FilmiqooApp() {
                     when(tab) {
                         0 -> HomeScreen(
                             repository=repository,
+                            backend=backend,
+                            loggedIn=backend.session.isLoggedIn,
                             onMedia={overlay=OverlayRoute.Detail(it)},
+                            onPlay={overlay=OverlayRoute.Player(it)},
                             onStory={m,i->overlay=OverlayRoute.Story(m,i)},
                             onSearch={showSearch=true},
                             onNotifications={overlay=OverlayRoute.Notifications},
@@ -193,18 +196,34 @@ fun FilmiqooApp() {
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
-                        else -> ProfileScreen(
-                            repository=repository,
-                            store=store,
-                            onCreator={
-                                overlay=OverlayRoute.CreatorPage(
-                                    Creator("Armin Studio","@arminstudio","4.8K","نقد، معرفی و تجربه شخصی از فیلم و سریال")
+                        else -> {
+                            if(backend.session.isLoggedIn) {
+                                ConnectedProfileScreen(
+                                    backend=backend,
+                                    repository=repository,
+                                    onMedia={overlay=OverlayRoute.Detail(it)},
+                                    onPlay={overlay=OverlayRoute.Player(it)},
+                                    onCommunity={tab=3},
+                                    onLoggedOut={
+                                        authenticated=false
+                                        previewMode=false
+                                    }
                                 )
-                            },
-                            onWatchParty={overlay=OverlayRoute.WatchParty(null)},
-                            onMessages={tab=3},
-                            onMedia={overlay=OverlayRoute.Detail(it)}
-                        )
+                            } else {
+                                ProfileScreen(
+                                    repository=repository,
+                                    store=store,
+                                    onCreator={
+                                        overlay=OverlayRoute.CreatorPage(
+                                            Creator("Preview","@preview","","حالت نمایشی Filmiqoo")
+                                        )
+                                    },
+                                    onWatchParty={overlay=OverlayRoute.WatchParty(null)},
+                                    onMessages={tab=3},
+                                    onMedia={overlay=OverlayRoute.Detail(it)}
+                                )
+                            }
+                        }
                     }
                 }
             }

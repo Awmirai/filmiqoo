@@ -158,6 +158,11 @@ fun DetailScreen(
             .getOrElse { DetailLoad.Error(it.message ?: "خطا") }
         if (!media.backendId.isNullOrBlank()) {
             platformDetail = runCatching { backend.detail(media.backendId) }.getOrNull()
+            if(backend.session.isLoggedIn) {
+                favorite = runCatching {
+                    backend.favorites().any { it.backendId == media.backendId }
+                }.getOrDefault(favorite)
+            }
         }
     }
 
@@ -277,7 +282,16 @@ fun DetailScreen(
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 FilledTonalIconButton(
-                                    onClick={favorite=store.toggle("favorites",media.key)},
+                                    onClick={
+                                        if(!media.backendId.isNullOrBlank() && backend.session.isLoggedIn) {
+                                            scope.launch {
+                                                favorite=runCatching { backend.toggleFavorite(media.backendId) }
+                                                    .getOrDefault(favorite)
+                                            }
+                                        } else {
+                                            favorite=store.toggle("favorites",media.key)
+                                        }
+                                    },
                                     colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=FqSurface2)
                                 ) {
                                     Icon(if(favorite)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,null,tint=if(favorite)FqGold else Color.White)

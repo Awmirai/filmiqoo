@@ -39,7 +39,10 @@ private sealed interface HomeLoad {
 @Composable
 fun HomeScreen(
     repository: TmdbRepository,
+    backend: BackendRepository,
+    loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit,
+    onPlay: (PlaybackTarget) -> Unit,
     onStory: (MediaItem, Int) -> Unit,
     onSearch: () -> Unit,
     onNotifications: () -> Unit,
@@ -47,8 +50,14 @@ fun HomeScreen(
 ) {
     var reload by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<HomeLoad>(HomeLoad.Loading) }
+    var continueItems by remember { mutableStateOf<List<ContinueWatchingItem>>(emptyList()) }
 
-    LaunchedEffect(reload) {
+    LaunchedEffect(reload,loggedIn) {
+        if(loggedIn) {
+            continueItems=runCatching { backend.continueWatching() }.getOrDefault(emptyList())
+        } else {
+            continueItems=emptyList()
+        }
         state = HomeLoad.Loading
         state = runCatching { HomeLoad.Ready(repository.home()) }
             .getOrElse { HomeLoad.Error(it.message ?: "خطای ناشناخته") }
@@ -79,10 +88,17 @@ fun HomeScreen(
                     }
                 }
                 item {
-                    SectionHeader("ادامه تماشا","جایی که رها کردی برگرد")
+                    SectionHeader(
+                        "ادامه تماشا",
+                        if(continueItems.isNotEmpty()) "همگام با حساب Filmiqoo" else "جایی که رها کردی برگرد"
+                    )
                 }
                 item {
-                    ContinueWatchingRow(data.popularTv.take(5),repository,onMedia)
+                    if(continueItems.isNotEmpty()) {
+                        ContinueWatchingRealRow(continueItems,repository,onPlay)
+                    } else {
+                        ContinueWatchingRow(data.popularTv.take(5),repository,onMedia)
+                    }
                 }
                 item { SectionHeader("ترند امروز","محبوب‌ترین‌های همین حالا") }
                 item { MediaRow(data.trending,repository,onMedia) }
@@ -251,6 +267,61 @@ private fun ContinueWatchingRow(
                     modifier=Modifier.fillMaxWidth().padding(top=6.dp).height(3.dp)
                 )
                 Text("ادامه از " + (15 + m.id%35) + " دقیقه",color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=5.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueWatchingRealRow(
+    list: List<ContinueWatchingItem>,
+    repository: TmdbRepository,
+    onPlay: (PlaybackTarget) -> Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp),
+        horizontalArrangement=Arrangement.spacedBy(12.dp)
+    ) {
+        items(list,key={it.target.mediaVersionId}) { item ->
+            Column(Modifier.width(240.dp).clickable { onPlay(item.target) }) {
+                Box(Modifier.fillMaxWidth().height(135.dp).clip(RoundedCornerShape(18.dp))) {
+                    RemoteImage(
+                        repository.backdrop(item.media.backdropPath ?: item.media.posterPath),
+                        Modifier.fillMaxSize()
+                    )
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.82f)))
+                        )
+                    )
+                    Icon(
+                        Icons.Default.PlayCircle,null,tint=Color.White,
+                        modifier=Modifier.size(50.dp).align(Alignment.Center)
+                    )
+                    Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+                        Text(
+                            item.media.title,
+                            maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=12.sp
+                        )
+                        if(item.episodeLabel.isNotBlank()) {
+                            Text(
+                                item.episodeLabel,
+                                color=Color.White.copy(alpha=.7f),
+                                maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=8.sp
+                            )
+                        }
+                    }
+                }
+                LinearProgressIndicator(
+                    progress={item.progress},
+                    color=FqGold,
+                    trackColor=FqSurface2,
+                    modifier=Modifier.fillMaxWidth().padding(top=6.dp).height(4.dp)
+                )
+                Text(
+                    (item.progress*100).toInt().toString()+"% تماشا شده",
+                    color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(top=4.dp)
+                )
             }
         }
     }

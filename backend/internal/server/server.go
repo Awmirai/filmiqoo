@@ -111,6 +111,11 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/rooms/{id}/messages", s.sendRoomMessage)
 			r.Get("/realtime/rooms/{id}", s.roomRealtime)
 			r.Post("/watch/progress", s.saveProgress)
+			r.Get("/watch/continue", s.continueWatching)
+			r.Get("/watch/history", s.history)
+			r.Get("/library/favorites", s.favorites)
+			r.Post("/library/favorites/{id}/toggle", s.toggleFavorite)
+			r.Get("/library/stats", s.libraryStats)
 			r.Post("/playback/token", s.playbackToken)
 			r.Post("/uploads/presign", s.presignUpload)
 			r.Post("/uploads/{id}/complete", s.completeUpload)
@@ -318,11 +323,12 @@ func (s *Server) saveProgress(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, err); return
 	}
+	completed := body.DurationMS > 0 && float64(body.PositionMS)/float64(body.DurationMS) >= 0.95
 	_, err := s.db.Exec(r.Context(),
-		"INSERT INTO watch_progress (user_id,media_version_id,position_ms,duration_ms,updated_at) " +
-		"VALUES ($1,$2,$3,$4,now()) ON CONFLICT (user_id,media_version_id) DO UPDATE SET " +
-		"position_ms=EXCLUDED.position_ms,duration_ms=EXCLUDED.duration_ms,updated_at=now()",
-		userID, body.MediaVersionID, body.PositionMS, body.DurationMS)
+		"INSERT INTO watch_progress (user_id,media_version_id,position_ms,duration_ms,completed,updated_at) " +
+		"VALUES ($1,$2,$3,$4,$5,now()) ON CONFLICT (user_id,media_version_id) DO UPDATE SET " +
+		"position_ms=EXCLUDED.position_ms,duration_ms=EXCLUDED.duration_ms,completed=EXCLUDED.completed,updated_at=now()",
+		userID, body.MediaVersionID, body.PositionMS, body.DurationMS, completed)
 	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
 	writeJSON(w, http.StatusOK, map[string]any{"saved":true})
 }

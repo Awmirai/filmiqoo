@@ -48,6 +48,36 @@ data class PlaybackTarget(
     val posterUrl: String? = null
 )
 
+data class AccountProfile(
+    val id: String,
+    val email: String,
+    val username: String,
+    val displayName: String,
+    val bio: String,
+    val avatarUrl: String,
+    val coverUrl: String,
+    val verified: Boolean,
+    val privateAccount: Boolean,
+    val followers: Long,
+    val following: Long
+)
+
+data class LibraryStats(
+    val distinctTitles: Long,
+    val completedVersions: Long,
+    val watchTimeMinutes: Long,
+    val favorites: Long
+)
+
+data class ContinueWatchingItem(
+    val target: PlaybackTarget,
+    val media: MediaItem,
+    val progress: Float,
+    val positionMs: Long,
+    val durationMs: Long,
+    val episodeLabel: String
+)
+
 data class PlatformDetail(
     val id: String,
     val tmdbId: Int?,
@@ -366,6 +396,106 @@ class BackendRepository(context: Context) {
 
         postJson("/v1/uploads/"+ticket.uploadId+"/complete",JSONObject(),authorized=true)
         ticket
+    }
+
+    suspend fun me(): AccountProfile = withContext(Dispatchers.IO) {
+        val o=getJson("/v1/me",authorized=true)
+        AccountProfile(
+            id=o.optString("id"),
+            email=o.optString("email"),
+            username=o.optString("username"),
+            displayName=o.optString("displayName"),
+            bio=o.optString("bio"),
+            avatarUrl=o.optString("avatarUrl"),
+            coverUrl=o.optString("coverUrl"),
+            verified=o.optBoolean("verified"),
+            privateAccount=o.optBoolean("private"),
+            followers=o.optLong("followers"),
+            following=o.optLong("following")
+        )
+    }
+
+    suspend fun libraryStats(): LibraryStats = withContext(Dispatchers.IO) {
+        val o=getJson("/v1/library/stats",authorized=true)
+        LibraryStats(
+            distinctTitles=o.optLong("distinctTitles"),
+            completedVersions=o.optLong("completedVersions"),
+            watchTimeMinutes=o.optLong("watchTimeMinutes"),
+            favorites=o.optLong("favorites")
+        )
+    }
+
+    suspend fun continueWatching(): List<ContinueWatchingItem> = withContext(Dispatchers.IO) {
+        val root=getJson("/v1/watch/continue",authorized=true)
+        val arr=root.optJSONArray("items") ?: return@withContext emptyList()
+        buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val m=x.optJSONObject("media") ?: continue
+                val e=x.optJSONObject("episode")
+                val media=parsePlatformMedia(m)
+                val versionId=x.optString("mediaVersionId")
+                if(versionId.isBlank()) continue
+                val season=if(e==null || e.isNull("seasonNumber")) null else e.optInt("seasonNumber")
+                val episode=if(e==null || e.isNull("episodeNumber")) null else e.optInt("episodeNumber")
+                val episodeName=e?.optString("name").orEmpty()
+                val label=if(season!=null && episode!=null) {
+                    "S"+season.toString().padStart(2,'0')+"E"+episode.toString().padStart(2,'0')+
+                        if(episodeName.isBlank())"" else " • "+episodeName
+                } else x.optString("quality")
+                add(
+                    ContinueWatchingItem(
+                        target=PlaybackTarget(
+                            mediaVersionId=versionId,
+                            title=media.title,
+                            subtitle=label,
+                            posterUrl=media.posterPath
+                        ),
+                        media=media.copy(
+                            mediaVersionId=versionId,
+                            streamReady=true,
+                            quality=x.optString("quality")
+                        ),
+                        progress=x.optDouble("progress",0.0).toFloat().coerceIn(0f,1f),
+                        positionMs=x.optLong("positionMs"),
+                        durationMs=x.optLong("durationMs"),
+                        episodeLabel=label
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun favorites(): List<MediaItem> = withContext(Dispatchers.IO) {
+        val root=getJson("/v1/library/favorites",authorized=true)
+        val arr=root.optJSONArray("items") ?: return@withContext emptyList()
+        buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(parsePlatformMedia(x))
+            }
+        }
+    }
+
+    suspend fun toggleFavorite(mediaBackendId: String): Boolean = withContext(Dispatchers.IO) {
+        postJson("/v1/library/favorites/"+mediaBackendId+"/toggle",JSONObject(),authorized=true)
+            .optBoolean("favorite")
+    }
+
+    private fun parsePlatformMedia(x: JSONObject): MediaItem {
+        val tmdbId=if(x.isNull("tmdbId"))0 else x.optInt("tmdbId")
+        return MediaItem(
+            id=tmdbId,
+            type=if(x.optString("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+            title=x.optString("title").ifBlank{x.optString("originalTitle")},
+            originalTitle=x.optString("originalTitle"),
+            overview=x.optString("overview"),
+            posterPath=x.optString("posterUrl").takeIf(String::isNotBlank),
+            backdropPath=x.optString("backdropUrl").takeIf(String::isNotBlank),
+            vote=x.optDouble("rating",0.0),
+            date=x.optInt("year",0).takeIf{it>0}?.toString().orEmpty(),
+            backendId=x.optString("id")
+        )
     }
 
     suspend fun playbackUrl(mediaVersionId: String, download: Boolean = false): String =
