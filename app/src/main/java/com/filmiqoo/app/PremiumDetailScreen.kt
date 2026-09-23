@@ -1345,8 +1345,9 @@ private fun PremiumCommunityPanel(
             onDismiss={showReview=false},
             onPublish={rating,body,spoiler->
                 scope.launch {
+                    val targetId=mediaId ?: return@launch
                     runCatching {
-                        reviews.save(mediaId,rating,body,spoiler)
+                        reviews.save(targetId,rating,body,spoiler)
                     }.onSuccess {
                         showReview=false
                         refresh++
