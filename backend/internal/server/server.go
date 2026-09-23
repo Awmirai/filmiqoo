@@ -199,29 +199,56 @@ func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(r.Context(),
-		"SELECT r.id::text, r.caption, r.playback_url, r.cover_url, r.duration_ms, " +
-		"p.display_name, p.username, r.like_count, r.comment_count, r.view_count " +
-		"FROM reels r JOIN profiles p ON p.user_id=r.creator_user_id " +
-		"WHERE r.status='published' ORDER BY r.published_at DESC NULLS LAST, r.created_at DESC LIMIT 30")
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
+	rows, err := s.db.Query(r.Context(), `
+		SELECT r.id::text,r.caption,r.playback_url,r.cover_url,r.duration_ms,
+		       r.like_count,r.comment_count,r.save_count,r.share_count,r.view_count,r.spoiler,
+		       p.user_id::text,p.display_name,p.username::text,p.avatar_url,p.verified,
+		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,mt.backdrop_url,
+		       mt.year,mt.rating
+		  FROM reels r
+		  JOIN profiles p ON p.user_id=r.creator_user_id
+		  LEFT JOIN media_titles mt ON mt.id=r.media_title_id
+		 WHERE r.status='published'
+		 ORDER BY r.published_at DESC NULLS LAST,r.created_at DESC
+		 LIMIT 50
+	`)
+	if err != nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
-	items := make([]map[string]any, 0)
+	items:=make([]map[string]any,0)
 	for rows.Next() {
-		var id, caption, playbackURL, coverURL, displayName, username string
-		var durationMS int
-		var likes, comments, views int64
-		if err := rows.Scan(&id,&caption,&playbackURL,&coverURL,&durationMS,&displayName,&username,&likes,&comments,&views); err != nil {
-			writeError(w, http.StatusInternalServerError, err); return
+		var id,caption,playbackURL,coverURL,authorID,displayName,username,avatar string
+		var duration int
+		var likes,comments,saves,shares,views int64
+		var spoiler,verified bool
+		var mediaID,kind,title,originalTitle,poster,backdrop *string
+		var tmdbID *int64
+		var year *int
+		var rating *float64
+		if err:=rows.Scan(
+			&id,&caption,&playbackURL,&coverURL,&duration,
+			&likes,&comments,&saves,&shares,&views,&spoiler,
+			&authorID,&displayName,&username,&avatar,&verified,
+			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
+		); err!=nil {
+			continue
 		}
-		items = append(items, map[string]any{
+		items=append(items,map[string]any{
 			"id":id,"caption":caption,"playbackUrl":playbackURL,"coverUrl":coverURL,
-			"durationMs":durationMS,"displayName":displayName,"username":username,
-			"likes":likes,"comments":comments,"views":views,
+			"durationMs":duration,"likes":likes,"comments":comments,"saves":saves,
+			"shares":shares,"views":views,"spoiler":spoiler,
+			"author":map[string]any{
+				"id":authorID,"displayName":displayName,"username":username,
+				"avatarUrl":avatar,"verified":verified,
+			},
+			"media":map[string]any{
+				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
+				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
+				"year":year,"rating":rating,
+			},
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items":items,"nextCursor":nil})
+	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
 }
 
 func (s *Server) channels(w http.ResponseWriter, r *http.Request) {

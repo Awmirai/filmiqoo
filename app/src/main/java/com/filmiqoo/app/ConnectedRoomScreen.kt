@@ -26,6 +26,7 @@ fun ConnectedRoomScreen(
     roomId: String,
     title: String,
     social: SocialRepository,
+    backend: BackendRepository,
     loggedIn: Boolean,
     onRequireAuth: () -> Unit,
     onBack: () -> Unit
@@ -37,6 +38,8 @@ fun ConnectedRoomScreen(
     var spoiler by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var syncing by remember { mutableStateOf(true) }
+    var realtimeConnected by remember { mutableStateOf(false) }
+    val realtime=remember(backend) { RoomRealtimeClient(backend.session) }
 
     suspend fun refresh() {
         runCatching { social.roomMessages(roomId) }
@@ -52,9 +55,39 @@ fun ConnectedRoomScreen(
     }
 
     LaunchedEffect(roomId) {
+        refresh()
         while(isActive) {
+            // Safety resync; live updates normally arrive over WebSocket.
+            delay(30_000)
             refresh()
-            delay(3000)
+        }
+    }
+
+    DisposableEffect(roomId,loggedIn) {
+        val socket=if(loggedIn) {
+            realtime.connect(
+                roomId=roomId,
+                onConnected={
+                    scope.launch {
+                        realtimeConnected=true
+                        error=null
+                    }
+                },
+                onEvent={
+                    scope.launch {
+                        refresh()
+                    }
+                },
+                onDisconnected={reason ->
+                    scope.launch {
+                        realtimeConnected=false
+                        if(!reason.isNullOrBlank()) error=reason
+                    }
+                }
+            )
+        } else null
+        onDispose {
+            socket?.close(1000,"screen closed")
         }
     }
 
@@ -73,9 +106,22 @@ fun ConnectedRoomScreen(
             Column(Modifier.weight(1f)) {
                 Text(title,fontSize=14.sp)
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Box(Modifier.size(6.dp).background(if(error==null)FqGreen else FqDanger,CircleShape))
+                    Box(
+                        Modifier.size(6.dp).background(
+                            if(realtimeConnected)FqGreen else if(error==null)FqGold else FqDanger,
+                            CircleShape
+                        )
+                    )
                     Spacer(Modifier.width(4.dp))
-                    Text(if(syncing)"در حال همگام‌سازی..." else "همگام با سرور",color=FqMuted,fontSize=8.sp)
+                    Text(
+                        when {
+                            realtimeConnected -> "Realtime • WebSocket"
+                            syncing -> "در حال همگام‌سازی..."
+                            loggedIn -> "اتصال Realtime در حال بازیابی"
+                            else -> "حالت فقط مشاهده"
+                        },
+                        color=FqMuted,fontSize=8.sp
+                    )
                 }
             }
             IconButton(onClick={scope.launch{refresh()}}) { Icon(Icons.Default.Refresh,null) }

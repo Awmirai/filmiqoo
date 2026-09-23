@@ -107,6 +107,7 @@ fun FilmiqooApp() {
                     roomId=route.roomId,
                     title=route.title,
                     social=social,
+                    backend=backend,
                     loggedIn=backend.session.isLoggedIn,
                     onRequireAuth={overlay=OverlayRoute.Auth},
                     onBack=closeOverlay
@@ -175,12 +176,15 @@ fun FilmiqooApp() {
                             onNotifications={overlay=OverlayRoute.Notifications},
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)}
                         )
-                        1 -> ExploreScreen(
+                        1 -> ConnectedExploreScreen(
+                            social=social,
                             repository=repository,
                             store=store,
+                            loggedIn=backend.session.isLoggedIn,
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onChat={overlay=OverlayRoute.Chat("گفت‌وگو درباره " + it.title,it)},
-                            onCreator={overlay=OverlayRoute.CreatorPage(it)}
+                            onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                            onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         3 -> CommunityScreen(
                             social=social,

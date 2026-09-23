@@ -85,9 +85,96 @@ data class RoomMessageItem(
     val author: SocialAuthor
 )
 
+
+data class ReelMediaRef(
+    val backendId: String?,
+    val tmdbId: Int?,
+    val type: MediaType,
+    val title: String,
+    val originalTitle: String,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+    val year: Int?,
+    val rating: Double?
+) {
+    fun asMediaItem(): MediaItem? {
+        if (backendId.isNullOrBlank() || title.isBlank()) return null
+        return MediaItem(
+            id = tmdbId ?: 0,
+            type = type,
+            title = title,
+            originalTitle = originalTitle,
+            posterPath = posterUrl,
+            backdropPath = backdropUrl,
+            vote = rating ?: 0.0,
+            date = year?.toString().orEmpty(),
+            backendId = backendId
+        )
+    }
+}
+
+data class ReelFeedItem(
+    val id: String,
+    val caption: String,
+    val playbackUrl: String,
+    val coverUrl: String,
+    val durationMs: Long,
+    val likes: Long,
+    val comments: Long,
+    val saves: Long,
+    val shares: Long,
+    val views: Long,
+    val spoiler: Boolean,
+    val author: SocialAuthor,
+    val media: ReelMediaRef?
+)
+
 class SocialRepository(
     private val backend: BackendRepository
 ) {
+    suspend fun reels(): List<ReelFeedItem> {
+        val root=backend.getJson("/v1/social/reels",authorized=false)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val mediaObj=x.optJSONObject("media")
+                val kind=mediaObj?.optString("kind").orEmpty()
+                val media=mediaObj?.let {
+                    val backendId=it.optString("id").takeIf(String::isNotBlank)
+                    if(backendId==null) null else ReelMediaRef(
+                        backendId=backendId,
+                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
+                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
+                        title=it.optString("title"),
+                        originalTitle=it.optString("originalTitle"),
+                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
+                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
+                        year=if(it.isNull("year")) null else it.optInt("year"),
+                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
+                    )
+                }
+                add(
+                    ReelFeedItem(
+                        id=x.optString("id"),
+                        caption=x.optString("caption"),
+                        playbackUrl=x.optString("playbackUrl"),
+                        coverUrl=x.optString("coverUrl"),
+                        durationMs=x.optLong("durationMs"),
+                        likes=x.optLong("likes"),
+                        comments=x.optLong("comments"),
+                        saves=x.optLong("saves"),
+                        shares=x.optLong("shares"),
+                        views=x.optLong("views"),
+                        spoiler=x.optBoolean("spoiler"),
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+                        media=media
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun feed(): List<SocialPost> {
         val root=backend.getJson("/v1/social/feed",authorized=false)
         val arr=root.optJSONArray("items") ?: return emptyList()
@@ -350,6 +437,35 @@ class SocialRepository(
     suspend fun markReelViewed(id: String) {
         backend.postJson("/v1/social/reels/"+id+"/view",JSONObject(),authorized=true)
     }
+
+    suspend fun reelComments(reelId: String): List<SocialComment> {
+        val root=backend.getJson("/v1/social/reels/"+reelId+"/comments",authorized=false)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    SocialComment(
+                        id=x.optString("id"),
+                        parentCommentId=x.optString("parentCommentId").takeIf(String::isNotBlank),
+                        body=x.optString("body"),
+                        spoiler=x.optBoolean("spoiler"),
+                        likes=x.optLong("likes"),
+                        createdAt=x.optString("createdAt"),
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject())
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun addReelComment(reelId: String, body: String, spoiler: Boolean=false): String =
+        backend.postJson(
+            "/v1/social/reels/"+reelId+"/comments",
+            JSONObject().put("body",body).put("spoiler",spoiler),
+            authorized=true
+        ).getString("id")
+
 
     private fun parseAuthor(o: JSONObject)=SocialAuthor(
         id=o.optString("id"),
