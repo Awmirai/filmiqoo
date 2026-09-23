@@ -46,7 +46,8 @@ fun PremiumDetailScreen(
     onMedia: (MediaItem) -> Unit,
     onChat: (MediaItem) -> Unit,
     onWatchParty: (MediaItem) -> Unit,
-    onPlay: (PlaybackTarget) -> Unit
+    onPlay: (PlaybackTarget) -> Unit,
+    onRequireAuth: () -> Unit
 ) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -370,6 +371,9 @@ fun PremiumDetailScreen(
                             item {
                                 PremiumCommunityPanel(
                                     media=d.media,
+                                    backend=backend,
+                                    loggedIn=backend.session.isLoggedIn,
+                                    onRequireAuth=onRequireAuth,
                                     onChat=onChat,
                                     onWatchParty=onWatchParty
                                 )
@@ -1119,9 +1123,28 @@ private fun PreviewSeasonCard(
 @Composable
 private fun PremiumCommunityPanel(
     media: MediaItem,
+    backend: BackendRepository,
+    loggedIn: Boolean,
+    onRequireAuth: () -> Unit,
     onChat: (MediaItem) -> Unit,
     onWatchParty: (MediaItem) -> Unit
 ) {
+    val scope=rememberCoroutineScope()
+    val reviews=remember { ReviewsRepository(backend) }
+    val mediaId=media.backendId
+
+    var refresh by remember(media.key) { mutableIntStateOf(0) }
+    var bundle by remember(media.key) { mutableStateOf<MediaReviewsBundle?>(null) }
+    var reviewError by remember { mutableStateOf<String?>(null) }
+    var showReview by remember { mutableStateOf(false) }
+
+    LaunchedEffect(mediaId,refresh) {
+        if(mediaId.isNullOrBlank()) return@LaunchedEffect
+        runCatching { reviews.load(mediaId) }
+            .onSuccess { bundle=it;reviewError=null }
+            .onFailure { reviewError=it.message }
+    }
+
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Surface(
             color=FqSurface,
@@ -1141,7 +1164,7 @@ private fun PremiumCommunityPanel(
                     Column(Modifier.weight(1f)) {
                         Text("Community "+media.title,fontSize=15.sp,fontWeight=FontWeight.Bold)
                         Text(
-                            "بحث بدون اسپویل، نقد و Watch Party",
+                            "امتیاز کاربران، Review، بحث و Watch Party",
                             color=FqMuted,
                             fontSize=9.sp,
                             modifier=Modifier.padding(top=3.dp)
@@ -1150,7 +1173,7 @@ private fun PremiumCommunityPanel(
                 }
 
                 Text(
-                    "روم این عنوان به Catalog متصل است و برای سریال‌ها می‌تونه به سطح هر قسمت جدا بشه؛ Spoiler Shield هم برای پیام‌ها و نقدها فعال می‌شه.",
+                    "بحث این عنوان به Catalog متصل است؛ Reviewها و پیام‌های اسپویلر با Spoiler Shield محافظت می‌شن.",
                     color=Color.White.copy(alpha=.75f),
                     fontSize=9.sp,
                     lineHeight=16.sp,
@@ -1179,9 +1202,301 @@ private fun PremiumCommunityPanel(
                 }
             }
         }
+
+        if(mediaId.isNullOrBlank()) {
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(18.dp),
+                modifier=Modifier.fillMaxWidth().padding(top=12.dp)
+            ) {
+                Text(
+                    "امتیاز Community وقتی این عنوان وارد Catalog واقعی Filmiqoo بشه فعال می‌شه.",
+                    color=FqMuted,
+                    fontSize=8.sp,
+                    modifier=Modifier.padding(14.dp)
+                )
+            }
+            return@Column
+        }
+
+        val ratings=bundle
+        Surface(
+            color=FqSurface,
+            shape=RoundedCornerShape(22.dp),
+            modifier=Modifier.fillMaxWidth().padding(top=12.dp)
+        ) {
+            Column(Modifier.padding(15.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Column {
+                        Text(
+                            if(ratings==null || ratings.count==0L)"—"
+                            else String.format(Locale.US,"%.1f",ratings.average),
+                            fontSize=34.sp,
+                            fontWeight=FontWeight.Black,
+                            color=FqGold
+                        )
+                        Text("از 10",color=FqMuted,fontSize=8.sp)
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if(ratings==null)"در حال دریافت امتیازها..."
+                            else ratings.count.toString()+" امتیاز Community",
+                            fontSize=10.sp,
+                            fontWeight=FontWeight.Bold
+                        )
+                        if(ratings!=null && ratings.count>0) {
+                            LinearProgressIndicator(
+                                progress={(ratings.average/10.0).toFloat().coerceIn(0f,1f)},
+                                color=FqGold,
+                                trackColor=FqSurface3,
+                                modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick={
+                            if(!loggedIn) onRequireAuth() else showReview=true
+                        },
+                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                        shape=RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.StarRate,null,tint=Color.Black,modifier=Modifier.size(17.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("امتیاز",color=Color.Black,fontSize=8.sp)
+                    }
+                }
+
+                if(ratings!=null && ratings.count>0) {
+                    Column(Modifier.padding(top=12.dp)) {
+                        (10 downTo 6).forEach { rating ->
+                            val count=ratings.distribution[rating] ?: 0L
+                            val fraction=(count.toFloat()/ratings.count.toFloat()).coerceIn(0f,1f)
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical=2.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Text(rating.toString(),color=FqMuted,fontSize=7.sp,modifier=Modifier.width(18.dp))
+                                LinearProgressIndicator(
+                                    progress={fraction},
+                                    color=FqGold,
+                                    trackColor=FqSurface3,
+                                    modifier=Modifier.weight(1f).height(4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        reviewError?.let {
+            Text(it,color=FqDanger,fontSize=8.sp,modifier=Modifier.padding(top=8.dp))
+        }
+
+        if(ratings!=null) {
+            Row(
+                Modifier.fillMaxWidth().padding(top=16.dp,bottom=7.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Text("Reviewهای کاربران",fontSize=14.sp,fontWeight=FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text(ratings.items.size.toString(),color=FqMuted,fontSize=8.sp)
+            }
+
+            if(ratings.items.isEmpty()) {
+                Surface(
+                    color=FqSurface,
+                    shape=RoundedCornerShape(18.dp),
+                    modifier=Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "اولین Review این عنوان رو ثبت کن.",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(14.dp)
+                    )
+                }
+            } else {
+                ratings.items.take(8).forEach { review ->
+                    MediaReviewCard(
+                        review=review,
+                        onLike={
+                            if(!loggedIn) {
+                                onRequireAuth()
+                            } else {
+                                scope.launch {
+                                    runCatching { reviews.toggleLike(review.id) }
+                                        .onSuccess { refresh++ }
+                                        .onFailure { reviewError=it.message }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    if(showReview) {
+        ReviewComposerDialog(
+            mediaTitle=media.title,
+            onDismiss={showReview=false},
+            onPublish={rating,body,spoiler->
+                scope.launch {
+                    runCatching {
+                        reviews.save(mediaId,rating,body,spoiler)
+                    }.onSuccess {
+                        showReview=false
+                        refresh++
+                    }.onFailure {
+                        reviewError=it.message
+                    }
+                }
+            }
+        )
     }
 }
 
+@Composable
+private fun MediaReviewCard(
+    review:MediaReview,
+    onLike:()->Unit
+) {
+    var revealed by remember(review.id) { mutableStateOf(!review.spoiler) }
+
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        modifier=Modifier.fillMaxWidth().padding(top=7.dp)
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                RemoteImage(
+                    review.author.avatarUrl.takeIf(String::isNotBlank),
+                    Modifier.size(38.dp).clip(CircleShape),
+                    ContentScale.Crop
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text(review.author.displayName,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                        if(review.author.verified) {
+                            Spacer(Modifier.width(3.dp))
+                            Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(12.dp))
+                        }
+                    }
+                    Text("@"+review.author.username,color=FqMuted,fontSize=7.sp)
+                }
+                Surface(
+                    color=FqGold.copy(alpha=.13f),
+                    shape=RoundedCornerShape(9.dp)
+                ) {
+                    Row(
+                        Modifier.padding(horizontal=8.dp,vertical=5.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Star,null,tint=FqGold,modifier=Modifier.size(13.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text(review.rating.toString()+"/10",color=FqGold,fontSize=8.sp,fontWeight=FontWeight.Bold)
+                    }
+                }
+            }
+
+            if(review.spoiler && !revealed) {
+                Surface(
+                    color=FqDanger.copy(alpha=.1f),
+                    shape=RoundedCornerShape(12.dp),
+                    modifier=Modifier.fillMaxWidth().padding(top=9.dp).clickable { revealed=true }
+                ) {
+                    Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(17.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Spoiler Shield • برای نمایش Review لمس کن",color=FqDanger,fontSize=8.sp)
+                    }
+                }
+            } else if(review.body.isNotBlank()) {
+                Text(
+                    review.body,
+                    fontSize=9.sp,
+                    lineHeight=16.sp,
+                    modifier=Modifier.padding(top=9.dp)
+                )
+            }
+
+            TextButton(
+                onClick=onLike,
+                contentPadding=PaddingValues(horizontal=3.dp,vertical=2.dp),
+                modifier=Modifier.padding(top=4.dp)
+            ) {
+                Icon(Icons.Default.ThumbUpOffAlt,null,modifier=Modifier.size(15.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(review.likes.toString(),fontSize=7.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewComposerDialog(
+    mediaTitle:String,
+    onDismiss:()->Unit,
+    onPublish:(Int,String,Boolean)->Unit
+) {
+    var rating by remember { mutableIntStateOf(8) }
+    var body by remember { mutableStateOf("") }
+    var spoiler by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        title={Text("امتیاز به "+mediaTitle)},
+        text={
+            Column {
+                Text("امتیاز از ۱ تا ۱۰",color=FqMuted,fontSize=8.sp)
+                LazyRow(
+                    horizontalArrangement=Arrangement.spacedBy(5.dp),
+                    modifier=Modifier.padding(top=7.dp)
+                ) {
+                    items((1..10).toList()) { value ->
+                        FilterChip(
+                            selected=rating==value,
+                            onClick={rating=value},
+                            label={Text(value.toString())}
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value=body,
+                    onValueChange={body=it.take(5000)},
+                    label={Text("Review (اختیاری)")},
+                    minLines=4,
+                    maxLines=8,
+                    shape=RoundedCornerShape(14.dp),
+                    modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                )
+
+                FilterChip(
+                    selected=spoiler,
+                    onClick={spoiler=!spoiler},
+                    label={Text("این Review اسپویل دارد")},
+                    leadingIcon={Icon(Icons.Default.VisibilityOff,null)},
+                    modifier=Modifier.padding(top=8.dp)
+                )
+            }
+        },
+        confirmButton={
+            Button(
+                onClick={onPublish(rating,body.trim(),spoiler)},
+                colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+            ) {
+                Text("ثبت",color=Color.Black)
+            }
+        },
+        dismissButton={TextButton(onClick=onDismiss){Text("لغو")}}
+    )
+}
 @Composable
 private fun TechnicalInfoSection(
     media: MediaItem,

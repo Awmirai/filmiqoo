@@ -106,7 +106,8 @@ fun FilmiqooApp() {
                         } else {
                             overlay=OverlayRoute.Auth
                         }
-                    }
+                    },
+                    onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 is OverlayRoute.Player -> FilmiqooPlayerScreen(
                     target=route.target,
