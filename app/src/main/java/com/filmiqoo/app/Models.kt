@@ -94,6 +94,7 @@ sealed interface OverlayRoute {
     data object History : OverlayRoute
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
+    data object Security : OverlayRoute
     data object EditProfile : OverlayRoute
     data object Releases : OverlayRoute
     data object CreatorStudio : OverlayRoute

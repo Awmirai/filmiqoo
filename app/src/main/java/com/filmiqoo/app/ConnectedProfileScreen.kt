@@ -47,6 +47,7 @@ fun ConnectedProfileScreen(
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
     onSettings: () -> Unit,
+    onSecurity: () -> Unit,
     onEditProfile: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
@@ -170,6 +171,12 @@ fun ConnectedProfileScreen(
                         title="زبان، دوبله و زیرنویس",
                         subtitle="ترجیحات پخش فارسی و انگلیسی",
                         onClick={}
+                    )
+                    ProfileActionRow(
+                        icon=Icons.Default.Security,
+                        title="امنیت و دستگاه‌ها",
+                        subtitle="Sessionهای فعال و خروج از دستگاه‌های دیگر",
+                        onClick=onSecurity
                     )
                     ProfileActionRow(
                         icon=Icons.Default.Settings,

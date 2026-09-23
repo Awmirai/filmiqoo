@@ -161,6 +161,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/creator/studio", s.creatorStudio)
 			r.Get("/settings", s.getSettings)
 			r.Post("/settings", s.updateSettings)
+			r.Post("/security/sessions", s.securitySessions)
+			r.Post("/security/sessions/revoke-others", s.revokeOtherSessions)
+			r.Post("/security/sessions/{id}/revoke", s.revokeSession)
 		})
 	})
 

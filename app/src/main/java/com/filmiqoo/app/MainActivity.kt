@@ -214,6 +214,15 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                OverlayRoute.Security -> SecurityScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onCurrentSessionRevoked={
+                        authenticated=false
+                        previewMode=false
+                        overlay=null
+                    }
+                )
                 OverlayRoute.EditProfile -> EditProfileScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -311,6 +320,7 @@ fun FilmiqooApp() {
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},
                                     onSettings={overlay=OverlayRoute.Settings},
+                                    onSecurity={overlay=OverlayRoute.Security},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onLoggedOut={
                                         authenticated=false
