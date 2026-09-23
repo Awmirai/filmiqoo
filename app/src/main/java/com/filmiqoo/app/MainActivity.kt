@@ -261,7 +261,7 @@ private fun TmdbSetupScreen(onSave: (String) -> Unit) {
                         modifier=Modifier.fillMaxWidth().padding(top=14.dp)
                     )
                     Button(
-                        onClick={if(value.trim().length>=20){{onSave(value.trim())}} else {{} } },
+                        onClick={ onSave(value.trim()) },
                         enabled=value.trim().length>=20,
                         colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                         shape=RoundedCornerShape(14.dp),
