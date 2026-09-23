@@ -200,10 +200,14 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay
                 )
-                is OverlayRoute.WatchParty -> WatchPartyScreen(
+                is OverlayRoute.WatchParty -> ConnectedWatchPartyScreen(
                     media=route.media,
+                    initialPartyId=route.partyId,
+                    backend=backend,
+                    social=social,
                     repository=repository,
-                    onBack=closeOverlay
+                    onBack=closeOverlay,
+                    onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 OverlayRoute.Create -> CreateHubScreen(social=social,loggedIn=backend.session.isLoggedIn,onRequireAuth={overlay=OverlayRoute.Auth},onBack=closeOverlay)
                 OverlayRoute.Notifications -> ConnectedNotificationsScreen(

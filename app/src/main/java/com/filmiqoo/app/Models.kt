@@ -86,7 +86,7 @@ sealed interface OverlayRoute {
     data class SocialStories(val stories: List<SocialStory>, val index: Int = 0) : OverlayRoute
     data class Chat(val title: String, val media: MediaItem? = null) : OverlayRoute
     data class CreatorPage(val creator: Creator) : OverlayRoute
-    data class WatchParty(val media: MediaItem? = null) : OverlayRoute
+    data class WatchParty(val media: MediaItem? = null, val partyId: String? = null) : OverlayRoute
     data class Player(val target: PlaybackTarget) : OverlayRoute
     data class Room(val roomId: String, val title: String) : OverlayRoute
     data object Downloads : OverlayRoute
