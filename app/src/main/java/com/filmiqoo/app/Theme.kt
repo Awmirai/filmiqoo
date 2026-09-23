@@ -36,8 +36,8 @@ fun FilmiqooTheme(content: @Composable () -> Unit) {
         runCatching {
             FontFamily(
                 Font(
-                    context.assets,
-                    "iransans.ttf",
+                    path = "iransans.ttf",
+                    assetManager = context.assets,
                     weight = FontWeight.Bold
                 )
             )
