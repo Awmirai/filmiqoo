@@ -103,6 +103,10 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                OverlayRoute.Downloads -> DownloadsScreen(
+                    onBack=closeOverlay,
+                    onPlay={overlay=OverlayRoute.Player(it)}
+                )
                 is OverlayRoute.Room -> ConnectedRoomScreen(
                     roomId=route.roomId,
                     title=route.title,
@@ -204,6 +208,7 @@ fun FilmiqooApp() {
                                     onMedia={overlay=OverlayRoute.Detail(it)},
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onCommunity={tab=3},
+                                    onDownloads={overlay=OverlayRoute.Downloads},
                                     onLoggedOut={
                                         authenticated=false
                                         previewMode=false

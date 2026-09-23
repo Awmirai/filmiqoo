@@ -209,13 +209,29 @@ fun FilmiqooPlayerScreen(
         }
     }
 
-    LaunchedEffect(currentTarget.mediaVersionId) {
+    LaunchedEffect(currentTarget.mediaVersionId,currentTarget.localUri) {
         currentVersionId=currentTarget.mediaVersionId
         selectedVariantId=currentTarget.mediaVersionId
-        loadVersion(
-            versionId=currentTarget.mediaVersionId,
-            startPosition=currentTarget.startPositionMs
-        )
+
+        val local=currentTarget.localUri
+        if(!local.isNullOrBlank()) {
+            loading=true
+            error=null
+            ended=false
+            playUrl=local
+            player.setMediaItem(ExoMediaItem.fromUri(local))
+            if(currentTarget.startPositionMs>0) player.seekTo(currentTarget.startPositionMs)
+            player.prepare()
+            player.playbackParameters=player.playbackParameters.withSpeed(playbackSpeed)
+            player.playWhenReady=true
+            loading=false
+            bumpControls()
+        } else {
+            loadVersion(
+                versionId=currentTarget.mediaVersionId,
+                startPosition=currentTarget.startPositionMs
+            )
+        }
     }
 
     LaunchedEffect(player) {
@@ -420,6 +436,10 @@ fun FilmiqooPlayerScreen(
                 onBack=onBack,
                 onDownload={
                     scope.launch {
+                        if(currentTarget.localUri!=null) {
+                            downloadQueued=true
+                            return@launch
+                        }
                         runCatching {
                             backend.enqueueDownload(
                                 context,

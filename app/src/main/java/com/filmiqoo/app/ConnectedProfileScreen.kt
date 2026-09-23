@@ -41,6 +41,7 @@ fun ConnectedProfileScreen(
     onMedia: (MediaItem) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onCommunity: () -> Unit,
+    onDownloads: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -131,8 +132,8 @@ fun ConnectedProfileScreen(
                     ProfileActionRow(
                         icon=Icons.Default.Download,
                         title="دانلودهای آفلاین",
-                        subtitle="مدیریت فایل‌های دانلودشده روی این دستگاه",
-                        onClick={}
+                        subtitle="صف، Pause/Resume، Retry و پخش بدون اینترنت",
+                        onClick=onDownloads
                     )
                     ProfileActionRow(
                         icon=Icons.Default.Subtitles,

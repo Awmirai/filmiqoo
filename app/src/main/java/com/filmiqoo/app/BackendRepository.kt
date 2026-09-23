@@ -59,7 +59,8 @@ data class PlaybackTarget(
     val recapEndMs: Long? = null,
     val nextMediaVersionId: String? = null,
     val nextTitle: String? = null,
-    val nextSubtitle: String? = null
+    val nextSubtitle: String? = null,
+    val localUri: String? = null
 )
 
 data class AccountProfile(
@@ -537,24 +538,10 @@ class BackendRepository(context: Context) {
         }
     }
 
-    suspend fun enqueueDownload(context: Context, target: PlaybackTarget): Long {
-        val url = playbackUrl(target.mediaVersionId, download = true)
-        return withContext(Dispatchers.IO) {
-            val request = DownloadManager.Request(Uri.parse(url))
-                .setTitle(target.title)
-                .setDescription(target.subtitle.ifBlank { "Filmiqoo • دانلود آفلاین" })
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setAllowedOverMetered(true)
-                .setAllowedOverRoaming(false)
-                .setDestinationInExternalFilesDir(
-                    context,
-                    Environment.DIRECTORY_MOVIES,
-                    sanitizeFileName(target.title) + ".mp4"
-                )
-            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            manager.enqueue(request)
+    suspend fun enqueueDownload(context: Context, target: PlaybackTarget): String =
+        withContext(Dispatchers.IO) {
+            OfflineDownloadManager.enqueue(context,target)
         }
-    }
 
     internal suspend fun getJson(path: String, authorized: Boolean): JSONObject =
         executeJson(Request.Builder().url(session.baseUrl + path).get(), authorized)
