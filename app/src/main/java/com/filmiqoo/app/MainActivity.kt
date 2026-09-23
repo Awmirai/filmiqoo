@@ -233,7 +233,14 @@ fun FilmiqooApp() {
                     onBack=closeOverlay,
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
-                OverlayRoute.Create -> CreateHubScreen(social=social,loggedIn=backend.session.isLoggedIn,onRequireAuth={overlay=OverlayRoute.Auth},onBack=closeOverlay)
+                OverlayRoute.Create -> PremiumCreateHubScreen(
+                    social=social,
+                    backend=backend,
+                    repository=repository,
+                    loggedIn=backend.session.isLoggedIn,
+                    onRequireAuth={overlay=OverlayRoute.Auth},
+                    onBack=closeOverlay
+                )
                 OverlayRoute.Notifications -> ConnectedNotificationsScreen(
                     backend=backend,
                     onBack=closeOverlay,

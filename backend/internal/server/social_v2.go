@@ -59,6 +59,7 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		MediaTitleID *string `json:"mediaTitleId"`
 		EpisodeID *string `json:"episodeId"`
 		Spoiler bool `json:"spoiler"`
+		PollOptions []string `json:"pollOptions"`
 	}
 	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
 		writeError(w,http.StatusBadRequest,err); return
@@ -74,8 +75,29 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid post type"}); return
 	}
 
+	if body.Type=="poll" {
+		clean:=make([]string,0,len(body.PollOptions))
+		seen:=map[string]bool{}
+		for _,option:=range body.PollOptions {
+			option=strings.TrimSpace(option)
+			if option=="" || len([]rune(option))>120 { continue }
+			key:=strings.ToLower(option)
+			if seen[key] { continue }
+			seen[key]=true
+			clean=append(clean,option)
+		}
+		if len(clean)<2 || len(clean)>6 {
+			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"poll requires 2-6 unique options"}); return
+		}
+		body.PollOptions=clean
+	}
+
+	tx,err:=s.db.Begin(r.Context())
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer tx.Rollback(r.Context())
+
 	var id string
-	err:=s.db.QueryRow(r.Context(),`
+	err=tx.QueryRow(r.Context(),`
 		INSERT INTO posts (
 			author_user_id,channel_id,media_title_id,episode_id,post_type,body,spoiler,status,published_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,'published',now())
@@ -83,13 +105,35 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 	`,userID,body.ChannelID,body.MediaTitleID,body.EpisodeID,body.Type,body.Body,body.Spoiler).Scan(&id)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
-	_,_=s.db.Exec(r.Context(),"UPDATE profiles SET post_count=post_count+1,updated_at=now() WHERE user_id=$1",userID)
+	if body.Type=="poll" {
+		for i,option:=range body.PollOptions {
+			if _,err:=tx.Exec(r.Context(),`
+				INSERT INTO poll_options (post_id,label,sort_order)
+				VALUES ($1,$2,$3)
+			`,id,option,i); err!=nil {
+				writeError(w,http.StatusInternalServerError,err); return
+			}
+		}
+	}
+
+	if _,err=tx.Exec(r.Context(),
+		"UPDATE profiles SET post_count=post_count+1,updated_at=now() WHERE user_id=$1",
+		userID); err!=nil {
+		writeError(w,http.StatusInternalServerError,err); return
+	}
 	if body.ChannelID!=nil {
-		_,_=s.db.Exec(r.Context(),"UPDATE channels SET post_count=post_count+1,updated_at=now() WHERE id=$1",*body.ChannelID)
+		if _,err=tx.Exec(r.Context(),
+			"UPDATE channels SET post_count=post_count+1,updated_at=now() WHERE id=$1",
+			*body.ChannelID); err!=nil {
+			writeError(w,http.StatusInternalServerError,err); return
+		}
+	}
+
+	if err:=tx.Commit(r.Context()); err!=nil {
+		writeError(w,http.StatusInternalServerError,err); return
 	}
 	writeJSON(w,http.StatusCreated,map[string]any{"id":id,"status":"published"})
 }
-
 func (s *Server) togglePostLike(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	postID:=chi.URLParam(r,"id")

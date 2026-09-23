@@ -110,6 +110,9 @@ fun CommunityScreen(
                         items(feed,key={it.id}) { post ->
                             SocialPostCard(
                                 post=post,
+                                social=social,
+                                loggedIn=loggedIn,
+                                onRequireAuth=onRequireAuth,
                                 onLike={
                                     if(!loggedIn) {
                                         onRequireAuth()
@@ -321,6 +324,9 @@ fun CommunityScreen(
 @Composable
 private fun SocialPostCard(
     post: SocialPost,
+    social: SocialRepository,
+    loggedIn: Boolean,
+    onRequireAuth: () -> Unit,
     onLike: () -> Unit,
     onComments: () -> Unit,
     onCreator: () -> Unit
@@ -365,6 +371,15 @@ private fun SocialPostCard(
                 Text(post.body,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(top=12.dp))
             }
 
+            if(post.type=="poll" && (!post.spoiler || revealed)) {
+                PollWidget(
+                    postId=post.id,
+                    social=social,
+                    loggedIn=loggedIn,
+                    onRequireAuth=onRequireAuth
+                )
+            }
+
             post.media?.takeIf { !it.title.isNullOrBlank() }?.let { media ->
                 Surface(color=FqSurface2,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth().padding(top=10.dp)) {
                     Row(Modifier.padding(9.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -396,6 +411,117 @@ private fun SocialPostCard(
             }
         }
     }
+}
+
+@Composable
+private fun PollWidget(
+    postId:String,
+    social:SocialRepository,
+    loggedIn:Boolean,
+    onRequireAuth:()->Unit
+) {
+    val scope=rememberCoroutineScope()
+    var data by remember(postId) { mutableStateOf<PollData?>(null) }
+    var selected by remember(postId) { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    suspend fun refresh() {
+        runCatching { social.poll(postId) }
+            .onSuccess { data=it; error=null }
+            .onFailure { error=it.message }
+    }
+
+    LaunchedEffect(postId) { refresh() }
+
+    Surface(
+        color=FqSurface2,
+        shape=RoundedCornerShape(16.dp),
+        modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+    ) {
+        Column(Modifier.padding(11.dp)) {
+            val poll=data
+            if(poll==null && error==null) {
+                LinearProgressIndicator(
+                    color=FqGold,
+                    trackColor=FqSurface3,
+                    modifier=Modifier.fillMaxWidth()
+                )
+            } else if(poll!=null) {
+                poll.options.forEach { option ->
+                    val fraction=if(poll.totalVotes>0) {
+                        option.votes.toFloat()/poll.totalVotes.toFloat()
+                    } else 0f
+                    Surface(
+                        color=if(selected==option.id)FqGold.copy(alpha=.14f) else FqBg,
+                        shape=RoundedCornerShape(13.dp),
+                        modifier=Modifier.fillMaxWidth().padding(vertical=4.dp)
+                            .clickable(enabled=!busy) {
+                                if(!loggedIn) {
+                                    onRequireAuth()
+                                } else {
+                                    busy=true
+                                    scope.launch {
+                                        runCatching { social.votePoll(postId,option.id) }
+                                            .onSuccess {
+                                                selected=it
+                                                refresh()
+                                            }
+                                            .onFailure { error=it.message }
+                                        busy=false
+                                    }
+                                }
+                            }
+                    ) {
+                        Box(Modifier.fillMaxWidth()) {
+                            if(fraction>0f) {
+                                Box(
+                                    Modifier.fillMaxWidth(fraction.coerceIn(0f,1f))
+                                        .matchParentSize()
+                                        .background(FqGold.copy(alpha=.08f))
+                                )
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=9.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    option.label,
+                                    fontSize=9.sp,
+                                    fontWeight=if(selected==option.id)FontWeight.Bold else FontWeight.Normal,
+                                    modifier=Modifier.weight(1f)
+                                )
+                                Text(
+                                    if(poll.totalVotes>0)
+                                        ((fraction*100).toInt()).toString()+"٪"
+                                    else
+                                        "0٪",
+                                    color=FqMuted,
+                                    fontSize=8.sp
+                                )
+                            }
+                        }
+                    }
+                }
+                Text(
+                    compactPollVotes(poll.totalVotes)+" رأی",
+                    color=FqMuted,
+                    fontSize=7.sp,
+                    modifier=Modifier.padding(top=5.dp)
+                )
+            }
+
+            error?.let {
+                Text(it,color=FqDanger,fontSize=7.sp,modifier=Modifier.padding(top=5.dp))
+            }
+        }
+    }
+}
+
+private fun compactPollVotes(value:Long):String=when {
+    value>=1_000_000 -> String.format(java.util.Locale.US,"%.1fM",value/1_000_000.0)
+    value>=1_000 -> String.format(java.util.Locale.US,"%.1fK",value/1_000.0)
+    else -> value.toString()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

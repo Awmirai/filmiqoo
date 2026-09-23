@@ -3,6 +3,7 @@ package com.filmiqoo.app
 import android.content.Context
 import android.net.Uri
 import org.json.JSONObject
+import org.json.JSONArray
 
 data class SocialAuthor(
     val id: String,
@@ -66,6 +67,17 @@ data class SocialStory(
     val expiresAt: String,
     val author: SocialAuthor,
     val media: SocialMediaRef?
+)
+
+data class PollOption(
+    val id: String,
+    val label: String,
+    val votes: Long
+)
+
+data class PollData(
+    val options: List<PollOption>,
+    val totalVotes: Long
 )
 
 data class SocialChannel(
@@ -282,7 +294,8 @@ class SocialRepository(
         type: String="post",
         spoiler: Boolean=false,
         channelId: String?=null,
-        mediaTitleId: String?=null
+        mediaTitleId: String?=null,
+        pollOptions: List<String> = emptyList()
     ): String {
         val o=JSONObject()
             .put("type",type)
@@ -290,8 +303,38 @@ class SocialRepository(
             .put("spoiler",spoiler)
         if(!channelId.isNullOrBlank()) o.put("channelId",channelId)
         if(!mediaTitleId.isNullOrBlank()) o.put("mediaTitleId",mediaTitleId)
+        if(pollOptions.isNotEmpty()) {
+            val arr=JSONArray()
+            pollOptions.forEach { arr.put(it) }
+            o.put("pollOptions",arr)
+        }
         return backend.postJson("/v1/social/posts",o,authorized=true).getString("id")
     }
+
+    suspend fun poll(postId: String): PollData {
+        val root=backend.getJson("/v1/social/posts/"+postId+"/poll",authorized=false)
+        val arr=root.optJSONArray("options")
+        val options=buildList {
+            if(arr!=null) for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    PollOption(
+                        id=x.optString("id"),
+                        label=x.optString("label"),
+                        votes=x.optLong("votes")
+                    )
+                )
+            }
+        }
+        return PollData(options,root.optLong("totalVotes"))
+    }
+
+    suspend fun votePoll(postId: String, optionId: String): String =
+        backend.postJson(
+            "/v1/social/posts/"+postId+"/poll/vote",
+            JSONObject().put("optionId",optionId),
+            authorized=true
+        ).optString("selectedOptionId")
 
     suspend fun togglePostLike(id: String): Boolean =
         backend.postJson("/v1/social/posts/"+id+"/like",JSONObject(),authorized=true)
