@@ -50,11 +50,15 @@ fun PremiumDetailScreen(
 ) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    val library=remember { LibraryRepository(backend) }
 
     var reload by remember(media.key) { mutableIntStateOf(0) }
     var state by remember(media.key) { mutableStateOf<PremiumDetailLoad>(PremiumDetailLoad.Loading) }
     var favorite by remember(media.key) { mutableStateOf(store.contains("favorites",media.key)) }
     var favoriteBusy by remember { mutableStateOf(false) }
+    var watchlist by remember(media.key) { mutableStateOf(false) }
+    var watchlistBusy by remember { mutableStateOf(false) }
+    var showCollections by remember { mutableStateOf(false) }
     var downloadBusy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
@@ -65,6 +69,11 @@ fun PremiumDetailScreen(
             val platform=if(!media.backendId.isNullOrBlank()) {
                 runCatching { backend.detail(media.backendId) }.getOrNull()
             } else null
+            if(backend.session.isLoggedIn && !media.backendId.isNullOrBlank()) {
+                watchlist=runCatching {
+                    library.watchlist().any { it.backendId==media.backendId }
+                }.getOrDefault(false)
+            }
             PremiumDetailLoad.Ready(tmdb,platform)
         }.getOrElse { PremiumDetailLoad.Error(it.message ?: "خطا در دریافت اطلاعات") }
     }
@@ -149,6 +158,8 @@ fun PremiumDetailScreen(
                         PremiumDetailActions(
                             favorite=favorite,
                             favoriteBusy=favoriteBusy,
+                            watchlist=watchlist,
+                            watchlistBusy=watchlistBusy,
                             downloadBusy=downloadBusy,
                             canDownload=canPlay,
                             onFavorite={
@@ -167,6 +178,30 @@ fun PremiumDetailScreen(
                                         message=it.message
                                     }
                                     favoriteBusy=false
+                                }
+                            },
+                            onWatchlist={
+                                val id=d.media.backendId
+                                if(id.isNullOrBlank() || !backend.session.isLoggedIn) {
+                                    message="برای Watchlist باید وارد حساب Filmiqoo شوی."
+                                    return@PremiumDetailActions
+                                }
+                                if(watchlistBusy) return@PremiumDetailActions
+                                watchlistBusy=true
+                                scope.launch {
+                                    runCatching { library.toggleWatchlist(id) }
+                                        .onSuccess { watchlist=it }
+                                        .onFailure { message=it.message }
+                                    watchlistBusy=false
+                                }
+                            },
+                            onCollections={
+                                if(!backend.session.isLoggedIn) {
+                                    message="برای Collectionها باید وارد حساب Filmiqoo شوی."
+                                } else if(d.media.backendId.isNullOrBlank()) {
+                                    message="این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست."
+                                } else {
+                                    showCollections=true
                                 }
                             },
                             onDownload={
@@ -365,6 +400,18 @@ fun PremiumDetailScreen(
                 }
             }
         }
+
+        if(showCollections) {
+            CollectionPickerSheet(
+                backend=backend,
+                media=d.media,
+                onDismiss={showCollections=false},
+                onMessage={
+                    message=it
+                    showCollections=false
+                }
+            )
+        }
     }
 }
 
@@ -549,9 +596,13 @@ private fun DetailMetaPill(
 private fun PremiumDetailActions(
     favorite: Boolean,
     favoriteBusy: Boolean,
+    watchlist: Boolean,
+    watchlistBusy: Boolean,
     downloadBusy: Boolean,
     canDownload: Boolean,
     onFavorite: () -> Unit,
+    onWatchlist: () -> Unit,
+    onCollections: () -> Unit,
     onDownload: () -> Unit,
     onWatchParty: () -> Unit,
     onChat: () -> Unit
@@ -562,11 +613,27 @@ private fun PremiumDetailActions(
     ) {
         item {
             ActionTile(
-                icon=if(favorite)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                label=if(favorite)"ذخیره شده" else "لیست من",
+                icon=if(favorite)Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                label=if(favorite)"موردعلاقه" else "Favorite",
                 active=favorite,
                 loading=favoriteBusy,
                 onClick=onFavorite
+            )
+        }
+        item {
+            ActionTile(
+                icon=if(watchlist)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                label=if(watchlist)"در Watchlist" else "Watchlist",
+                active=watchlist,
+                loading=watchlistBusy,
+                onClick=onWatchlist
+            )
+        }
+        item {
+            ActionTile(
+                icon=Icons.Default.CollectionsBookmark,
+                label="Collection",
+                onClick=onCollections
             )
         }
         item {

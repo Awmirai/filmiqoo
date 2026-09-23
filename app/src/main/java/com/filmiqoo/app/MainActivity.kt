@@ -117,6 +117,12 @@ fun FilmiqooApp() {
                     onBack=closeOverlay,
                     onPlay={overlay=OverlayRoute.Player(it)}
                 )
+                OverlayRoute.Library -> LibraryScreen(
+                    backend=backend,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)}
+                )
                 OverlayRoute.History -> WatchHistoryScreen(
                     backend=backend,
                     repository=repository,
@@ -287,6 +293,7 @@ fun FilmiqooApp() {
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onCommunity={tab=3},
                                     onDownloads={overlay=OverlayRoute.Downloads},
+                                    onLibrary={overlay=OverlayRoute.Library},
                                     onHistory={overlay=OverlayRoute.History},
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},

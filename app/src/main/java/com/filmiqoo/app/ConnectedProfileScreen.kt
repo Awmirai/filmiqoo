@@ -42,6 +42,7 @@ fun ConnectedProfileScreen(
     onPlay: (PlaybackTarget) -> Unit,
     onCommunity: () -> Unit,
     onDownloads: () -> Unit,
+    onLibrary: () -> Unit,
     onHistory: () -> Unit,
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
@@ -138,6 +139,12 @@ fun ConnectedProfileScreen(
                         title="Community و Creator",
                         subtitle="روم‌ها، کانال‌ها و فعالیت اجتماعی",
                         onClick=onCommunity
+                    )
+                    ProfileActionRow(
+                        icon=Icons.Default.VideoLibrary,
+                        title="Library",
+                        subtitle="Favorites، Watchlist و Collectionهای شخصی",
+                        onClick=onLibrary
                     )
                     ProfileActionRow(
                         icon=Icons.Default.History,
