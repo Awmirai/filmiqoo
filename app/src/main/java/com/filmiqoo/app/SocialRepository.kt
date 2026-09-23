@@ -104,7 +104,13 @@ data class RoomMessageItem(
     val type: String,
     val spoiler: Boolean,
     val createdAt: String,
-    val author: SocialAuthor
+    val author: SocialAuthor,
+    val attachmentUrl: String? = null,
+    val attachmentMime: String? = null,
+    val replyToId: String? = null,
+    val replyPreview: String? = null,
+    val replyAuthor: String? = null,
+    val reactions: Map<String,Long> = emptyMap()
 )
 
 
@@ -445,7 +451,20 @@ class SocialRepository(
                         type=x.optString("type"),
                         spoiler=x.optBoolean("spoiler"),
                         createdAt=x.optString("createdAt"),
-                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject())
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+                        attachmentUrl=x.optJSONObject("attachment")?.optString("url")?.takeIf(String::isNotBlank),
+                        attachmentMime=x.optJSONObject("attachment")?.optString("mimeType")?.takeIf(String::isNotBlank),
+                        replyToId=x.optJSONObject("replyTo")?.optString("id")?.takeIf(String::isNotBlank),
+                        replyPreview=x.optJSONObject("replyTo")?.optString("body")?.takeIf(String::isNotBlank),
+                        replyAuthor=x.optJSONObject("replyTo")?.optString("author")?.takeIf(String::isNotBlank),
+                        reactions=buildMap {
+                            val ro=x.optJSONObject("reactions") ?: JSONObject()
+                            val keys=ro.keys()
+                            while(keys.hasNext()) {
+                                val key=keys.next()
+                                put(key,ro.optLong(key))
+                            }
+                        }
                     )
                 )
             }
@@ -455,13 +474,61 @@ class SocialRepository(
     suspend fun sendMessage(
         roomId: String,
         body: String,
-        spoiler: Boolean=false
-    ): String =
-        backend.postJson(
+        spoiler: Boolean=false,
+        replyToMessageId: String?=null
+    ): String {
+        val payload=JSONObject()
+            .put("body",body)
+            .put("type","text")
+            .put("spoiler",spoiler)
+        if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
+        return backend.postJson(
             "/v1/rooms/"+roomId+"/messages",
-            JSONObject().put("body",body).put("type","text").put("spoiler",spoiler),
+            payload,
             authorized=true
         ).optString("id")
+    }
+
+    suspend fun sendMediaMessage(
+        context: Context,
+        roomId: String,
+        uri: Uri,
+        caption: String="",
+        spoiler: Boolean=false,
+        replyToMessageId: String?=null
+    ): String {
+        val ticket=uploadMedia(context,uri,"chat")
+        val type=if(ticket.mimeType.startsWith("video/")) "video" else "image"
+        val payload=JSONObject()
+            .put("body",caption)
+            .put("type",type)
+            .put("spoiler",spoiler)
+            .put(
+                "attachment",
+                JSONObject()
+                    .put("url",ticket.mediaUrl)
+                    .put("mimeType",ticket.mimeType)
+                    .put("fileName",ticket.fileName)
+                    .put("sizeBytes",ticket.sizeBytes)
+            )
+        if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages",
+            payload,
+            authorized=true
+        ).optString("id")
+    }
+
+    suspend fun toggleMessageReaction(
+        roomId: String,
+        messageId: String,
+        reaction: String
+    ): Boolean =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/"+messageId+"/reaction",
+            JSONObject().put("reaction",reaction),
+            authorized=true
+        ).optBoolean("active")
 
     suspend fun toggleReelLike(id: String): Boolean =
         backend.postJson("/v1/social/reels/"+id+"/like",JSONObject(),authorized=true)

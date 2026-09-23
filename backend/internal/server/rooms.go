@@ -40,8 +40,21 @@ func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
 	roomID:=chi.URLParam(r,"id")
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT m.id::text,m.body,m.message_type,m.attachment,m.spoiler,m.created_at,
-		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified
-		  FROM messages m JOIN profiles p ON p.user_id=m.author_user_id
+		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
+		       m.reply_to_message_id::text,reply.body,reply_author.display_name,
+		       COALESCE((
+		         SELECT jsonb_object_agg(rx.reaction,rx.cnt)
+		           FROM (
+		             SELECT reaction,COUNT(*) AS cnt
+		               FROM message_reactions
+		              WHERE message_id=m.id
+		              GROUP BY reaction
+		           ) rx
+		       ),'{}'::jsonb)
+		  FROM messages m
+		  JOIN profiles p ON p.user_id=m.author_user_id
+		  LEFT JOIN messages reply ON reply.id=m.reply_to_message_id
+		  LEFT JOIN profiles reply_author ON reply_author.user_id=reply.author_user_id
 		 WHERE m.room_id=$1 AND m.deleted_at IS NULL
 		 ORDER BY m.created_at DESC
 		 LIMIT 100
@@ -52,13 +65,20 @@ func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
 	items:=make([]map[string]any,0)
 	for rows.Next() {
 		var id,body,typ,userID,username,displayName,avatar string
-		var attachment []byte
+		var attachment,reactions []byte
 		var spoiler,verified bool
 		var created time.Time
-		if err:=rows.Scan(&id,&body,&typ,&attachment,&spoiler,&created,&userID,&username,&displayName,&avatar,&verified); err!=nil { continue }
+		var replyID,replyBody,replyAuthor *string
+		if err:=rows.Scan(
+			&id,&body,&typ,&attachment,&spoiler,&created,
+			&userID,&username,&displayName,&avatar,&verified,
+			&replyID,&replyBody,&replyAuthor,&reactions,
+		); err!=nil { continue }
 		items=append(items,map[string]any{
 			"id":id,"body":body,"type":typ,"attachment":decodeJSONOrEmptyObject(attachment),
 			"spoiler":spoiler,"createdAt":created,
+			"replyTo":map[string]any{"id":replyID,"body":replyBody,"author":replyAuthor},
+			"reactions":decodeJSONOrEmptyObject(reactions),
 			"author":map[string]any{"id":userID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
 		})
 	}
@@ -80,6 +100,11 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
 	body.Body=strings.TrimSpace(body.Body)
 	if body.Type=="" { body.Type="text" }
+	switch body.Type {
+	case "text","image","video","voice","reel","movie","episode":
+	default:
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported message type"}); return
+	}
 	if body.Type=="text" && body.Body=="" {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is empty"}); return
 	}
@@ -163,4 +188,48 @@ func decodeJSONOrEmptyObject(raw []byte) any {
 	var value any
 	if err:=json.Unmarshal(raw,&value); err!=nil { return map[string]any{} }
 	return value
+}
+
+
+func (s *Server) toggleMessageReaction(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	roomID:=chi.URLParam(r,"id")
+	messageID:=chi.URLParam(r,"messageID")
+	var body struct {
+		Reaction string `json:"reaction"`
+	}
+	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
+		writeError(w,http.StatusBadRequest,err); return
+	}
+	body.Reaction=strings.TrimSpace(body.Reaction)
+	if body.Reaction=="" || len([]rune(body.Reaction))>16 {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid reaction"}); return
+	}
+
+	var belongs bool
+	_=s.db.QueryRow(r.Context(),
+		"SELECT EXISTS(SELECT 1 FROM messages WHERE id=$1 AND room_id=$2 AND deleted_at IS NULL)",
+		messageID,roomID).Scan(&belongs)
+	if !belongs {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"message not found"}); return
+	}
+
+	var exists bool
+	_=s.db.QueryRow(r.Context(),
+		"SELECT EXISTS(SELECT 1 FROM message_reactions WHERE message_id=$1 AND user_id=$2 AND reaction=$3)",
+		messageID,userID,body.Reaction).Scan(&exists)
+
+	var err error
+	if exists {
+		_,err=s.db.Exec(r.Context(),
+			"DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2 AND reaction=$3",
+			messageID,userID,body.Reaction)
+	} else {
+		_,err=s.db.Exec(r.Context(),
+			"INSERT INTO message_reactions (message_id,user_id,reaction) VALUES ($1,$2,$3)",
+			messageID,userID,body.Reaction)
+	}
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+	writeJSON(w,http.StatusOK,map[string]any{"active":!exists,"reaction":body.Reaction})
 }

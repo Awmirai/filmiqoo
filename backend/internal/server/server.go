@@ -122,6 +122,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/users/{id}/follow", s.toggleUserFollow)
 			r.Post("/rooms", s.createRoom)
 			r.Post("/rooms/{id}/messages", s.sendRoomMessage)
+			r.Post("/rooms/{id}/messages/{messageID}/reaction", s.toggleMessageReaction)
 			r.Post("/watch-parties", s.createWatchParty)
 			r.Post("/watch-parties/{id}/join", s.joinWatchParty)
 			r.Post("/watch-parties/{id}/state", s.updateWatchPartyState)
