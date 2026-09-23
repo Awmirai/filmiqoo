@@ -73,7 +73,11 @@ data class Creator(
     val handle: String,
     val followers: String,
     val bio: String,
-    val verified: Boolean = true
+    val verified: Boolean = true,
+    val id: String = "",
+    val entityType: String = "user",
+    val avatarUrl: String = "",
+    val coverUrl: String = ""
 )
 
 sealed interface OverlayRoute {
@@ -86,6 +90,7 @@ sealed interface OverlayRoute {
     data class Player(val target: PlaybackTarget) : OverlayRoute
     data class Room(val roomId: String, val title: String) : OverlayRoute
     data object Downloads : OverlayRoute
+    data object CreatorStudio : OverlayRoute
     data object Auth : OverlayRoute
     data object Create : OverlayRoute
     data object Notifications : OverlayRoute

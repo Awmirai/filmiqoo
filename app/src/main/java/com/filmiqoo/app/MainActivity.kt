@@ -156,12 +156,23 @@ fun FilmiqooApp() {
                     onBack=closeOverlay,
                     onMedia={ overlay=OverlayRoute.Detail(it) }
                 )
-                is OverlayRoute.CreatorPage -> CreatorProfileScreen(
+                is OverlayRoute.CreatorPage -> PremiumCreatorChannelScreen(
                     creator=route.creator,
-                    repository=repository,
-                    store=store,
+                    backend=backend,
+                    social=social,
                     onBack=closeOverlay,
-                    onMedia={ overlay=OverlayRoute.Detail(it) }
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
+                    onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
+                    onOpenReels={
+                        overlay=null
+                        tab=1
+                    },
+                    onRequireAuth={overlay=OverlayRoute.Auth}
+                )
+                OverlayRoute.CreatorStudio -> CreatorStudioScreen(
+                    backend=backend,
+                    onBack=closeOverlay
                 )
                 is OverlayRoute.WatchParty -> WatchPartyScreen(
                     media=route.media,
@@ -226,6 +237,7 @@ fun FilmiqooApp() {
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onCommunity={tab=3},
                                     onDownloads={overlay=OverlayRoute.Downloads},
+                                    onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onLoggedOut={
                                         authenticated=false
                                         previewMode=false

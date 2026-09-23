@@ -42,6 +42,7 @@ fun ConnectedProfileScreen(
     onPlay: (PlaybackTarget) -> Unit,
     onCommunity: () -> Unit,
     onDownloads: () -> Unit,
+    onCreatorStudio: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -117,6 +118,12 @@ fun ConnectedProfileScreen(
 
                 item { SectionHeader("مرکز حساب") }
                 item {
+                    ProfileActionRow(
+                        icon=Icons.Default.Analytics,
+                        title="Creator Studio",
+                        subtitle="Analytics، Reels، Stories و عملکرد کانال‌ها",
+                        onClick=onCreatorStudio
+                    )
                     ProfileActionRow(
                         icon=Icons.Default.Groups,
                         title="Community و Creator",

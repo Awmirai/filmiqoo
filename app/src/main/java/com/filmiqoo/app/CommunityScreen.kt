@@ -128,11 +128,14 @@ fun CommunityScreen(
                                 onCreator={
                                     onCreator(
                                         Creator(
-                                            post.author.displayName,
-                                            "@"+post.author.username,
-                                            "",
-                                            "عضو Community Filmiqoo",
-                                            post.author.verified
+                                            name=post.author.displayName,
+                                            handle="@"+post.author.username,
+                                            followers="",
+                                            bio="عضو Community Filmiqoo",
+                                            verified=post.author.verified,
+                                            id=post.author.id,
+                                            entityType="user",
+                                            avatarUrl=post.author.avatarUrl
                                         )
                                     )
                                 }
@@ -215,7 +218,19 @@ fun CommunityScreen(
                             ) {
                                 Row(
                                     Modifier.padding(13.dp).clickable {
-                                        onCreator(Creator(channel.name,"@"+channel.slug,channel.followers.toString(),channel.bio,channel.verified))
+                                        onCreator(
+                                            Creator(
+                                                name=channel.name,
+                                                handle="@"+channel.slug,
+                                                followers=channel.followers.toString(),
+                                                bio=channel.bio,
+                                                verified=channel.verified,
+                                                id=channel.id,
+                                                entityType="channel",
+                                                avatarUrl=channel.avatarUrl,
+                                                coverUrl=channel.coverUrl
+                                            )
+                                        )
                                     },
                                     verticalAlignment=Alignment.CenterVertically
                                 ) {

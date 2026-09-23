@@ -20,7 +20,10 @@ data class SearchUser(
         handle="@"+username,
         followers=compactSearchCount(followers),
         bio=bio,
-        verified=verified
+        verified=verified,
+        id=id,
+        entityType="user",
+        avatarUrl=avatarUrl
     )
 }
 
@@ -40,7 +43,10 @@ data class SearchChannel(
         handle="@"+slug,
         followers=compactSearchCount(followers),
         bio=bio,
-        verified=verified
+        verified=verified,
+        id=id,
+        entityType="channel",
+        avatarUrl=avatarUrl
     )
 }
 
