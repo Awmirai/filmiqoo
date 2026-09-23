@@ -18,8 +18,18 @@ class TmdbRepository(private val context: Context) {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    private val apiKey: String by lazy {
-        context.assets.open("tmdb_api_key.txt").bufferedReader().use { it.readText().trim() }
+    private val prefs = context.getSharedPreferences("filmiqoo_tmdb", Context.MODE_PRIVATE)
+
+    fun hasApiKey(): Boolean = prefs.getString("credential", "").orEmpty().isNotBlank()
+
+    fun setApiKey(value: String) {
+        prefs.edit().putString("credential", value.trim()).apply()
+    }
+
+    private fun credential(): String {
+        return prefs.getString("credential", "").orEmpty().trim().also {
+            if (it.isBlank()) error("TMDB credential is not configured")
+        }
     }
 
     private val base = "https://api.themoviedb.org/3/"
@@ -29,14 +39,22 @@ class TmdbRepository(private val context: Context) {
     val imageOriginal = "https://image.tmdb.org/t/p/original"
 
     private suspend fun get(path: String, params: Map<String, String> = emptyMap()): JSONObject = withContext(Dispatchers.IO) {
+        val token = credential()
         val builder = (base + path).toHttpUrl().newBuilder()
-            .addQueryParameter("api_key", apiKey)
+        if (!token.startsWith("eyJ")) {
+            builder.addQueryParameter("api_key", token)
+        }
         params.forEach { (k, v) -> builder.addQueryParameter(k, v) }
-        val request = Request.Builder()
+
+        val requestBuilder = Request.Builder()
             .url(builder.build())
             .header("accept", "application/json")
-            .build()
-        client.newCall(request).execute().use { response ->
+
+        if (token.startsWith("eyJ")) {
+            requestBuilder.header("Authorization", "Bearer " + token)
+        }
+
+        client.newCall(requestBuilder.build()).execute().use { response ->
             if (!response.isSuccessful) {
                 error("TMDB " + response.code + " for " + path)
             }
