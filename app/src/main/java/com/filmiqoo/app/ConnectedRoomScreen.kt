@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,22 @@ fun ConnectedRoomScreen(
     val realtime=remember(backend) { RoomRealtimeClient(backend.session) }
     val messaging=remember(backend) { MessagingRepository(backend) }
 
+    suspend fun refresh() {
+        runCatching { social.roomMessages(roomId) }
+            .onSuccess {
+                val changed=it.size!=messages.size
+                messages=it
+                syncing=false
+                if(loggedIn) {
+                    runCatching { messaging.markRoomRead(roomId) }
+                }
+                if(changed && it.isNotEmpty()) {
+                    scope.launch { listState.animateScrollToItem(it.lastIndex) }
+                }
+            }
+            .onFailure { error=it.message }
+    }
+
     val mediaPicker=rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -80,21 +97,7 @@ fun ConnectedRoomScreen(
         }
     }
 
-    suspend fun refresh() {
-        runCatching { social.roomMessages(roomId) }
-            .onSuccess {
-                val changed=it.size!=messages.size
-                messages=it
-                syncing=false
-                if(loggedIn) {
-                    runCatching { messaging.markRoomRead(roomId) }
-                }
-                if(changed && it.isNotEmpty()) {
-                    scope.launch { listState.animateScrollToItem(it.lastIndex) }
-                }
-            }
-            .onFailure { error=it.message }
-    }
+
 
     LaunchedEffect(roomId) {
         refresh()
