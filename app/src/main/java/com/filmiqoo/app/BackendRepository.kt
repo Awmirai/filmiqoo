@@ -430,6 +430,40 @@ class BackendRepository(context: Context) {
         )
     }
 
+    suspend fun updateProfile(
+        username: String,
+        displayName: String,
+        bio: String,
+        avatarUrl: String,
+        coverUrl: String,
+        privateAccount: Boolean
+    ): AccountProfile = withContext(Dispatchers.IO) {
+        val o=postJson(
+            "/v1/me",
+            JSONObject()
+                .put("username",username.trim())
+                .put("displayName",displayName.trim())
+                .put("bio",bio.trim())
+                .put("avatarUrl",avatarUrl.trim())
+                .put("coverUrl",coverUrl.trim())
+                .put("privateAccount",privateAccount),
+            authorized=true
+        )
+        AccountProfile(
+            id=o.optString("id"),
+            email=o.optString("email"),
+            username=o.optString("username"),
+            displayName=o.optString("displayName"),
+            bio=o.optString("bio"),
+            avatarUrl=o.optString("avatarUrl"),
+            coverUrl=o.optString("coverUrl"),
+            verified=o.optBoolean("verified"),
+            privateAccount=o.optBoolean("private"),
+            followers=o.optLong("followers"),
+            following=o.optLong("following")
+        ).also { session.displayName=it.displayName }
+    }
+
     suspend fun libraryStats(): LibraryStats = withContext(Dispatchers.IO) {
         val o=getJson("/v1/library/stats",authorized=true)
         LibraryStats(

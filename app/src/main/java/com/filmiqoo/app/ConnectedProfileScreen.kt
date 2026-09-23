@@ -47,6 +47,7 @@ fun ConnectedProfileScreen(
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
     onSettings: () -> Unit,
+    onEditProfile: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -122,6 +123,12 @@ fun ConnectedProfileScreen(
 
                 item { SectionHeader("مرکز حساب") }
                 item {
+                    ProfileActionRow(
+                        icon=Icons.Default.Edit,
+                        title="ویرایش پروفایل",
+                        subtitle="Avatar، Cover، Username، Bio و حریم خصوصی",
+                        onClick=onEditProfile
+                    )
                     ProfileActionRow(
                         icon=Icons.Default.Analytics,
                         title="Creator Studio",

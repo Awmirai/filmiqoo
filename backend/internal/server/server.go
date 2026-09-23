@@ -152,6 +152,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/uploads/presign", s.presignUpload)
 			r.Post("/uploads/{id}/complete", s.completeUpload)
 			r.Get("/me", s.me)
+			r.Post("/me", s.updateProfile)
 			r.Get("/creator/studio", s.creatorStudio)
 			r.Get("/settings", s.getSettings)
 			r.Post("/settings", s.updateSettings)

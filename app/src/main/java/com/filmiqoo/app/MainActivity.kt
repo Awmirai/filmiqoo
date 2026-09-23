@@ -213,6 +213,11 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                OverlayRoute.EditProfile -> EditProfileScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onSaved={overlay=null}
+                )
                 OverlayRoute.Releases -> ReleaseCenterScreen(
                     backend=backend,
                     repository=repository,
@@ -298,6 +303,7 @@ fun FilmiqooApp() {
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},
                                     onSettings={overlay=OverlayRoute.Settings},
+                                    onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onLoggedOut={
                                         authenticated=false
                                         previewMode=false
