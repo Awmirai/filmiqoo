@@ -8,6 +8,7 @@ import (
 func (s *Server) personalizedHome(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	viewerID:=s.viewerProfileID(r,userID)
+	maturity:=s.viewerMaturityLevel(r,userID)
 
 	preferredKind:=""
 	preferredLanguage:=""
@@ -70,6 +71,11 @@ func (s *Server) personalizedHome(w http.ResponseWriter,r *http.Request) {
 		     LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
+		   AND (
+		     $5='all'
+		     OR ($5='teen' AND mt.audience_level IN ('kids','teen'))
+		     OR ($5='kids' AND mt.audience_level='kids')
+		   )
 		   AND NOT (
 		     ($2<>'' AND EXISTS (
 		       SELECT 1 FROM viewer_favorites f
@@ -98,7 +104,7 @@ func (s *Server) personalizedHome(w http.ResponseWriter,r *http.Request) {
 		   COALESCE(mt.rating,0) DESC,
 		   mt.updated_at DESC
 		 LIMIT 24
-	`,userID,viewerID,preferredKind,preferredLanguage)
+	`,userID,viewerID,preferredKind,preferredLanguage,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	watchlistItems,err:=s.homeMediaRows(r.Context(),`
@@ -124,9 +130,14 @@ func (s *Server) personalizedHome(w http.ResponseWriter,r *http.Request) {
 		     LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
+		   AND (
+		     $3='all'
+		     OR ($3='teen' AND mt.audience_level IN ('kids','teen'))
+		     OR ($3='kids' AND mt.audience_level='kids')
+		   )
 		 ORDER BY wl.created_at DESC
 		 LIMIT 20
-	`,userID,viewerID)
+	`,userID,viewerID,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	communityHot,err:=s.homeMediaRows(r.Context(),`
@@ -159,9 +170,14 @@ func (s *Server) personalizedHome(w http.ResponseWriter,r *http.Request) {
 		     LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
+		   AND (
+		     $1='all'
+		     OR ($1='teen' AND mt.audience_level IN ('kids','teen'))
+		     OR ($1='kids' AND mt.audience_level='kids')
+		   )
 		 ORDER BY e.score DESC,COALESCE(mt.rating,0) DESC
 		 LIMIT 20
-	`)
+	`,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	newForYou,err:=s.homeMediaRows(r.Context(),`
@@ -177,11 +193,16 @@ func (s *Server) personalizedHome(w http.ResponseWriter,r *http.Request) {
 		     LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
+		   AND (
+		     $2='all'
+		     OR ($2='teen' AND mt.audience_level IN ('kids','teen'))
+		     OR ($2='kids' AND mt.audience_level='kids')
+		   )
 		 ORDER BY
 		   CASE WHEN $1<>'' AND mt.original_language=$1 THEN 0 ELSE 1 END,
 		   mt.created_at DESC
 		 LIMIT 20
-	`,preferredLanguage)
+	`,preferredLanguage,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	writeJSON(w,http.StatusOK,map[string]any{

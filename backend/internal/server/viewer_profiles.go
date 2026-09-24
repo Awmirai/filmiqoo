@@ -58,6 +58,37 @@ func (s *Server) viewerProfileID(r *http.Request,userID string) string {
     return id
 }
 
+func (s *Server) viewerMaturityLevel(r *http.Request,userID string) string {
+    viewerID:=s.viewerProfileID(r,userID)
+    if viewerID=="" { return "all" }
+
+    var level string
+    if s.db.QueryRow(r.Context(),`
+        SELECT maturity_level
+          FROM viewer_profiles
+         WHERE id=$1 AND user_id=$2
+    `,viewerID,userID).Scan(&level)!=nil {
+        return "all"
+    }
+    switch level {
+    case "kids","teen","all":
+        return level
+    default:
+        return "all"
+    }
+}
+
+func viewerAllowsAudience(profileLevel,audienceLevel string) bool {
+    switch profileLevel {
+    case "kids":
+        return audienceLevel=="kids"
+    case "teen":
+        return audienceLevel=="kids" || audienceLevel=="teen"
+    default:
+        return true
+    }
+}
+
 func (s *Server) viewerProfiles(w http.ResponseWriter,r *http.Request) {
     userID:=userIDFromContext(r.Context())
     if err:=s.ensureDefaultViewerProfile(r.Context(),userID); err!=nil {

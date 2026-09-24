@@ -398,7 +398,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onPlay={overlay=OverlayRoute.Player(it)},
                             onStory={m,i->overlay=OverlayRoute.Story(m,i)},
-                            onSearch={showSearch=true},
+                            onSearch={
+                                if(activeViewer?.kidsMode!=true) {
+                                    showSearch=true
+                                }
+                            },
                             onNotifications={overlay=OverlayRoute.Notifications},
                             onReleases={overlay=OverlayRoute.Releases},
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)}

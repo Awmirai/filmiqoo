@@ -48,8 +48,8 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 	err=tx.QueryRow(ctx,`
 		INSERT INTO media_titles (
 			tmdb_id,kind,title,original_title,overview,year,poster_url,backdrop_url,rating,
-			original_language,visibility,updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'public',now())
+			original_language,audience_level,visibility,updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'public',now())
 		ON CONFLICT (tmdb_id,kind) DO UPDATE SET
 			title=EXCLUDED.title,
 			original_title=EXCLUDED.original_title,
@@ -59,10 +59,14 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 			backdrop_url=CASE WHEN EXCLUDED.backdrop_url<>'' THEN EXCLUDED.backdrop_url ELSE media_titles.backdrop_url END,
 			rating=EXCLUDED.rating,
 			original_language=EXCLUDED.original_language,
+			audience_level=CASE
+				WHEN EXCLUDED.audience_level<>'unrated' THEN EXCLUDED.audience_level
+				ELSE media_titles.audience_level
+			END,
 			updated_at=now()
 		RETURNING id::text
 	`,match.TMDBID,match.Kind,match.Title,match.OriginalTitle,match.Overview,match.Year,
-		match.PosterURL,match.BackdropURL,match.Rating,match.OriginalLanguage).Scan(&mediaTitleID)
+		match.PosterURL,match.BackdropURL,match.Rating,match.OriginalLanguage,match.AudienceLevel).Scan(&mediaTitleID)
 	if err!=nil { return err }
 
 	// Every title gets a first-class community room automatically.

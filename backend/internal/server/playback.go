@@ -34,15 +34,28 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ready bool
-	if err := s.db.QueryRow(r.Context(),
-		"SELECT stream_ready FROM media_versions WHERE id=$1",
+	var audienceLevel string
+	if err := s.db.QueryRow(r.Context(),`
+		SELECT mv.stream_ready,mt.audience_level
+		  FROM media_versions mv
+		  LEFT JOIN episodes e ON e.id=mv.episode_id
+		  LEFT JOIN seasons sn ON sn.id=e.season_id
+		  JOIN media_titles mt ON mt.id=COALESCE(mv.media_title_id,sn.media_title_id)
+		 WHERE mv.id=$1
+	`,
 		body.MediaVersionID,
-	).Scan(&ready); err != nil {
+	).Scan(&ready,&audienceLevel); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error":"media version not found"})
 		return
 	}
 	if !ready {
 		writeJSON(w, http.StatusConflict, map[string]string{"error":"media version is not ready for streaming"})
+		return
+	}
+
+	userID:=userIDFromContext(r.Context())
+	if !viewerAllowsAudience(s.viewerMaturityLevel(r,userID),audienceLevel) {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"این محتوا برای پروفایل فعال مجاز نیست."})
 		return
 	}
 
@@ -139,7 +152,7 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 	versionID:=chi.URLParam(r,"versionID")
 
 	var (
-		mediaID,title,poster,quality,codec,hdr string
+		mediaID,title,poster,quality,codec,hdr,audienceLevel string
 		episodeID,episodeName *string
 		seasonNumber,episodeNumber *int
 		introEnd,recapEnd,creditsStart *int64
@@ -147,7 +160,7 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 
 	err:=s.db.QueryRow(r.Context(),`
 		SELECT mt.id::text,mt.title,mt.poster_url,
-		       mv.quality_label,mv.video_codec,mv.hdr_type,
+		       mv.quality_label,mv.video_codec,mv.hdr_type,mt.audience_level,
 		       e.id::text,e.name,sn.season_number,e.episode_number,
 		       e.intro_end_ms,e.recap_end_ms,e.credits_start_ms
 		  FROM media_versions mv
@@ -156,12 +169,18 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 		  JOIN media_titles mt ON mt.id=COALESCE(mv.media_title_id,sn.media_title_id)
 		 WHERE mv.id=$1
 	`,versionID).Scan(
-		&mediaID,&title,&poster,&quality,&codec,&hdr,
+		&mediaID,&title,&poster,&quality,&codec,&hdr,&audienceLevel,
 		&episodeID,&episodeName,&seasonNumber,&episodeNumber,
 		&introEnd,&recapEnd,&creditsStart,
 	)
 	if err!=nil {
 		writeJSON(w,http.StatusNotFound,map[string]string{"error":"playback context not found"})
+		return
+	}
+
+	userID:=userIDFromContext(r.Context())
+	if !viewerAllowsAudience(s.viewerMaturityLevel(r,userID),audienceLevel) {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"این محتوا برای پروفایل فعال مجاز نیست."})
 		return
 	}
 

@@ -50,8 +50,10 @@ fun PremiumHomeScreen(
     var continueItems by remember { mutableStateOf<List<ContinueWatchingItem>>(emptyList()) }
     var personalized by remember { mutableStateOf<PersonalizedHomeBundle?>(null) }
     val personalizationRepo=remember { HomePersonalizationRepository(backend) }
+    val activeViewer=if(loggedIn) backend.viewerProfiles.active() else null
+    val kidsMode=activeViewer?.kidsMode==true
 
-    LaunchedEffect(reload,loggedIn) {
+    LaunchedEffect(reload,loggedIn,activeViewer?.id,kidsMode) {
         if(loggedIn) {
             continueItems=runCatching { backend.continueWatching() }.getOrDefault(emptyList())
             personalized=runCatching { personalizationRepo.load() }.getOrNull()
@@ -60,8 +62,12 @@ fun PremiumHomeScreen(
             personalized=null
         }
         state=PremiumHomeLoad.Loading
-        state=runCatching { PremiumHomeLoad.Ready(repository.home()) }
-            .getOrElse { PremiumHomeLoad.Error(it.message ?: "خطا در دریافت خانه") }
+        state=if(kidsMode) {
+            PremiumHomeLoad.Ready(HomeBundle())
+        } else {
+            runCatching { PremiumHomeLoad.Ready(repository.home()) }
+                .getOrElse { PremiumHomeLoad.Error(it.message ?: "خطا در دریافت خانه") }
+        }
     }
 
     when(val s=state) {
@@ -73,6 +79,7 @@ fun PremiumHomeScreen(
             personalized=personalized,
             repository=repository,
             loggedIn=loggedIn,
+            kidsMode=kidsMode,
             onMedia=onMedia,
             onPlay=onPlay,
             onStory=onStory,
@@ -92,6 +99,7 @@ private fun PremiumHomeContent(
     personalized: PersonalizedHomeBundle?,
     repository: TmdbRepository,
     loggedIn: Boolean,
+    kidsMode: Boolean,
     onMedia: (MediaItem) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onStory: (MediaItem, Int) -> Unit,
@@ -101,19 +109,36 @@ private fun PremiumHomeContent(
     onWatchParty: (MediaItem?) -> Unit,
     onRefresh: () -> Unit
 ) {
-    val hero=data.trending.ifEmpty { data.popularMovies + data.popularTv }.distinctBy { it.key }.take(6)
-    val top10=(data.trending + data.popularMovies + data.popularTv).distinctBy { it.key }.take(10)
+    val safePersonalized=(
+        personalized?.forYou.orEmpty() +
+        personalized?.watchlist.orEmpty() +
+        personalized?.newForYou.orEmpty()
+    ).distinctBy { it.key }
+    val hero=if(kidsMode) {
+        safePersonalized.take(6)
+    } else {
+        data.trending.ifEmpty { data.popularMovies + data.popularTv }.distinctBy { it.key }.take(6)
+    }
+    val top10=if(kidsMode) {
+        safePersonalized.take(10)
+    } else {
+        (data.trending + data.popularMovies + data.popularTv).distinctBy { it.key }.take(10)
+    }
 
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             PremiumTopBar(
-                subtitle=if(loggedIn)"پیشنهادهای امروز بر اساس تماشای تو" else "فیلم، سریال و Community در یک جا",
+                subtitle=when {
+                    kidsMode -> "فضای امن Kids • فقط محتوای متناسب با پروفایل"
+                    loggedIn -> "پیشنهادهای امروز بر اساس تماشای تو"
+                    else -> "فیلم، سریال و Community در یک جا"
+                },
                 onSearch=onSearch,
                 onNotifications=onNotifications
             )
         }
 
-        if(data.trending.isNotEmpty()) {
+        if(!kidsMode && data.trending.isNotEmpty()) {
             item {
                 LazyRow(
                     contentPadding=PaddingValues(horizontal=FqDimens.Screen),
@@ -140,12 +165,19 @@ private fun PremiumHomeContent(
                 horizontalArrangement=Arrangement.spacedBy(8.dp),
                 modifier=Modifier.padding(top=14.dp)
             ) {
-                item { PremiumChip(Icons.Default.LocalFireDepartment,"ترند",true){} }
-                item { PremiumChip(Icons.Default.Movie,"فیلم"){} }
-                item { PremiumChip(Icons.Default.Tv,"سریال"){} }
-                item { PremiumChip(Icons.Default.Animation,"انیمه"){} }
-                item { PremiumChip(Icons.Default.Language,"ایرانی"){} }
-                item { PremiumChip(Icons.Default.CalendarMonth,"انتشارها",false,onReleases) }
+                if(kidsMode) {
+                    item { PremiumChip(Icons.Default.ChildCare,"Kids",true){} }
+                    item { PremiumChip(Icons.Default.Movie,"فیلم"){} }
+                    item { PremiumChip(Icons.Default.Tv,"سریال"){} }
+                    item { PremiumChip(Icons.Default.Animation,"انیمیشن"){} }
+                } else {
+                    item { PremiumChip(Icons.Default.LocalFireDepartment,"ترند",true){} }
+                    item { PremiumChip(Icons.Default.Movie,"فیلم"){} }
+                    item { PremiumChip(Icons.Default.Tv,"سریال"){} }
+                    item { PremiumChip(Icons.Default.Animation,"انیمه"){} }
+                    item { PremiumChip(Icons.Default.Language,"ایرانی"){} }
+                    item { PremiumChip(Icons.Default.CalendarMonth,"انتشارها",false,onReleases) }
+                }
             }
         }
 
@@ -195,7 +227,7 @@ private fun PremiumHomeContent(
             item { PremiumWideRow(items,repository,onMedia) }
         }
 
-        personalized?.communityHot?.takeIf { it.isNotEmpty() }?.let { items ->
+        if(!kidsMode) personalized?.communityHot?.takeIf { it.isNotEmpty() }?.let { items ->
             item {
                 PremiumSectionHeader(
                     title="داغ در Community",
@@ -228,55 +260,57 @@ private fun PremiumHomeContent(
             item { PremiumTop10Row(top10,repository,onMedia) }
         }
 
-        if(data.popularMovies.isNotEmpty()) {
+        if(!kidsMode && data.popularMovies.isNotEmpty()) {
             item { PremiumSectionHeader("فیلم‌های منتخب","برای امشب",Icons.Default.Movie) }
             item { PremiumPosterRow(data.popularMovies,repository,onMedia) }
         }
 
-        if(data.popularTv.isNotEmpty()) {
+        if(!kidsMode && data.popularTv.isNotEmpty()) {
             item { PremiumSectionHeader("سریال‌های داغ","قسمت بعدی منتظرته",Icons.Default.LiveTv) }
             item { PremiumWideRow(data.popularTv,repository,onMedia) }
         }
 
-        if(data.iranian.isNotEmpty()) {
+        if(!kidsMode && data.iranian.isNotEmpty()) {
             item { PremiumSectionHeader("سینمای ایران","فیلم و سریال ایرانی",Icons.Default.Language) }
             item { PremiumPosterRow(data.iranian,repository,onMedia) }
         }
 
-        if(data.korean.isNotEmpty()) {
+        if(!kidsMode && data.korean.isNotEmpty()) {
             item { PremiumSectionHeader("K-Drama","انتخاب‌های محبوب کره‌ای",Icons.Default.Favorite) }
             item { PremiumPosterRow(data.korean,repository,onMedia) }
         }
 
-        if(data.anime.isNotEmpty()) {
+        if(!kidsMode && data.anime.isNotEmpty()) {
             item { PremiumSectionHeader("Anime","دنیای انیمه",Icons.Default.Animation) }
             item { PremiumWideRow(data.anime,repository,onMedia) }
         }
 
-        item {
-            Surface(
-                color=FqSurface,
-                shape=RoundedCornerShape(24.dp),
-                modifier=Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(52.dp).clip(RoundedCornerShape(16.dp))
-                            .background(FqGold.copy(alpha=.13f)),
-                        contentAlignment=Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(28.dp))
+        if(!kidsMode) {
+            item {
+                Surface(
+                    color=FqSurface,
+                    shape=RoundedCornerShape(24.dp),
+                    modifier=Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(52.dp).clip(RoundedCornerShape(16.dp))
+                                .background(FqGold.copy(alpha=.13f)),
+                            contentAlignment=Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(28.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Watch Party",fontSize=15.sp,fontWeight=FontWeight.Bold)
+                            Text("فیلم رو همزمان با بقیه ببین، چت کن و واکنش بده.",color=FqMuted,fontSize=9.sp,lineHeight=15.sp)
+                        }
+                        Button(
+                            onClick={onWatchParty(hero.firstOrNull())},
+                            colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                            contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)
+                        ) { Text("شروع",fontSize=9.sp) }
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Watch Party",fontSize=15.sp,fontWeight=FontWeight.Bold)
-                        Text("فیلم رو همزمان با بقیه ببین، چت کن و واکنش بده.",color=FqMuted,fontSize=9.sp,lineHeight=15.sp)
-                    }
-                    Button(
-                        onClick={onWatchParty(hero.firstOrNull())},
-                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                        contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)
-                    ) { Text("شروع",fontSize=9.sp) }
                 }
             }
         }

@@ -10,6 +10,7 @@ import (
 func (s *Server) continueWatching(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	viewerID:=s.viewerProfileID(r,userID)
+	maturity:=s.viewerMaturityLevel(r,userID)
 	rows,err:=s.db.Query(r.Context(),`
 		WITH progress AS (
 			SELECT media_version_id,position_ms,duration_ms,completed,updated_at
@@ -30,11 +31,16 @@ func (s *Server) continueWatching(w http.ResponseWriter,r *http.Request) {
 		  LEFT JOIN seasons s ON s.id=e.season_id
 		  JOIN media_titles mt ON mt.id=COALESCE(mv.media_title_id,s.media_title_id)
 		 WHERE wp.completed=false
+		   AND (
+		     $3='all'
+		     OR ($3='teen' AND mt.audience_level IN ('kids','teen'))
+		     OR ($3='kids' AND mt.audience_level='kids')
+		   )
 		   AND wp.position_ms>0
 		   AND (wp.duration_ms=0 OR wp.position_ms < wp.duration_ms*0.95)
 		 ORDER BY wp.updated_at DESC
 		 LIMIT 30
-	`,userID,viewerID)
+	`,userID,viewerID,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -77,6 +83,7 @@ func (s *Server) continueWatching(w http.ResponseWriter,r *http.Request) {
 func (s *Server) history(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	viewerID:=s.viewerProfileID(r,userID)
+	maturity:=s.viewerMaturityLevel(r,userID)
 	rows,err:=s.db.Query(r.Context(),`
 		WITH progress AS (
 			SELECT media_version_id,position_ms,duration_ms,completed,updated_at
@@ -96,9 +103,14 @@ func (s *Server) history(w http.ResponseWriter,r *http.Request) {
 		  LEFT JOIN episodes e ON e.id=mv.episode_id
 		  LEFT JOIN seasons s ON s.id=e.season_id
 		  JOIN media_titles mt ON mt.id=COALESCE(mv.media_title_id,s.media_title_id)
+		 WHERE (
+		   $3='all'
+		   OR ($3='teen' AND mt.audience_level IN ('kids','teen'))
+		   OR ($3='kids' AND mt.audience_level='kids')
+		 )
 		 ORDER BY wp.updated_at DESC
 		 LIMIT 100
-	`,userID,viewerID)
+	`,userID,viewerID,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -133,6 +145,7 @@ func (s *Server) history(w http.ResponseWriter,r *http.Request) {
 func (s *Server) favorites(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	viewerID:=s.viewerProfileID(r,userID)
+	maturity:=s.viewerMaturityLevel(r,userID)
 	rows,err:=s.db.Query(r.Context(),`
 		WITH saved AS (
 			SELECT media_title_id,created_at
@@ -147,9 +160,14 @@ func (s *Server) favorites(w http.ResponseWriter,r *http.Request) {
 		       mt.backdrop_url,mt.year,mt.rating,f.created_at
 		  FROM saved f
 		  JOIN media_titles mt ON mt.id=f.media_title_id
+		 WHERE (
+		   $3='all'
+		   OR ($3='teen' AND mt.audience_level IN ('kids','teen'))
+		   OR ($3='kids' AND mt.audience_level='kids')
+		 )
 		 ORDER BY f.created_at DESC
 		 LIMIT 200
-	`,userID,viewerID)
+	`,userID,viewerID,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -174,6 +192,18 @@ func (s *Server) toggleFavorite(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	viewerID:=s.viewerProfileID(r,userID)
 	mediaID:=chi.URLParam(r,"id")
+
+	if viewerID!="" {
+		var audience string
+		if err:=s.db.QueryRow(r.Context(),
+			"SELECT audience_level FROM media_titles WHERE id=$1",
+			mediaID).Scan(&audience); err!=nil {
+			writeJSON(w,http.StatusNotFound,map[string]string{"error":"media title not found"}); return
+		}
+		if !viewerAllowsAudience(s.viewerMaturityLevel(r,userID),audience) {
+			writeJSON(w,http.StatusForbidden,map[string]string{"error":"این محتوا برای پروفایل فعال مجاز نیست."}); return
+		}
+	}
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer tx.Rollback(r.Context())

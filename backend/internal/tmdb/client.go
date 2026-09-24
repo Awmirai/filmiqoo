@@ -28,6 +28,7 @@ type TitleMatch struct {
 	BackdropURL string
 	Rating float64
 	OriginalLanguage string
+	AudienceLevel string
 	Confidence int
 }
 
@@ -76,6 +77,7 @@ func (c *Client) Search(ctx context.Context, kind, title string, year *int) (Tit
 			FirstAirDate string `json:"first_air_date"`
 			VoteAverage float64 `json:"vote_average"`
 			OriginalLanguage string `json:"original_language"`
+			Adult bool `json:"adult"`
 		} `json:"results"`
 	}
 	if err := c.get(ctx, endpoint, params, &response); err != nil { return TitleMatch{}, err }
@@ -85,6 +87,7 @@ func (c *Client) Search(ctx context.Context, kind, title string, year *int) (Tit
 
 	want := normalize(title)
 	bestScore := -1
+	bestAdult := false
 	var best TitleMatch
 	for _, r := range response.Results {
 		candidateTitle := r.Title
@@ -110,12 +113,18 @@ func (c *Client) Search(ctx context.Context, kind, title string, year *int) (Tit
 				PosterURL:imageURL("w500",r.PosterPath),
 				BackdropURL:imageURL("w1280",r.BackdropPath),
 				Rating:r.VoteAverage, OriginalLanguage:r.OriginalLanguage,
-				Confidence:score,
+				AudienceLevel:"unrated", Confidence:score,
 			}
+			bestAdult=r.Adult
 		}
 	}
 	if bestScore < 60 {
 		return TitleMatch{}, fmt.Errorf("low-confidence TMDB match for %q: %d", title, bestScore)
+	}
+	if bestAdult {
+		best.AudienceLevel="adult"
+	} else if level,err:=c.AudienceLevel(ctx,best.Kind,best.TMDBID); err==nil && level!="" {
+		best.AudienceLevel=level
 	}
 	return best, nil
 }
