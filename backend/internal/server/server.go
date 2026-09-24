@@ -311,6 +311,10 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/creator/scheduled/{kind}/{id}/unschedule", s.unscheduleCreatorContent)
 			r.Get("/settings", s.getSettings)
 			r.Post("/settings", s.updateSettings)
+			r.Get("/privacy/export", s.privacyExport)
+			r.With(
+				s.authRateLimit("delete-account",5,time.Hour),
+			).Post("/privacy/delete-account", s.deleteAccount)
 			r.Post("/security/sessions", s.securitySessions)
 			r.Post("/security/sessions/revoke-others", s.revokeOtherSessions)
 			r.Post("/security/sessions/{id}/revoke", s.revokeSession)
@@ -574,10 +578,18 @@ func (s *Server) auth(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"missing bearer token"}); return
 		}
 		tokenString := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
-		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any,error) {
-			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() { return nil, errors.New("unexpected signing method") }
-			return []byte(s.cfg.JWTSecret), nil
-		})
+		token, err := jwt.Parse(
+			tokenString,
+			func(t *jwt.Token) (any,error) {
+				if t.Method.Alg()!=jwt.SigningMethodHS256.Alg() {
+					return nil,errors.New("unexpected signing method")
+				}
+				return []byte(s.cfg.JWTSecret),nil
+			},
+			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+			jwt.WithIssuer("filmiqoo"),
+			jwt.WithAudience("filmiqoo-android"),
+		)
 		if err != nil || !token.Valid {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid token"}); return
 		}
@@ -587,9 +599,23 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		}
 		sub, err := claims.GetSubject()
 		if err != nil || sub == "" {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"missing subject"}); return
+			writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"missing subject"})
+			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey, sub)))
+		if s.redis!=nil {
+			blocked,redisErr:=s.redis.Exists(
+				r.Context(),
+				"auth:blocked-user:"+sub,
+			).Result()
+			if redisErr==nil && blocked>0 {
+				writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"account is unavailable"})
+				return
+			}
+		}
+		next.ServeHTTP(
+			w,
+			r.WithContext(context.WithValue(r.Context(),userKey,sub)),
+		)
 	})
 }
 
