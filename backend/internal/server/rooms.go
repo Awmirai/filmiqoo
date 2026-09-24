@@ -38,52 +38,21 @@ func (s *Server) roomsList(w http.ResponseWriter,r *http.Request) {
 
 func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
 	roomID:=chi.URLParam(r,"id")
-	rows,err:=s.db.Query(r.Context(),`
-		SELECT m.id::text,m.body,m.message_type,m.attachment,m.spoiler,m.created_at,
-		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
-		       m.reply_to_message_id::text,reply.body,reply_author.display_name,
-		       COALESCE((
-		         SELECT jsonb_object_agg(rx.reaction,rx.cnt)
-		           FROM (
-		             SELECT reaction,COUNT(*) AS cnt
-		               FROM message_reactions
-		              WHERE message_id=m.id
-		              GROUP BY reaction
-		           ) rx
-		       ),'{}'::jsonb)
-		  FROM messages m
-		  JOIN profiles p ON p.user_id=m.author_user_id
-		  LEFT JOIN messages reply ON reply.id=m.reply_to_message_id
-		  LEFT JOIN profiles reply_author ON reply_author.user_id=reply.author_user_id
-		 WHERE m.room_id=$1 AND m.deleted_at IS NULL
-		 ORDER BY m.created_at DESC
-		 LIMIT 100
-	`,roomID)
+	items,err:=s.queryRoomMessages(
+		r.Context(),
+		`
+		WHERE m.room_id=$1 AND m.deleted_at IS NULL
+		ORDER BY m.created_at DESC
+		LIMIT 100
+		`,
+		roomID,
+	)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	defer rows.Close()
 
-	items:=make([]map[string]any,0)
-	for rows.Next() {
-		var id,body,typ,userID,username,displayName,avatar string
-		var attachment,reactions []byte
-		var spoiler,verified bool
-		var created time.Time
-		var replyID,replyBody,replyAuthor *string
-		if err:=rows.Scan(
-			&id,&body,&typ,&attachment,&spoiler,&created,
-			&userID,&username,&displayName,&avatar,&verified,
-			&replyID,&replyBody,&replyAuthor,&reactions,
-		); err!=nil { continue }
-		items=append(items,map[string]any{
-			"id":id,"body":body,"type":typ,"attachment":decodeJSONOrEmptyObject(attachment),
-			"spoiler":spoiler,"createdAt":created,
-			"replyTo":map[string]any{"id":replyID,"body":replyBody,"author":replyAuthor},
-			"reactions":decodeJSONOrEmptyObject(reactions),
-			"author":map[string]any{"id":userID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
-		})
+	// queryRoomMessages returns newest -> oldest for efficient SQL; UI expects oldest -> newest.
+	for i,j:=0,len(items)-1;i<j;i,j=i+1,j-1 {
+		items[i],items[j]=items[j],items[i]
 	}
-	// Reverse so clients receive oldest -> newest.
-	for i,j:=0,len(items)-1;i<j;i,j=i+1,j-1 { items[i],items[j]=items[j],items[i] }
 	writeJSON(w,http.StatusOK,map[string]any{"items":items})
 }
 

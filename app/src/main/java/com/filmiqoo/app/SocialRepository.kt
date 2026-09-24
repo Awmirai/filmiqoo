@@ -160,7 +160,10 @@ data class RoomMessageItem(
     val replyToId: String? = null,
     val replyPreview: String? = null,
     val replyAuthor: String? = null,
-    val reactions: Map<String,Long> = emptyMap()
+    val reactions: Map<String,Long> = emptyMap(),
+    val editedAt: String? = null,
+    val seenBy: Long = 0,
+    val pinned: Boolean = false
 )
 
 
@@ -735,32 +738,63 @@ class SocialRepository(
         return buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                add(
-                    RoomMessageItem(
-                        id=x.optString("id"),
-                        body=x.optString("body"),
-                        type=x.optString("type"),
-                        spoiler=x.optBoolean("spoiler"),
-                        createdAt=x.optString("createdAt"),
-                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
-                        attachmentUrl=x.optJSONObject("attachment")?.optString("url")?.takeIf(String::isNotBlank),
-                        attachmentMime=x.optJSONObject("attachment")?.optString("mimeType")?.takeIf(String::isNotBlank),
-                        replyToId=x.optJSONObject("replyTo")?.optString("id")?.takeIf(String::isNotBlank),
-                        replyPreview=x.optJSONObject("replyTo")?.optString("body")?.takeIf(String::isNotBlank),
-                        replyAuthor=x.optJSONObject("replyTo")?.optString("author")?.takeIf(String::isNotBlank),
-                        reactions=buildMap {
-                            val ro=x.optJSONObject("reactions") ?: JSONObject()
-                            val keys=ro.keys()
-                            while(keys.hasNext()) {
-                                val key=keys.next()
-                                put(key,ro.optLong(key))
-                            }
-                        }
-                    )
-                )
+                add(parseRoomMessage(x))
             }
         }
     }
+
+    suspend fun searchRoomMessages(
+        roomId:String,
+        query:String
+    ):List<RoomMessageItem> {
+        val q=java.net.URLEncoder.encode(query.trim(),"UTF-8")
+        val root=backend.getJson(
+            "/v1/rooms/"+roomId+"/messages/search?q="+q,
+            authorized=true
+        )
+        return parseRoomMessages(root)
+    }
+
+    suspend fun pinnedRoomMessages(roomId:String):List<RoomMessageItem> =
+        parseRoomMessages(
+            backend.getJson("/v1/rooms/"+roomId+"/pins",authorized=true)
+        )
+
+    suspend fun editMessage(
+        roomId:String,
+        messageId:String,
+        body:String,
+        spoiler:Boolean
+    ) {
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/"+messageId+"/edit",
+            JSONObject()
+                .put("body",body.trim())
+                .put("spoiler",spoiler),
+            authorized=true
+        )
+    }
+
+    suspend fun deleteMessage(
+        roomId:String,
+        messageId:String
+    ) {
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/"+messageId+"/delete",
+            JSONObject(),
+            authorized=true
+        )
+    }
+
+    suspend fun toggleMessagePin(
+        roomId:String,
+        messageId:String
+    ):Boolean =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/"+messageId+"/pin",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("pinned")
 
     suspend fun sendMessage(
         roomId: String,
@@ -896,6 +930,46 @@ class SocialRepository(
             authorized=true
         ).getString("id")
 
+
+    private fun parseRoomMessages(root:JSONObject):List<RoomMessageItem> {
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(parseRoomMessage(x))
+            }
+        }
+    }
+
+    private fun parseRoomMessage(x:JSONObject)=RoomMessageItem(
+        id=x.optString("id"),
+        body=x.optString("body"),
+        type=x.optString("type"),
+        spoiler=x.optBoolean("spoiler"),
+        createdAt=x.optString("createdAt"),
+        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+        attachmentUrl=x.optJSONObject("attachment")
+            ?.optString("url")?.takeIf(String::isNotBlank),
+        attachmentMime=x.optJSONObject("attachment")
+            ?.optString("mimeType")?.takeIf(String::isNotBlank),
+        replyToId=x.optJSONObject("replyTo")
+            ?.optString("id")?.takeIf(String::isNotBlank),
+        replyPreview=x.optJSONObject("replyTo")
+            ?.optString("body")?.takeIf(String::isNotBlank),
+        replyAuthor=x.optJSONObject("replyTo")
+            ?.optString("author")?.takeIf(String::isNotBlank),
+        reactions=buildMap {
+            val ro=x.optJSONObject("reactions") ?: JSONObject()
+            val keys=ro.keys()
+            while(keys.hasNext()) {
+                val key=keys.next()
+                put(key,ro.optLong(key))
+            }
+        },
+        editedAt=x.optString("editedAt").takeIf(String::isNotBlank),
+        seenBy=x.optLong("seenBy"),
+        pinned=x.optBoolean("pinned")
+    )
 
     private fun parseAuthor(o: JSONObject)=SocialAuthor(
         id=o.optString("id"),
