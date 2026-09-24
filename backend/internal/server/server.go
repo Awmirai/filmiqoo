@@ -181,6 +181,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/library/favorites", s.favorites)
 			r.Post("/library/favorites/{id}/toggle", s.toggleFavorite)
 			r.Post("/catalog/{id}/reviews", s.upsertMediaReview)
+			r.Get("/catalog/{id}/availability-alerts", s.availabilityAlertsStatus)
+			r.Post("/catalog/{id}/availability-alerts", s.updateAvailabilityAlert)
 			r.Post("/reviews/{id}/like", s.toggleReviewLike)
 			r.Get("/library/watchlist", s.watchlist)
 			r.Post("/library/watchlist/{id}/toggle", s.toggleWatchlist)

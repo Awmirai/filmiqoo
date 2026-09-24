@@ -64,6 +64,7 @@ fun PremiumDetailScreen(
     var seriesFollowing by remember(media.key) { mutableStateOf(false) }
     var seriesFollowBusy by remember { mutableStateOf(false) }
     var showCollections by remember { mutableStateOf(false) }
+    var showAvailabilityAlerts by remember { mutableStateOf(false) }
     var downloadBusy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
@@ -171,6 +172,7 @@ fun PremiumDetailScreen(
                             watchlist=watchlist,
                             watchlistBusy=watchlistBusy,
                             showSeriesFollow=d.media.type==MediaType.TV && !d.media.backendId.isNullOrBlank(),
+                            showAvailabilityAlerts=!d.media.backendId.isNullOrBlank(),
                             seriesFollowing=seriesFollowing,
                             seriesFollowBusy=seriesFollowBusy,
                             downloadBusy=downloadBusy,
@@ -235,6 +237,15 @@ fun PremiumDetailScreen(
                                         message=it.message
                                     }
                                     seriesFollowBusy=false
+                                }
+                            },
+                            onAvailabilityAlerts={
+                                if(!backend.session.isLoggedIn) {
+                                    onRequireAuth()
+                                } else if(d.media.backendId.isNullOrBlank()) {
+                                    message="این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست."
+                                } else {
+                                    showAvailabilityAlerts=true
                                 }
                             },
                             onCollections={
@@ -544,6 +555,14 @@ fun PremiumDetailScreen(
                 }
             }
 
+            if(showAvailabilityAlerts && !d.media.backendId.isNullOrBlank()) {
+                AvailabilityAlertsSheet(
+                    mediaId=d.media.backendId,
+                    backend=backend,
+                    onDismiss={showAvailabilityAlerts=false}
+                )
+            }
+
             if(showCollections) {
                 CollectionPickerSheet(
                     backend=backend,
@@ -743,6 +762,7 @@ private fun PremiumDetailActions(
     watchlist: Boolean,
     watchlistBusy: Boolean,
     showSeriesFollow: Boolean,
+    showAvailabilityAlerts: Boolean,
     seriesFollowing: Boolean,
     seriesFollowBusy: Boolean,
     downloadBusy: Boolean,
@@ -750,6 +770,7 @@ private fun PremiumDetailActions(
     onFavorite: () -> Unit,
     onWatchlist: () -> Unit,
     onSeriesFollow: () -> Unit,
+    onAvailabilityAlerts: () -> Unit,
     onCollections: () -> Unit,
     onDownload: () -> Unit,
     onWatchParty: () -> Unit,
@@ -785,6 +806,15 @@ private fun PremiumDetailActions(
                     active=seriesFollowing,
                     loading=seriesFollowBusy,
                     onClick=onSeriesFollow
+                )
+            }
+        }
+        if(showAvailabilityAlerts) {
+            item {
+                ActionTile(
+                    icon=Icons.Default.AddAlert,
+                    label="دوبله / 4K",
+                    onClick=onAvailabilityAlerts
                 )
             }
         }

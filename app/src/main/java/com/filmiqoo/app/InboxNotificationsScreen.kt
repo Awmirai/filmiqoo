@@ -375,6 +375,9 @@ private fun notificationIcon(type:String)=when(type) {
     "story_reply" -> Icons.Default.Reply
     "dm_message" -> Icons.Default.MarkChatUnread
     "release_ready" -> Icons.Default.NewReleases
+    "new_episode" -> Icons.Default.LiveTv
+    "episode_stream_ready" -> Icons.Default.PlayCircle
+    "availability_ready" -> Icons.Default.HighQuality
     "collection_update" -> Icons.Default.CollectionsBookmark
     else -> Icons.Default.Notifications
 }
@@ -387,6 +390,9 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "story_reply" -> "Story Reply"
     "dm_message" -> "پیام"
     "release_ready" -> "انتشار"
+    "new_episode" -> "قسمت جدید"
+    "episode_stream_ready" -> "آماده تماشا"
+    "availability_ready" -> "نسخه جدید"
     "collection_update" -> "Collection"
     else -> "Filmiqoo"
 }
