@@ -325,7 +325,7 @@ class TmdbRepository(private val context: Context) {
         }
 
         val crewArray = obj.optJSONObject("credits")?.optJSONArray("crew") ?: JSONArray()
-        val directors = buildList {
+        val directors = buildList<CastMember> {
             for (i in 0 until crewArray.length()) {
                 val c = crewArray.optJSONObject(i) ?: continue
                 val job=c.optString("job")

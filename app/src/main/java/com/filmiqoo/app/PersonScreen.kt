@@ -278,7 +278,7 @@ private fun PersonHero(
         }
 
         Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal=18.dp,bottom=22.dp),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start=18.dp,end=18.dp,bottom=22.dp),
             horizontalAlignment=Alignment.CenterHorizontally
         ) {
             Box(
