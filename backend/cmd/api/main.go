@@ -22,7 +22,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := storage.OpenPostgres(ctx, cfg.DatabaseURL)
+	db, err := storage.OpenPostgres(ctx,cfg.DatabaseURL,cfg.PostgresMaxConns,cfg.PostgresMinConns)
 	if err != nil { log.Fatalf("postgres: %v", err) }
 	defer db.Close()
 
@@ -33,7 +33,7 @@ func main() {
 	}
 	migrationCancel()
 
-	redisClient := storage.OpenRedis(cfg.RedisAddr, cfg.RedisPassword)
+	redisClient := storage.OpenRedis(cfg.RedisAddr,cfg.RedisPassword,cfg.RedisPoolSize)
 	defer redisClient.Close()
 
 	srv := server.New(cfg, db, redisClient)
