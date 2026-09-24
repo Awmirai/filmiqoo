@@ -12,6 +12,8 @@ import android.os.SystemClock
 import android.util.Rational
 import android.view.View
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -114,6 +116,9 @@ fun FilmiqooPlayerScreen(
     var subtitleTextColor by remember { mutableStateOf(initialSettings.subtitleTextColor) }
     var subtitleBackgroundOpacity by remember { mutableFloatStateOf(initialSettings.subtitleBackgroundOpacity) }
     var subtitleEdgeStyle by remember { mutableStateOf(initialSettings.subtitleEdgeStyle) }
+    var externalSubtitleUri by remember { mutableStateOf<String?>(null) }
+    var externalSubtitleMime by remember { mutableStateOf<String?>(null) }
+    var externalSubtitleLabel by remember { mutableStateOf<String?>(null) }
     var playerResizeMode by remember { mutableStateOf(initialSettings.playerResizeMode) }
     var trackRevision by remember { mutableIntStateOf(0) }
     var positionMs by remember { mutableLongStateOf(0L) }
@@ -179,6 +184,56 @@ fun FilmiqooPlayerScreen(
         onDispose { mediaSession.release() }
     }
 
+    fun applyExternalSubtitle(uri:String?,mime:String?,label:String?) {
+        externalSubtitleUri=uri
+        externalSubtitleMime=mime
+        externalSubtitleLabel=label
+
+        val source=playUrl ?: currentTarget.localUri ?: return
+        val position=player.currentPosition.coerceAtLeast(0L)
+        val wasPlaying=player.playWhenReady
+        player.setMediaItem(
+            playerMediaItem(
+                source,
+                currentTarget,
+                uri,
+                mime
+            )
+        )
+        player.seekTo(position)
+        player.prepare()
+        player.playWhenReady=wasPlaying
+        trackRevision++
+    }
+
+    val externalSubtitlePicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if(uri!=null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            val raw=uri.toString()
+            val lower=raw.lowercase(Locale.US)
+            val mime=context.contentResolver.getType(uri)
+                ?.takeIf(String::isNotBlank)
+                ?: when {
+                    lower.endsWith(".vtt") -> "text/vtt"
+                    lower.endsWith(".ass") || lower.endsWith(".ssa") -> "text/x-ssa"
+                    else -> "application/x-subrip"
+                }
+            val label=uri.lastPathSegment
+                ?.substringAfterLast('/')
+                ?.takeIf(String::isNotBlank)
+                ?: "External subtitle"
+            applyExternalSubtitle(raw,mime,label)
+            playerSettingsMessage="زیرنویس خارجی اضافه شد • "+label
+        }
+    }
+
     fun bumpControls() {
         controlsVisible=true
         controlsEpoch++
@@ -206,7 +261,14 @@ fun FilmiqooPlayerScreen(
                 playUrl=url
                 currentVersionId=versionId
                 selectedVariantId=versionId
-                player.setMediaItem(playerMediaItem(url,currentTarget))
+                player.setMediaItem(
+                    playerMediaItem(
+                        url,
+                        currentTarget,
+                        externalSubtitleUri,
+                        externalSubtitleMime
+                    )
+                )
                 if(startPosition>0) player.seekTo(startPosition)
                 player.prepare()
                 player.playbackParameters=player.playbackParameters.withSpeed(playbackSpeed)
@@ -456,6 +518,9 @@ fun FilmiqooPlayerScreen(
         telemetryBufferMsPending=0L
         telemetryQualitySwitchPending=0
         telemetryLastHeartbeatAt=SystemClock.elapsedRealtime()
+        externalSubtitleUri=null
+        externalSubtitleMime=null
+        externalSubtitleLabel=null
 
         selectedVariantId=currentTarget.mediaVersionId
         resumePromptPositionMs=null
@@ -468,7 +533,14 @@ fun FilmiqooPlayerScreen(
             error=null
             ended=false
             playUrl=local
-            player.setMediaItem(playerMediaItem(local,currentTarget))
+            player.setMediaItem(
+                playerMediaItem(
+                    local,
+                    currentTarget,
+                    externalSubtitleUri,
+                    externalSubtitleMime
+                )
+            )
             if(currentTarget.startPositionMs>0) player.seekTo(currentTarget.startPositionMs)
             player.prepare()
             player.playbackParameters=player.playbackParameters.withSpeed(playbackSpeed)
@@ -1208,6 +1280,7 @@ fun FilmiqooPlayerScreen(
             subtitleTextColor=subtitleTextColor,
             subtitleBackgroundOpacity=subtitleBackgroundOpacity,
             subtitleEdgeStyle=subtitleEdgeStyle,
+            externalSubtitleLabel=externalSubtitleLabel,
             resizeMode=playerResizeMode,
             autoPlayNext=autoPlayNext,
             dataSaverApplied=dataSaverApplied,
@@ -1253,6 +1326,21 @@ fun FilmiqooPlayerScreen(
             onSubtitleTextColor={subtitleTextColor=it},
             onSubtitleBackgroundOpacity={subtitleBackgroundOpacity=it},
             onSubtitleEdgeStyle={subtitleEdgeStyle=it},
+            onPickExternalSubtitle={
+                externalSubtitlePicker.launch(
+                    arrayOf(
+                        "application/x-subrip",
+                        "text/vtt",
+                        "text/x-ssa",
+                        "text/plain",
+                        "application/octet-stream"
+                    )
+                )
+            },
+            onClearExternalSubtitle={
+                applyExternalSubtitle(null,null,null)
+                playerSettingsMessage="زیرنویس خارجی حذف شد"
+            },
             onResizeMode={playerResizeMode=it},
             onAutoPlayNext={autoPlayNext=it},
             onSleepTimer={minutes->
@@ -1994,6 +2082,7 @@ private fun PlayerSettingsSheet(
     subtitleTextColor: String,
     subtitleBackgroundOpacity: Float,
     subtitleEdgeStyle: String,
+    externalSubtitleLabel: String?,
     resizeMode: String,
     autoPlayNext: Boolean,
     dataSaverApplied: Boolean,
@@ -2014,6 +2103,8 @@ private fun PlayerSettingsSheet(
     onSubtitleTextColor: (String) -> Unit,
     onSubtitleBackgroundOpacity: (Float) -> Unit,
     onSubtitleEdgeStyle: (String) -> Unit,
+    onPickExternalSubtitle: () -> Unit,
+    onClearExternalSubtitle: () -> Unit,
     onResizeMode: (String) -> Unit,
     onAutoPlayNext: (Boolean) -> Unit,
     onSleepTimer: (Int?) -> Unit,
@@ -2134,6 +2225,23 @@ private fun PlayerSettingsSheet(
                             title=choice.label,
                             selected=choice.selected,
                             onClick={onSubtitle(choice)}
+                        )
+                    }
+
+                    PlayerSettingsRow(
+                        icon=Icons.Default.NoteAdd,
+                        title="افزودن زیرنویس از دستگاه",
+                        subtitle="SRT • VTT • ASS / SSA",
+                        selected=false,
+                        onClick=onPickExternalSubtitle
+                    )
+                    externalSubtitleLabel?.let { label ->
+                        PlayerSettingsRow(
+                            icon=Icons.Default.Attachment,
+                            title=label,
+                            subtitle="External subtitle فعال • لمس برای حذف",
+                            selected=true,
+                            onClick=onClearExternalSubtitle
                         )
                     }
 
@@ -2926,7 +3034,9 @@ private fun variantQualityRank(label:String):Int {
 
 private fun playerMediaItem(
     uri:String,
-    target:PlaybackTarget
+    target:PlaybackTarget,
+    externalSubtitleUri:String?=null,
+    externalSubtitleMime:String?=null
 ):ExoMediaItem {
     val metadata=MediaMetadata.Builder()
         .setTitle(target.title)
@@ -2939,11 +3049,24 @@ private fun playerMediaItem(
         }
         .build()
 
-    return ExoMediaItem.Builder()
+    val builder=ExoMediaItem.Builder()
         .setUri(uri)
         .setMediaId(target.mediaVersionId)
         .setMediaMetadata(metadata)
-        .build()
+
+    if(!externalSubtitleUri.isNullOrBlank()) {
+        val subtitle=androidx.media3.common.MediaItem.SubtitleConfiguration.Builder(
+            android.net.Uri.parse(externalSubtitleUri)
+        )
+            .setMimeType(externalSubtitleMime ?: "application/x-subrip")
+            .setLanguage("fa")
+            .setLabel("External")
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+        builder.setSubtitleConfigurations(listOf(subtitle))
+    }
+
+    return builder.build()
 }
 
 private fun applySubtitleAppearance(
