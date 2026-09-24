@@ -298,7 +298,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     backend=backend,
                     repository=repository,
                     onBack=closeOverlay,
-                    onMedia={overlay=OverlayRoute.Detail(it)}
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onPlay={overlay=OverlayRoute.Player(it)}
                 )
                 OverlayRoute.SocialSaves -> SavedSocialScreen(
                     social=social,

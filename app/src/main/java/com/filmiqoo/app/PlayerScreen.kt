@@ -108,6 +108,7 @@ fun FilmiqooPlayerScreen(
     var locked by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var momentsOpen by remember { mutableStateOf(false) }
+    var bookmarksOpen by remember { mutableStateOf(false) }
     var dialogueSearchOpen by remember { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
@@ -1159,6 +1160,7 @@ fun FilmiqooPlayerScreen(
                     }
                 },
                 onMoments={momentsOpen=true},
+                onBookmarks={bookmarksOpen=true},
                 onDialogueSearch={dialogueSearchOpen=true},
                 onQueue={queueOpen=true},
                 onShare={
@@ -1332,6 +1334,20 @@ fun FilmiqooPlayerScreen(
                 bumpControls()
             },
             onDismiss={momentsOpen=false}
+        )
+    }
+
+    if(bookmarksOpen) {
+        SceneBookmarksSheet(
+            backend=backend,
+            mediaVersionId=currentVersionId,
+            currentPositionMs=activePositionMs(),
+            onSeekTo={
+                player.seekTo(it)
+                positionMs=it
+                bumpControls()
+            },
+            onDismiss={bookmarksOpen=false}
         )
     }
 
@@ -1675,6 +1691,7 @@ private fun PlayerTopControls(
     onBack: () -> Unit,
     onDownload: () -> Unit,
     onMoments: () -> Unit,
+    onBookmarks: () -> Unit,
     onDialogueSearch: () -> Unit,
     onQueue: () -> Unit,
     onShare: () -> Unit,
@@ -1709,6 +1726,8 @@ private fun PlayerTopControls(
             )
         }
         PlayerGlassIcon(Icons.Default.Forum,onMoments)
+        Spacer(Modifier.width(5.dp))
+        PlayerGlassIcon(Icons.Default.BookmarkAdd,onBookmarks)
         Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(Icons.Default.ManageSearch,onDialogueSearch)
         Spacer(Modifier.width(5.dp))

@@ -27,16 +27,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-private enum class LibraryTab { FAVORITES, WATCHLIST, COLLECTIONS }
+private enum class LibraryTab { FAVORITES, WATCHLIST, COLLECTIONS, SCENES }
 
 @Composable
 fun LibraryScreen(
     backend: BackendRepository,
     repository: TmdbRepository,
     onBack: () -> Unit,
-    onMedia: (MediaItem) -> Unit
+    onMedia: (MediaItem) -> Unit,
+    onPlay: (PlaybackTarget) -> Unit
 ) {
     val lib=remember { LibraryRepository(backend) }
+    val sceneRepo=remember { SceneBookmarksRepository(backend) }
     val scope=rememberCoroutineScope()
 
     var tab by remember { mutableStateOf(LibraryTab.FAVORITES) }
@@ -46,6 +48,7 @@ fun LibraryScreen(
     var favorites by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
     var watchlist by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
     var collections by remember { mutableStateOf<List<MediaCollection>>(emptyList()) }
+    var sceneBookmarks by remember { mutableStateOf<List<SceneBookmark>>(emptyList()) }
     var activeCollection by remember { mutableStateOf<MediaCollectionDetail?>(null) }
     var showCreate by remember { mutableStateOf(false) }
 
@@ -56,15 +59,23 @@ fun LibraryScreen(
     LaunchedEffect(refresh) {
         loading=true
         error=null
-        runCatching {
-            Triple(lib.favorites(),lib.watchlist(),lib.collections())
-        }.onSuccess {
-            favorites=it.first
-            watchlist=it.second
-            collections=it.third
-        }.onFailure {
-            error=it.message ?: "خطا در دریافت Library"
-        }
+
+        runCatching { lib.favorites() }
+            .onSuccess { favorites=it }
+            .onFailure { error=it.message ?: "خطا در دریافت Favoriteها" }
+
+        runCatching { lib.watchlist() }
+            .onSuccess { watchlist=it }
+            .onFailure { error=error ?: it.message ?: "خطا در دریافت Watchlist" }
+
+        runCatching { lib.collections() }
+            .onSuccess { collections=it }
+            .onFailure { error=error ?: it.message ?: "خطا در دریافت Collectionها" }
+
+        runCatching { sceneRepo.all() }
+            .onSuccess { sceneBookmarks=it }
+            .onFailure { error=error ?: it.message ?: "خطا در دریافت Scene Bookmarkها" }
+
         loading=false
     }
 
@@ -111,6 +122,7 @@ fun LibraryScreen(
             favoriteCount=favorites.size,
             watchlistCount=watchlist.size,
             collectionCount=collections.size,
+            sceneCount=sceneBookmarks.size,
             onBack=onBack,
             onRefresh={refresh++}
         )
@@ -123,7 +135,8 @@ fun LibraryScreen(
             listOf(
                 LibraryTab.FAVORITES to "موردعلاقه‌ها",
                 LibraryTab.WATCHLIST to "Watchlist",
-                LibraryTab.COLLECTIONS to "Collectionها"
+                LibraryTab.COLLECTIONS to "Collectionها",
+                LibraryTab.SCENES to "Sceneها"
             ).forEach { item ->
                 Tab(
                     selected=tab==item.first,
@@ -219,6 +232,20 @@ fun LibraryScreen(
                     }
                 }
             }
+
+            LibraryTab.SCENES -> SceneBookmarksLibrary(
+                items=sceneBookmarks,
+                onPlay=onPlay,
+                onDelete={bookmark->
+                    scope.launch {
+                        runCatching { sceneRepo.delete(bookmark.id) }
+                            .onSuccess {
+                                sceneBookmarks=sceneBookmarks.filterNot { it.id==bookmark.id }
+                            }
+                            .onFailure { error=it.message }
+                    }
+                }
+            )
         }
     }
 
@@ -246,6 +273,7 @@ private fun LibraryHeader(
     favoriteCount:Int,
     watchlistCount:Int,
     collectionCount:Int,
+    sceneCount:Int,
     onBack:()->Unit,
     onRefresh:()->Unit
 ) {
@@ -285,6 +313,7 @@ private fun LibraryHeader(
                 PremiumStat(favoriteCount.toString(),"Favorite",Modifier.weight(1f))
                 PremiumStat(watchlistCount.toString(),"Watchlist",Modifier.weight(1f))
                 PremiumStat(collectionCount.toString(),"Collection",Modifier.weight(1f))
+                PremiumStat(sceneCount.toString(),"Scene",Modifier.weight(1f))
             }
         }
     }
@@ -741,5 +770,116 @@ fun CollectionPickerSheet(
                 }
             }
         )
+    }
+}
+
+
+@Composable
+private fun SceneBookmarksLibrary(
+    items:List<SceneBookmark>,
+    onPlay:(PlaybackTarget)->Unit,
+    onDelete:(SceneBookmark)->Unit
+) {
+    if(items.isEmpty()) {
+        PremiumEmptyState(
+            icon=Icons.Default.Bookmarks,
+            title="Scene Bookmark نداری",
+            body="وسط پخش روی Bookmark بزن تا هر صحنه را خصوصی با زمان دقیق ذخیره کنی."
+        )
+        return
+    }
+
+    LazyColumn(
+        contentPadding=PaddingValues(horizontal=12.dp,vertical=10.dp),
+        verticalArrangement=Arrangement.spacedBy(8.dp),
+        modifier=Modifier.fillMaxSize()
+    ) {
+        items(items,key={it.id}) { bookmark ->
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(18.dp),
+                modifier=Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clickable { onPlay(bookmark.asPlaybackTarget()) }
+                        .padding(10.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.width(74.dp).height(92.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(FqSurface2)
+                    ) {
+                        RemoteImage(
+                            bookmark.posterUrl,
+                            Modifier.fillMaxSize(),
+                            ContentScale.Crop
+                        )
+                        Surface(
+                            color=Color.Black.copy(alpha=.76f),
+                            shape=RoundedCornerShape(7.dp),
+                            modifier=Modifier.align(Alignment.BottomStart).padding(5.dp)
+                        ) {
+                            Text(
+                                formatSceneTime(bookmark.positionMs),
+                                color=FqGold,
+                                fontSize=7.sp,
+                                fontWeight=FontWeight.Bold,
+                                modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.width(10.dp))
+
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            bookmark.title,
+                            fontSize=10.sp,
+                            fontWeight=FontWeight.Bold,
+                            maxLines=1,
+                            overflow=TextOverflow.Ellipsis
+                        )
+                        if(bookmark.subtitle.isNotBlank()) {
+                            Text(
+                                bookmark.subtitle,
+                                color=FqMuted,
+                                fontSize=7.sp,
+                                modifier=Modifier.padding(top=2.dp)
+                            )
+                        }
+                        Text(
+                            bookmark.note.ifBlank { "Scene Bookmark" },
+                            color=Color.White.copy(alpha=.72f),
+                            fontSize=8.sp,
+                            maxLines=2,
+                            overflow=TextOverflow.Ellipsis,
+                            modifier=Modifier.padding(top=6.dp)
+                        )
+                        if(bookmark.tag.isNotBlank()) {
+                            Text(
+                                "#"+bookmark.tag,
+                                color=FqGold,
+                                fontSize=7.sp,
+                                modifier=Modifier.padding(top=4.dp)
+                            )
+                        }
+                    }
+
+                    Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.PlayCircle,
+                            null,
+                            tint=FqGold,
+                            modifier=Modifier.size(27.dp)
+                        )
+                        IconButton(onClick={onDelete(bookmark)}) {
+                            Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
