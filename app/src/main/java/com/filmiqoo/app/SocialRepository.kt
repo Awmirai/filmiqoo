@@ -202,6 +202,7 @@ data class ReelFeedItem(
     val shares: Long,
     val views: Long,
     val spoiler: Boolean,
+    val savedByMe: Boolean = false,
     val author: SocialAuthor,
     val media: ReelMediaRef?
 )
@@ -248,6 +249,7 @@ class SocialRepository(
                         shares=x.optLong("shares"),
                         views=x.optLong("views"),
                         spoiler=x.optBoolean("spoiler"),
+                        savedByMe=x.optBoolean("savedByMe"),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
                         media=media
                     )
@@ -283,6 +285,77 @@ class SocialRepository(
                         savedByMe=x.optBoolean("savedByMe"),
                         author=author,
                         media=mediaObj?.let(::parseMedia)
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun savedPosts(): List<SocialPost> {
+        val root=backend.getJson("/v1/social/posts/saved",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    SocialPost(
+                        id=x.optString("id"),
+                        type=x.optString("type","post"),
+                        body=x.optString("body"),
+                        spoiler=x.optBoolean("spoiler"),
+                        likes=x.optLong("likes"),
+                        comments=x.optLong("comments"),
+                        saves=x.optLong("saves"),
+                        shares=x.optLong("shares"),
+                        publishedAt=x.optString("publishedAt").takeIf(String::isNotBlank),
+                        likedByMe=x.optBoolean("likedByMe"),
+                        savedByMe=x.optBoolean("savedByMe",true),
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+                        media=x.optJSONObject("media")?.let(::parseMedia)
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun savedReels(): List<ReelFeedItem> {
+        val root=backend.getJson("/v1/social/reels/saved",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val mediaObj=x.optJSONObject("media")
+                val kind=mediaObj?.optString("kind").orEmpty()
+                val media=mediaObj?.let {
+                    val backendId=it.optString("id").takeIf(String::isNotBlank)
+                    if(backendId==null) null else ReelMediaRef(
+                        backendId=backendId,
+                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
+                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
+                        title=it.optString("title"),
+                        originalTitle=it.optString("originalTitle"),
+                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
+                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
+                        year=if(it.isNull("year")) null else it.optInt("year"),
+                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
+                    )
+                }
+                add(
+                    ReelFeedItem(
+                        id=x.optString("id"),
+                        caption=x.optString("caption"),
+                        playbackUrl=x.optString("playbackUrl"),
+                        coverUrl=x.optString("coverUrl"),
+                        durationMs=x.optLong("durationMs"),
+                        likes=x.optLong("likes"),
+                        comments=x.optLong("comments"),
+                        saves=x.optLong("saves"),
+                        shares=x.optLong("shares"),
+                        views=x.optLong("views"),
+                        spoiler=x.optBoolean("spoiler"),
+                        savedByMe=true,
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+                        media=media
                     )
                 )
             }

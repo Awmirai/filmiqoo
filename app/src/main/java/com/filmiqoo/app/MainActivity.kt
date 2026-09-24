@@ -199,6 +199,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onMedia={overlay=OverlayRoute.Detail(it)}
                 )
+                OverlayRoute.SocialSaves -> SavedSocialScreen(
+                    social=social,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                    onMedia={overlay=OverlayRoute.Detail(it)}
+                )
                 OverlayRoute.History -> WatchHistoryScreen(
                     backend=backend,
                     repository=repository,
@@ -482,6 +489,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onCommunity={tab=3},
                                     onDownloads={overlay=OverlayRoute.Downloads},
                                     onLibrary={overlay=OverlayRoute.Library},
+                                    onSocialSaves={overlay=OverlayRoute.SocialSaves},
                                     onHistory={overlay=OverlayRoute.History},
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},

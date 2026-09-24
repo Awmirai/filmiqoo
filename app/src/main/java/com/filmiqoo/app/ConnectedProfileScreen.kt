@@ -44,6 +44,7 @@ fun ConnectedProfileScreen(
     onCommunity: () -> Unit,
     onDownloads: () -> Unit,
     onLibrary: () -> Unit,
+    onSocialSaves: () -> Unit,
     onHistory: () -> Unit,
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
@@ -192,6 +193,12 @@ fun ConnectedProfileScreen(
                             title="Community و Creator",
                             subtitle="روم‌ها، کانال‌ها و فعالیت اجتماعی",
                             onClick=onCommunity
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.CollectionsBookmark,
+                            title="ذخیره‌های اجتماعی",
+                            subtitle="Saved Postها و Saved Reelها در یک جا",
+                            onClick=onSocialSaves
                         )
                     }
 

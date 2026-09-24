@@ -102,6 +102,7 @@ sealed interface OverlayRoute {
     data class Room(val roomId: String, val title: String) : OverlayRoute
     data object Downloads : OverlayRoute
     data object Library : OverlayRoute
+    data object SocialSaves : OverlayRoute
     data object History : OverlayRoute
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
