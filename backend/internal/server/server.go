@@ -68,6 +68,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	r.Use(middleware.Recoverer)
 	r.Use(s.securityHeaders)
 	r.Use(s.limitJSONBody)
+	r.Use(s.requestDeadline)
 	r.Use(s.cors)
 
 	r.Get("/healthz", s.health)
@@ -673,6 +674,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeError(w http.ResponseWriter,status int,err error) {
 	if err==nil {
 		err=errors.New(http.StatusText(status))
+	}
+	if errors.Is(err,context.DeadlineExceeded) {
+		writeJSON(w,http.StatusGatewayTimeout,map[string]string{"error":"request timed out"})
+		return
 	}
 	if status>=http.StatusInternalServerError {
 		log.Printf("internal server error: %v",err)
