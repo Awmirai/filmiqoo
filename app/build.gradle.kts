@@ -55,7 +55,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
-    implementation("com.google.android.gms:play-services-cast-framework:22.3.1")
+    implementation("com.google.android.gms:play-services-cast-framework:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.15.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
