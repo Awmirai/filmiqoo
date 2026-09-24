@@ -39,11 +39,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem as ExoMediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -155,6 +157,16 @@ fun FilmiqooPlayerScreen(
             }
     }
 
+    val mediaSession=remember(player) {
+        MediaSession.Builder(context,player)
+            .setId("filmiqoo-player")
+            .build()
+    }
+
+    DisposableEffect(mediaSession) {
+        onDispose { mediaSession.release() }
+    }
+
     fun bumpControls() {
         controlsVisible=true
         controlsEpoch++
@@ -182,7 +194,7 @@ fun FilmiqooPlayerScreen(
                 playUrl=url
                 currentVersionId=versionId
                 selectedVariantId=versionId
-                player.setMediaItem(ExoMediaItem.fromUri(url))
+                player.setMediaItem(playerMediaItem(url,currentTarget))
                 if(startPosition>0) player.seekTo(startPosition)
                 player.prepare()
                 player.playbackParameters=player.playbackParameters.withSpeed(playbackSpeed)
@@ -314,7 +326,7 @@ fun FilmiqooPlayerScreen(
             error=null
             ended=false
             playUrl=local
-            player.setMediaItem(ExoMediaItem.fromUri(local))
+            player.setMediaItem(playerMediaItem(local,currentTarget))
             if(currentTarget.startPositionMs>0) player.seekTo(currentTarget.startPositionMs)
             player.prepare()
             player.playbackParameters=player.playbackParameters.withSpeed(playbackSpeed)
@@ -2632,6 +2644,28 @@ private fun formatSpeed(value: Float): String =
         String.format(Locale.US,"%.2gx",value)
     }
 
+
+private fun playerMediaItem(
+    uri:String,
+    target:PlaybackTarget
+):ExoMediaItem {
+    val metadata=MediaMetadata.Builder()
+        .setTitle(target.title)
+        .setSubtitle(target.subtitle)
+        .apply {
+            target.posterUrl
+                ?.takeIf(String::isNotBlank)
+                ?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() }
+                ?.let(::setArtworkUri)
+        }
+        .build()
+
+    return ExoMediaItem.Builder()
+        .setUri(uri)
+        .setMediaId(target.mediaVersionId)
+        .setMediaMetadata(metadata)
+        .build()
+}
 
 private fun applySubtitleAppearance(
     view:androidx.media3.ui.SubtitleView?,
