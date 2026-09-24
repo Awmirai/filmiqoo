@@ -17,6 +17,10 @@ func strongProductionConfig() Config {
 		AuthRegisterRateLimit:8,
 		AuthRefreshRateLimit:30,
 		AuthenticatedWriteRateLimit:240,
+		PushMaxAttempts:6,
+		TelegramIngestMaxAttempts:8,
+		TelegramIngestRetryBaseSeconds:30,
+		TelemetryRetentionDays:30,
 	}
 }
 
