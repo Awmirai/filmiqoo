@@ -56,6 +56,7 @@ fun ConnectedProfileScreen(
     onFollowRequests: () -> Unit,
     onEditProfile: () -> Unit,
     onFilmDna: () -> Unit,
+    onReputation: (String) -> Unit,
     onSeriesCalendar: () -> Unit,
     onSocialCollections: () -> Unit,
     onLoggedOut: () -> Unit
@@ -164,6 +165,12 @@ fun ConnectedProfileScreen(
                             title="Film DNA",
                             subtitle="سلیقه واقعی، ژانرها، زبان‌ها و Badgeهای تماشای تو",
                             onClick=onFilmDna
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.MilitaryTech,
+                            title="Reputation و Badgeها",
+                            subtitle="اعتبار عمومی بر اساس Review، Collection و Community",
+                            onClick={onReputation(s.profile.id)}
                         )
                         ProfileActionRow(
                             icon=Icons.Default.EventAvailable,

@@ -96,6 +96,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/social/channels/{id}/manage", s.channelManageOverview)
 			r.Get("/social/channels/{id}/manage/rooms", s.channelManageRooms)
 		r.Get("/social/users/{id}", s.publicUserProfile)
+		r.Get("/social/users/{id}/reputation", s.userReputation)
 		r.Get("/social/users/{id}/posts", s.publicUserPosts)
 		r.Get("/social/users/{id}/reels", s.publicUserReels)
 		r.Get("/social/users/{id}/collections", s.publicUserCollections)

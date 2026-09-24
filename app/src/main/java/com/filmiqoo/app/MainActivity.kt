@@ -290,6 +290,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onManageChannel={channelId,name->
                         overlay=OverlayRoute.ChannelManage(channelId,name)
                     },
+                    onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 is OverlayRoute.ChannelManage -> ChannelManageScreen(
@@ -366,6 +367,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onSaved={overlay=null}
                 )
                 OverlayRoute.FilmDna -> FilmDnaScreen(
+                    backend=backend,
+                    onBack=closeOverlay
+                )
+                is OverlayRoute.Reputation -> ReputationScreen(
+                    userId=route.userId,
                     backend=backend,
                     onBack=closeOverlay
                 )
@@ -502,6 +508,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onFilmDna={overlay=OverlayRoute.FilmDna},
+                                    onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
                                     onSeriesCalendar={overlay=OverlayRoute.SeriesCalendar},
                                     onSocialCollections={overlay=OverlayRoute.SocialCollections()},
                                     onLoggedOut={

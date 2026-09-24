@@ -60,6 +60,7 @@ fun PremiumCreatorChannelScreen(
     onOpenReels: () -> Unit,
     onStartDm: (String, String) -> Unit,
     onManageChannel: (String, String) -> Unit,
+    onReputation: (String) -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val repo=remember { CreatorChannelRepository(backend) }
@@ -167,6 +168,7 @@ fun PremiumCreatorChannelScreen(
                     }
                 },
                 onMessage={onStartDm(p.id,p.displayName)},
+                onReputation={onReputation(p.id)},
                 onFollow={
                     if(!backend.session.isLoggedIn) {
                         onRequireAuth()
@@ -298,6 +300,7 @@ private fun CreatorEntityScaffold(
     onMore: () -> Unit,
     onManage: (() -> Unit)? = null,
     onMessage: (() -> Unit)? = null,
+    onReputation: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Column(Modifier.fillMaxSize().background(FqBg)) {
@@ -335,6 +338,12 @@ private fun CreatorEntityScaffold(
                         onClick=onManage,
                         modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                     ) { Icon(Icons.Default.AdminPanelSettings,null,tint=FqGold) }
+                }
+                if(onReputation!=null) {
+                    IconButton(
+                        onClick=onReputation,
+                        modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
+                    ) { Icon(Icons.Default.MilitaryTech,null,tint=FqGold) }
                 }
                 IconButton(
                     onClick=onRefresh,
