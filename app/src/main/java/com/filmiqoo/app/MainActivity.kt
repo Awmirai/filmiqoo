@@ -372,6 +372,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onCreator={overlay=OverlayRoute.CreatorPage(it)},
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
+                is OverlayRoute.SocialCollections -> SocialCollectionsScreen(
+                    backend=backend,
+                    repository=repository,
+                    loggedIn=backend.session.isLoggedIn,
+                    initialCollectionId=route.collectionId,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                    onRequireAuth={overlay=OverlayRoute.Auth}
+                )
                 OverlayRoute.Releases -> ReleaseCenterScreen(
                     backend=backend,
                     repository=repository,

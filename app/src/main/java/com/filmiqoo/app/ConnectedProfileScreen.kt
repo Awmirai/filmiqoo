@@ -170,6 +170,12 @@ fun ConnectedProfileScreen(
                             onClick=onSocialCollections
                         )
                         ProfileActionRow(
+                            icon=Icons.Default.CollectionsBookmark,
+                            title="Community Lists",
+                            subtitle="Collectionهای عمومی فیلم‌بازها و Creatorها",
+                            onClick=onSocialCollections
+                        )
+                        ProfileActionRow(
                             icon=Icons.Default.Analytics,
                             title="Creator Studio",
                             subtitle="Analytics، Reels، Stories و عملکرد کانال‌ها",
