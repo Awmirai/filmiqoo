@@ -46,7 +46,8 @@ data class MediaDetail(
     val cast: List<CastMember>,
     val trailerKey: String?,
     val recommendations: List<MediaItem>,
-    val seasons: List<SeasonInfo>
+    val seasons: List<SeasonInfo>,
+    val directors: List<CastMember> = emptyList()
 )
 
 data class HomeBundle(
@@ -86,6 +87,7 @@ sealed interface OverlayRoute {
     data class SocialStories(val stories: List<SocialStory>, val index: Int = 0) : OverlayRoute
     data class Chat(val title: String, val media: MediaItem? = null) : OverlayRoute
     data class CreatorPage(val creator: Creator) : OverlayRoute
+    data class PersonPage(val personId:Int,val name:String) : OverlayRoute
     data class WatchParty(val media: MediaItem? = null, val partyId: String? = null) : OverlayRoute
     data class Player(val target: PlaybackTarget) : OverlayRoute
     data class Room(val roomId: String, val title: String) : OverlayRoute

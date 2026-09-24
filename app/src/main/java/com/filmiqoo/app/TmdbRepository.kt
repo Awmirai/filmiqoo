@@ -324,6 +324,32 @@ class TmdbRepository(private val context: Context) {
             }
         }
 
+        val crewArray = obj.optJSONObject("credits")?.optJSONArray("crew") ?: JSONArray()
+        val directors = buildList {
+            for (i in 0 until crewArray.length()) {
+                val c = crewArray.optJSONObject(i) ?: continue
+                val job=c.optString("job")
+                val department=c.optString("department")
+                val isDirector=job.equals("Director",true) ||
+                    (media.type==MediaType.TV && (
+                        job.equals("Executive Producer",true) ||
+                        department.equals("Directing",true)
+                    ))
+                if(!isDirector) continue
+                val id=c.optInt("id")
+                if(id<=0 || any { it.id==id }) continue
+                add(
+                    CastMember(
+                        id=id,
+                        name=c.optString("name"),
+                        character=job.ifBlank { department },
+                        profilePath=c.optString("profile_path").takeIf { it.isNotBlank() && it!="null" }
+                    )
+                )
+                if(size>=8) break
+            }
+        }
+
         val videos = obj.optJSONObject("videos")?.optJSONArray("results") ?: JSONArray()
         var trailer: String? = null
         for (i in 0 until videos.length()) {
@@ -371,7 +397,111 @@ class TmdbRepository(private val context: Context) {
             cast = cast,
             trailerKey = trailer,
             recommendations = recommendations,
-            seasons = seasons
+            seasons = seasons,
+            directors = directors
+        )
+    }
+
+    suspend fun person(id:Int):PersonDetail {
+        require(id>0) { "Invalid person id" }
+
+        var obj=get(
+            "person/"+id,
+            mapOf(
+                "language" to "fa-IR",
+                "append_to_response" to "combined_credits,images,external_ids"
+            )
+        )
+
+        if(obj.optString("biography").isBlank()) {
+            val en=get(
+                "person/"+id,
+                mapOf(
+                    "language" to "en-US",
+                    "append_to_response" to "combined_credits,images,external_ids"
+                )
+            )
+            val merged=JSONObject(obj.toString())
+            if(merged.optString("biography").isBlank()) {
+                merged.put("biography",en.optString("biography"))
+            }
+            if(merged.optString("place_of_birth").isBlank()) {
+                merged.put("place_of_birth",en.optString("place_of_birth"))
+            }
+            obj=merged
+        }
+
+        val combined=obj.optJSONObject("combined_credits") ?: JSONObject()
+        val credits=buildList {
+            val cast=combined.optJSONArray("cast") ?: JSONArray()
+            for(i in 0 until cast.length()) {
+                val c=cast.optJSONObject(i) ?: continue
+                val mt=c.optString("media_type")
+                if(mt!="movie" && mt!="tv") continue
+                val media=parseMedia(c,if(mt=="tv")MediaType.TV else MediaType.MOVIE)
+                if(media.id<=0 || media.title.isBlank()) continue
+                add(
+                    PersonCredit(
+                        media=media,
+                        role=c.optString("character"),
+                        department="Acting"
+                    )
+                )
+            }
+
+            val crew=combined.optJSONArray("crew") ?: JSONArray()
+            for(i in 0 until crew.length()) {
+                val c=crew.optJSONObject(i) ?: continue
+                val mt=c.optString("media_type")
+                if(mt!="movie" && mt!="tv") continue
+                val media=parseMedia(c,if(mt=="tv")MediaType.TV else MediaType.MOVIE)
+                if(media.id<=0 || media.title.isBlank()) continue
+                val job=c.optString("job")
+                val department=c.optString("department")
+                add(
+                    PersonCredit(
+                        media=media,
+                        role=job,
+                        department=department
+                    )
+                )
+            }
+        }
+            .distinctBy { it.media.key+"|"+it.role }
+            .sortedWith(
+                compareByDescending<PersonCredit> { it.media.date }
+                    .thenByDescending { it.media.popularity }
+            )
+
+        val imageArr=obj.optJSONObject("images")?.optJSONArray("profiles") ?: JSONArray()
+        val images=buildList {
+            for(i in 0 until minOf(imageArr.length(),24)) {
+                val path=imageArr.optJSONObject(i)?.optString("file_path").orEmpty()
+                if(path.isNotBlank() && path!="null") add(path)
+            }
+        }.distinct()
+
+        val aliasesArr=obj.optJSONArray("also_known_as") ?: JSONArray()
+        val aliases=buildList {
+            for(i in 0 until aliasesArr.length()) {
+                aliasesArr.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }.distinct().take(12)
+
+        val external=obj.optJSONObject("external_ids")
+        return PersonDetail(
+            id=id,
+            name=obj.optString("name").ifBlank { "بدون نام" },
+            biography=obj.optString("biography"),
+            birthday=obj.optString("birthday"),
+            deathday=obj.optString("deathday").takeIf { it.isNotBlank() && it!="null" },
+            placeOfBirth=obj.optString("place_of_birth"),
+            knownForDepartment=obj.optString("known_for_department"),
+            profilePath=obj.optString("profile_path").takeIf { it.isNotBlank() && it!="null" },
+            alsoKnownAs=aliases,
+            imdbId=external?.optString("imdb_id")?.takeIf { it.isNotBlank() && it!="null" },
+            images=images,
+            credits=credits
         )
     }
 

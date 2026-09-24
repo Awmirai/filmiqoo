@@ -47,6 +47,7 @@ fun PremiumDetailScreen(
     onChat: (MediaItem) -> Unit,
     onWatchParty: (MediaItem) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
+    onPerson: (CastMember) -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val context=LocalContext.current
@@ -288,7 +289,17 @@ fun PremiumDetailScreen(
                                         icon=Icons.Default.Groups
                                     )
                                 }
-                                item { PremiumCastRow(d.cast,repository) }
+                                item { PremiumCastRow(d.cast,repository,onPerson) }
+                            }
+                            if(d.directors.isNotEmpty()) {
+                                item {
+                                    PremiumSectionHeader(
+                                        title=if(d.media.type==MediaType.MOVIE)"کارگردان" else "سازندگان و کارگردانان",
+                                        subtitle="عوامل کلیدی پشت دوربین",
+                                        icon=Icons.Default.MovieCreation
+                                    )
+                                }
+                                item { PremiumCastRow(d.directors,repository,onPerson) }
                             }
                             if(d.recommendations.isNotEmpty()) {
                                 item {
@@ -411,8 +422,31 @@ fun PremiumDetailScreen(
                                     icon=Icons.Default.TheaterComedy
                                 )
                             }
+                            if(d.directors.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        if(d.media.type==MediaType.MOVIE)"کارگردان" else "سازندگان و کارگردانان",
+                                        fontSize=11.sp,
+                                        fontWeight=FontWeight.Bold,
+                                        color=FqGold,
+                                        modifier=Modifier.padding(horizontal=16.dp,vertical=6.dp)
+                                    )
+                                }
+                                items(d.directors,key={"director_"+it.id}) { person ->
+                                    PremiumCastListItem(person,repository,onPerson)
+                                }
+                                item {
+                                    Text(
+                                        "بازیگران",
+                                        fontSize=11.sp,
+                                        fontWeight=FontWeight.Bold,
+                                        color=FqGold,
+                                        modifier=Modifier.padding(start=16.dp,end=16.dp,top=14.dp,bottom=6.dp)
+                                    )
+                                }
+                            }
                             items(d.cast,key={it.id}) { actor ->
-                                PremiumCastListItem(actor,repository)
+                                PremiumCastListItem(actor,repository,onPerson)
                             }
                         }
 
@@ -864,7 +898,8 @@ private fun OverviewSection(
 @Composable
 private fun PremiumCastRow(
     cast: List<CastMember>,
-    repository: TmdbRepository
+    repository: TmdbRepository,
+    onPerson: (CastMember) -> Unit
 ) {
     LazyRow(
         contentPadding=PaddingValues(horizontal=16.dp),
@@ -872,7 +907,7 @@ private fun PremiumCastRow(
     ) {
         items(cast.take(18),key={it.id}) { actor ->
             Column(
-                Modifier.width(92.dp),
+                Modifier.width(92.dp).clickable { onPerson(actor) },
                 horizontalAlignment=Alignment.CenterHorizontally
             ) {
                 RemoteImage(
@@ -902,11 +937,13 @@ private fun PremiumCastRow(
 @Composable
 private fun PremiumCastListItem(
     actor: CastMember,
-    repository: TmdbRepository
+    repository: TmdbRepository,
+    onPerson: (CastMember) -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)
-            .clip(RoundedCornerShape(17.dp)).background(FqSurface).padding(10.dp),
+            .clip(RoundedCornerShape(17.dp)).background(FqSurface)
+            .clickable { onPerson(actor) }.padding(10.dp),
         verticalAlignment=Alignment.CenterVertically
     ) {
         RemoteImage(

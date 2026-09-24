@@ -107,6 +107,9 @@ fun FilmiqooApp() {
                             overlay=OverlayRoute.Auth
                         }
                     },
+                    onPerson={person->
+                        overlay=OverlayRoute.PersonPage(person.id,person.name)
+                    },
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 is OverlayRoute.Player -> FilmiqooPlayerScreen(
@@ -173,6 +176,13 @@ fun FilmiqooApp() {
                     repository=repository,
                     onBack=closeOverlay,
                     onMedia={ overlay=OverlayRoute.Detail(it) }
+                )
+                is OverlayRoute.PersonPage -> PersonScreen(
+                    personId=route.personId,
+                    initialName=route.name,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)}
                 )
                 is OverlayRoute.CreatorPage -> PremiumCreatorChannelScreen(
                     creator=route.creator,
