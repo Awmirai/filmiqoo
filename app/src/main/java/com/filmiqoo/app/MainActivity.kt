@@ -133,7 +133,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             val host=uri.host.orEmpty().lowercase()
             val id=uri.pathSegments.firstOrNull().orEmpty()
             val kidsMode=activeViewer?.kidsMode==true
-            val socialHost=host in setOf("creator","channel","collection","party","room","reel")
+            val socialHost=host in setOf(
+                "creator","channel","collection","party","room","room-invite","reel"
+            )
 
             if(kidsMode && socialHost) {
                 overlay=null
@@ -222,6 +224,15 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             title=uri.getQueryParameter("title")
                                 ?.takeIf(String::isNotBlank)
                                 ?: "Filmiqoo Room"
+                        )
+                    }
+
+                    "room-invite" -> {
+                        require(id.isNotBlank())
+                        val joined=messaging.joinRoomInvite(id)
+                        overlay=OverlayRoute.Room(
+                            roomId=joined.id,
+                            title=joined.title.ifBlank { "Filmiqoo Group" }
                         )
                     }
 
