@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 import okio.BufferedSink
 
@@ -457,6 +458,59 @@ class BackendRepository(context: Context) {
                         sink.write(buffer,0,read)
                     }
                 } ?: throw IllegalStateException("فایل قابل خواندن نیست")
+            }
+        }
+
+        val put=Request.Builder().url(ticket.uploadUrl).put(body).build()
+        client.newCall(put).execute().use { res ->
+            if(!res.isSuccessful) throw IllegalStateException("آپلود فایل ناموفق بود ("+res.code+")")
+        }
+
+        postJson("/v1/uploads/"+ticket.uploadId+"/complete",JSONObject(),authorized=true)
+        ticket
+    }
+
+    suspend fun uploadFile(
+        file: File,
+        mimeType: String,
+        kind: String
+    ): UploadTicket = withContext(Dispatchers.IO) {
+        val mime=mimeType.trim().ifBlank { "application/octet-stream" }
+        val size=file.length()
+        if(!file.isFile || size<=0L) throw IllegalStateException("فایل قابل خواندن نیست")
+
+        val ticketJson=postJson(
+            "/v1/uploads/presign",
+            JSONObject()
+                .put("kind",kind)
+                .put("mimeType",mime)
+                .put("fileName",file.name)
+                .put("sizeBytes",size),
+            authorized=true
+        )
+
+        val ticket=UploadTicket(
+            uploadId=ticketJson.getString("uploadId"),
+            uploadUrl=ticketJson.getString("uploadUrl"),
+            objectKey=ticketJson.getString("objectKey"),
+            mediaUrl=ticketJson.getString("mediaUrl"),
+            mimeType=mime,
+            fileName=file.name,
+            sizeBytes=size
+        )
+
+        val body=object: RequestBody() {
+            override fun contentType()=mime.toMediaTypeOrNull()
+            override fun contentLength()=size
+            override fun writeTo(sink: BufferedSink) {
+                file.inputStream().use { input ->
+                    val buffer=ByteArray(DEFAULT_BUFFER_SIZE)
+                    while(true) {
+                        val read=input.read(buffer)
+                        if(read<0) break
+                        sink.write(buffer,0,read)
+                    }
+                }
             }
         }
 

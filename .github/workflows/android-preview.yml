@@ -3,6 +3,13 @@ name: Build Filmiqoo Premium Preview APK
 on:
   push:
     branches: [ main ]
+  pull_request:
+    paths:
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/android-preview.yml"
   workflow_dispatch:
 
 jobs:

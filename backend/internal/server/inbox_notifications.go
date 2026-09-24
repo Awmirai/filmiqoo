@@ -40,7 +40,14 @@ func (s *Server) inbox(w http.ResponseWriter,r *http.Request) {
 		     LIMIT 1
 		  ) otherp ON true
 		  LEFT JOIN LATERAL (
-		    SELECT m.body,m.created_at
+		    SELECT CASE
+		             WHEN btrim(m.body)<>'' THEN m.body
+		             WHEN m.message_type='voice' THEN '🎙 پیام صوتی'
+		             WHEN m.message_type='image' THEN '🖼 تصویر'
+		             WHEN m.message_type='video' THEN '🎬 ویدیو'
+		             ELSE 'پیام'
+		           END AS body,
+		           m.created_at
 		      FROM messages m
 		     WHERE m.room_id=rm.id AND m.deleted_at IS NULL
 		     ORDER BY m.created_at DESC

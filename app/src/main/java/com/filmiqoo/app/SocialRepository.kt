@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import org.json.JSONObject
 import org.json.JSONArray
+import java.io.File
 
 data class SocialAuthor(
     val id: String,
@@ -148,6 +149,39 @@ data class SocialRoom(
     val media: SocialMediaRef?
 )
 
+data class ForwardedMessageRef(
+    val id:String,
+    val body:String,
+    val type:String,
+    val author:String
+)
+
+data class RoomMemberItem(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val avatarUrl:String,
+    val verified:Boolean,
+    val role:String,
+    val presence:String,
+    val lastSeenAt:String?
+)
+
+data class RoomMembersState(
+    val roomType:String,
+    val myRole:String,
+    val online:Long,
+    val items:List<RoomMemberItem>
+)
+
+data class RoomMemberCandidate(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val avatarUrl:String,
+    val verified:Boolean
+)
+
 data class RoomMessageItem(
     val id: String,
     val body: String,
@@ -157,9 +191,11 @@ data class RoomMessageItem(
     val author: SocialAuthor,
     val attachmentUrl: String? = null,
     val attachmentMime: String? = null,
+    val attachmentDurationMs: Long = 0L,
     val replyToId: String? = null,
     val replyPreview: String? = null,
     val replyAuthor: String? = null,
+    val forwardedFrom: ForwardedMessageRef? = null,
     val reactions: Map<String,Long> = emptyMap(),
     val editedAt: String? = null,
     val seenBy: Long = 0,
@@ -796,6 +832,100 @@ class SocialRepository(
             authorized=true
         ).optBoolean("pinned")
 
+    suspend fun roomMembers(roomId:String):RoomMembersState {
+        val root=backend.getJson("/v1/rooms/"+roomId+"/members",authorized=true)
+        val arr=root.optJSONArray("items")
+        val items=buildList {
+            if(arr!=null) for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    RoomMemberItem(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified"),
+                        role=x.optString("role"),
+                        presence=x.optString("presence","offline"),
+                        lastSeenAt=x.optString("lastSeenAt").takeIf(String::isNotBlank)
+                    )
+                )
+            }
+        }
+        return RoomMembersState(
+            roomType=root.optString("roomType"),
+            myRole=root.optString("myRole"),
+            online=root.optLong("online"),
+            items=items
+        )
+    }
+
+    suspend fun searchRoomMemberCandidates(
+        roomId:String,
+        query:String
+    ):List<RoomMemberCandidate> {
+        val q=java.net.URLEncoder.encode(query.trim(),"UTF-8")
+        val root=backend.getJson(
+            "/v1/rooms/"+roomId+"/member-candidates?q="+q,
+            authorized=true
+        )
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    RoomMemberCandidate(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified")
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun addRoomMember(roomId:String,userId:String):Boolean =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/members/"+userId+"/add",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("added")
+
+    suspend fun updateRoomMemberRole(
+        roomId:String,
+        userId:String,
+        role:String
+    ):String =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/members/"+userId+"/role",
+            JSONObject().put("role",role),
+            authorized=true
+        ).optString("role")
+
+    suspend fun removeRoomMember(roomId:String,userId:String):Boolean =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/members/"+userId+"/remove",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("removed")
+
+    suspend fun forwardMessage(
+        roomId:String,
+        messageId:String,
+        targetRoomId:String
+    ):String =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/"+messageId+"/forward",
+            JSONObject().put("targetRoomId",targetRoomId),
+            authorized=true
+        ).optString("id")
+
+    suspend fun heartbeatPresence() {
+        backend.postJson("/v1/presence/heartbeat",JSONObject(),authorized=true)
+    }
+
     suspend fun sendMessage(
         roomId: String,
         body: String,
@@ -835,6 +965,35 @@ class SocialRepository(
                     .put("mimeType",ticket.mimeType)
                     .put("fileName",ticket.fileName)
                     .put("sizeBytes",ticket.sizeBytes)
+            )
+        if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages",
+            payload,
+            authorized=true
+        ).optString("id")
+    }
+
+    suspend fun sendVoiceMessage(
+        roomId:String,
+        file:File,
+        durationMs:Long,
+        spoiler:Boolean=false,
+        replyToMessageId:String?=null
+    ):String {
+        val ticket=backend.uploadFile(file,"audio/mp4","chat")
+        val payload=JSONObject()
+            .put("body","")
+            .put("type","voice")
+            .put("spoiler",spoiler)
+            .put(
+                "attachment",
+                JSONObject()
+                    .put("url",ticket.mediaUrl)
+                    .put("mimeType",ticket.mimeType)
+                    .put("fileName",ticket.fileName)
+                    .put("sizeBytes",ticket.sizeBytes)
+                    .put("durationMs",durationMs.coerceAtLeast(0L))
             )
         if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
         return backend.postJson(
@@ -941,35 +1100,44 @@ class SocialRepository(
         }
     }
 
-    private fun parseRoomMessage(x:JSONObject)=RoomMessageItem(
-        id=x.optString("id"),
-        body=x.optString("body"),
-        type=x.optString("type"),
-        spoiler=x.optBoolean("spoiler"),
-        createdAt=x.optString("createdAt"),
-        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
-        attachmentUrl=x.optJSONObject("attachment")
-            ?.optString("url")?.takeIf(String::isNotBlank),
-        attachmentMime=x.optJSONObject("attachment")
-            ?.optString("mimeType")?.takeIf(String::isNotBlank),
-        replyToId=x.optJSONObject("replyTo")
-            ?.optString("id")?.takeIf(String::isNotBlank),
-        replyPreview=x.optJSONObject("replyTo")
-            ?.optString("body")?.takeIf(String::isNotBlank),
-        replyAuthor=x.optJSONObject("replyTo")
-            ?.optString("author")?.takeIf(String::isNotBlank),
-        reactions=buildMap {
-            val ro=x.optJSONObject("reactions") ?: JSONObject()
-            val keys=ro.keys()
-            while(keys.hasNext()) {
-                val key=keys.next()
-                put(key,ro.optLong(key))
-            }
-        },
-        editedAt=x.optString("editedAt").takeIf(String::isNotBlank),
-        seenBy=x.optLong("seenBy"),
-        pinned=x.optBoolean("pinned")
-    )
+    private fun parseRoomMessage(x:JSONObject):RoomMessageItem {
+        val attachment=x.optJSONObject("attachment")
+        val reply=x.optJSONObject("replyTo")
+        val forwarded=x.optJSONObject("forwardedFrom")
+        return RoomMessageItem(
+            id=x.optString("id"),
+            body=x.optString("body"),
+            type=x.optString("type"),
+            spoiler=x.optBoolean("spoiler"),
+            createdAt=x.optString("createdAt"),
+            author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+            attachmentUrl=attachment?.optString("url")?.takeIf(String::isNotBlank),
+            attachmentMime=attachment?.optString("mimeType")?.takeIf(String::isNotBlank),
+            attachmentDurationMs=attachment?.optLong("durationMs") ?: 0L,
+            replyToId=reply?.optString("id")?.takeIf(String::isNotBlank),
+            replyPreview=reply?.optString("body")?.takeIf(String::isNotBlank),
+            replyAuthor=reply?.optString("author")?.takeIf(String::isNotBlank),
+            forwardedFrom=forwarded?.optString("id")?.takeIf(String::isNotBlank)?.let {
+                ForwardedMessageRef(
+                    id=it,
+                    body=forwarded.optString("body"),
+                    type=forwarded.optString("type"),
+                    author=forwarded.optString("author")
+                )
+            },
+            reactions=buildMap {
+                val ro=x.optJSONObject("reactions") ?: JSONObject()
+                val keys=ro.keys()
+                while(keys.hasNext()) {
+                    val key=keys.next()
+                    put(key,ro.optLong(key))
+                }
+            },
+            editedAt=x.optString("editedAt").takeIf(String::isNotBlank),
+            seenBy=x.optLong("seenBy"),
+            pinned=x.optBoolean("pinned")
+        )
+    }
 
     private fun parseAuthor(o: JSONObject)=SocialAuthor(
         id=o.optString("id"),

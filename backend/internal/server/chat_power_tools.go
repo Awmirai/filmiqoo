@@ -284,11 +284,17 @@ func (s *Server) queryRoomMessages(
                EXISTS(
                  SELECT 1 FROM room_message_pins rp
                   WHERE rp.room_id=m.room_id AND rp.message_id=m.id
-               )
+               ),
+               m.forwarded_from_message_id::text,
+               forwarded.body,
+               forwarded.message_type,
+               forwarded_author.display_name
           FROM messages m
           JOIN profiles p ON p.user_id=m.author_user_id
           LEFT JOIN messages reply ON reply.id=m.reply_to_message_id
           LEFT JOIN profiles reply_author ON reply_author.user_id=reply.author_user_id
+          LEFT JOIN messages forwarded ON forwarded.id=m.forwarded_from_message_id
+          LEFT JOIN profiles forwarded_author ON forwarded_author.user_id=forwarded.author_user_id
     `+suffix,args...)
     if err!=nil { return nil,err }
     defer rows.Close()
@@ -302,12 +308,25 @@ func (s *Server) queryRoomMessages(
         var editedAt *time.Time
         var seenBy int64
         var replyID,replyBody,replyAuthor *string
+        var forwardedID,forwardedBody,forwardedType,forwardedAuthor *string
         if err:=rows.Scan(
             &id,&body,&typ,&attachment,&spoiler,&created,
             &userID,&username,&displayName,&avatar,&verified,
             &replyID,&replyBody,&replyAuthor,&reactions,
             &editedAt,&seenBy,&pinned,
+            &forwardedID,&forwardedBody,&forwardedType,&forwardedAuthor,
         ); err!=nil { continue }
+
+        var forwardedFrom any
+        if forwardedID!=nil {
+            forwardedFrom=map[string]any{
+                "id":forwardedID,
+                "body":forwardedBody,
+                "type":forwardedType,
+                "author":forwardedAuthor,
+            }
+        }
+
         items=append(items,map[string]any{
             "id":id,
             "body":body,
@@ -321,6 +340,7 @@ func (s *Server) queryRoomMessages(
             "replyTo":map[string]any{
                 "id":replyID,"body":replyBody,"author":replyAuthor,
             },
+            "forwardedFrom":forwardedFrom,
             "reactions":decodeJSONOrEmptyObject(reactions),
             "author":map[string]any{
                 "id":userID,"username":username,"displayName":displayName,

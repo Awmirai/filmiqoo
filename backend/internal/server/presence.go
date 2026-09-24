@@ -32,11 +32,11 @@ func (s *Server) setWatchingPresence(
 	_,err:=s.db.Exec(ctx,`
 		INSERT INTO user_presence (
 			user_id,media_version_id,media_title_id,episode_id,
-			state,position_ms,visible_until,updated_at
+			state,position_ms,visible_until,last_seen_at,updated_at
 		)
 		SELECT
 			$1,mv.id,COALESCE(mv.media_title_id,sn.media_title_id),mv.episode_id,
-			'watching',$3,now()+interval '90 seconds',now()
+			'watching',$3,now()+interval '90 seconds',now(),now()
 		  FROM media_versions mv
 		  LEFT JOIN episodes e ON e.id=mv.episode_id
 		  LEFT JOIN seasons sn ON sn.id=e.season_id
@@ -49,6 +49,7 @@ func (s *Server) setWatchingPresence(
 			state='watching',
 			position_ms=EXCLUDED.position_ms,
 			visible_until=EXCLUDED.visible_until,
+			last_seen_at=now(),
 			updated_at=now()
 	`,
 		userID,mediaVersionID,clampInt64(positionMS,0,86_400_000),
@@ -59,8 +60,9 @@ func (s *Server) setWatchingPresence(
 func (s *Server) clearWatchingPresence(ctx context.Context,userID string) error {
 	_,err:=s.db.Exec(ctx,`
 		UPDATE user_presence
-		   SET state='offline',
-		       visible_until=now(),
+		   SET state='online',
+		       visible_until=now()+interval '90 seconds',
+		       last_seen_at=now(),
 		       updated_at=now()
 		 WHERE user_id=$1
 	`,userID)
