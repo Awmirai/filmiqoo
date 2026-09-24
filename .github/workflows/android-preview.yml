@@ -26,11 +26,33 @@ jobs:
           gradle-version: '8.9'
       - name: Run Android unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
-      - name: Run Android lint audit
-        continue-on-error: true
+      - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace
+      - name: Print Android lint report
+        if: always()
+        run: |
+          report="$(find app/build -name 'lint-results-debug.txt' -print -quit)"
+          if [ -n "$report" ] && [ -f "$report" ]; then
+            echo "Lint report: $report"
+            cat "$report"
+          fi
+
+      - name: Upload Android lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-lint-${{ github.sha }}
+          path: |
+            app/build/reports/lint-results-debug.txt
+            app/build/reports/lint-results-debug.html
+            app/build/intermediates/**/lint-results-debug.txt
+          if-no-files-found: ignore
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+      - name: Build minified release smoke
+        env:
+          FILMIQOO_RELEASE_API_BASE_URL: https://release-smoke.invalid
+        run: gradle :app:assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: filmiqoo-premium-preview

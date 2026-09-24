@@ -175,8 +175,7 @@ func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) validIngestSecret(value string) bool {
-	expected := strings.TrimSpace(s.cfg.TelegramIngestSecret)
-	return expected != "" && value == expected
+	return secureSecretEqual(s.cfg.TelegramIngestSecret,value)
 }
 
 

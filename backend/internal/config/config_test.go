@@ -21,6 +21,7 @@ func strongProductionConfig() Config {
 		TelegramIngestMaxAttempts:8,
 		TelegramIngestRetryBaseSeconds:30,
 		TelemetryRetentionDays:30,
+		OpsSecret:"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef",
 	}
 }
 

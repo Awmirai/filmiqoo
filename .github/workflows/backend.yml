@@ -57,12 +57,8 @@ jobs:
           go mod tidy
           go mod verify
 
-      - name: Apply all database migrations
-        run: |
-          for file in migrations/*.sql; do
-            echo "Applying $file"
-            psql               -h localhost               -U filmiqoo               -d filmiqoo_ci               -v ON_ERROR_STOP=1               -f "$file"
-          done
+      - name: Apply embedded database migrations
+        run: go run ./cmd/migrate
 
       - name: Unit tests with race detector
         run: go test -race ./...

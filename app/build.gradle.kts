@@ -4,17 +4,35 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+fun quotedBuildConfig(value:String):String =
+    "\"" + value.replace("\\","\\\\").replace("\"","\\\"") + "\""
+
+val debugApiBaseUrl =
+    System.getenv("FILMIQOO_DEBUG_API_BASE_URL") ?: "http://10.0.2.2:8080"
+val releaseApiBaseUrl =
+    System.getenv("FILMIQOO_RELEASE_API_BASE_URL") ?: ""
+val releaseKeystorePath =
+    System.getenv("FILMIQOO_KEYSTORE_PATH").orEmpty()
+val releaseStorePassword =
+    System.getenv("FILMIQOO_KEYSTORE_PASSWORD").orEmpty()
+val releaseKeyAlias =
+    System.getenv("FILMIQOO_KEY_ALIAS").orEmpty()
+val releaseKeyPassword =
+    System.getenv("FILMIQOO_KEY_PASSWORD").orEmpty()
+val requireReleaseSigning =
+    System.getenv("FILMIQOO_REQUIRE_SIGNING")?.equals("true",ignoreCase=true)==true
+
 android {
     namespace = "com.filmiqoo.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.filmiqoo.previewfix"
+        applicationId =
+            System.getenv("FILMIQOO_APPLICATION_ID") ?: "com.filmiqoo.previewfix"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4-connected-preview"
-        buildConfigField("String", "FILMIQOO_API_BASE_URL", "\"http://10.0.2.2:8080\"")
+        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 4
+        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.4-connected-preview"
         buildConfigField(
             "String",
             "FIREBASE_API_KEY",
@@ -37,9 +55,36 @@ android {
         )
     }
 
+    signingConfigs {
+        create("release") {
+            if(releaseKeystorePath.isNotBlank()) {
+                storeFile=file(releaseKeystorePath)
+                storePassword=releaseStorePassword
+                keyAlias=releaseKeyAlias
+                keyPassword=releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "FILMIQOO_API_BASE_URL",
+                quotedBuildConfig(debugApiBaseUrl)
+            )
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            buildConfigField(
+                "String",
+                "FILMIQOO_API_BASE_URL",
+                quotedBuildConfig(releaseApiBaseUrl)
+            )
+            if(releaseKeystorePath.isNotBlank()) {
+                signingConfig=signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -57,6 +102,41 @@ android {
         buildConfig = true
     }
 
+    lint {
+        lintConfig=file("lint.xml")
+        abortOnError=true
+        checkReleaseBuilds=true
+        textReport=true
+        textOutput=file("build/reports/lint-results-debug.txt")
+        htmlReport=true
+    }
+
+}
+
+val verifyProductionReleaseConfig=tasks.register("verifyProductionReleaseConfig") {
+    doLast {
+        require(releaseApiBaseUrl.startsWith("https://")) {
+            "FILMIQOO_RELEASE_API_BASE_URL must be a non-empty HTTPS URL"
+        }
+        if(requireReleaseSigning) {
+            require(releaseKeystorePath.isNotBlank()) {
+                "FILMIQOO_KEYSTORE_PATH is required for signed production releases"
+            }
+            require(releaseStorePassword.isNotBlank()) {
+                "FILMIQOO_KEYSTORE_PASSWORD is required for signed production releases"
+            }
+            require(releaseKeyAlias.isNotBlank()) {
+                "FILMIQOO_KEY_ALIAS is required for signed production releases"
+            }
+            require(releaseKeyPassword.isNotBlank()) {
+                "FILMIQOO_KEY_PASSWORD is required for signed production releases"
+            }
+        }
+    }
+}
+
+tasks.matching { it.name=="preReleaseBuild" }.configureEach {
+    dependsOn(verifyProductionReleaseConfig)
 }
 
 dependencies {

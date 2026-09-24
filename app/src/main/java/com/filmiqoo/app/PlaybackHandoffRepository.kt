@@ -2,7 +2,6 @@ package com.filmiqoo.app
 
 import android.content.Context
 import android.os.Build
-import android.provider.Settings
 import org.json.JSONObject
 import java.net.URLEncoder
 
@@ -44,12 +43,7 @@ class PlaybackHandoffRepository(
 ) {
     private val appContext=context.applicationContext
 
-    fun deviceId():String =
-        Settings.Secure.getString(
-            appContext.contentResolver,
-            Settings.Secure.ANDROID_ID
-        )?.takeIf(String::isNotBlank)
-            ?: ("android-"+Build.MODEL.replace(" ","-"))
+    fun deviceId():String = LocalDeviceIdentity.id(appContext)
 
     fun deviceName():String {
         val manufacturer=Build.MANUFACTURER

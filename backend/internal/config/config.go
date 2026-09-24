@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -46,6 +48,8 @@ type Config struct {
 	TelegramIngestMaxAttempts int
 	TelegramIngestRetryBaseSeconds int
 	TelemetryRetentionDays int
+	OpsSecret string
+	AllowInternalPlaintextDatabase bool
 }
 
 func Load() Config {
@@ -86,6 +90,8 @@ func Load() Config {
 		TelegramIngestMaxAttempts: envInt("TELEGRAM_INGEST_MAX_ATTEMPTS", 8),
 		TelegramIngestRetryBaseSeconds: envInt("TELEGRAM_INGEST_RETRY_BASE_SECONDS", 30),
 		TelemetryRetentionDays: envInt("TELEMETRY_RETENTION_DAYS", 30),
+		OpsSecret: env("OPS_SECRET", "dev-ops-change-me"),
+		AllowInternalPlaintextDatabase: envBool("ALLOW_INTERNAL_PLAINTEXT_DATABASE", false),
 	}
 }
 
@@ -121,6 +127,7 @@ func (c Config) Validate() error {
 			"TELEGRAM_INGEST_SECRET":c.TelegramIngestSecret,
 			"PLAYBACK_SIGNING_SECRET":c.PlaybackSigningSecret,
 			"OBJECT_STORAGE_SECRET":c.ObjectStorageSecret,
+			"OPS_SECRET":c.OpsSecret,
 		}
 		for name,value:=range weak {
 			v:=strings.TrimSpace(value)
@@ -140,7 +147,9 @@ func (c Config) Validate() error {
 			}
 		}
 		if strings.Contains(strings.ToLower(c.DatabaseURL),"sslmode=disable") {
-			return errors.New("production DATABASE_URL must not disable TLS")
+			if !c.AllowInternalPlaintextDatabase || !isInternalDatabaseURL(c.DatabaseURL) {
+				return errors.New("production DATABASE_URL may disable TLS only for explicitly allowed internal/private database hosts")
+			}
 		}
 	}
 
@@ -215,4 +224,22 @@ func envBool(key string,fallback bool) bool {
 	default:
 		return fallback
 	}
+}
+
+
+func isInternalDatabaseURL(raw string) bool {
+	parsed,err:=url.Parse(raw)
+	if err!=nil { return false }
+	host:=strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host=="" { return false }
+	switch host {
+	case "localhost","127.0.0.1","::1","postgres":
+		return true
+	}
+	if strings.HasSuffix(host,".internal") ||
+		strings.HasSuffix(host,".local") {
+		return true
+	}
+	ip:=net.ParseIP(host)
+	return ip!=nil && (ip.IsPrivate() || ip.IsLoopback())
 }

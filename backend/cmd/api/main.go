@@ -26,6 +26,13 @@ func main() {
 	if err != nil { log.Fatalf("postgres: %v", err) }
 	defer db.Close()
 
+	migrationCtx,migrationCancel:=context.WithTimeout(ctx,5*time.Minute)
+	if err:=storage.ApplyMigrations(migrationCtx,db); err!=nil {
+		migrationCancel()
+		log.Fatalf("migrations: %v",err)
+	}
+	migrationCancel()
+
 	redisClient := storage.OpenRedis(cfg.RedisAddr, cfg.RedisPassword)
 	defer redisClient.Close()
 

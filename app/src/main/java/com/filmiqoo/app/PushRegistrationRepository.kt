@@ -1,7 +1,6 @@
 package com.filmiqoo.app
 
 import android.content.Context
-import android.provider.Settings
 import org.json.JSONObject
 
 data class PushDevice(
@@ -19,10 +18,7 @@ class PushRegistrationRepository(
 ) {
     private val appContext=context.applicationContext
 
-    fun deviceId():String =
-        Settings.Secure.getString(appContext.contentResolver,Settings.Secure.ANDROID_ID)
-            ?.takeIf(String::isNotBlank)
-            ?: "android-"+android.os.Build.MODEL.replace(" ","-")
+    fun deviceId():String = LocalDeviceIdentity.id(appContext)
 
     suspend fun registerFcmToken(token:String,locale:String="fa"):String {
         val root=backend.postJson(
