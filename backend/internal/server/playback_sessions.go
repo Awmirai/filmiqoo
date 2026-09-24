@@ -111,6 +111,14 @@ func (s *Server) startPlaybackSession(w http.ResponseWriter,r *http.Request) {
     ).Scan(&id)
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
+    _=s.setWatchingPresence(
+        r.Context(),
+        userID,
+        viewerID,
+        body.MediaVersionID,
+        body.PositionMS,
+    )
+
     writeJSON(w,http.StatusCreated,map[string]any{
         "id":id,
         "started":true,
@@ -156,6 +164,17 @@ func (s *Server) heartbeatPlaybackSession(w http.ResponseWriter,r *http.Request)
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     if tag.RowsAffected()==0 {
         writeJSON(w,http.StatusNotFound,map[string]string{"error":"playback session not found"}); return
+    }
+
+    viewerID:=s.viewerProfileID(r,userID)
+    if body.CurrentMediaVersionID!="" {
+        _=s.setWatchingPresence(
+            r.Context(),
+            userID,
+            viewerID,
+            body.CurrentMediaVersionID,
+            body.PositionMS,
+        )
     }
 
     writeJSON(w,http.StatusOK,map[string]any{"updated":true})
@@ -210,5 +229,8 @@ func (s *Server) endPlaybackSession(w http.ResponseWriter,r *http.Request) {
         writeJSON(w,http.StatusOK,map[string]any{"ended":false})
         return
     }
+
+    _=s.clearWatchingPresence(r.Context(),userID)
+
     writeJSON(w,http.StatusOK,map[string]any{"ended":true})
 }

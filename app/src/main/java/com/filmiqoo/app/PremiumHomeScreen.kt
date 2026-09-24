@@ -49,7 +49,9 @@ fun PremiumHomeScreen(
     var state by remember { mutableStateOf<PremiumHomeLoad>(PremiumHomeLoad.Loading) }
     var continueItems by remember { mutableStateOf<List<ContinueWatchingItem>>(emptyList()) }
     var personalized by remember { mutableStateOf<PersonalizedHomeBundle?>(null) }
+    var friendsWatching by remember { mutableStateOf<List<FriendWatchingNow>>(emptyList()) }
     val personalizationRepo=remember { HomePersonalizationRepository(backend) }
+    val friendActivityRepo=remember { FriendActivityRepository(backend) }
     val activeViewer=if(loggedIn) backend.viewerProfiles.active() else null
     val kidsMode=activeViewer?.kidsMode==true
 
@@ -57,9 +59,13 @@ fun PremiumHomeScreen(
         if(loggedIn) {
             continueItems=runCatching { backend.continueWatching() }.getOrDefault(emptyList())
             personalized=runCatching { personalizationRepo.load() }.getOrNull()
+            friendsWatching=if(!kidsMode) {
+                runCatching { friendActivityRepo.followingWatching() }.getOrDefault(emptyList())
+            } else emptyList()
         } else {
             continueItems=emptyList()
             personalized=null
+            friendsWatching=emptyList()
         }
         state=PremiumHomeLoad.Loading
         state=if(kidsMode) {
@@ -77,6 +83,7 @@ fun PremiumHomeScreen(
             data=s.data,
             continueItems=continueItems,
             personalized=personalized,
+            friendsWatching=friendsWatching,
             repository=repository,
             loggedIn=loggedIn,
             kidsMode=kidsMode,
@@ -97,6 +104,7 @@ private fun PremiumHomeContent(
     data: HomeBundle,
     continueItems: List<ContinueWatchingItem>,
     personalized: PersonalizedHomeBundle?,
+    friendsWatching: List<FriendWatchingNow>,
     repository: TmdbRepository,
     loggedIn: Boolean,
     kidsMode: Boolean,
@@ -201,6 +209,23 @@ private fun PremiumHomeContent(
                     icon=Icons.Default.PlayCircleOutline,
                     title="صف تماشات خالیه",
                     body="وقتی یک فیلم یا قسمت رو شروع کنی، اینجا با زمان دقیق ادامه نمایش داده می‌شه."
+                )
+            }
+        }
+
+        if(!kidsMode && friendsWatching.isNotEmpty()) {
+            item {
+                PremiumSectionHeader(
+                    title="دوستان الان دارن می‌بینن",
+                    subtitle="فعالیت زنده افرادی که Follow کردی",
+                    icon=Icons.Default.Groups
+                )
+            }
+            item {
+                FriendsWatchingRow(
+                    items=friendsWatching,
+                    repository=repository,
+                    onMedia=onMedia
                 )
             }
         }
