@@ -214,7 +214,7 @@ fun RoomConversationSettingsSheet(
                         modifier=Modifier.padding(vertical=14.dp)
                     )
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        Icon(Icons.Default.AdminPanelSettings,null,tint=FqGold)
+                        Icon(Icons.Default.Star,null,tint=FqGold)
                         Spacer(Modifier.width(7.dp))
                         Text("مدیریت گروه",fontSize=12.sp)
                     }
