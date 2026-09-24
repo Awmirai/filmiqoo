@@ -13,7 +13,41 @@ data class InboxConversation(
     val avatarUrl: String,
     val lastMessage: String,
     val lastMessageAt: String?,
-    val unread: Long
+    val unread: Long,
+    val notificationLevel: String = "all",
+    val archived: Boolean = false
+)
+
+data class RoomConversationSettings(
+    val id:String,
+    val name:String,
+    val topic:String,
+    val type:String,
+    val visibility:String,
+    val members:Long,
+    val slowModeSeconds:Int,
+    val channelId:String?,
+    val myRole:String,
+    val notificationLevel:String,
+    val archived:Boolean,
+    val canManage:Boolean
+)
+
+data class RoomPreferences(
+    val notificationLevel:String,
+    val archived:Boolean
+)
+
+data class RoomInviteInfo(
+    val code:String,
+    val deepLink:String,
+    val usageCount:Long
+)
+
+data class RoomJoinResult(
+    val id:String,
+    val title:String,
+    val existing:Boolean
 )
 
 data class DmRoom(
@@ -37,8 +71,9 @@ data class FilmiqooNotification(
 class MessagingRepository(
     private val backend: BackendRepository
 ) {
-    suspend fun inbox(): List<InboxConversation> {
-        val root=backend.getJson("/v1/inbox",authorized=true)
+    suspend fun inbox(archived:Boolean=false): List<InboxConversation> {
+        val path=if(archived)"/v1/inbox?archived=1" else "/v1/inbox"
+        val root=backend.getJson(path,authorized=true)
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
@@ -55,7 +90,9 @@ class MessagingRepository(
                         avatarUrl=x.optString("avatarUrl"),
                         lastMessage=x.optString("lastMessage"),
                         lastMessageAt=x.optString("lastMessageAt").takeIf(String::isNotBlank),
-                        unread=x.optLong("unread")
+                        unread=x.optLong("unread"),
+                        notificationLevel=x.optString("notificationLevel","all"),
+                        archived=x.optBoolean("archived")
                     )
                 )
             }
@@ -73,6 +110,114 @@ class MessagingRepository(
     suspend fun markRoomRead(roomId: String) {
         backend.postJson("/v1/rooms/"+roomId+"/read",JSONObject(),authorized=true)
     }
+
+    suspend fun roomSettings(roomId:String):RoomConversationSettings {
+        val o=backend.getJson("/v1/rooms/"+roomId+"/settings",authorized=true)
+        return RoomConversationSettings(
+            id=o.optString("id"),
+            name=o.optString("name"),
+            topic=o.optString("topic"),
+            type=o.optString("type"),
+            visibility=o.optString("visibility"),
+            members=o.optLong("members"),
+            slowModeSeconds=o.optInt("slowModeSeconds"),
+            channelId=o.optString("channelId").takeIf(String::isNotBlank),
+            myRole=o.optString("myRole"),
+            notificationLevel=o.optString("notificationLevel","all"),
+            archived=o.optBoolean("archived"),
+            canManage=o.optBoolean("canManage")
+        )
+    }
+
+    suspend fun updateRoomSettings(
+        roomId:String,
+        name:String,
+        topic:String,
+        visibility:String,
+        slowModeSeconds:Int
+    ):RoomConversationSettings {
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/settings",
+            JSONObject()
+                .put("name",name)
+                .put("topic",topic)
+                .put("visibility",visibility)
+                .put("slowModeSeconds",slowModeSeconds),
+            authorized=true
+        )
+        return roomSettings(roomId)
+    }
+
+    suspend fun updateRoomPreferences(
+        roomId:String,
+        notificationLevel:String?=null,
+        archived:Boolean?=null
+    ):RoomPreferences {
+        val body=JSONObject()
+        if(notificationLevel!=null) body.put("notificationLevel",notificationLevel)
+        if(archived!=null) body.put("archived",archived)
+        val o=backend.postJson(
+            "/v1/rooms/"+roomId+"/preferences",
+            body,
+            authorized=true
+        )
+        return RoomPreferences(
+            notificationLevel=o.optString("notificationLevel","all"),
+            archived=o.optBoolean("archived")
+        )
+    }
+
+    suspend fun roomInvite(roomId:String):RoomInviteInfo {
+        val o=backend.getJson("/v1/rooms/"+roomId+"/invite",authorized=true)
+        return RoomInviteInfo(
+            code=o.optString("code"),
+            deepLink=o.optString("deepLink"),
+            usageCount=o.optLong("usageCount")
+        )
+    }
+
+    suspend fun regenerateRoomInvite(roomId:String):RoomInviteInfo {
+        val o=backend.postJson(
+            "/v1/rooms/"+roomId+"/invite/regenerate",
+            JSONObject(),
+            authorized=true
+        )
+        return RoomInviteInfo(
+            code=o.optString("code"),
+            deepLink=o.optString("deepLink"),
+            usageCount=o.optLong("usageCount")
+        )
+    }
+
+    suspend fun joinRoomInvite(code:String):RoomJoinResult {
+        val o=backend.postJson(
+            "/v1/room-invites/"+code+"/join",
+            JSONObject(),
+            authorized=true
+        )
+        return RoomJoinResult(
+            id=o.optString("id"),
+            title=o.optString("title"),
+            existing=o.optBoolean("existing")
+        )
+    }
+
+    suspend fun leaveRoom(roomId:String):Boolean =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/leave",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("left")
+
+    suspend fun transferRoomOwnership(
+        roomId:String,
+        userId:String
+    ):String =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/members/"+userId+"/transfer-owner",
+            JSONObject(),
+            authorized=true
+        ).optString("ownerId")
 
     suspend fun notifications(): Pair<List<FilmiqooNotification>,Long> {
         val root=backend.getJson("/v1/notifications",authorized=true)
