@@ -49,6 +49,7 @@ fun ConnectedProfileScreen(
     onInbox: () -> Unit,
     onSettings: () -> Unit,
     onViewerProfiles: () -> Unit,
+    onParentalControls: () -> Unit,
     onSecurity: () -> Unit,
     onSafety: () -> Unit,
     onFollowRequests: () -> Unit,
@@ -126,21 +127,34 @@ fun ConnectedProfileScreen(
                     }
                 }
 
-                item { SectionHeader("مرکز حساب") }
+                item { SectionHeader(if(kidsMode)"Kids Center" else "مرکز حساب") }
                 item {
-                    ProfileActionRow(
-                        icon=Icons.Default.SwitchAccount,
-                        title="پروفایل‌های تماشا",
-                        subtitle="Multi‑Profile، Kids Mode و Library جدا",
-                        onClick=onViewerProfiles
-                    )
-                    ProfileActionRow(
-                        icon=Icons.Default.Edit,
-                        title="ویرایش پروفایل",
-                        subtitle="Avatar، Cover، Username، Bio و حریم خصوصی",
-                        onClick=onEditProfile
-                    )
-                    if(!kidsMode) {
+                    if(kidsMode) {
+                        ProfileActionRow(
+                            icon=Icons.Default.ExitToApp,
+                            title="خروج از Kids Mode",
+                            subtitle="نیاز به تأیید والدین",
+                            onClick=onViewerProfiles
+                        )
+                    } else {
+                        ProfileActionRow(
+                            icon=Icons.Default.SwitchAccount,
+                            title="پروفایل‌های تماشا",
+                            subtitle="Multi‑Profile، Kids Mode و Library جدا",
+                            onClick=onViewerProfiles
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.AdminPanelSettings,
+                            title="کنترل والدین",
+                            subtitle="Parental PIN و محافظت خروج از Kids",
+                            onClick=onParentalControls
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.Edit,
+                            title="ویرایش پروفایل",
+                            subtitle="Avatar، Cover، Username، Bio و حریم خصوصی",
+                            onClick=onEditProfile
+                        )
                         ProfileActionRow(
                             icon=Icons.Default.Analytics,
                             title="Creator Studio",
@@ -160,6 +174,7 @@ fun ConnectedProfileScreen(
                             onClick=onCommunity
                         )
                     }
+
                     ProfileActionRow(
                         icon=Icons.Default.VideoLibrary,
                         title="Library",
@@ -178,55 +193,58 @@ fun ConnectedProfileScreen(
                         subtitle="صف، Pause/Resume، Retry و پخش بدون اینترنت",
                         onClick=onDownloads
                     )
-                    ProfileActionRow(
-                        icon=Icons.Default.Subtitles,
-                        title="زبان، دوبله و زیرنویس",
-                        subtitle="ترجیحات پخش فارسی و انگلیسی",
-                        onClick={}
-                    )
+
                     if(!kidsMode) {
+                        ProfileActionRow(
+                            icon=Icons.Default.Subtitles,
+                            title="زبان، دوبله و زیرنویس",
+                            subtitle="ترجیحات پخش فارسی و انگلیسی",
+                            onClick=onSettings
+                        )
                         ProfileActionRow(
                             icon=Icons.Default.PersonAddAlt1,
                             title="درخواست‌های Follow",
                             subtitle="Accept یا Decline درخواست‌های حساب خصوصی",
                             onClick=onFollowRequests
                         )
+                        ProfileActionRow(
+                            icon=Icons.Default.Shield,
+                            title="مرکز ایمنی",
+                            subtitle="Block، Mute و مدیریت تجربه اجتماعی",
+                            onClick=onSafety
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.Security,
+                            title="امنیت و دستگاه‌ها",
+                            subtitle="Sessionهای فعال و خروج از دستگاه‌های دیگر",
+                            onClick=onSecurity
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.Settings,
+                            title="تنظیمات",
+                            subtitle="پخش، دانلود، زیرنویس، اعلان‌ها و حریم خصوصی",
+                            onClick=onSettings
+                        )
                     }
-                    ProfileActionRow(
-                        icon=Icons.Default.Shield,
-                        title="مرکز ایمنی",
-                        subtitle="Block، Mute و مدیریت تجربه اجتماعی",
-                        onClick=onSafety
-                    )
-                    ProfileActionRow(
-                        icon=Icons.Default.Security,
-                        title="امنیت و دستگاه‌ها",
-                        subtitle="Sessionهای فعال و خروج از دستگاه‌های دیگر",
-                        onClick=onSecurity
-                    )
-                    ProfileActionRow(
-                        icon=Icons.Default.Settings,
-                        title="تنظیمات",
-                        subtitle="پخش، دانلود، زیرنویس، اعلان‌ها و حریم خصوصی",
-                        onClick=onSettings
-                    )
                 }
 
-                item {
-                    OutlinedButton(
-                        onClick={
-                            scope.launch {
-                                backend.logout()
-                                onLoggedOut()
-                            }
-                        },
-                        shape=RoundedCornerShape(14.dp),
-                        colors=ButtonDefaults.outlinedButtonColors(contentColor=FqDanger),
-                        modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=18.dp)
-                    ) {
-                        Icon(Icons.Default.Logout,null)
-                        Spacer(Modifier.width(7.dp))
-                        Text("خروج از حساب")
+                if(!kidsMode) {
+                    item {
+                        OutlinedButton(
+                            onClick={
+                                scope.launch {
+                                    backend.logout()
+                                    onLoggedOut()
+                                }
+                            },
+                            shape=RoundedCornerShape(14.dp),
+                            colors=ButtonDefaults.outlinedButtonColors(contentColor=FqDanger),
+                            modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=18.dp)
+                        ) {
+                            Icon(Icons.Default.Logout,null)
+                            Spacer(Modifier.width(7.dp))
+                            Text("خروج از حساب")
+                        }
                     }
                 }
             }

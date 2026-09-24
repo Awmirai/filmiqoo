@@ -316,6 +316,15 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         overlay=null
                     }
                 )
+                OverlayRoute.ParentalGate -> ParentalGateScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onVerified={overlay=OverlayRoute.ViewerProfiles}
+                )
+                OverlayRoute.ParentalControls -> ParentalControlsScreen(
+                    backend=backend,
+                    onBack=closeOverlay
+                )
                 OverlayRoute.Security -> SecurityScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -443,7 +452,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},
                                     onSettings={overlay=OverlayRoute.Settings},
-                                    onViewerProfiles={overlay=OverlayRoute.ViewerProfiles},
+                                    onViewerProfiles={
+                                        overlay=if(activeViewer?.kidsMode==true)
+                                            OverlayRoute.ParentalGate
+                                        else
+                                            OverlayRoute.ViewerProfiles
+                                    },
+                                    onParentalControls={overlay=OverlayRoute.ParentalControls},
                                     onSecurity={overlay=OverlayRoute.Security},
                                     onSafety={overlay=OverlayRoute.Safety},
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},

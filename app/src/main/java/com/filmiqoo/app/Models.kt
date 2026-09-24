@@ -106,6 +106,8 @@ sealed interface OverlayRoute {
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
     data object ViewerProfiles : OverlayRoute
+    data object ParentalGate : OverlayRoute
+    data object ParentalControls : OverlayRoute
     data object Security : OverlayRoute
     data object Safety : OverlayRoute
     data object FollowRequests : OverlayRoute
