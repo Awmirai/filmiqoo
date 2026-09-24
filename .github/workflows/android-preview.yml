@@ -29,8 +29,18 @@ jobs:
       - name: Run Android lint audit
         continue-on-error: true
         run: gradle :app:lintDebug --stacktrace
+      - name: Print Android lint report
+        if: always()
+        run: |
+          if [ -f app/build/reports/lint-results-debug.txt ]; then
+            cat app/build/reports/lint-results-debug.txt
+          fi
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+      - name: Build minified release smoke
+        env:
+          FILMIQOO_RELEASE_API_BASE_URL: https://release-smoke.invalid
+        run: gradle :app:assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: filmiqoo-premium-preview
