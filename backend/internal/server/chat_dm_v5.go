@@ -587,6 +587,11 @@ func (s *Server) notifyRoomMessage(
 		return
 	}
 
+	var replyArg any
+	if replyToMessageID!=nil && strings.TrimSpace(*replyToMessageID)!="" {
+		replyArg=*replyToMessageID
+	}
+
 	_,_=s.db.Exec(ctx,`
 		INSERT INTO notifications (
 			user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
@@ -613,7 +618,7 @@ func (s *Server) notifyRoomMessage(
 		       )
 		     )
 		   )
-	`,roomID,actorUserID,roomName,preview,messageBody,replyToMessageID)
+	`,roomID,actorUserID,roomName,preview,messageBody,replyArg)
 }
 
 func messagePreview(body,typ string) string {
