@@ -362,6 +362,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                is OverlayRoute.SocialCollections -> SocialCollectionsScreen(
+                    backend=backend,
+                    repository=repository,
+                    loggedIn=backend.session.isLoggedIn,
+                    initialCollectionId=route.collectionId,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                    onRequireAuth={overlay=OverlayRoute.Auth}
+                )
                 OverlayRoute.Releases -> ReleaseCenterScreen(
                     backend=backend,
                     repository=repository,
@@ -392,6 +402,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
                     onOpenCreator={overlay=OverlayRoute.CreatorPage(it)},
                     onOpenMedia={overlay=OverlayRoute.Detail(it)},
+                    onOpenCollection={overlay=OverlayRoute.SocialCollections(it)},
                     onFollowRequests={overlay=OverlayRoute.FollowRequests}
                 )
             }
@@ -477,6 +488,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onFilmDna={overlay=OverlayRoute.FilmDna},
+                                    onSocialCollections={overlay=OverlayRoute.SocialCollections()},
                                     onLoggedOut={
                                         backend.viewerProfiles.clear()
                                         activeViewer=null

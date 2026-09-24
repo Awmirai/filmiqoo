@@ -211,6 +211,7 @@ fun ConnectedNotificationsScreen(
     onOpenRoom: (String,String) -> Unit,
     onOpenCreator: (Creator) -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
+    onOpenCollection: (String) -> Unit,
     onFollowRequests: () -> Unit
 ) {
     val repo=remember { MessagingRepository(backend) }
@@ -280,6 +281,8 @@ fun ConnectedNotificationsScreen(
                                 if(!item.read) runCatching { repo.markNotificationRead(item.id) }
                                 when {
                                     item.type=="follow_request" -> onFollowRequests()
+                                    item.entityType=="collection" && !item.entityId.isNullOrBlank() ->
+                                        onOpenCollection(item.entityId)
                                     item.entityType=="room" && !item.entityId.isNullOrBlank() ->
                                         onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
                                     item.media!=null ->
@@ -372,6 +375,7 @@ private fun notificationIcon(type:String)=when(type) {
     "story_reply" -> Icons.Default.Reply
     "dm_message" -> Icons.Default.MarkChatUnread
     "release_ready" -> Icons.Default.NewReleases
+    "collection_update" -> Icons.Default.CollectionsBookmark
     else -> Icons.Default.Notifications
 }
 
@@ -383,6 +387,7 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "story_reply" -> "Story Reply"
     "dm_message" -> "پیام"
     "release_ready" -> "انتشار"
+    "collection_update" -> "Collection"
     else -> "Filmiqoo"
 }
 

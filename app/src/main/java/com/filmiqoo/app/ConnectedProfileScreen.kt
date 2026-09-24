@@ -55,6 +55,7 @@ fun ConnectedProfileScreen(
     onFollowRequests: () -> Unit,
     onEditProfile: () -> Unit,
     onFilmDna: () -> Unit,
+    onSocialCollections: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -161,6 +162,12 @@ fun ConnectedProfileScreen(
                             title="Film DNA",
                             subtitle="سلیقه واقعی، ژانرها، زبان‌ها و Badgeهای تماشای تو",
                             onClick=onFilmDna
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.CollectionsBookmark,
+                            title="Community Lists",
+                            subtitle="Collectionهای عمومی فیلم‌بازها و Creatorها",
+                            onClick=onSocialCollections
                         )
                         ProfileActionRow(
                             icon=Icons.Default.Analytics,

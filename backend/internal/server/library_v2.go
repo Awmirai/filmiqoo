@@ -318,6 +318,24 @@ func (s *Server) toggleCollectionItem(w http.ResponseWriter,r *http.Request) {
     `,collectionID)
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
+    if !exists {
+        _,_=tx.Exec(r.Context(),`
+            INSERT INTO notifications (
+                user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
+            )
+            SELECT cf.user_id,$2,'collection_update','collection',$1,
+                   'Collection به‌روزرسانی شد',
+                   c.name || ' • یک عنوان جدید اضافه شد'
+              FROM collection_followers cf
+              JOIN collections c ON c.id=cf.collection_id
+              LEFT JOIN user_preferences up ON up.user_id=cf.user_id
+             WHERE cf.collection_id=$1
+               AND cf.user_id<>$2
+               AND c.visibility IN ('public','unlisted')
+               AND COALESCE(up.notifications_social,true)=true
+        `,collectionID,userID)
+    }
+
     if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     writeJSON(w,http.StatusOK,map[string]any{"included":!exists})
 }
