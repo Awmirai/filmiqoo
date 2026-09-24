@@ -55,6 +55,7 @@ private data class CreateDraft(
     val kind:String="POST",
     val caption:String="",
     val spoiler:Boolean=false,
+    val closeFriendsOnly:Boolean=false,
     val allowComments:Boolean=true,
     val channelName:String="",
     val channelSlug:String="",
@@ -75,6 +76,7 @@ private class CreateDraftStore(context:Context) {
         kind=prefs.getString("kind","POST") ?: "POST",
         caption=prefs.getString("caption","") ?: "",
         spoiler=prefs.getBoolean("spoiler",false),
+        closeFriendsOnly=prefs.getBoolean("close_friends_only",false),
         allowComments=prefs.getBoolean("allow_comments",true),
         channelName=prefs.getString("channel_name","") ?: "",
         channelSlug=prefs.getString("channel_slug","") ?: "",
@@ -93,6 +95,7 @@ private class CreateDraftStore(context:Context) {
             .putString("kind",d.kind)
             .putString("caption",d.caption)
             .putBoolean("spoiler",d.spoiler)
+            .putBoolean("close_friends_only",d.closeFriendsOnly)
             .putBoolean("allow_comments",d.allowComments)
             .putString("channel_name",d.channelName)
             .putString("channel_slug",d.channelSlug)
@@ -132,6 +135,7 @@ fun PremiumCreateHubScreen(
     }
     var caption by remember { mutableStateOf(savedDraft.caption) }
     var spoiler by remember { mutableStateOf(savedDraft.spoiler) }
+    var closeFriendsOnly by remember { mutableStateOf(savedDraft.closeFriendsOnly) }
     var allowComments by remember { mutableStateOf(savedDraft.allowComments) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -177,6 +181,7 @@ fun PremiumCreateHubScreen(
         kind=kind.name,
         caption=caption,
         spoiler=spoiler,
+        closeFriendsOnly=closeFriendsOnly,
         allowComments=allowComments,
         channelName=channelName,
         channelSlug=channelSlug,
@@ -426,6 +431,25 @@ fun PremiumCreateHubScreen(
                                 label={Text("Spoiler",fontSize=8.sp)},
                                 leadingIcon={Icon(Icons.Default.VisibilityOff,null,modifier=Modifier.size(15.dp))}
                             )
+                            if(kind==CreateKind.STORY) {
+                                FilterChip(
+                                    selected=closeFriendsOnly,
+                                    onClick={closeFriendsOnly=!closeFriendsOnly},
+                                    label={
+                                        Text(
+                                            if(closeFriendsOnly)"Close Friends" else "عمومی",
+                                            fontSize=8.sp
+                                        )
+                                    },
+                                    leadingIcon={
+                                        Icon(
+                                            if(closeFriendsOnly)Icons.Default.Star else Icons.Default.Public,
+                                            null,
+                                            modifier=Modifier.size(15.dp)
+                                        )
+                                    }
+                                )
+                            }
                             if(kind==CreateKind.REEL) {
                                 FilterChip(
                                     selected=allowComments,
@@ -649,17 +673,22 @@ fun PremiumCreateHubScreen(
                                             ticket=ticket,
                                             caption=caption.trim(),
                                             spoiler=spoiler,
-                                            mediaTitleId=mediaId
+                                            mediaTitleId=mediaId,
+                                            closeFriendsOnly=closeFriendsOnly
                                         )
                                     } else {
                                         publishStage="در حال انتشار Story متنی..."
                                         social.createTextStory(
                                             caption=caption.trim(),
                                             spoiler=spoiler,
-                                            mediaTitleId=mediaId
+                                            mediaTitleId=mediaId,
+                                            closeFriendsOnly=closeFriendsOnly
                                         )
                                     }
-                                    "Story برای ۲۴ ساعت منتشر شد."
+                                    if(closeFriendsOnly)
+                                        "Story فقط برای Close Friends منتشر شد."
+                                    else
+                                        "Story برای ۲۴ ساعت منتشر شد."
                                 }
                                 CreateKind.REEL -> {
                                     publishStage="در حال آپلود Reel..."
@@ -692,6 +721,7 @@ fun PremiumCreateHubScreen(
                             caption=""
                             selectedUri=null
                             spoiler=false
+                            closeFriendsOnly=false
                             taggedMedia=null
                             scheduledAtMillis=null
                             pollOptions.clear()

@@ -413,6 +413,10 @@ func (s *Server) createStory(w http.ResponseWriter,r *http.Request) {
 func (s *Server) markStoryView(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	storyID:=chi.URLParam(r,"id")
+	if _,allowed:=s.storyAuthorIfAccessible(r.Context(),storyID,userID); !allowed {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"story not found"})
+		return
+	}
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer tx.Rollback(r.Context())

@@ -25,10 +25,8 @@ func (s *Server) reactToStory(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
-	var authorID string
-	if err:=s.db.QueryRow(r.Context(),
-		"SELECT author_user_id::text FROM stories WHERE id=$1 AND expires_at>now()",
-		storyID).Scan(&authorID); err!=nil {
+	authorID,allowed:=s.storyAuthorIfAccessible(r.Context(),storyID,userID)
+	if !allowed {
 		writeJSON(w,http.StatusNotFound,map[string]string{"error":"story not found"})
 		return
 	}
@@ -75,10 +73,8 @@ func (s *Server) replyToStory(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
-	var authorID string
-	if err:=s.db.QueryRow(r.Context(),
-		"SELECT author_user_id::text FROM stories WHERE id=$1 AND expires_at>now()",
-		storyID).Scan(&authorID); err!=nil {
+	authorID,allowed:=s.storyAuthorIfAccessible(r.Context(),storyID,userID)
+	if !allowed {
 		writeJSON(w,http.StatusNotFound,map[string]string{"error":"story not found"})
 		return
 	}

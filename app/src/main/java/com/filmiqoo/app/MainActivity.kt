@@ -361,6 +361,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onCreator={overlay=OverlayRoute.CreatorPage(it)}
                 )
+                OverlayRoute.CloseFriends -> CloseFriendsScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)}
+                )
                 OverlayRoute.EditProfile -> EditProfileScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -506,6 +511,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onSecurity={overlay=OverlayRoute.Security},
                                     onSafety={overlay=OverlayRoute.Safety},
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},
+                                    onCloseFriends={overlay=OverlayRoute.CloseFriends},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onFilmDna={overlay=OverlayRoute.FilmDna},
                                     onReputation={userId->overlay=OverlayRoute.Reputation(userId)},

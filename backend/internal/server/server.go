@@ -141,6 +141,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/stories/{id}/reaction", s.reactToStory)
 			r.Post("/social/stories/{id}/reply", s.replyToStory)
 			r.Post("/social/users/{id}/follow", s.toggleUserFollow)
+			r.Get("/social/close-friends", s.closeFriends)
+			r.Post("/social/close-friends/{userID}/toggle", s.toggleCloseFriend)
 			r.Get("/social/collections/following", s.followedCollections)
 			r.Post("/social/collections/{id}/follow", s.toggleCollectionFollow)
 			r.Get("/social/follow-requests", s.incomingFollowRequests)

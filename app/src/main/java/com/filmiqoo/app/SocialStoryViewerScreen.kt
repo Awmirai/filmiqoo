@@ -306,11 +306,34 @@ fun SocialStoryViewerScreen(
                             )
                         }
                     }
-                    Text(
-                        "@"+story.author.username+" • Story",
-                        color=Color.White.copy(alpha=.65f),
-                        fontSize=7.sp
-                    )
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text(
+                            "@"+story.author.username+" • Story",
+                            color=Color.White.copy(alpha=.65f),
+                            fontSize=7.sp
+                        )
+                        if(story.closeFriendsOnly) {
+                            Spacer(Modifier.width(5.dp))
+                            Surface(
+                                color=FqGreen.copy(alpha=.16f),
+                                shape=RoundedCornerShape(7.dp)
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal=5.dp,vertical=2.dp),
+                                    verticalAlignment=Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        null,
+                                        tint=FqGreen,
+                                        modifier=Modifier.size(10.dp)
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Text("Close Friends",color=FqGreen,fontSize=5.sp)
+                                }
+                            }
+                        }
+                    }
                 }
                 IconButton(onClick={paused=!paused}) {
                     Icon(

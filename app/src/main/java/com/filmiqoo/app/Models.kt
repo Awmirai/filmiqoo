@@ -112,6 +112,7 @@ sealed interface OverlayRoute {
     data object Security : OverlayRoute
     data object Safety : OverlayRoute
     data object FollowRequests : OverlayRoute
+    data object CloseFriends : OverlayRoute
     data object EditProfile : OverlayRoute
     data object FilmDna : OverlayRoute
     data class Reputation(val userId:String) : OverlayRoute

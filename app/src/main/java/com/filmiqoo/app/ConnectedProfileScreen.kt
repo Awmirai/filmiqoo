@@ -54,6 +54,7 @@ fun ConnectedProfileScreen(
     onSecurity: () -> Unit,
     onSafety: () -> Unit,
     onFollowRequests: () -> Unit,
+    onCloseFriends: () -> Unit,
     onEditProfile: () -> Unit,
     onFilmDna: () -> Unit,
     onReputation: (String) -> Unit,
@@ -241,6 +242,12 @@ fun ConnectedProfileScreen(
                             title="درخواست‌های Follow",
                             subtitle="Accept یا Decline درخواست‌های حساب خصوصی",
                             onClick=onFollowRequests
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.Star,
+                            title="Close Friends",
+                            subtitle="Audience خصوصی Story برای آدم‌های منتخب",
+                            onClick=onCloseFriends
                         )
                         ProfileActionRow(
                             icon=Icons.Default.Shield,

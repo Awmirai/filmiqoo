@@ -68,7 +68,8 @@ data class SocialStory(
     val createdAt: String,
     val expiresAt: String,
     val author: SocialAuthor,
-    val media: SocialMediaRef?
+    val media: SocialMediaRef?,
+    val closeFriendsOnly: Boolean = false
 )
 
 data class PollOption(
@@ -384,7 +385,8 @@ class SocialRepository(
                         createdAt=x.optString("createdAt"),
                         expiresAt=x.optString("expiresAt"),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
-                        media=x.optJSONObject("media")?.let(::parseMedia)
+                        media=x.optJSONObject("media")?.let(::parseMedia),
+                        closeFriendsOnly=x.optBoolean("closeFriendsOnly")
                     )
                 )
             }
@@ -557,7 +559,8 @@ class SocialRepository(
         ticket: UploadTicket,
         caption: String,
         spoiler: Boolean=false,
-        mediaTitleId: String?=null
+        mediaTitleId: String?=null,
+        closeFriendsOnly:Boolean=false
     ): String {
         val type=if(ticket.mimeType.startsWith("video/")) "video" else "image"
         val body=JSONObject()
@@ -566,6 +569,7 @@ class SocialRepository(
             .put("thumbnailUrl",if(type=="image")ticket.mediaUrl else "")
             .put("caption",caption)
             .put("spoiler",spoiler)
+            .put("closeFriendsOnly",closeFriendsOnly)
         if(!mediaTitleId.isNullOrBlank()) body.put("mediaTitleId",mediaTitleId)
         return backend.postJson("/v1/social/stories",body,authorized=true).getString("id")
     }
@@ -573,12 +577,14 @@ class SocialRepository(
     suspend fun createTextStory(
         caption: String,
         spoiler: Boolean=false,
-        mediaTitleId: String?=null
+        mediaTitleId: String?=null,
+        closeFriendsOnly:Boolean=false
     ): String {
         val body=JSONObject()
             .put("type","text")
             .put("caption",caption)
             .put("spoiler",spoiler)
+            .put("closeFriendsOnly",closeFriendsOnly)
         if(!mediaTitleId.isNullOrBlank()) body.put("mediaTitleId",mediaTitleId)
         return backend.postJson("/v1/social/stories",body,authorized=true).getString("id")
     }

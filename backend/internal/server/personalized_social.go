@@ -204,7 +204,7 @@ func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT st.id::text,st.story_type,st.media_url,st.thumbnail_url,st.caption,st.spoiler,
-		       st.view_count,st.created_at,st.expires_at,
+		       st.close_friends_only,st.view_count,st.created_at,st.expires_at,
 		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
 		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,
 		       mt.backdrop_url,mt.year,mt.rating
@@ -212,7 +212,15 @@ func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles p ON p.user_id=st.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=st.media_title_id
 		 WHERE st.expires_at>now()
-		   AND st.close_friends_only=false
+		   AND (
+		     st.close_friends_only=false
+		     OR st.author_user_id=$1
+		     OR EXISTS (
+		       SELECT 1 FROM close_friends cf
+		        WHERE cf.owner_user_id=st.author_user_id
+		          AND cf.friend_user_id=$1
+		     )
+		   )
 		   AND NOT EXISTS (
 		     SELECT 1 FROM blocks b
 		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=st.author_user_id)
@@ -236,7 +244,7 @@ func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
 	items:=make([]map[string]any,0)
 	for rows.Next() {
 		var id,typ,mediaURL,thumb,caption,userID2,username,displayName,avatar string
-		var spoiler,verified bool
+		var spoiler,closeFriendsOnly,verified bool
 		var views int64
 		var created,expires time.Time
 		var mediaID,kind,title,originalTitle,poster,backdrop *string
@@ -244,14 +252,14 @@ func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
 		var year *int
 		var rating *float64
 		if err:=rows.Scan(
-			&id,&typ,&mediaURL,&thumb,&caption,&spoiler,&views,&created,&expires,
+			&id,&typ,&mediaURL,&thumb,&caption,&spoiler,&closeFriendsOnly,&views,&created,&expires,
 			&userID2,&username,&displayName,&avatar,&verified,
 			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
 		); err!=nil { continue }
 
 		items=append(items,map[string]any{
 			"id":id,"type":typ,"mediaUrl":mediaURL,"thumbnailUrl":thumb,
-			"caption":caption,"spoiler":spoiler,"views":views,
+			"caption":caption,"spoiler":spoiler,"closeFriendsOnly":closeFriendsOnly,"views":views,
 			"createdAt":created,"expiresAt":expires,
 			"author":map[string]any{
 				"id":userID2,"username":username,"displayName":displayName,
