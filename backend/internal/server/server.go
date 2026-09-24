@@ -114,7 +114,13 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/releases", s.releaseCenter)
 		r.Get("/catalog/{id}", s.catalogDetail)
 		r.Get("/catalog/{id}/reviews", s.mediaReviews)
-		r.Get("/search", s.universalSearch)
+		r.With(
+			s.authRateLimit(
+				"public-search",
+				s.cfg.PublicSearchRateLimit,
+				time.Minute,
+			),
+		).Get("/search",s.universalSearch)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/reels/{id}", s.reelDetail)
 		r.Get("/social/feed", s.socialFeed)
