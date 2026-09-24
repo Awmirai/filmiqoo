@@ -404,7 +404,7 @@ fun RoomConversationSettingsSheet(
                     }
                 }
 
-                if(current.type!="dm" && current.myRole.isNotBlank()) {
+                if(current.type=="group" && current.myRole.isNotBlank()) {
                     HorizontalDivider(
                         color=Color.White.copy(alpha=.08f),
                         modifier=Modifier.padding(vertical=14.dp)
