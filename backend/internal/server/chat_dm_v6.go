@@ -776,3 +776,21 @@ func formatScheduledRoomMessageError(err error) string {
 	if err==nil { return "" }
 	return fmt.Sprintf("%v",err)
 }
+
+
+func (s *Server) runRoomMessageScheduler(ctx context.Context) {
+	ticker:=time.NewTicker(15*time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if s.db==nil { continue }
+			runCtx,cancel:=context.WithTimeout(ctx,10*time.Second)
+			_ = s.processDueScheduledRoomMessages(runCtx)
+			cancel()
+		}
+	}
+}
