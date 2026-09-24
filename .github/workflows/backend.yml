@@ -37,6 +37,18 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: filmiqoo-ci
+          MINIO_ROOT_PASSWORD: filmiqoo-ci-secret-password
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
     defaults:
       run:
         working-directory: backend
@@ -45,6 +57,11 @@ jobs:
       PGPASSWORD: filmiqoo
       REDIS_ADDR: localhost:6379
       FILMIQOO_E2E: "1"
+      OBJECT_STORAGE_ENDPOINT: http://localhost:9000
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
+      OBJECT_STORAGE_BUCKET: filmiqoo-ci
+      OBJECT_STORAGE_KEY: filmiqoo-ci
+      OBJECT_STORAGE_SECRET: filmiqoo-ci-secret-password
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
