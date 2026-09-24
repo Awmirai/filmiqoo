@@ -157,10 +157,18 @@ fun PremiumDetailScreen(
                                 d.trailerKey?.let { openYoutube(context,it) }
                             },
                             onShare={
-                                shareText(
-                                    context,
-                                    d.media.title + if(d.media.year.isBlank()) "" else " ("+d.media.year+")"
-                                )
+                                val label=d.media.title +
+                                    if(d.media.year.isBlank()) "" else " ("+d.media.year+")"
+                                val backendId=d.media.backendId
+                                if(backendId.isNullOrBlank()) {
+                                    shareText(context,label)
+                                } else {
+                                    FilmiqooDeepLinks.share(
+                                        context,
+                                        label,
+                                        FilmiqooDeepLinks.title(backendId)
+                                    )
+                                }
                             }
                         )
                     }

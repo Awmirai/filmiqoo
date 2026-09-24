@@ -2964,7 +2964,7 @@ private fun sharePlayerMoment(
     mediaVersionId:String,
     positionMs:Long
 ) {
-    val link="filmiqoo://play/"+mediaVersionId+"?t="+positionMs
+    val link=FilmiqooDeepLinks.play(mediaVersionId,positionMs)
     val message=buildString {
         append(target.title)
         if(target.subtitle.isNotBlank()) append(" • ").append(target.subtitle)

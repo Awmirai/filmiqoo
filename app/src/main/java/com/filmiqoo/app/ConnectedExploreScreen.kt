@@ -49,6 +49,8 @@ fun ConnectedExploreScreen(
     repository: TmdbRepository,
     store: LocalStore,
     loggedIn: Boolean,
+    initialReelId: String? = null,
+    onInitialReelConsumed: () -> Unit = {},
     onMedia: (MediaItem) -> Unit,
     onChat: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
@@ -59,10 +61,24 @@ fun ConnectedExploreScreen(
     var state by remember { mutableStateOf<ReelLoad>(ReelLoad.Loading) }
     var refresh by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(refresh) {
+    LaunchedEffect(refresh,initialReelId) {
         state=ReelLoad.Loading
-        state=runCatching { ReelLoad.Ready(social.reels()) }
-            .getOrElse { ReelLoad.Error(it.message ?: "خطا در دریافت Reels") }
+        state=runCatching {
+            val feed=social.reels()
+            val target=initialReelId
+                ?.takeIf(String::isNotBlank)
+                ?.let { id ->
+                    feed.firstOrNull { it.id==id }
+                        ?: runCatching { social.reel(id) }.getOrNull()
+                }
+            val ordered=if(target==null) {
+                feed
+            } else {
+                listOf(target)+feed.filterNot { it.id==target.id }
+            }
+            if(target!=null) onInitialReelConsumed()
+            ReelLoad.Ready(ordered)
+        }.getOrElse { ReelLoad.Error(it.message ?: "خطا در دریافت Reels") }
     }
 
     when(val s=state) {

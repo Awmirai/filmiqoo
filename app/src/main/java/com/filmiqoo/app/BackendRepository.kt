@@ -111,11 +111,35 @@ data class ContinueWatchingItem(
 data class PlatformDetail(
     val id: String,
     val tmdbId: Int?,
+    val kind: String,
     val title: String,
+    val originalTitle: String,
     val overview: String,
+    val year: Int,
+    val posterUrl: String,
+    val backdropUrl: String,
+    val rating: Double,
     val versions: List<PlatformVersion>,
     val seasons: List<PlatformSeason>
-)
+) {
+    fun asMediaItem(): MediaItem = MediaItem(
+        id=tmdbId ?: 0,
+        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
+        title=title.ifBlank { originalTitle },
+        originalTitle=originalTitle,
+        overview=overview,
+        posterPath=posterUrl.takeIf(String::isNotBlank),
+        backdropPath=backdropUrl.takeIf(String::isNotBlank),
+        vote=rating,
+        date=year.takeIf { it>0 }?.toString().orEmpty(),
+        backendId=id,
+        mediaVersionId=versions.firstOrNull { it.preferred && it.streamReady }?.id
+            ?: versions.firstOrNull { it.streamReady }?.id,
+        streamReady=versions.any { it.streamReady },
+        quality=versions.firstOrNull { it.preferred }?.quality
+            ?: versions.firstOrNull()?.quality.orEmpty()
+    )
+}
 
 data class PlatformVersion(
     val id: String,
@@ -366,8 +390,14 @@ class BackendRepository(context: Context) {
         PlatformDetail(
             id = o.optString("id"),
             tmdbId = if (o.isNull("tmdbId")) null else o.optInt("tmdbId"),
+            kind = o.optString("kind"),
             title = o.optString("title"),
+            originalTitle = o.optString("originalTitle"),
             overview = o.optString("overview"),
+            year = o.optInt("year"),
+            posterUrl = o.optString("posterUrl"),
+            backdropUrl = o.optString("backdropUrl"),
+            rating = o.optDouble("rating",0.0),
             versions = versions,
             seasons = seasons
         )

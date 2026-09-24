@@ -1,5 +1,6 @@
 package com.filmiqoo.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -21,14 +22,22 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val deepLinkState=mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val launchDeepLink=intent?.dataString
+        deepLinkState.value=intent?.dataString
         setContent {
             FilmiqooTheme {
-                FilmiqooApp(initialDeepLink=launchDeepLink)
+                FilmiqooApp(initialDeepLink=deepLinkState.value)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkState.value=intent.dataString
     }
 }
 
@@ -39,6 +48,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val backend = remember { BackendRepository(context.applicationContext) }
     val social = remember { SocialRepository(backend) }
     val messaging = remember { MessagingRepository(backend) }
+    val creatorChannels = remember { CreatorChannelRepository(backend) }
     val viewerProfilesRepository = remember { ViewerProfilesRepository(backend) }
     val viewerStore = remember { backend.viewerProfiles }
     val store = remember { LocalStore(context.applicationContext) }
@@ -53,6 +63,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var activeViewer by remember { mutableStateOf(viewerStore.active()) }
     var viewerReady by remember { mutableStateOf(!authenticated) }
     var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
+    var deepLinkReelId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(authenticated) {
         if(!authenticated) {
@@ -90,24 +101,114 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             !raw.isNullOrBlank()
         ) {
             val uri=runCatching { android.net.Uri.parse(raw) }.getOrNull()
-            val versionId=uri?.takeIf {
-                it.scheme=="filmiqoo" && it.host=="play"
-            }?.pathSegments?.firstOrNull()
-            if(!versionId.isNullOrBlank()) {
-                val position=uri.getQueryParameter("t")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
-                runCatching { backend.playbackContext(versionId) }
-                    .onSuccess { target->
+            val supported=uri?.scheme=="filmiqoo"
+            if(!supported) {
+                deepLinkHandled=true
+                return@LaunchedEffect
+            }
+
+            val host=uri.host.orEmpty().lowercase()
+            val id=uri.pathSegments.firstOrNull().orEmpty()
+            val kidsMode=activeViewer?.kidsMode==true
+            val socialHost=host in setOf("creator","channel","collection","party","room","reel")
+
+            if(kidsMode && socialHost) {
+                overlay=null
+                showSearch=false
+                tab=0
+                deepLinkHandled=true
+                return@LaunchedEffect
+            }
+
+            runCatching {
+                when(host) {
+                    "play" -> {
+                        require(id.isNotBlank())
+                        val position=uri.getQueryParameter("t")
+                            ?.toLongOrNull()
+                            ?.coerceAtLeast(0L)
+                            ?: 0L
+                        val target=backend.playbackContext(id)
                         overlay=OverlayRoute.Player(
                             target.copy(startPositionMs=position)
                         )
-                        deepLinkHandled=true
                     }
-                    .onFailure {
-                        deepLinkHandled=true
+
+                    "title" -> {
+                        require(id.isNotBlank())
+                        overlay=OverlayRoute.Detail(
+                            backend.detail(id).asMediaItem()
+                        )
                     }
-            } else {
-                deepLinkHandled=true
+
+                    "creator" -> {
+                        require(id.isNotBlank())
+                        val p=creatorChannels.userProfile(id)
+                        overlay=OverlayRoute.CreatorPage(
+                            Creator(
+                                name=p.displayName,
+                                handle="@"+p.username,
+                                followers=p.followers.toString(),
+                                bio=p.bio,
+                                verified=p.verified,
+                                id=p.id,
+                                entityType="user",
+                                avatarUrl=p.avatarUrl,
+                                coverUrl=p.coverUrl
+                            )
+                        )
+                    }
+
+                    "channel" -> {
+                        require(id.isNotBlank())
+                        val p=creatorChannels.channelProfile(id)
+                        overlay=OverlayRoute.CreatorPage(
+                            Creator(
+                                name=p.name,
+                                handle="@"+p.slug,
+                                followers=p.followers.toString(),
+                                bio=p.bio,
+                                verified=p.verified,
+                                id=p.id,
+                                entityType="channel",
+                                avatarUrl=p.avatarUrl,
+                                coverUrl=p.coverUrl
+                            )
+                        )
+                    }
+
+                    "collection" -> {
+                        require(id.isNotBlank())
+                        overlay=OverlayRoute.SocialCollections(id)
+                    }
+
+                    "party" -> {
+                        require(id.isNotBlank())
+                        overlay=OverlayRoute.WatchParty(media=null,partyId=id)
+                    }
+
+                    "room" -> {
+                        require(id.isNotBlank())
+                        overlay=OverlayRoute.Room(
+                            roomId=id,
+                            title=uri.getQueryParameter("title")
+                                ?.takeIf(String::isNotBlank)
+                                ?: "Filmiqoo Room"
+                        )
+                    }
+
+                    "reel" -> {
+                        require(id.isNotBlank())
+                        overlay=null
+                        showSearch=false
+                        deepLinkReelId=id
+                        tab=1
+                    }
+
+                    else -> Unit
+                }
             }
+            deepLinkHandled=true
         }
     }
 
@@ -470,6 +571,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             repository=repository,
                             store=store,
                             loggedIn=backend.session.isLoggedIn,
+                            initialReelId=deepLinkReelId,
+                            onInitialReelConsumed={deepLinkReelId=null},
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onChat={overlay=OverlayRoute.Chat("گفت‌وگو درباره " + it.title,it)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
