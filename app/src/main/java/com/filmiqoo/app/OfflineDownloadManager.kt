@@ -19,6 +19,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Semaphore
 
 data class OfflineDownloadItem(
     val id: String,
@@ -342,6 +343,10 @@ class FilmiqooDownloadWorker(
     params: WorkerParameters
 ): CoroutineWorker(appContext,params) {
 
+    companion object {
+        private val downloadGate=Semaphore(2,true)
+    }
+
     private val client=OkHttpClient.Builder()
         .connectTimeout(15,TimeUnit.SECONDS)
         .readTimeout(60,TimeUnit.SECONDS)
@@ -354,6 +359,8 @@ class FilmiqooDownloadWorker(
         val item=OfflineDownloadManager.get(applicationContext,id)
             ?: return@withContext Result.failure()
 
+        downloadGate.acquire()
+        try {
         try {
             setForeground(createForegroundInfo(item,0,false))
             OfflineDownloadManager.updateProgress(
@@ -470,6 +477,9 @@ class FilmiqooDownloadWorker(
                 )
             }
             Result.retry()
+        }
+        } finally {
+            downloadGate.release()
         }
     }
 
