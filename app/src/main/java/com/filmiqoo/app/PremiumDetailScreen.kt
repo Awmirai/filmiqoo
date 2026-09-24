@@ -281,6 +281,23 @@ fun PremiumDetailScreen(
                                     platform=platform
                                 )
                             }
+                            d.franchise?.takeIf { it.parts.size>1 }?.let { franchise ->
+                                item {
+                                    PremiumSectionHeader(
+                                        title="ترتیب تماشای مجموعه",
+                                        subtitle=franchise.name.ifBlank { "Franchise" },
+                                        icon=Icons.Default.PlaylistPlay
+                                    )
+                                }
+                                item {
+                                    FranchiseWatchOrderRow(
+                                        franchise=franchise,
+                                        current=d.media,
+                                        repository=repository,
+                                        onMedia=onMedia
+                                    )
+                                }
+                            }
                             if(d.cast.isNotEmpty()) {
                                 item {
                                     PremiumSectionHeader(
@@ -989,6 +1006,99 @@ private fun PremiumRecommendationRow(
                 Text(
                     listOf(media.year,if(media.vote>0)"★ "+formatVote(media.vote) else "")
                         .filter(String::isNotBlank).joinToString(" • "),
+                    color=FqMuted,
+                    fontSize=7.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FranchiseWatchOrderRow(
+    franchise:FranchiseInfo,
+    current:MediaItem,
+    repository:TmdbRepository,
+    onMedia:(MediaItem)->Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp),
+        horizontalArrangement=Arrangement.spacedBy(11.dp)
+    ) {
+        items(
+            franchise.parts,
+            key={it.key}
+        ) { media ->
+            val index=franchise.parts.indexOfFirst { it.key==media.key }+1
+            val active=media.id==current.id && media.type==current.type
+            Column(
+                Modifier.width(142.dp).clickable(enabled=!active) {
+                    onMedia(media)
+                }
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().height(207.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                ) {
+                    RemoteImage(
+                        repository.poster(media.posterPath),
+                        Modifier.fillMaxSize(),
+                        ContentScale.Crop
+                    )
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha=.06f),
+                                    Color.Black.copy(alpha=.72f)
+                                )
+                            )
+                        )
+                    )
+                    Surface(
+                        color=if(active)FqGold else Color.Black.copy(alpha=.72f),
+                        contentColor=if(active)Color.Black else Color.White,
+                        shape=RoundedCornerShape(10.dp),
+                        modifier=Modifier.align(Alignment.TopStart).padding(7.dp)
+                    ) {
+                        Text(
+                            "#"+index,
+                            fontSize=8.sp,
+                            fontWeight=FontWeight.Black,
+                            modifier=Modifier.padding(horizontal=7.dp,vertical=5.dp)
+                        )
+                    }
+                    if(active) {
+                        Surface(
+                            color=FqGold,
+                            contentColor=Color.Black,
+                            shape=RoundedCornerShape(9.dp),
+                            modifier=Modifier.align(Alignment.BottomCenter).padding(7.dp)
+                        ) {
+                            Text(
+                                "در حال مشاهده",
+                                fontSize=7.sp,
+                                fontWeight=FontWeight.Bold,
+                                modifier=Modifier.padding(horizontal=8.dp,vertical=4.dp)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    media.title,
+                    fontSize=9.sp,
+                    fontWeight=FontWeight.Bold,
+                    maxLines=1,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=6.dp)
+                )
+                Text(
+                    listOf(
+                        media.year,
+                        if(media.vote>0)"★ "+formatVote(media.vote) else ""
+                    ).filter(String::isNotBlank).joinToString(" • "),
                     color=FqMuted,
                     fontSize=7.sp
                 )

@@ -37,6 +37,14 @@ data class SeasonInfo(
     val airDate: String
 )
 
+data class FranchiseInfo(
+    val id:Int,
+    val name:String,
+    val posterPath:String?,
+    val backdropPath:String?,
+    val parts:List<MediaItem>
+)
+
 data class MediaDetail(
     val media: MediaItem,
     val tagline: String,
@@ -47,7 +55,8 @@ data class MediaDetail(
     val trailerKey: String?,
     val recommendations: List<MediaItem>,
     val seasons: List<SeasonInfo>,
-    val directors: List<CastMember> = emptyList()
+    val directors: List<CastMember> = emptyList(),
+    val franchise: FranchiseInfo? = null
 )
 
 data class HomeBundle(

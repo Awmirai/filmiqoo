@@ -381,6 +381,53 @@ class TmdbRepository(private val context: Context) {
             }
         }
 
+        val franchise=if(media.type==MediaType.MOVIE) {
+            val collectionRef=obj.optJSONObject("belongs_to_collection")
+            val collectionId=collectionRef?.optInt("id") ?: 0
+            if(collectionId>0) {
+                runCatching {
+                    val collection=get(
+                        "collection/"+collectionId,
+                        mapOf("language" to "fa-IR")
+                    )
+                    val partsArray=collection.optJSONArray("parts") ?: JSONArray()
+                    val parts=buildList {
+                        for(i in 0 until partsArray.length()) {
+                            val x=partsArray.optJSONObject(i) ?: continue
+                            add(
+                                MediaItem(
+                                    id=x.optInt("id"),
+                                    type=MediaType.MOVIE,
+                                    title=x.optString("title").ifBlank{x.optString("original_title")},
+                                    originalTitle=x.optString("original_title"),
+                                    overview=x.optString("overview"),
+                                    posterPath=x.optString("poster_path").takeIf { it.isNotBlank() && it!="null" },
+                                    backdropPath=x.optString("backdrop_path").takeIf { it.isNotBlank() && it!="null" },
+                                    vote=x.optDouble("vote_average",0.0),
+                                    date=x.optString("release_date"),
+                                    popularity=x.optDouble("popularity",0.0)
+                                )
+                            )
+                        }
+                    }.sortedWith(
+                        compareBy<MediaItem> {
+                            it.date.takeIf(String::isNotBlank) ?: "9999-12-31"
+                        }.thenBy { it.id }
+                    )
+                    FranchiseInfo(
+                        id=collectionId,
+                        name=collection.optString("name")
+                            .ifBlank{collectionRef?.optString("name").orEmpty()},
+                        posterPath=collection.optString("poster_path")
+                            .takeIf { it.isNotBlank() && it!="null" },
+                        backdropPath=collection.optString("backdrop_path")
+                            .takeIf { it.isNotBlank() && it!="null" },
+                        parts=parts
+                    )
+                }.getOrNull()
+            } else null
+        } else null
+
         val runtime = if (media.type == MediaType.MOVIE) {
             obj.optInt("runtime")
         } else {
@@ -398,7 +445,8 @@ class TmdbRepository(private val context: Context) {
             trailerKey = trailer,
             recommendations = recommendations,
             seasons = seasons,
-            directors = directors
+            directors = directors,
+            franchise = franchise
         )
     }
 
