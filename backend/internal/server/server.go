@@ -27,6 +27,7 @@ type Server struct {
 	upstreamClient *http.Client
 	tmdb *tmdb.Client
 	objects *objectstore.Store
+	workersCancel context.CancelFunc
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
@@ -312,6 +313,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout: 60 * time.Second,
 	}
+	workerCtx,workerCancel:=context.WithCancel(context.Background())
+	s.workersCancel=workerCancel
+	go s.runRoomMessageScheduler(workerCtx)
 	return s
 }
 
@@ -321,7 +325,10 @@ func (s *Server) ListenAndServe() error {
 	return err
 }
 
-func (s *Server) Shutdown(ctx context.Context) error { return s.http.Shutdown(ctx) }
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.workersCancel!=nil { s.workersCancel() }
+	return s.http.Shutdown(ctx)
+}
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
