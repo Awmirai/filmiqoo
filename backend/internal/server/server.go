@@ -179,6 +179,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/library/collections/{id}/items/{mediaID}/toggle", s.toggleCollectionItem)
 			r.Post("/library/collections/{id}/delete", s.deleteCollection)
 			r.Get("/library/stats", s.libraryStats)
+			r.Get("/profile/film-dna", s.filmDNA)
 			r.Post("/playback/token", s.playbackToken)
 			r.Get("/playback/{versionID}/context", s.playbackContext)
 			r.Get("/playback/{versionID}/moments", s.playbackMoments)

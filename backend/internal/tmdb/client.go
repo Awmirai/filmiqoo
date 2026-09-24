@@ -28,6 +28,7 @@ type TitleMatch struct {
 	BackdropURL string
 	Rating float64
 	OriginalLanguage string
+	Genres []string
 	AudienceLevel string
 	Confidence int
 }
@@ -77,6 +78,7 @@ func (c *Client) Search(ctx context.Context, kind, title string, year *int) (Tit
 			FirstAirDate string `json:"first_air_date"`
 			VoteAverage float64 `json:"vote_average"`
 			OriginalLanguage string `json:"original_language"`
+			GenreIDs []int `json:"genre_ids"`
 			Adult bool `json:"adult"`
 		} `json:"results"`
 	}
@@ -113,6 +115,7 @@ func (c *Client) Search(ctx context.Context, kind, title string, year *int) (Tit
 				PosterURL:imageURL("w500",r.PosterPath),
 				BackdropURL:imageURL("w1280",r.BackdropPath),
 				Rating:r.VoteAverage, OriginalLanguage:r.OriginalLanguage,
+				Genres:genreNames(resolvedKind,r.GenreIDs),
 				AudienceLevel:"unrated", Confidence:score,
 			}
 			bestAdult=r.Adult
@@ -228,4 +231,30 @@ func parseYear(date string) int {
 func imageURL(size,path string) string {
 	if strings.TrimSpace(path)=="" { return "" }
 	return "https://image.tmdb.org/t/p/"+size+path
+}
+
+
+func genreNames(kind string, ids []int) []string {
+	movie:=map[int]string{
+		28:"Action",12:"Adventure",16:"Animation",35:"Comedy",80:"Crime",99:"Documentary",
+		18:"Drama",10751:"Family",14:"Fantasy",36:"History",27:"Horror",10402:"Music",
+		9648:"Mystery",10749:"Romance",878:"Science Fiction",10770:"TV Movie",
+		53:"Thriller",10752:"War",37:"Western",
+	}
+	tv:=map[int]string{
+		10759:"Action & Adventure",16:"Animation",35:"Comedy",80:"Crime",99:"Documentary",
+		18:"Drama",10751:"Family",10762:"Kids",9648:"Mystery",10763:"News",10764:"Reality",
+		10765:"Sci-Fi & Fantasy",10766:"Soap",10767:"Talk",10768:"War & Politics",37:"Western",
+	}
+	source:=movie
+	if kind=="series" || kind=="anime" { source=tv }
+	out:=make([]string,0,len(ids))
+	seen:=map[string]bool{}
+	for _,id:=range ids {
+		name:=source[id]
+		if name=="" || seen[name] { continue }
+		seen[name]=true
+		out=append(out,name)
+	}
+	return out
 }

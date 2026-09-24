@@ -358,6 +358,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onSaved={overlay=null}
                 )
+                OverlayRoute.FilmDna -> FilmDnaScreen(
+                    backend=backend,
+                    onBack=closeOverlay
+                )
                 OverlayRoute.Releases -> ReleaseCenterScreen(
                     backend=backend,
                     repository=repository,
@@ -472,6 +476,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onSafety={overlay=OverlayRoute.Safety},
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
+                                    onFilmDna={overlay=OverlayRoute.FilmDna},
                                     onLoggedOut={
                                         backend.viewerProfiles.clear()
                                         activeViewer=null

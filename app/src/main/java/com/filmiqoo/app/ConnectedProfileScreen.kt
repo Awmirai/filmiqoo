@@ -54,6 +54,7 @@ fun ConnectedProfileScreen(
     onSafety: () -> Unit,
     onFollowRequests: () -> Unit,
     onEditProfile: () -> Unit,
+    onFilmDna: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -154,6 +155,12 @@ fun ConnectedProfileScreen(
                             title="ویرایش پروفایل",
                             subtitle="Avatar، Cover، Username، Bio و حریم خصوصی",
                             onClick=onEditProfile
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.AutoAwesome,
+                            title="Film DNA",
+                            subtitle="سلیقه واقعی، ژانرها، زبان‌ها و Badgeهای تماشای تو",
+                            onClick=onFilmDna
                         )
                         ProfileActionRow(
                             icon=Icons.Default.Analytics,
