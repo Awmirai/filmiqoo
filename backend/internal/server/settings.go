@@ -17,6 +17,9 @@ type preferencePayload struct {
 	SkipCredits *bool `json:"skipCredits"`
 	SubtitleScale *float64 `json:"subtitleScale"`
 	SubtitleBottomPadding *float64 `json:"subtitleBottomPadding"`
+	SubtitleTextColor *string `json:"subtitleTextColor"`
+	SubtitleBackgroundOpacity *float64 `json:"subtitleBackgroundOpacity"`
+	SubtitleEdgeStyle *string `json:"subtitleEdgeStyle"`
 	PlayerResizeMode *string `json:"playerResizeMode"`
 	SmartDownloads *bool `json:"smartDownloads"`
 	DownloadStorageLimitMB *int64 `json:"downloadStorageLimitMb"`
@@ -40,16 +43,18 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 	}
 
 	var autoplayNext,autoplayPreviews,wifiOnly,dataSaver,spoilerShield,skipIntro,skipRecap,skipCredits bool
-	var speed,subtitleScale,subtitleBottomPadding float64
+	var speed,subtitleScale,subtitleBottomPadding,subtitleBackgroundOpacity float64
 	var downloadStorageLimitMB int64
 	var smartDownloads bool
-	var audioLang,subtitleLang,playerResizeMode string
+	var audioLang,subtitleLang,playerResizeMode,subtitleTextColor,subtitleEdgeStyle string
 	var subtitlesEnabled,notifySocial,notifyMessages,notifyReleases,privateAccount bool
 
 	err:=s.db.QueryRow(r.Context(),`
 		SELECT up.autoplay_next,up.autoplay_previews,up.wifi_only_downloads,up.data_saver,
 		       up.spoiler_shield,up.skip_intro,up.skip_recap,up.skip_credits,
-		       up.subtitle_scale,up.subtitle_bottom_padding,up.player_resize_mode,
+		       up.subtitle_scale,up.subtitle_bottom_padding,
+		       up.subtitle_text_color,up.subtitle_background_opacity,up.subtitle_edge_style,
+		       up.player_resize_mode,
 		       up.smart_downloads,up.download_storage_limit_mb,
 		       up.default_playback_speed,
 		       up.default_audio_language,up.default_subtitle_language,up.subtitles_enabled,
@@ -61,8 +66,9 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 	`,userID).Scan(
 		&autoplayNext,&autoplayPreviews,&wifiOnly,&dataSaver,
 		&spoilerShield,&skipIntro,&skipRecap,&skipCredits,
-		&subtitleScale,&subtitleBottomPadding,&playerResizeMode,
-		&smartDownloads,&downloadStorageLimitMB,&speed,
+		&subtitleScale,&subtitleBottomPadding,
+		&subtitleTextColor,&subtitleBackgroundOpacity,&subtitleEdgeStyle,
+		&playerResizeMode,&smartDownloads,&downloadStorageLimitMB,&speed,
 		&audioLang,&subtitleLang,&subtitlesEnabled,
 		&notifySocial,&notifyMessages,&notifyReleases,&privateAccount,
 	)
@@ -79,6 +85,9 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		"skipCredits":skipCredits,
 		"subtitleScale":subtitleScale,
 		"subtitleBottomPadding":subtitleBottomPadding,
+		"subtitleTextColor":subtitleTextColor,
+		"subtitleBackgroundOpacity":subtitleBackgroundOpacity,
+		"subtitleEdgeStyle":subtitleEdgeStyle,
 		"playerResizeMode":playerResizeMode,
 		"smartDownloads":smartDownloads,
 		"downloadStorageLimitMb":downloadStorageLimitMB,
@@ -113,6 +122,27 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		(*body.SubtitleBottomPadding<0.02 || *body.SubtitleBottomPadding>0.28) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid subtitle bottom padding"})
 		return
+	}
+	if body.SubtitleBackgroundOpacity!=nil &&
+		(*body.SubtitleBackgroundOpacity<0.0 || *body.SubtitleBackgroundOpacity>1.0) {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid subtitle background opacity"})
+		return
+	}
+	if body.SubtitleTextColor!=nil {
+		v:=strings.ToLower(strings.TrimSpace(*body.SubtitleTextColor))
+		if v!="white" && v!="yellow" && v!="cyan" {
+			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid subtitle text color"})
+			return
+		}
+		body.SubtitleTextColor=&v
+	}
+	if body.SubtitleEdgeStyle!=nil {
+		v:=strings.ToLower(strings.TrimSpace(*body.SubtitleEdgeStyle))
+		if v!="none" && v!="outline" && v!="shadow" {
+			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid subtitle edge style"})
+			return
+		}
+		body.SubtitleEdgeStyle=&v
 	}
 	if body.PlayerResizeMode!=nil {
 		v:=strings.ToLower(strings.TrimSpace(*body.PlayerResizeMode))
@@ -157,24 +187,28 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		  skip_credits=COALESCE($9,skip_credits),
 		  subtitle_scale=COALESCE($10,subtitle_scale),
 		  subtitle_bottom_padding=COALESCE($11,subtitle_bottom_padding),
-		  player_resize_mode=COALESCE($12,player_resize_mode),
-		  smart_downloads=COALESCE($13,smart_downloads),
-		  download_storage_limit_mb=COALESCE($14,download_storage_limit_mb),
-		  default_playback_speed=COALESCE($15,default_playback_speed),
-		  default_audio_language=COALESCE($16,default_audio_language),
-		  default_subtitle_language=COALESCE($17,default_subtitle_language),
-		  subtitles_enabled=COALESCE($18,subtitles_enabled),
-		  notifications_social=COALESCE($19,notifications_social),
-		  notifications_messages=COALESCE($20,notifications_messages),
-		  notifications_releases=COALESCE($21,notifications_releases),
+		  subtitle_text_color=COALESCE($12,subtitle_text_color),
+		  subtitle_background_opacity=COALESCE($13,subtitle_background_opacity),
+		  subtitle_edge_style=COALESCE($14,subtitle_edge_style),
+		  player_resize_mode=COALESCE($15,player_resize_mode),
+		  smart_downloads=COALESCE($16,smart_downloads),
+		  download_storage_limit_mb=COALESCE($17,download_storage_limit_mb),
+		  default_playback_speed=COALESCE($18,default_playback_speed),
+		  default_audio_language=COALESCE($19,default_audio_language),
+		  default_subtitle_language=COALESCE($20,default_subtitle_language),
+		  subtitles_enabled=COALESCE($21,subtitles_enabled),
+		  notifications_social=COALESCE($22,notifications_social),
+		  notifications_messages=COALESCE($23,notifications_messages),
+		  notifications_releases=COALESCE($24,notifications_releases),
 		  updated_at=now()
 		WHERE user_id=$1
 	`,
 		userID,
 		body.AutoplayNext,body.AutoplayPreviews,body.WifiOnlyDownloads,body.DataSaver,
 		body.SpoilerShield,body.SkipIntro,body.SkipRecap,body.SkipCredits,
-		body.SubtitleScale,body.SubtitleBottomPadding,body.PlayerResizeMode,
-		body.SmartDownloads,body.DownloadStorageLimitMB,body.DefaultPlaybackSpeed,
+		body.SubtitleScale,body.SubtitleBottomPadding,
+		body.SubtitleTextColor,body.SubtitleBackgroundOpacity,body.SubtitleEdgeStyle,
+		body.PlayerResizeMode,body.SmartDownloads,body.DownloadStorageLimitMB,body.DefaultPlaybackSpeed,
 		body.DefaultAudioLanguage,body.DefaultSubtitleLanguage,body.SubtitlesEnabled,
 		body.NotificationsSocial,body.NotificationsMessages,body.NotificationsReleases,
 	)

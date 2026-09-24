@@ -44,6 +44,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
@@ -104,6 +105,9 @@ fun FilmiqooPlayerScreen(
     var playbackSpeed by remember { mutableFloatStateOf(initialSettings.defaultPlaybackSpeed) }
     var subtitleScale by remember { mutableFloatStateOf(initialSettings.subtitleScale) }
     var subtitleBottomPadding by remember { mutableFloatStateOf(initialSettings.subtitleBottomPadding) }
+    var subtitleTextColor by remember { mutableStateOf(initialSettings.subtitleTextColor) }
+    var subtitleBackgroundOpacity by remember { mutableFloatStateOf(initialSettings.subtitleBackgroundOpacity) }
+    var subtitleEdgeStyle by remember { mutableStateOf(initialSettings.subtitleEdgeStyle) }
     var playerResizeMode by remember { mutableStateOf(initialSettings.playerResizeMode) }
     var trackRevision by remember { mutableIntStateOf(0) }
     var positionMs by remember { mutableLongStateOf(0L) }
@@ -596,6 +600,12 @@ fun FilmiqooPlayerScreen(
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                         subtitleView?.setFractionalTextSize(.0533f*subtitleScale)
                         subtitleView?.setBottomPaddingFraction(subtitleBottomPadding)
+                        applySubtitleAppearance(
+                            subtitleView,
+                            subtitleTextColor,
+                            subtitleBackgroundOpacity,
+                            subtitleEdgeStyle
+                        )
                     }
                 },
                 update={
@@ -603,6 +613,12 @@ fun FilmiqooPlayerScreen(
                     it.resizeMode=playerResizeModeValue(playerResizeMode)
                     it.subtitleView?.setFractionalTextSize(.0533f*subtitleScale)
                     it.subtitleView?.setBottomPaddingFraction(subtitleBottomPadding)
+                    applySubtitleAppearance(
+                        it.subtitleView,
+                        subtitleTextColor,
+                        subtitleBackgroundOpacity,
+                        subtitleEdgeStyle
+                    )
                 },
                 modifier=Modifier.fillMaxSize()
             )
@@ -931,6 +947,9 @@ fun FilmiqooPlayerScreen(
             speed=playbackSpeed,
             subtitleScale=subtitleScale,
             subtitleBottomPadding=subtitleBottomPadding,
+            subtitleTextColor=subtitleTextColor,
+            subtitleBackgroundOpacity=subtitleBackgroundOpacity,
+            subtitleEdgeStyle=subtitleEdgeStyle,
             resizeMode=playerResizeMode,
             autoPlayNext=autoPlayNext,
             dataSaverApplied=dataSaverApplied,
@@ -970,6 +989,9 @@ fun FilmiqooPlayerScreen(
             },
             onSubtitleScale={subtitleScale=it},
             onSubtitleBottomPadding={subtitleBottomPadding=it},
+            onSubtitleTextColor={subtitleTextColor=it},
+            onSubtitleBackgroundOpacity={subtitleBackgroundOpacity=it},
+            onSubtitleEdgeStyle={subtitleEdgeStyle=it},
             onResizeMode={playerResizeMode=it},
             onAutoPlayNext={autoPlayNext=it},
             onSleepTimer={minutes->
@@ -1022,6 +1044,9 @@ fun FilmiqooPlayerScreen(
                     defaultPlaybackSpeed=playbackSpeed,
                     subtitleScale=subtitleScale,
                     subtitleBottomPadding=subtitleBottomPadding,
+                    subtitleTextColor=subtitleTextColor,
+                    subtitleBackgroundOpacity=subtitleBackgroundOpacity,
+                    subtitleEdgeStyle=subtitleEdgeStyle,
                     playerResizeMode=playerResizeMode,
                     autoplayNext=autoPlayNext
                 )
@@ -1705,6 +1730,9 @@ private fun PlayerSettingsSheet(
     speed: Float,
     subtitleScale: Float,
     subtitleBottomPadding: Float,
+    subtitleTextColor: String,
+    subtitleBackgroundOpacity: Float,
+    subtitleEdgeStyle: String,
     resizeMode: String,
     autoPlayNext: Boolean,
     dataSaverApplied: Boolean,
@@ -1722,6 +1750,9 @@ private fun PlayerSettingsSheet(
     onSpeed: (Float) -> Unit,
     onSubtitleScale: (Float) -> Unit,
     onSubtitleBottomPadding: (Float) -> Unit,
+    onSubtitleTextColor: (String) -> Unit,
+    onSubtitleBackgroundOpacity: (Float) -> Unit,
+    onSubtitleEdgeStyle: (String) -> Unit,
     onResizeMode: (String) -> Unit,
     onAutoPlayNext: (Boolean) -> Unit,
     onSleepTimer: (Int?) -> Unit,
@@ -1883,6 +1914,78 @@ private fun PlayerSettingsSheet(
                         ),
                         modifier=Modifier.padding(horizontal=18.dp)
                     )
+
+                    HorizontalDivider(
+                        color=FqSurface3,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
+                    )
+
+                    Text(
+                        "رنگ زیرنویس",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=5.dp)
+                    )
+                    LazyRow(
+                        contentPadding=PaddingValues(horizontal=18.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            listOf(
+                                "white" to "سفید",
+                                "yellow" to "زرد",
+                                "cyan" to "فیروزه‌ای"
+                            )
+                        ) { item ->
+                            PremiumChip(
+                                label=item.second,
+                                active=subtitleTextColor==item.first,
+                                onClick={onSubtitleTextColor(item.first)}
+                            )
+                        }
+                    }
+
+                    Text(
+                        "پس‌زمینه • "+(subtitleBackgroundOpacity*100).roundToInt()+"٪",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
+                    )
+                    Slider(
+                        value=subtitleBackgroundOpacity.coerceIn(0f,.85f),
+                        onValueChange=onSubtitleBackgroundOpacity,
+                        valueRange=0f..0.85f,
+                        colors=SliderDefaults.colors(
+                            thumbColor=FqGold,
+                            activeTrackColor=FqGold
+                        ),
+                        modifier=Modifier.padding(horizontal=18.dp)
+                    )
+
+                    Text(
+                        "حاشیه متن",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=5.dp)
+                    )
+                    LazyRow(
+                        contentPadding=PaddingValues(horizontal=18.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            listOf(
+                                "none" to "بدون حاشیه",
+                                "outline" to "Outline",
+                                "shadow" to "Shadow"
+                            )
+                        ) { item ->
+                            PremiumChip(
+                                label=item.second,
+                                active=subtitleEdgeStyle==item.first,
+                                onClick={onSubtitleEdgeStyle(item.first)}
+                            )
+                        }
+                    }
                 }
 
                 PlayerSettingsTab.DISPLAY -> {
@@ -2529,6 +2632,37 @@ private fun formatSpeed(value: Float): String =
         String.format(Locale.US,"%.2gx",value)
     }
 
+
+private fun applySubtitleAppearance(
+    view:androidx.media3.ui.SubtitleView?,
+    textColor:String,
+    backgroundOpacity:Float,
+    edgeStyle:String
+) {
+    if(view==null) return
+    val foreground=when(textColor) {
+        "yellow" -> android.graphics.Color.rgb(255,232,88)
+        "cyan" -> android.graphics.Color.rgb(102,224,255)
+        else -> android.graphics.Color.WHITE
+    }
+    val alpha=(backgroundOpacity.coerceIn(0f,1f)*255f).roundToInt()
+    val background=android.graphics.Color.argb(alpha,0,0,0)
+    val edge=when(edgeStyle) {
+        "none" -> CaptionStyleCompat.EDGE_TYPE_NONE
+        "shadow" -> CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW
+        else -> CaptionStyleCompat.EDGE_TYPE_OUTLINE
+    }
+    view.setStyle(
+        CaptionStyleCompat(
+            foreground,
+            background,
+            android.graphics.Color.TRANSPARENT,
+            edge,
+            android.graphics.Color.BLACK,
+            null
+        )
+    )
+}
 
 @Composable
 private fun PlayerDiagnosticsOverlay(

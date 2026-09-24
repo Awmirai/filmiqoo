@@ -14,6 +14,9 @@ data class AppSettings(
     val skipCredits: Boolean = false,
     val subtitleScale: Float = 1f,
     val subtitleBottomPadding: Float = 0.08f,
+    val subtitleTextColor: String = "white",
+    val subtitleBackgroundOpacity: Float = 0.45f,
+    val subtitleEdgeStyle: String = "outline",
     val playerResizeMode: String = "fit",
     val smartDownloads: Boolean = false,
     val downloadStorageLimitMb: Long = 10240L,
@@ -42,6 +45,9 @@ class AppPreferences(context: Context) {
         skipCredits=prefs.getBoolean("skip_credits",false),
         subtitleScale=prefs.getFloat("subtitle_scale",1f),
         subtitleBottomPadding=prefs.getFloat("subtitle_bottom_padding",0.08f),
+        subtitleTextColor=prefs.getString("subtitle_text_color","white") ?: "white",
+        subtitleBackgroundOpacity=prefs.getFloat("subtitle_background_opacity",0.45f),
+        subtitleEdgeStyle=prefs.getString("subtitle_edge_style","outline") ?: "outline",
         playerResizeMode=prefs.getString("player_resize_mode","fit") ?: "fit",
         smartDownloads=prefs.getBoolean("smart_downloads",false),
         downloadStorageLimitMb=prefs.getLong("download_storage_limit_mb",10240L),
@@ -67,6 +73,9 @@ class AppPreferences(context: Context) {
             .putBoolean("skip_credits",s.skipCredits)
             .putFloat("subtitle_scale",s.subtitleScale)
             .putFloat("subtitle_bottom_padding",s.subtitleBottomPadding)
+            .putString("subtitle_text_color",s.subtitleTextColor)
+            .putFloat("subtitle_background_opacity",s.subtitleBackgroundOpacity)
+            .putString("subtitle_edge_style",s.subtitleEdgeStyle)
             .putString("player_resize_mode",s.playerResizeMode)
             .putBoolean("smart_downloads",s.smartDownloads)
             .putLong("download_storage_limit_mb",s.downloadStorageLimitMb)
@@ -112,6 +121,9 @@ class SettingsRepository(
                 .put("skipCredits",settings.skipCredits)
                 .put("subtitleScale",settings.subtitleScale.toDouble())
                 .put("subtitleBottomPadding",settings.subtitleBottomPadding.toDouble())
+                .put("subtitleTextColor",settings.subtitleTextColor)
+                .put("subtitleBackgroundOpacity",settings.subtitleBackgroundOpacity.toDouble())
+                .put("subtitleEdgeStyle",settings.subtitleEdgeStyle)
                 .put("playerResizeMode",settings.playerResizeMode)
                 .put("smartDownloads",settings.smartDownloads)
                 .put("downloadStorageLimitMb",settings.downloadStorageLimitMb)
@@ -142,6 +154,9 @@ class SettingsRepository(
         skipCredits=o.optBoolean("skipCredits"),
         subtitleScale=o.optDouble("subtitleScale",1.0).toFloat(),
         subtitleBottomPadding=o.optDouble("subtitleBottomPadding",0.08).toFloat(),
+        subtitleTextColor=o.optString("subtitleTextColor","white"),
+        subtitleBackgroundOpacity=o.optDouble("subtitleBackgroundOpacity",0.45).toFloat(),
+        subtitleEdgeStyle=o.optString("subtitleEdgeStyle","outline"),
         playerResizeMode=o.optString("playerResizeMode","fit"),
         smartDownloads=o.optBoolean("smartDownloads"),
         downloadStorageLimitMb=o.optLong("downloadStorageLimitMb",10240L),
