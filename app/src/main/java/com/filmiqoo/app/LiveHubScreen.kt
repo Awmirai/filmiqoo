@@ -499,10 +499,11 @@ private fun LiveEventDetailScreen(
                 Modifier.fillMaxWidth().padding(14.dp),
                 horizontalArrangement=Arrangement.spacedBy(8.dp)
             ) {
-                if(localEvent.allowChat && localEvent.roomId!=null) {
+                val liveRoomId=localEvent.roomId
+                if(localEvent.allowChat && liveRoomId!=null) {
                     Button(
                         onClick={
-                            if(loggedIn) onOpenRoom(localEvent.roomId,localEvent.title)
+                            if(loggedIn) onOpenRoom(liveRoomId,localEvent.title)
                             else onRequireAuth()
                         },
                         colors=ButtonDefaults.buttonColors(containerColor=FqGold),
