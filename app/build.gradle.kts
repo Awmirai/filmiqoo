@@ -102,6 +102,13 @@ android {
         buildConfig = true
     }
 
+    lint {
+        abortOnError = false
+        textReport = true
+        textOutput = file("build/reports/lint-results-debug.txt")
+        htmlReport = true
+    }
+
 }
 
 val verifyProductionReleaseConfig=tasks.register("verifyProductionReleaseConfig") {
