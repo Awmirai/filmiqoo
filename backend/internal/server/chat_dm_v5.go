@@ -631,6 +631,12 @@ func messagePreview(body,typ string) string {
 			value="🖼 تصویر"
 		case "video":
 			value="🎬 ویدیو"
+		case "document":
+			value="📎 فایل"
+		case "location":
+			value="📍 موقعیت مکانی"
+		case "contact":
+			value="👤 مخاطب"
 		default:
 			value="پیام جدید"
 		}
