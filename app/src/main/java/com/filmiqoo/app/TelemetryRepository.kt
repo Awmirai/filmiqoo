@@ -59,17 +59,10 @@ object FilmiqooCrashStore {
 
 object TelemetryIdentity {
     private const val PREFS="filmiqoo_telemetry"
-    private const val DEVICE_ID="device_id"
     private const val SESSION_ID="session_id"
 
-    fun deviceId(context:Context):String {
-        val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
-        val existing=prefs.getString(DEVICE_ID,null)
-        if(!existing.isNullOrBlank()) return existing
-        val next="android-"+UUID.randomUUID().toString()
-        prefs.edit().putString(DEVICE_ID,next).apply()
-        return next
-    }
+    fun deviceId(context:Context):String =
+        LocalDeviceIdentity.id(context)
 
     fun sessionId(context:Context):String {
         val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
