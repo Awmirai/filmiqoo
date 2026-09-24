@@ -760,15 +760,20 @@ fun CreatorStudioScreen(
     val repo=remember { CreatorChannelRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
+    var analyticsDays by remember { mutableIntStateOf(30) }
     var data by remember { mutableStateOf<CreatorStudioAnalytics?>(null) }
+    var analytics by remember { mutableStateOf<CreatorAnalyticsV3?>(null) }
     var scheduled by remember { mutableStateOf<List<ScheduledCreatorItem>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
 
     BackHandler { onBack() }
 
-    LaunchedEffect(refresh) {
+    LaunchedEffect(refresh,analyticsDays) {
         error=null
         data=runCatching { repo.creatorStudio() }
+            .onFailure { error=it.message }
+            .getOrNull()
+        analytics=runCatching { repo.creatorAnalytics(analyticsDays) }
             .onFailure { error=it.message }
             .getOrNull()
         scheduled=runCatching { repo.scheduledContent() }.getOrDefault(emptyList())
@@ -784,13 +789,21 @@ fun CreatorStudioScreen(
             Row(Modifier.fillMaxWidth().padding(8.dp)) {
                 IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             }
-            PremiumEmptyState(Icons.Default.Analytics,"Creator Studio در دسترس نیست",error ?: "خطا", "تلاش دوباره"){refresh++}
+            PremiumEmptyState(
+                Icons.Default.Analytics,
+                "Creator Studio در دسترس نیست",
+                error ?: "خطا",
+                "تلاش دوباره"
+            ){refresh++}
         }
         return
     }
 
     val d=data!!
-    LazyColumn(Modifier.fillMaxSize().background(FqBg),contentPadding=PaddingValues(bottom=28.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize().background(FqBg),
+        contentPadding=PaddingValues(bottom=28.dp)
+    ) {
         item {
             Box(
                 Modifier.fillMaxWidth().height(230.dp).background(
@@ -809,7 +822,10 @@ fun CreatorStudioScreen(
                     Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(18.dp)
                 ) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        RemoteImage(d.avatarUrl.takeIf(String::isNotBlank),Modifier.size(62.dp).clip(CircleShape))
+                        RemoteImage(
+                            d.avatarUrl.takeIf(String::isNotBlank),
+                            Modifier.size(62.dp).clip(CircleShape)
+                        )
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text("Creator Studio",color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
@@ -857,7 +873,8 @@ fun CreatorStudioScreen(
         item {
             PremiumSectionHeader(
                 "Scheduled",
-                if(scheduled.isEmpty())"محتوای زمان‌بندی‌شده‌ای نداری" else scheduled.size.toString()+" محتوای در صف",
+                if(scheduled.isEmpty())"محتوای زمان‌بندی‌شده‌ای نداری"
+                else scheduled.size.toString()+" محتوای در صف",
                 Icons.Default.ScheduleSend
             )
         }
@@ -876,7 +893,7 @@ fun CreatorStudioScreen(
                         Icon(Icons.Default.EventAvailable,null,tint=FqMuted)
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            "از Filmiqoo Studio می‌تونی Post، Review، Poll و Reel رو برای زمان دقیق برنامه‌ریزی کنی.",
+                            "Post، Review، Poll و Reel رو برای زمان دقیق برنامه‌ریزی کن.",
                             color=FqMuted,
                             fontSize=8.sp,
                             lineHeight=14.sp
@@ -907,18 +924,95 @@ fun CreatorStudioScreen(
         }
 
         item {
+            PremiumSectionHeader(
+                "Analytics V3",
+                "Watch Time، Retention، Completion، Rewatch و Conversion واقعی",
+                Icons.Default.Insights
+            )
+        }
+
+        item {
+            LazyRow(
+                contentPadding=PaddingValues(horizontal=14.dp),
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
+                items(listOf(7,30,90)) { days ->
+                    FilterChip(
+                        selected=analyticsDays==days,
+                        onClick={analyticsDays=days},
+                        label={Text(days.toString()+" روز",fontSize=8.sp)}
+                    )
+                }
+            }
+        }
+
+        analytics?.let { a3 ->
+            item {
+                CreatorRetentionMetrics(a3.summary)
+            }
+
+            item {
+                PremiumSectionHeader(
+                    "Watch Time روزانه",
+                    "Sessionهای واقعی Reel در "+a3.days+" روز اخیر",
+                    Icons.Default.ShowChart
+                )
+            }
+
+            item {
+                CreatorDailyChart(a3.daily)
+            }
+
+            if(a3.topReels.isNotEmpty()) {
+                item {
+                    PremiumSectionHeader(
+                        "بهترین Reelها",
+                        "بر اساس Session، Watch Time و Completion",
+                        Icons.Default.Leaderboard
+                    )
+                }
+                items(a3.topReels,key={it.id}) { reel ->
+                    CreatorTopReelCard(reel)
+                }
+            }
+        }
+
+        item {
             PremiumSectionHeader("نمای کلی","آمار واقعی حساب و محتوای منتشرشده",Icons.Default.Analytics)
         }
 
         item {
             Column(Modifier.padding(horizontal=14.dp)) {
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    StudioMetric("بازدید Reels",compactCreatorCount(d.reelViews),Icons.Default.Visibility,Modifier.weight(1f))
-                    StudioMetric("Story Views",compactCreatorCount(d.storyViews),Icons.Default.AutoStories,Modifier.weight(1f))
+                    StudioMetric(
+                        "بازدید Reels",
+                        compactCreatorCount(d.reelViews),
+                        Icons.Default.Visibility,
+                        Modifier.weight(1f)
+                    )
+                    StudioMetric(
+                        "Story Views",
+                        compactCreatorCount(d.storyViews),
+                        Icons.Default.AutoStories,
+                        Modifier.weight(1f)
+                    )
                 }
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(top=8.dp)) {
-                    StudioMetric("دنبال‌کننده",compactCreatorCount(d.followers),Icons.Default.Groups,Modifier.weight(1f))
-                    StudioMetric("Channel Followers",compactCreatorCount(d.channelFollowers),Icons.Default.Campaign,Modifier.weight(1f))
+                Row(
+                    horizontalArrangement=Arrangement.spacedBy(8.dp),
+                    modifier=Modifier.padding(top=8.dp)
+                ) {
+                    StudioMetric(
+                        "دنبال‌کننده",
+                        compactCreatorCount(d.followers),
+                        Icons.Default.Groups,
+                        Modifier.weight(1f)
+                    )
+                    StudioMetric(
+                        "Channel Followers",
+                        compactCreatorCount(d.channelFollowers),
+                        Icons.Default.Campaign,
+                        Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -928,7 +1022,11 @@ fun CreatorStudioScreen(
         }
 
         item {
-            Surface(color=FqSurface,shape=RoundedCornerShape(22.dp),modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)) {
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(22.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
+            ) {
                 Column(Modifier.padding(14.dp)) {
                     StudioStatRow("Like",d.reelLikes,Icons.Default.Favorite)
                     StudioStatRow("Comment",d.reelComments,Icons.Default.ChatBubble)
@@ -953,27 +1051,241 @@ fun CreatorStudioScreen(
             }
         }
 
-        item {
-            Surface(
-                color=FqGold.copy(alpha=.1f),
-                shape=RoundedCornerShape(20.dp),
-                modifier=Modifier.fillMaxWidth().padding(14.dp)
+        error?.let {
+            item {
+                Text(
+                    it,
+                    color=FqDanger,
+                    fontSize=8.sp,
+                    modifier=Modifier.fillMaxWidth().padding(14.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreatorRetentionMetrics(summary:CreatorAnalyticsSummary) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp),
+        verticalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            StudioMetric(
+                "Unique Viewers",
+                compactCreatorCount(summary.uniqueViewers),
+                Icons.Default.PersonSearch,
+                Modifier.weight(1f)
+            )
+            StudioMetric(
+                "Watch Time",
+                formatCreatorWatchTime(summary.watchMs),
+                Icons.Default.Timer,
+                Modifier.weight(1f)
+            )
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            StudioMetric(
+                "Completion",
+                formatCreatorPercent(summary.completionRate),
+                Icons.Default.TaskAlt,
+                Modifier.weight(1f)
+            )
+            StudioMetric(
+                "Rewatch",
+                formatCreatorPercent(summary.rewatchRate),
+                Icons.Default.Replay,
+                Modifier.weight(1f)
+            )
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            StudioMetric(
+                "Avg Watch",
+                formatCreatorDuration(summary.averageWatchMs),
+                Icons.Default.AvgTime,
+                Modifier.weight(1f)
+            )
+            StudioMetric(
+                "Follow Conversion",
+                formatCreatorPercent(summary.followerConversion),
+                Icons.Default.PersonAdd,
+                Modifier.weight(1f)
+            )
+        }
+
+        Surface(
+            color=FqGold.copy(alpha=.08f),
+            shape=RoundedCornerShape(17.dp),
+            modifier=Modifier.fillMaxWidth()
+        ) {
+            Row(
+                Modifier.padding(12.dp),
+                verticalAlignment=Alignment.CenterVertically
             ) {
-                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Icon(Icons.Default.Lightbulb,null,tint=FqGold)
-                    Spacer(Modifier.width(9.dp))
-                    Column {
-                        Text("Analytics V2",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                Icon(Icons.Default.TrendingUp,null,tint=FqGold)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Followerهای جدید",fontSize=9.sp,fontWeight=FontWeight.Bold)
+                    Text(
+                        "در بازه انتخاب‌شده",
+                        color=FqMuted,
+                        fontSize=7.sp
+                    )
+                }
+                Text(
+                    "+"+summary.followersGained,
+                    color=FqGold,
+                    fontSize=16.sp,
+                    fontWeight=FontWeight.Black
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreatorDailyChart(items:List<CreatorDailyMetric>) {
+    if(items.isEmpty()) {
+        Surface(
+            color=FqSurface,
+            shape=RoundedCornerShape(18.dp),
+            modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
+        ) {
+            Text(
+                "هنوز داده Playback برای نمودار ثبت نشده.",
+                color=FqMuted,
+                fontSize=8.sp,
+                modifier=Modifier.padding(14.dp)
+            )
+        }
+        return
+    }
+
+    val visible=items.takeLast(30)
+    val maxWatch=visible.maxOfOrNull { it.watchMs }?.coerceAtLeast(1L) ?: 1L
+
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(20.dp),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
+    ) {
+        Column(Modifier.padding(vertical=14.dp)) {
+            LazyRow(
+                contentPadding=PaddingValues(horizontal=12.dp),
+                horizontalArrangement=Arrangement.spacedBy(8.dp),
+                verticalAlignment=Alignment.Bottom
+            ) {
+                items(visible,key={it.date}) { day ->
+                    val fraction=(day.watchMs.toFloat()/maxWatch.toFloat()).coerceIn(.04f,1f)
+                    Column(
+                        horizontalAlignment=Alignment.CenterHorizontally,
+                        verticalArrangement=Arrangement.Bottom,
+                        modifier=Modifier.height(126.dp).width(24.dp)
+                    ) {
                         Text(
-                            "مرحله بعد Retention، Completion Rate، Follower Conversion و نمودار روزانه به همین Studio اضافه می‌شه.",
+                            compactCreatorCount(day.uniqueViewers),
                             color=FqMuted,
-                            fontSize=8.sp,
-                            lineHeight=14.sp
+                            fontSize=5.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            Modifier.width(13.dp)
+                                .height((82f*fraction).dp)
+                                .background(FqGold,RoundedCornerShape(6.dp))
+                        )
+                        Text(
+                            day.date.takeLast(5),
+                            color=FqMuted,
+                            fontSize=5.sp,
+                            modifier=Modifier.padding(top=5.dp)
                         )
                     }
                 }
             }
+            Text(
+                "ارتفاع ستون = Watch Time • عدد بالا = Unique Viewer",
+                color=FqMuted,
+                fontSize=6.sp,
+                modifier=Modifier.padding(horizontal=14.dp,vertical=4.dp)
+            )
         }
+    }
+}
+
+@Composable
+private fun CreatorTopReelCard(item:CreatorTopReelMetric) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
+    ) {
+        Row(Modifier.padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
+            Box(
+                Modifier.width(62.dp).height(86.dp).clip(RoundedCornerShape(12.dp))
+            ) {
+                RemoteImage(item.coverUrl.takeIf(String::isNotBlank),Modifier.fillMaxSize(),ContentScale.Crop)
+                Box(
+                    Modifier.align(Alignment.BottomStart)
+                        .background(Color.Black.copy(alpha=.72f),RoundedCornerShape(6.dp))
+                        .padding(horizontal=5.dp,vertical=3.dp)
+                ) {
+                    Text(
+                        formatCreatorPercent(item.completionRate),
+                        color=FqGold,
+                        fontSize=6.sp
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.caption.ifBlank{"Reel"},
+                    fontSize=9.sp,
+                    fontWeight=FontWeight.Bold,
+                    maxLines=2,
+                    overflow=TextOverflow.Ellipsis
+                )
+                Text(
+                    compactCreatorCount(item.uniqueViewers)+" Viewer • "+
+                        formatCreatorWatchTime(item.watchMs),
+                    color=FqMuted,
+                    fontSize=7.sp,
+                    modifier=Modifier.padding(top=5.dp)
+                )
+                LinearProgressIndicator(
+                    progress={item.completionRate.toFloat().coerceIn(0f,1f)},
+                    color=FqGold,
+                    trackColor=FqSurface3,
+                    modifier=Modifier.fillMaxWidth().padding(top=7.dp).height(4.dp)
+                )
+                Text(
+                    compactCreatorCount(item.sessions)+" Session",
+                    color=FqMuted,
+                    fontSize=6.sp,
+                    modifier=Modifier.padding(top=4.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun formatCreatorPercent(value:Double):String =
+    String.format(java.util.Locale.US,"%.1f%%",value.coerceIn(0.0,1.0)*100.0)
+
+private fun formatCreatorDuration(ms:Long):String {
+    if(ms<=0L) return "0s"
+    val seconds=ms/1000L
+    return if(seconds<60L) seconds.toString()+"s"
+    else (seconds/60L).toString()+"m "+(seconds%60L).toString()+"s"
+}
+
+private fun formatCreatorWatchTime(ms:Long):String {
+    if(ms<=0L) return "0m"
+    val minutes=ms/60_000L
+    return when {
+        minutes>=1440L -> String.format(java.util.Locale.US,"%.1fd",minutes/1440.0)
+        minutes>=60L -> String.format(java.util.Locale.US,"%.1fh",minutes/60.0)
+        else -> minutes.toString()+"m"
     }
 }
 

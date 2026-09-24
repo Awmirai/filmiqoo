@@ -30,8 +30,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private sealed interface ReelLoad {
     data object Loading : ReelLoad
@@ -153,6 +155,45 @@ private fun RealReelsPager(
         }
     }
 
+    LaunchedEffect(pager.currentPage,reels,loggedIn) {
+        if(!loggedIn) return@LaunchedEffect
+        val reel=reels.getOrNull(pager.currentPage) ?: return@LaunchedEffect
+        var watchMs=0L
+        var lastSample=android.os.SystemClock.elapsedRealtime()
+
+        try {
+            while(true) {
+                delay(500)
+                val now=android.os.SystemClock.elapsedRealtime()
+                val elapsed=(now-lastSample).coerceIn(0L,1500L)
+                lastSample=now
+                if(player.isPlaying) {
+                    watchMs+=elapsed
+                }
+            }
+        } finally {
+            val playerDuration=player.duration.takeIf { it>0L }
+            val knownDuration=playerDuration
+                ?: reel.durationMs.toLong().takeIf { it>0L }
+                ?: 0L
+            if(watchMs>=500L) {
+                val completed=knownDuration>0L && watchMs>=knownDuration*9L/10L
+                val rewatched=knownDuration>0L && watchMs>=knownDuration*3L/2L
+                withContext(NonCancellable) {
+                    runCatching {
+                        social.reportReelPlayback(
+                            id=reel.id,
+                            watchMs=watchMs,
+                            durationMs=knownDuration,
+                            completed=completed,
+                            rewatched=rewatched
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(muted) {
         player.volume=if(muted)0f else 1f
     }
@@ -173,7 +214,10 @@ private fun RealReelsPager(
                 liked=liked[reel.id] == true,
                 saved=saved[reel.id] == true,
                 followed=followed[reel.author.id] == true,
-                onReveal={revealed[reel.id]=true},
+                onReveal={
+                    revealed[reel.id]=true
+                    if(isCurrent) player.play()
+                },
                 onLike={
                     if(!loggedIn) onRequireAuth()
                     else scope.launch {

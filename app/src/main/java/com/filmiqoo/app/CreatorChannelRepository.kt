@@ -80,6 +80,43 @@ data class ScheduledCreatorItem(
     val spoiler:Boolean
 )
 
+data class CreatorAnalyticsSummary(
+    val sessions:Long,
+    val uniqueViewers:Long,
+    val watchMs:Long,
+    val averageWatchMs:Long,
+    val completionRate:Double,
+    val rewatchRate:Double,
+    val followersGained:Long,
+    val followerConversion:Double
+)
+
+data class CreatorDailyMetric(
+    val date:String,
+    val sessions:Long,
+    val uniqueViewers:Long,
+    val watchMs:Long,
+    val completionRate:Double,
+    val rewatchRate:Double
+)
+
+data class CreatorTopReelMetric(
+    val id:String,
+    val caption:String,
+    val coverUrl:String,
+    val sessions:Long,
+    val uniqueViewers:Long,
+    val watchMs:Long,
+    val completionRate:Double
+)
+
+data class CreatorAnalyticsV3(
+    val days:Int,
+    val summary:CreatorAnalyticsSummary,
+    val daily:List<CreatorDailyMetric>,
+    val topReels:List<CreatorTopReelMetric>
+)
+
 data class CreatorStudioAnalytics(
     val id: String,
     val username: String,
@@ -316,6 +353,65 @@ class CreatorChannelRepository(
                 .put("visibility",visibility)
                 .put("slowModeSeconds",slowModeSeconds),
             authorized=true
+        )
+    }
+
+    suspend fun creatorAnalytics(days:Int=30):CreatorAnalyticsV3 {
+        val root=backend.getJson(
+            "/v1/creator/analytics?days="+days.coerceIn(7,90),
+            authorized=true
+        )
+        val summary=root.optJSONObject("summary") ?: JSONObject()
+        val dailyArr=root.optJSONArray("daily")
+        val topArr=root.optJSONArray("topReels")
+
+        val daily=buildList {
+            if(dailyArr!=null) for(i in 0 until dailyArr.length()) {
+                val x=dailyArr.optJSONObject(i) ?: continue
+                add(
+                    CreatorDailyMetric(
+                        date=x.optString("date"),
+                        sessions=x.optLong("sessions"),
+                        uniqueViewers=x.optLong("uniqueViewers"),
+                        watchMs=x.optLong("watchMs"),
+                        completionRate=x.optDouble("completionRate"),
+                        rewatchRate=x.optDouble("rewatchRate")
+                    )
+                )
+            }
+        }
+
+        val top=buildList {
+            if(topArr!=null) for(i in 0 until topArr.length()) {
+                val x=topArr.optJSONObject(i) ?: continue
+                add(
+                    CreatorTopReelMetric(
+                        id=x.optString("id"),
+                        caption=x.optString("caption"),
+                        coverUrl=x.optString("coverUrl"),
+                        sessions=x.optLong("sessions"),
+                        uniqueViewers=x.optLong("uniqueViewers"),
+                        watchMs=x.optLong("watchMs"),
+                        completionRate=x.optDouble("completionRate")
+                    )
+                )
+            }
+        }
+
+        return CreatorAnalyticsV3(
+            days=root.optInt("days",days),
+            summary=CreatorAnalyticsSummary(
+                sessions=summary.optLong("sessions"),
+                uniqueViewers=summary.optLong("uniqueViewers"),
+                watchMs=summary.optLong("watchMs"),
+                averageWatchMs=summary.optLong("averageWatchMs"),
+                completionRate=summary.optDouble("completionRate"),
+                rewatchRate=summary.optDouble("rewatchRate"),
+                followersGained=summary.optLong("followersGained"),
+                followerConversion=summary.optDouble("followerConversion")
+            ),
+            daily=daily,
+            topReels=top
         )
     }
 

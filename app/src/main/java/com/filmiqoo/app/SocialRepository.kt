@@ -791,6 +791,25 @@ class SocialRepository(
         backend.postJson("/v1/social/reels/"+id+"/view",JSONObject(),authorized=true)
     }
 
+    suspend fun reportReelPlayback(
+        id:String,
+        watchMs:Long,
+        durationMs:Long,
+        completed:Boolean,
+        rewatched:Boolean
+    ) {
+        backend.postJson(
+            "/v1/social/reels/"+id+"/playback-event",
+            JSONObject()
+                .put("watchMs",watchMs)
+                .put("durationMs",durationMs)
+                .put("completed",completed)
+                .put("rewatched",rewatched),
+            authorized=true
+        )
+    }
+
+
     suspend fun feedback(
         targetType:String,
         targetId:String,
