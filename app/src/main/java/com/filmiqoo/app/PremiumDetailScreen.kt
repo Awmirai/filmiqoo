@@ -53,6 +53,7 @@ fun PremiumDetailScreen(
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val library=remember { LibraryRepository(backend) }
+    val seriesAlerts=remember { SeriesAlertsRepository(backend) }
 
     var reload by remember(media.key) { mutableIntStateOf(0) }
     var state by remember(media.key) { mutableStateOf<PremiumDetailLoad>(PremiumDetailLoad.Loading) }
@@ -60,6 +61,8 @@ fun PremiumDetailScreen(
     var favoriteBusy by remember { mutableStateOf(false) }
     var watchlist by remember(media.key) { mutableStateOf(false) }
     var watchlistBusy by remember { mutableStateOf(false) }
+    var seriesFollowing by remember(media.key) { mutableStateOf(false) }
+    var seriesFollowBusy by remember { mutableStateOf(false) }
     var showCollections by remember { mutableStateOf(false) }
     var downloadBusy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -75,6 +78,11 @@ fun PremiumDetailScreen(
                 watchlist=runCatching {
                     library.watchlist().any { it.backendId==media.backendId }
                 }.getOrDefault(false)
+                if(media.type==MediaType.TV) {
+                    seriesFollowing=runCatching {
+                        seriesAlerts.status(media.backendId).following
+                    }.getOrDefault(false)
+                }
             }
             PremiumDetailLoad.Ready(tmdb,platform)
         }.getOrElse { PremiumDetailLoad.Error(it.message ?: "خطا در دریافت اطلاعات") }
@@ -162,6 +170,9 @@ fun PremiumDetailScreen(
                             favoriteBusy=favoriteBusy,
                             watchlist=watchlist,
                             watchlistBusy=watchlistBusy,
+                            showSeriesFollow=d.media.type==MediaType.TV && !d.media.backendId.isNullOrBlank(),
+                            seriesFollowing=seriesFollowing,
+                            seriesFollowBusy=seriesFollowBusy,
                             downloadBusy=downloadBusy,
                             canDownload=canPlay,
                             onFavorite={
@@ -195,6 +206,35 @@ fun PremiumDetailScreen(
                                         .onSuccess { watchlist=it }
                                         .onFailure { message=it.message }
                                     watchlistBusy=false
+                                }
+                            },
+                            onSeriesFollow={
+                                val id=d.media.backendId
+                                if(id.isNullOrBlank()) return@PremiumDetailActions
+                                if(!backend.session.isLoggedIn) {
+                                    onRequireAuth()
+                                    return@PremiumDetailActions
+                                }
+                                if(seriesFollowBusy) return@PremiumDetailActions
+                                seriesFollowBusy=true
+                                scope.launch {
+                                    runCatching {
+                                        seriesAlerts.update(
+                                            mediaId=id,
+                                            following=!seriesFollowing,
+                                            notifyNewEpisode=true,
+                                            notifyStreamReady=true
+                                        )
+                                    }.onSuccess {
+                                        seriesFollowing=it.following
+                                        message=if(it.following)
+                                            "اعلان قسمت‌های جدید و نسخه آماده پخش فعال شد."
+                                        else
+                                            "دنبال‌کردن این سریال متوقف شد."
+                                    }.onFailure {
+                                        message=it.message
+                                    }
+                                    seriesFollowBusy=false
                                 }
                             },
                             onCollections={
@@ -702,10 +742,14 @@ private fun PremiumDetailActions(
     favoriteBusy: Boolean,
     watchlist: Boolean,
     watchlistBusy: Boolean,
+    showSeriesFollow: Boolean,
+    seriesFollowing: Boolean,
+    seriesFollowBusy: Boolean,
     downloadBusy: Boolean,
     canDownload: Boolean,
     onFavorite: () -> Unit,
     onWatchlist: () -> Unit,
+    onSeriesFollow: () -> Unit,
     onCollections: () -> Unit,
     onDownload: () -> Unit,
     onWatchParty: () -> Unit,
@@ -732,6 +776,17 @@ private fun PremiumDetailActions(
                 loading=watchlistBusy,
                 onClick=onWatchlist
             )
+        }
+        if(showSeriesFollow) {
+            item {
+                ActionTile(
+                    icon=if(seriesFollowing)Icons.Default.NotificationsActive else Icons.Default.AddAlert,
+                    label=if(seriesFollowing)"دنبال می‌کنی" else "اعلان سریال",
+                    active=seriesFollowing,
+                    loading=seriesFollowBusy,
+                    onClick=onSeriesFollow
+                )
+            }
         }
         item {
             ActionTile(

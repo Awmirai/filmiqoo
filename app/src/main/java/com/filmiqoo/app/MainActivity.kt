@@ -379,22 +379,18 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onCreator={overlay=OverlayRoute.CreatorPage(it)},
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
-                is OverlayRoute.SocialCollections -> SocialCollectionsScreen(
-                    backend=backend,
-                    repository=repository,
-                    loggedIn=backend.session.isLoggedIn,
-                    initialCollectionId=route.collectionId,
-                    onBack=closeOverlay,
-                    onMedia={overlay=OverlayRoute.Detail(it)},
-                    onCreator={overlay=OverlayRoute.CreatorPage(it)},
-                    onRequireAuth={overlay=OverlayRoute.Auth}
-                )
                 OverlayRoute.Releases -> ReleaseCenterScreen(
                     backend=backend,
                     repository=repository,
                     onBack=closeOverlay,
                     onMedia={overlay=OverlayRoute.Detail(it)},
                     onRequireAuth={overlay=OverlayRoute.Auth}
+                )
+                OverlayRoute.SeriesCalendar -> SeriesCalendarScreen(
+                    backend=backend,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)}
                 )
                 is OverlayRoute.WatchParty -> ConnectedWatchPartyScreen(
                     media=route.media,
@@ -506,6 +502,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onFilmDna={overlay=OverlayRoute.FilmDna},
+                                    onSeriesCalendar={overlay=OverlayRoute.SeriesCalendar},
                                     onSocialCollections={overlay=OverlayRoute.SocialCollections()},
                                     onLoggedOut={
                                         backend.viewerProfiles.clear()

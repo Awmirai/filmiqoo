@@ -116,6 +116,7 @@ sealed interface OverlayRoute {
     data object FilmDna : OverlayRoute
     data class SocialCollections(val collectionId:String?=null) : OverlayRoute
     data object Releases : OverlayRoute
+    data object SeriesCalendar : OverlayRoute
     data class ChannelManage(val channelId:String,val name:String) : OverlayRoute
     data object CreatorStudio : OverlayRoute
     data object LiveHub : OverlayRoute

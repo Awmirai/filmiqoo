@@ -169,6 +169,10 @@ func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 		writeError(w,http.StatusInternalServerError,err)
 		return
 	}
+	if err:=s.processDueSeriesAlerts(r.Context(),userID); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT n.id::text,n.notification_type,n.entity_type,n.entity_id::text,
 		       n.title,n.body,n.read_at,n.created_at,
@@ -180,7 +184,7 @@ func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 		  FROM notifications n
 		  LEFT JOIN profiles p ON p.user_id=n.actor_user_id
 		  LEFT JOIN media_titles mt
-		    ON n.entity_type='release' AND mt.id=n.entity_id
+		    ON n.entity_type IN ('release','series') AND mt.id=n.entity_id
 		  LEFT JOIN LATERAL (
 		    SELECT id,quality_label,stream_ready
 		      FROM media_versions

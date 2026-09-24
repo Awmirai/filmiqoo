@@ -56,6 +56,7 @@ fun ConnectedProfileScreen(
     onFollowRequests: () -> Unit,
     onEditProfile: () -> Unit,
     onFilmDna: () -> Unit,
+    onSeriesCalendar: () -> Unit,
     onSocialCollections: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
@@ -165,10 +166,10 @@ fun ConnectedProfileScreen(
                             onClick=onFilmDna
                         )
                         ProfileActionRow(
-                            icon=Icons.Default.CollectionsBookmark,
-                            title="Community Lists",
-                            subtitle="Collectionهای عمومی فیلم‌بازها و Creatorها",
-                            onClick=onSocialCollections
+                            icon=Icons.Default.EventAvailable,
+                            title="تقویم سریال‌های من",
+                            subtitle="قسمت‌های آینده و اعلان آماده‌شدن نسخه پخش",
+                            onClick=onSeriesCalendar
                         )
                         ProfileActionRow(
                             icon=Icons.Default.CollectionsBookmark,
