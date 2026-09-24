@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +31,7 @@ import kotlinx.coroutines.launch
 import okhttp3.WebSocket
 import org.json.JSONObject
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConnectedRoomScreen(
     roomId: String,
@@ -60,6 +63,19 @@ fun ConnectedRoomScreen(
     var headerMenuOpen by remember { mutableStateOf(false) }
     var roomTitle by remember(roomId,title) { mutableStateOf(title) }
     var forwardTarget by remember { mutableStateOf<RoomMessageItem?>(null) }
+    var attachmentMenuOpen by remember { mutableStateOf(false) }
+    var locationDialogOpen by remember { mutableStateOf(false) }
+    var contactDialogOpen by remember { mutableStateOf(false) }
+    var scheduledOpen by remember { mutableStateOf(false) }
+    var selectedMessageIds by remember(roomId) { mutableStateOf<Set<String>>(emptySet()) }
+    var bulkForwardOpen by remember { mutableStateOf(false) }
+    var bulkDeleteConfirm by remember { mutableStateOf(false) }
+    var firstUnreadMessageId by remember(roomId) { mutableStateOf<String?>(null) }
+    var initialUnreadCount by remember(roomId) { mutableLongStateOf(0L) }
+    var readStateCaptured by remember(roomId) { mutableStateOf(false) }
+    var initialPositioned by remember(roomId) { mutableStateOf(false) }
+    var draftLoaded by remember(roomId) { mutableStateOf(false) }
+    var draftReplyId by remember(roomId) { mutableStateOf<String?>(null) }
     var memberState by remember(roomId) { mutableStateOf<RoomMembersState?>(null) }
     var socket by remember(roomId) { mutableStateOf<WebSocket?>(null) }
     var typingUsers by remember(roomId) {
@@ -68,17 +84,34 @@ fun ConnectedRoomScreen(
     val realtime=remember(backend) { RoomRealtimeClient(backend.session) }
     val messaging=remember(backend) { MessagingRepository(backend) }
 
-    suspend fun refresh() {
+    suspend fun refresh(
+        markRead:Boolean=true,
+        autoScroll:Boolean=true
+    ) {
         runCatching { social.roomMessages(roomId) }
-            .onSuccess {
-                val changed=it.size!=messages.size
-                messages=it
+            .onSuccess { incoming ->
+                val changed=incoming.size!=messages.size
+                messages=incoming
                 syncing=false
-                if(loggedIn) {
+
+                if(draftReplyId!=null && replyTo==null) {
+                    replyTo=incoming.firstOrNull { it.id==draftReplyId }
+                }
+
+                if(loggedIn && markRead && readStateCaptured) {
                     runCatching { messaging.markRoomRead(roomId) }
                 }
-                if(changed && it.isNotEmpty()) {
-                    scope.launch { listState.animateScrollToItem(it.lastIndex) }
+
+                if(!initialPositioned && incoming.isNotEmpty()) {
+                    val unreadIndex=incoming.indexOfFirst { it.id==firstUnreadMessageId }
+                    initialPositioned=true
+                    scope.launch {
+                        listState.scrollToItem(
+                            if(unreadIndex>=0) unreadIndex else incoming.lastIndex
+                        )
+                    }
+                } else if(changed && autoScroll && incoming.isNotEmpty()) {
+                    scope.launch { listState.animateScrollToItem(incoming.lastIndex) }
                 }
             }
             .onFailure { error=it.message }
@@ -126,16 +159,81 @@ fun ConnectedRoomScreen(
 
 
 
-    LaunchedEffect(loggedIn,roomId) {
-        meId=if(loggedIn) runCatching { backend.me().id }.getOrNull() else null
-        refreshMembers()
+    val documentPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if(uri==null) return@rememberLauncherForActivityResult
+        if(!loggedIn) {
+            onRequireAuth()
+            return@rememberLauncherForActivityResult
+        }
+        uploading=true
+        val replyId=replyTo?.id
+        scope.launch {
+            runCatching {
+                social.sendDocumentMessage(
+                    context=context,
+                    roomId=roomId,
+                    uri=uri,
+                    caption="",
+                    spoiler=spoiler,
+                    replyToMessageId=replyId
+                )
+            }.onSuccess {
+                replyTo=null
+                draftReplyId=null
+                spoiler=false
+                refresh()
+            }.onFailure {
+                error=it.message
+            }
+            uploading=false
+        }
     }
 
+
     LaunchedEffect(roomId,loggedIn) {
-        refresh()
-        if(loggedIn) refreshMembers()
+        draftLoaded=false
+        readStateCaptured=!loggedIn
+        initialPositioned=false
+        firstUnreadMessageId=null
+        initialUnreadCount=0L
+        draftReplyId=null
+        replyTo=null
+
+        meId=if(loggedIn) runCatching { backend.me().id }.getOrNull() else null
+
+        if(loggedIn) {
+            runCatching { messaging.roomReadState(roomId) }
+                .onSuccess {
+                    firstUnreadMessageId=it.firstUnreadMessageId
+                    initialUnreadCount=it.unread
+                }
+                .onFailure { if(error==null) error=it.message }
+
+            runCatching { messaging.roomDraft(roomId) }
+                .onSuccess { draft ->
+                    if(draft.exists) {
+                        text=draft.body
+                        spoiler=draft.spoiler
+                        draftReplyId=draft.replyToMessageId
+                    }
+                }
+                .onFailure { if(error==null) error=it.message }
+        }
+
+        readStateCaptured=true
+        refresh(markRead=false,autoScroll=false)
+        if(loggedIn) {
+            runCatching { messaging.markRoomRead(roomId) }
+            refreshMembers()
+        }
+        if(draftReplyId!=null) {
+            replyTo=messages.firstOrNull { it.id==draftReplyId }
+        }
+        draftLoaded=true
+
         while(isActive) {
-            // Safety resync; live updates normally arrive over WebSocket.
             delay(30_000)
             refresh()
             if(loggedIn) refreshMembers()
@@ -151,6 +249,19 @@ fun ConnectedRoomScreen(
             ws.send(JSONObject().put("type","typing").put("active",false).toString())
         } else {
             ws.send(JSONObject().put("type","typing").put("active",false).toString())
+        }
+    }
+
+    LaunchedEffect(text,spoiler,replyTo?.id,draftLoaded,loggedIn) {
+        if(!loggedIn || !draftLoaded) return@LaunchedEffect
+        delay(700)
+        runCatching {
+            messaging.saveRoomDraft(
+                roomId=roomId,
+                body=text,
+                replyToMessageId=replyTo?.id ?: draftReplyId,
+                spoiler=spoiler
+            )
         }
     }
 
@@ -232,7 +343,13 @@ fun ConnectedRoomScreen(
         }
     }
 
-    BackHandler { onBack() }
+    BackHandler {
+        if(selectedMessageIds.isNotEmpty()) {
+            selectedMessageIds=emptySet()
+        } else {
+            onBack()
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
