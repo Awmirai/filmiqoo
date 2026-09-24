@@ -138,6 +138,12 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.auth)
+			r.Use(
+				s.authenticatedWriteRateLimit(
+					s.cfg.AuthenticatedWriteRateLimit,
+					time.Minute,
+				),
+			)
 			r.Post("/social/reels", s.createReel)
 			r.Post("/social/reels/{id}/like", s.toggleReelLike)
 			r.Post("/social/reels/{id}/save", s.toggleReelSave)
