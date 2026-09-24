@@ -222,6 +222,19 @@ fun ConnectedWatchPartyScreen(
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
                 ) { Icon(Icons.Default.Close,null) }
                 Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick={
+                        FilmiqooDeepLinks.share(
+                            context,
+                            p.title,
+                            FilmiqooDeepLinks.watchParty(p.id)
+                        )
+                    },
+                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
+                ) {
+                    Icon(Icons.Default.Share,null)
+                }
+                Spacer(Modifier.width(6.dp))
                 Surface(
                     color=if(p.state=="live")FqDanger else FqSurface2,
                     shape=RoundedCornerShape(9.dp)

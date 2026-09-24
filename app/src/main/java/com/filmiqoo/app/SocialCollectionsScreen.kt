@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -354,6 +355,7 @@ private fun SocialCollectionDetailScreen(
     onCreator:()->Unit,
     onMedia:(MediaItem)->Unit
 ) {
+    val context=LocalContext.current
     BackHandler { onBack() }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
@@ -385,6 +387,20 @@ private fun SocialCollectionDetailScreen(
                     .clip(CircleShape).background(Color.Black.copy(alpha=.38f))
             ) {
                 Icon(Icons.Default.ArrowBack,null)
+            }
+
+            IconButton(
+                onClick={
+                    FilmiqooDeepLinks.share(
+                        context,
+                        detail.summary.name,
+                        FilmiqooDeepLinks.collection(detail.summary.id)
+                    )
+                },
+                modifier=Modifier.align(Alignment.TopEnd).padding(8.dp)
+                    .clip(CircleShape).background(Color.Black.copy(alpha=.38f))
+            ) {
+                Icon(Icons.Default.Share,null)
             }
 
             Column(

@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,7 @@ fun PremiumCreatorChannelScreen(
     onReputation: (String) -> Unit,
     onRequireAuth: () -> Unit
 ) {
+    val context=LocalContext.current
     val repo=remember { CreatorChannelRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
@@ -156,6 +158,13 @@ fun PremiumCreatorChannelScreen(
                 tabs=listOf("Reels","پست‌ها","درباره"),
                 onBack=onBack,
                 onRefresh={refresh++},
+                onShare={
+                    FilmiqooDeepLinks.share(
+                        context,
+                        p.displayName+" • @"+p.username,
+                        FilmiqooDeepLinks.creator(p.id)
+                    )
+                },
                 onTab={tab=it},
                 onMore={
                     if(!backend.session.isLoggedIn) {
@@ -220,6 +229,13 @@ fun PremiumCreatorChannelScreen(
                 tabs=listOf("Reels","پست‌ها","Stories","اعضا","چت"),
                 onBack=onBack,
                 onRefresh={refresh++},
+                onShare={
+                    FilmiqooDeepLinks.share(
+                        context,
+                        p.name+" • @"+p.slug,
+                        FilmiqooDeepLinks.channel(p.id)
+                    )
+                },
                 onTab={tab=it},
                 onManage=s.management?.let { { onManageChannel(p.id,p.name) } },
                 onMore={
@@ -295,6 +311,7 @@ private fun CreatorEntityScaffold(
     tabs: List<String>,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
+    onShare: () -> Unit,
     onTab: (Int) -> Unit,
     onFollow: () -> Unit,
     onMore: () -> Unit,
@@ -345,6 +362,10 @@ private fun CreatorEntityScaffold(
                         modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                     ) { Icon(Icons.Default.MilitaryTech,null,tint=FqGold) }
                 }
+                IconButton(
+                    onClick=onShare,
+                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
+                ) { Icon(Icons.Default.Share,null) }
                 IconButton(
                     onClick=onRefresh,
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))

@@ -169,6 +169,15 @@ fun ConnectedRoomScreen(
                     )
                 }
             }
+            IconButton(
+                onClick={
+                    FilmiqooDeepLinks.share(
+                        context,
+                        title,
+                        FilmiqooDeepLinks.room(roomId,title)
+                    )
+                }
+            ) { Icon(Icons.Default.Share,null) }
             IconButton(onClick={scope.launch{refresh()}}) { Icon(Icons.Default.Refresh,null) }
         }
 
