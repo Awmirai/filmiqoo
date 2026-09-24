@@ -57,6 +57,7 @@ type Config struct {
 	PostgresMaxConns int
 	PostgresMinConns int
 	RedisPoolSize int
+	APIRequestTimeoutSeconds int
 }
 
 func Load() Config {
@@ -106,6 +107,7 @@ func Load() Config {
 		PostgresMaxConns: envInt("POSTGRES_MAX_CONNS", 40),
 		PostgresMinConns: envInt("POSTGRES_MIN_CONNS", 4),
 		RedisPoolSize: envInt("REDIS_POOL_SIZE", 60),
+		APIRequestTimeoutSeconds: envInt("API_REQUEST_TIMEOUT_SECONDS", 20),
 	}
 }
 
@@ -191,6 +193,9 @@ func (c Config) Validate() error {
 	if c.PostgresMaxConns<=0 || c.PostgresMinConns<0 ||
 		c.PostgresMinConns>c.PostgresMaxConns || c.RedisPoolSize<=0 {
 		return errors.New("database and redis pool settings are invalid")
+	}
+	if c.APIRequestTimeoutSeconds<5 || c.APIRequestTimeoutSeconds>120 {
+		return errors.New("API_REQUEST_TIMEOUT_SECONDS must be between 5 and 120")
 	}
 	if c.PushMaxAttempts<=0 || c.TelegramIngestMaxAttempts<=0 ||
 		c.TelegramIngestRetryBaseSeconds<=0 || c.TelemetryRetentionDays<=0 {
