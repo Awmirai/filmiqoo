@@ -56,4 +56,22 @@ class SecurityRepository(
             JSONObject().put("refreshToken",backend.session.refreshToken.orEmpty()),
             authorized=true
         ).optLong("revoked")
+
+    suspend fun accountExportJson():String =
+        backend.getJson(
+            "/v1/privacy/export",
+            authorized=true
+        ).toString(2)
+
+    suspend fun deleteAccount(
+        password:String,
+        confirmation:String
+    ):Boolean =
+        backend.postJson(
+            "/v1/privacy/delete-account",
+            JSONObject()
+                .put("password",password)
+                .put("confirmation",confirmation),
+            authorized=true
+        ).optBoolean("deleted")
 }
