@@ -148,7 +148,9 @@ fun ConnectedRoomScreen(
                 )
             }.onSuccess {
                 replyTo=null
+                draftReplyId=null
                 spoiler=false
+                runCatching { messaging.deleteRoomDraft(roomId) }
                 refresh()
             }.onFailure {
                 error=it.message
@@ -183,6 +185,7 @@ fun ConnectedRoomScreen(
                 replyTo=null
                 draftReplyId=null
                 spoiler=false
+                runCatching { messaging.deleteRoomDraft(roomId) }
                 refresh()
             }.onFailure {
                 error=it.message
