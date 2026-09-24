@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
+import android.net.ConnectivityManager
 import android.util.Rational
 import android.view.View
 import androidx.activity.compose.BackHandler
@@ -118,6 +119,7 @@ fun FilmiqooPlayerScreen(
     var sleepTimerEndsAt by remember { mutableStateOf<Long?>(null) }
     var sleepAtEpisodeEnd by remember { mutableStateOf(false) }
     var sleepTimerMessage by remember { mutableStateOf<String?>(null) }
+    var dataSaverApplied by remember { mutableStateOf(false) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -280,8 +282,16 @@ fun FilmiqooPlayerScreen(
             if(enriched!=null) {
                 currentTarget=enriched.copy(startPositionMs=requestedStart)
             }
+            val saverVariant=if(
+                initialSettings.dataSaver &&
+                isMeteredConnection(context)
+            ) {
+                chooseDataSaverVariant(currentTarget.variants)
+            } else null
+            val initialVersion=saverVariant?.mediaVersionId ?: currentTarget.mediaVersionId
+            dataSaverApplied=saverVariant!=null && initialVersion!=currentTarget.mediaVersionId
             loadVersion(
-                versionId=currentTarget.mediaVersionId,
+                versionId=initialVersion,
                 startPosition=requestedStart
             )
         }
@@ -782,6 +792,7 @@ fun FilmiqooPlayerScreen(
             subtitleBottomPadding=subtitleBottomPadding,
             resizeMode=playerResizeMode,
             autoPlayNext=autoPlayNext,
+            dataSaverApplied=dataSaverApplied,
             sleepTimerEndsAt=sleepTimerEndsAt,
             sleepAtEpisodeEnd=sleepAtEpisodeEnd,
             onDismiss={settingsOpen=false},
@@ -1256,6 +1267,7 @@ private fun PlayerSettingsSheet(
     subtitleBottomPadding: Float,
     resizeMode: String,
     autoPlayNext: Boolean,
+    dataSaverApplied: Boolean,
     sleepTimerEndsAt: Long?,
     sleepAtEpisodeEnd: Boolean,
     onDismiss: () -> Unit,
@@ -1310,6 +1322,30 @@ private fun PlayerSettingsSheet(
 
             when(tab) {
                 PlayerSettingsTab.QUALITY -> {
+                    if(dataSaverApplied) {
+                        Surface(
+                            color=FqGold.copy(alpha=.09f),
+                            shape=RoundedCornerShape(14.dp),
+                            modifier=Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp)
+                        ) {
+                            Row(
+                                Modifier.padding(11.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.DataSaverOn,null,tint=FqGold)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text("Data Saver فعال",fontSize=9.sp,fontWeight=FontWeight.Bold)
+                                    Text(
+                                        "روی شبکه Metered کیفیت سبک‌تر به‌صورت خودکار انتخاب شده؛ هر زمان خواستی دستی عوضش کن.",
+                                        color=FqMuted,
+                                        fontSize=7.sp,
+                                        lineHeight=13.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                     if(variants.isEmpty()) {
                         PlayerSettingsEmpty("نسخه دیگری برای این فایل موجود نیست.")
                     } else {
@@ -1929,4 +1965,28 @@ private fun playerResizeModeValue(mode:String):Int=when(mode) {
     "fill" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
     "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+}
+
+
+private fun isMeteredConnection(context:Context):Boolean {
+    val manager=context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        ?: return false
+    return runCatching { manager.isActiveNetworkMetered }.getOrDefault(false)
+}
+
+private fun chooseDataSaverVariant(
+    variants:List<PlaybackVariant>
+):PlaybackVariant? {
+    if(variants.size<2) return null
+
+    fun resolution(label:String):Int? =
+        Regex("""(\d{3,4})""").find(label)?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+    val numbered=variants.mapNotNull { variant ->
+        resolution(variant.label)?.let { it to variant }
+    }
+    if(numbered.isEmpty()) return variants.lastOrNull()
+
+    val under720=numbered.filter { it.first<=720 }
+    return (under720.maxByOrNull { it.first } ?: numbered.minByOrNull { it.first })?.second
 }
