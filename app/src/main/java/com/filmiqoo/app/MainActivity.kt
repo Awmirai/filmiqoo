@@ -197,7 +197,16 @@ fun FilmiqooApp() {
                             }
                         }
                     },
+                    onManageChannel={channelId,name->
+                        overlay=OverlayRoute.ChannelManage(channelId,name)
+                    },
                     onRequireAuth={overlay=OverlayRoute.Auth}
+                )
+                is OverlayRoute.ChannelManage -> ChannelManageScreen(
+                    channelId=route.channelId,
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onOpenRoom={id,name->overlay=OverlayRoute.Room(id,name)}
                 )
                 OverlayRoute.CreatorStudio -> CreatorStudioScreen(
                     backend=backend,

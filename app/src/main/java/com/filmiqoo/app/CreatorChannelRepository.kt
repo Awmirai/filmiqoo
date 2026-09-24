@@ -41,6 +41,32 @@ data class ChannelMember(
     val verified: Boolean
 )
 
+data class ManagedChannelRoom(
+    val id:String,
+    val name:String,
+    val topic:String,
+    val type:String,
+    val visibility:String,
+    val members:Long,
+    val slowModeSeconds:Int
+)
+
+data class ChannelManageOverview(
+    val id:String,
+    val ownerUserId:String,
+    val slug:String,
+    val name:String,
+    val bio:String,
+    val avatarUrl:String,
+    val coverUrl:String,
+    val visibility:String,
+    val verified:Boolean,
+    val followers:Long,
+    val posts:Long,
+    val reels:Long,
+    val myRole:String
+)
+
 data class CreatorStudioAnalytics(
     val id: String,
     val username: String,
@@ -159,6 +185,125 @@ class CreatorChannelRepository(
                 )
             }
         }
+    }
+
+    suspend fun managedRooms(id:String):List<ManagedChannelRoom> {
+        val root=backend.getJson("/v1/social/channels/"+id+"/manage/rooms",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    ManagedChannelRoom(
+                        id=x.optString("id"),
+                        name=x.optString("name"),
+                        topic=x.optString("topic"),
+                        type=x.optString("type"),
+                        visibility=x.optString("visibility"),
+                        members=x.optLong("members"),
+                        slowModeSeconds=x.optInt("slowModeSeconds")
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun manageOverview(id:String):ChannelManageOverview {
+        val o=backend.getJson("/v1/social/channels/"+id+"/manage",authorized=true)
+        return ChannelManageOverview(
+            id=o.optString("id"),
+            ownerUserId=o.optString("ownerUserId"),
+            slug=o.optString("slug"),
+            name=o.optString("name"),
+            bio=o.optString("bio"),
+            avatarUrl=o.optString("avatarUrl"),
+            coverUrl=o.optString("coverUrl"),
+            visibility=o.optString("visibility"),
+            verified=o.optBoolean("verified"),
+            followers=o.optLong("followers"),
+            posts=o.optLong("posts"),
+            reels=o.optLong("reels"),
+            myRole=o.optString("myRole")
+        )
+    }
+
+    suspend fun updateChannelSettings(
+        id:String,
+        name:String,
+        bio:String,
+        visibility:String
+    ):ChannelManageOverview {
+        val o=backend.postJson(
+            "/v1/social/channels/"+id+"/settings",
+            JSONObject()
+                .put("name",name.trim())
+                .put("bio",bio.trim())
+                .put("visibility",visibility),
+            authorized=true
+        )
+        return ChannelManageOverview(
+            id=o.optString("id"),
+            ownerUserId=o.optString("ownerUserId"),
+            slug=o.optString("slug"),
+            name=o.optString("name"),
+            bio=o.optString("bio"),
+            avatarUrl=o.optString("avatarUrl"),
+            coverUrl=o.optString("coverUrl"),
+            visibility=o.optString("visibility"),
+            verified=o.optBoolean("verified"),
+            followers=o.optLong("followers"),
+            posts=o.optLong("posts"),
+            reels=o.optLong("reels"),
+            myRole=o.optString("myRole")
+        )
+    }
+
+    suspend fun changeMemberRole(channelId:String,userId:String,role:String):String =
+        backend.postJson(
+            "/v1/social/channels/"+channelId+"/members/"+userId+"/role",
+            JSONObject().put("role",role),
+            authorized=true
+        ).optString("role")
+
+    suspend fun removeMember(channelId:String,userId:String):Boolean =
+        backend.postJson(
+            "/v1/social/channels/"+channelId+"/members/"+userId+"/remove",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("removed")
+
+    suspend fun createRoom(
+        channelId:String,
+        name:String,
+        topic:String,
+        visibility:String,
+        slowModeSeconds:Int
+    ):String =
+        backend.postJson(
+            "/v1/social/channels/"+channelId+"/rooms",
+            JSONObject()
+                .put("name",name.trim())
+                .put("topic",topic.trim())
+                .put("visibility",visibility)
+                .put("slowModeSeconds",slowModeSeconds),
+            authorized=true
+        ).optString("id")
+
+    suspend fun updateRoom(
+        channelId:String,
+        roomId:String,
+        topic:String,
+        visibility:String,
+        slowModeSeconds:Int
+    ) {
+        backend.postJson(
+            "/v1/social/channels/"+channelId+"/rooms/"+roomId+"/settings",
+            JSONObject()
+                .put("topic",topic.trim())
+                .put("visibility",visibility)
+                .put("slowModeSeconds",slowModeSeconds),
+            authorized=true
+        )
     }
 
     suspend fun creatorStudio(): CreatorStudioAnalytics {

@@ -41,7 +41,8 @@ private sealed interface CreatorEntityState {
         val reels: List<ReelFeedItem>,
         val stories: List<SocialStory>,
         val members: List<ChannelMember>,
-        val rooms: List<SocialRoom>
+        val rooms: List<SocialRoom>,
+        val management: ChannelManageOverview?
     ): CreatorEntityState
     data class Error(val message: String): CreatorEntityState
 }
@@ -57,6 +58,7 @@ fun PremiumCreatorChannelScreen(
     onStory: (List<SocialStory>, Int) -> Unit,
     onOpenReels: () -> Unit,
     onStartDm: (String, String) -> Unit,
+    onManageChannel: (String, String) -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val repo=remember { CreatorChannelRepository(backend) }
@@ -83,13 +85,17 @@ fun PremiumCreatorChannelScreen(
         state=CreatorEntityState.Loading
         state=runCatching {
             if(creator.entityType=="channel") {
+                val management=if(backend.session.isLoggedIn) {
+                    runCatching { repo.manageOverview(creator.id) }.getOrNull()
+                } else null
                 CreatorEntityState.Channel(
                     profile=repo.channelProfile(creator.id),
                     posts=repo.channelPosts(creator.id),
                     reels=repo.channelReels(creator.id),
                     stories=repo.channelStories(creator.id),
                     members=repo.channelMembers(creator.id),
-                    rooms=repo.channelRooms(creator.id)
+                    rooms=repo.channelRooms(creator.id),
+                    management=management
                 )
             } else {
                 CreatorEntityState.User(
@@ -199,6 +205,7 @@ fun PremiumCreatorChannelScreen(
                 onBack=onBack,
                 onRefresh={refresh++},
                 onTab={tab=it},
+                onManage=s.management?.let { { onManageChannel(p.id,p.name) } },
                 onMore={
                     if(!backend.session.isLoggedIn) {
                         onRequireAuth()
@@ -274,6 +281,7 @@ private fun CreatorEntityScaffold(
     onTab: (Int) -> Unit,
     onFollow: () -> Unit,
     onMore: () -> Unit,
+    onManage: (() -> Unit)? = null,
     onMessage: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
@@ -307,6 +315,12 @@ private fun CreatorEntityScaffold(
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                 ) { Icon(Icons.Default.ArrowBack,null) }
                 Spacer(Modifier.weight(1f))
+                if(onManage!=null) {
+                    IconButton(
+                        onClick=onManage,
+                        modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
+                    ) { Icon(Icons.Default.AdminPanelSettings,null,tint=FqGold) }
+                }
                 IconButton(
                     onClick=onRefresh,
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
