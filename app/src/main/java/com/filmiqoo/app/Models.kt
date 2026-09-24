@@ -115,6 +115,7 @@ sealed interface OverlayRoute {
     data object Releases : OverlayRoute
     data class ChannelManage(val channelId:String,val name:String) : OverlayRoute
     data object CreatorStudio : OverlayRoute
+    data object LiveHub : OverlayRoute
     data object Auth : OverlayRoute
     data object Create : OverlayRoute
     data object Notifications : OverlayRoute

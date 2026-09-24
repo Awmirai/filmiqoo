@@ -728,7 +728,7 @@ private fun ChannelComposer(
 }
 
 @Composable
-private fun MediaTagPickerDialog(
+fun MediaTagPickerDialog(
     backend:BackendRepository,
     repository:TmdbRepository,
     onDismiss:()->Unit,

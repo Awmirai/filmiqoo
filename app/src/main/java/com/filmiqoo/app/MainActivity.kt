@@ -293,7 +293,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 )
                 OverlayRoute.CreatorStudio -> CreatorStudioScreen(
                     backend=backend,
-                    onBack=closeOverlay
+                    onBack=closeOverlay,
+                    onLive={overlay=OverlayRoute.LiveHub}
+                )
+                OverlayRoute.LiveHub -> LiveHubScreen(
+                    backend=backend,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 OverlayRoute.Inbox -> InboxScreen(
                     backend=backend,

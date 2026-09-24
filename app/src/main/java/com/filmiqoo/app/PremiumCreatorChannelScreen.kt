@@ -745,7 +745,8 @@ private fun CreatorAbout(
 @Composable
 fun CreatorStudioScreen(
     backend: BackendRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onLive: () -> Unit
 ) {
     val repo=remember { CreatorChannelRepository(backend) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -804,6 +805,39 @@ fun CreatorStudioScreen(
                             Text("@"+d.username,color=FqMuted,fontSize=8.sp)
                         }
                     }
+                }
+            }
+        }
+
+        item {
+            Surface(
+                color=FqDanger.copy(alpha=.09f),
+                shape=RoundedCornerShape(20.dp),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=14.dp,vertical=10.dp)
+                    .clickable { onLive() }
+            ) {
+                Row(
+                    Modifier.padding(14.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(48.dp)
+                            .background(FqDanger.copy(alpha=.18f),RoundedCornerShape(15.dp)),
+                        contentAlignment=Alignment.Center
+                    ) {
+                        Icon(Icons.Default.LiveTv,null,tint=FqDanger)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Live & Premiere",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text(
+                            "ساخت، زمان‌بندی و مدیریت پخش زنده و Premiere",
+                            color=FqMuted,
+                            fontSize=8.sp
+                        )
+                    }
+                    Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
                 }
             }
         }
