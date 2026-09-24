@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -38,6 +39,13 @@ type Config struct {
 	AuthenticatedWriteRateLimit int
 	BuildVersion string
 	BuildCommit string
+	FirebasePushEnabled bool
+	FirebaseProjectID string
+	FirebaseServiceAccountJSON string
+	PushMaxAttempts int
+	TelegramIngestMaxAttempts int
+	TelegramIngestRetryBaseSeconds int
+	TelemetryRetentionDays int
 }
 
 func Load() Config {
@@ -71,6 +79,13 @@ func Load() Config {
 		AuthenticatedWriteRateLimit: envInt("AUTHENTICATED_WRITE_RATE_LIMIT_PER_MINUTE", 240),
 		BuildVersion: env("BUILD_VERSION", "dev"),
 		BuildCommit: env("BUILD_COMMIT", "unknown"),
+		FirebasePushEnabled: envBool("FIREBASE_PUSH_ENABLED", false),
+		FirebaseProjectID: strings.TrimSpace(os.Getenv("FIREBASE_PROJECT_ID")),
+		FirebaseServiceAccountJSON: strings.TrimSpace(os.Getenv("FIREBASE_SERVICE_ACCOUNT_JSON")),
+		PushMaxAttempts: envInt("PUSH_MAX_ATTEMPTS", 6),
+		TelegramIngestMaxAttempts: envInt("TELEGRAM_INGEST_MAX_ATTEMPTS", 8),
+		TelegramIngestRetryBaseSeconds: envInt("TELEGRAM_INGEST_RETRY_BASE_SECONDS", 30),
+		TelemetryRetentionDays: envInt("TELEMETRY_RETENTION_DAYS", 30),
 	}
 }
 
@@ -135,6 +150,27 @@ func (c Config) Validate() error {
 	if c.AuthenticatedWriteRateLimit<=0 {
 		return errors.New("authenticated write rate limit must be greater than zero")
 	}
+	if c.PushMaxAttempts<=0 || c.TelegramIngestMaxAttempts<=0 ||
+		c.TelegramIngestRetryBaseSeconds<=0 || c.TelemetryRetentionDays<=0 {
+		return errors.New("worker retry and telemetry retention settings must be greater than zero")
+	}
+	if c.FirebasePushEnabled {
+		if strings.TrimSpace(c.FirebaseProjectID)=="" {
+			return errors.New("FIREBASE_PROJECT_ID is required when push delivery is enabled")
+		}
+		raw:=strings.TrimSpace(c.FirebaseServiceAccountJSON)
+		if raw=="" {
+			return errors.New("FIREBASE_SERVICE_ACCOUNT_JSON is required when push delivery is enabled")
+		}
+		var serviceAccount map[string]any
+		if err:=json.Unmarshal([]byte(raw),&serviceAccount); err!=nil {
+			return errors.New("FIREBASE_SERVICE_ACCOUNT_JSON must be valid JSON")
+		}
+		if strings.TrimSpace(fmt.Sprint(serviceAccount["client_email"]))=="" ||
+			strings.TrimSpace(fmt.Sprint(serviceAccount["private_key"]))=="" {
+			return errors.New("Firebase service account JSON is missing client_email or private_key")
+		}
+	}
 	return nil
 }
 
@@ -165,4 +201,18 @@ func envList(key, fallback string) []string {
 		out=append(out,v)
 	}
 	return out
+}
+
+
+func envBool(key string,fallback bool) bool {
+	v:=strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if v=="" { return fallback }
+	switch v {
+	case "1","true","yes","on":
+		return true
+	case "0","false","no","off":
+		return false
+	default:
+		return fallback
+	}
 }

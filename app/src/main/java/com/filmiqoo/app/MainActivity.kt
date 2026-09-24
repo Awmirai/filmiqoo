@@ -1,9 +1,14 @@
 package com.filmiqoo.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -27,6 +33,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FilmiqooCrashStore.install(applicationContext)
         deepLinkState.value=intent?.dataString
         setContent {
             FilmiqooTheme {
@@ -47,6 +54,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { TmdbRepository(context.applicationContext) }
     val backend = remember { BackendRepository(context.applicationContext) }
+    val telemetry = remember {
+        TelemetryRepository(context.applicationContext,backend)
+    }
     val social = remember { SocialRepository(backend) }
     val messaging = remember { MessagingRepository(backend) }
     val creatorChannels = remember { CreatorChannelRepository(backend) }
@@ -57,6 +67,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val viewerStore = remember { backend.viewerProfiles }
     val store = remember { LocalStore(context.applicationContext) }
     val appScope = rememberCoroutineScope()
+    val notificationPermissionLauncher=rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
     var previewMode by remember { mutableStateOf(false) }
@@ -71,7 +84,43 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        telemetry.flushPendingCrash()
+        telemetry.event(
+            type="app_started",
+            metadata=org.json.JSONObject()
+                .put("authenticated",backend.session.isLoggedIn)
+        )
+    }
+
     LaunchedEffect(authenticated) {
+        if(authenticated && FilmiqooPush.initialize(context.applicationContext)) {
+            if(
+                Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )!=PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            }
+            runCatching {
+                FilmiqooPush.registerIfPossible(
+                    context.applicationContext,
+                    backend
+                )
+            }.onFailure {
+                telemetry.event(
+                    type="push_registration_failed",
+                    severity="warning",
+                    message=it.message.orEmpty()
+                )
+            }
+        }
+
+
         if(!authenticated) {
             activeViewer=null
             viewerReady=true

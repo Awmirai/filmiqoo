@@ -15,6 +15,26 @@ android {
         versionCode = 4
         versionName = "0.4-connected-preview"
         buildConfigField("String", "FILMIQOO_API_BASE_URL", "\"http://10.0.2.2:8080\"")
+        buildConfigField(
+            "String",
+            "FIREBASE_API_KEY",
+            "\""+(System.getenv("FILMIQOO_FIREBASE_API_KEY") ?: "").replace("\\","\\\\").replace("\"","\\\"")+"\""
+        )
+        buildConfigField(
+            "String",
+            "FIREBASE_APP_ID",
+            "\""+(System.getenv("FILMIQOO_FIREBASE_APP_ID") ?: "").replace("\\","\\\\").replace("\"","\\\"")+"\""
+        )
+        buildConfigField(
+            "String",
+            "FIREBASE_PROJECT_ID",
+            "\""+(System.getenv("FILMIQOO_FIREBASE_PROJECT_ID") ?: "").replace("\\","\\\\").replace("\"","\\\"")+"\""
+        )
+        buildConfigField(
+            "String",
+            "FIREBASE_SENDER_ID",
+            "\""+(System.getenv("FILMIQOO_FIREBASE_SENDER_ID") ?: "").replace("\\","\\\\").replace("\"","\\\"")+"\""
+        )
     }
 
     buildTypes {
@@ -58,5 +78,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-cast-framework:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
