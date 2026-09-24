@@ -165,6 +165,15 @@ func (c Config) Validate() error {
 				return errors.New("production DATABASE_URL may disable TLS only for explicitly allowed internal/private database hosts")
 			}
 		}
+		for name,value:=range map[string]string{
+			"PUBLIC_API_BASE_URL":c.PublicAPIBaseURL,
+			"OBJECT_STORAGE_PUBLIC_ENDPOINT":c.ObjectStoragePublicEndpoint,
+		} {
+			v:=strings.TrimSpace(value)
+			if v=="" || !strings.HasPrefix(strings.ToLower(v),"https://") {
+				return fmt.Errorf("%s must use HTTPS in production",name)
+			}
+		}
 	}
 
 	if c.AuthLoginRateLimit<=0 || c.AuthRegisterRateLimit<=0 || c.AuthRefreshRateLimit<=0 {
