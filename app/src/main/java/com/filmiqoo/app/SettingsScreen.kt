@@ -98,6 +98,9 @@ fun SettingsScreen(
             SettingsSwitchRow("رد کردن Recap","مرور قسمت قبل در صورت وجود Marker خودکار رد شود.",settings.skipRecap) {
                 persist(settings.copy(skipRecap=it))
             }
+            SettingsSwitchRow("رفتن به قسمت بعد در Credits","وقتی Credits شروع شد، اگر قسمت بعد موجود باشد سریع‌تر به Next Episode برو.",settings.skipCredits) {
+                persist(settings.copy(skipCredits=it))
+            }
         }
 
         item {
@@ -108,6 +111,17 @@ fun SettingsScreen(
                 options=listOf(".75x","1.0x","1.25x","1.5x","1.75x","2.0x")
             ) { selected ->
                 persist(settings.copy(defaultPlaybackSpeed=selected.removeSuffix("x").toFloatOrNull() ?: 1f))
+            }
+        }
+
+        item {
+            SettingsChoiceRow(
+                title="نسبت تصویر",
+                subtitle="نمایش پیش‌فرض ویدیو در Player",
+                value=resizeModeLabel(settings.playerResizeMode),
+                options=listOf("Fit","Fill","Zoom")
+            ) { selected ->
+                persist(settings.copy(playerResizeMode=resizeModeCode(selected)))
             }
         }
 
@@ -126,6 +140,16 @@ fun SettingsScreen(
                 languageLabel(settings.defaultSubtitleLanguage),
                 listOf("فارسی","English","Deutsch","العربية","Türkçe","한국어","日本語")
             ) { persist(settings.copy(defaultSubtitleLanguage=languageCode(it))) }
+            SettingsChoiceRow(
+                "اندازه زیرنویس","اندازه پیش‌فرض متن Subtitle",
+                subtitleScaleLabel(settings.subtitleScale),
+                listOf("کوچک","معمولی","بزرگ","خیلی بزرگ")
+            ) { persist(settings.copy(subtitleScale=subtitleScaleValue(it))) }
+            SettingsChoiceRow(
+                "موقعیت زیرنویس","فاصله Subtitle از پایین تصویر",
+                subtitlePositionLabel(settings.subtitleBottomPadding),
+                listOf("پایین","معمولی","بالاتر")
+            ) { persist(settings.copy(subtitleBottomPadding=subtitlePositionValue(it))) }
         }
 
         item { SettingsSectionTitle("دانلود و اینترنت",Icons.Default.Download) }
@@ -268,4 +292,43 @@ private fun languageCode(label:String)=when(label) {
     "한국어" -> "ko"
     "日本語" -> "ja"
     else -> "fa"
+}
+
+
+private fun resizeModeLabel(code:String)=when(code) {
+    "fill" -> "Fill"
+    "zoom" -> "Zoom"
+    else -> "Fit"
+}
+
+private fun resizeModeCode(label:String)=when(label) {
+    "Fill" -> "fill"
+    "Zoom" -> "zoom"
+    else -> "fit"
+}
+
+private fun subtitleScaleLabel(value:Float)=when {
+    value < .9f -> "کوچک"
+    value < 1.15f -> "معمولی"
+    value < 1.4f -> "بزرگ"
+    else -> "خیلی بزرگ"
+}
+
+private fun subtitleScaleValue(label:String)=when(label) {
+    "کوچک" -> .8f
+    "بزرگ" -> 1.25f
+    "خیلی بزرگ" -> 1.5f
+    else -> 1f
+}
+
+private fun subtitlePositionLabel(value:Float)=when {
+    value < .07f -> "پایین"
+    value < .16f -> "معمولی"
+    else -> "بالاتر"
+}
+
+private fun subtitlePositionValue(label:String)=when(label) {
+    "پایین" -> .04f
+    "بالاتر" -> .2f
+    else -> .1f
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 type playbackTokenRequest struct {
@@ -130,6 +131,137 @@ func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
+}
+
+
+
+func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
+	versionID:=chi.URLParam(r,"versionID")
+
+	var (
+		mediaID,title,poster,quality,codec,hdr string
+		episodeID,episodeName *string
+		seasonNumber,episodeNumber *int
+		introEnd,recapEnd,creditsStart *int64
+	)
+
+	err:=s.db.QueryRow(r.Context(),`
+		SELECT mt.id::text,mt.title,mt.poster_url,
+		       mv.quality_label,mv.video_codec,mv.hdr_type,
+		       e.id::text,e.name,sn.season_number,e.episode_number,
+		       e.intro_end_ms,e.recap_end_ms,e.credits_start_ms
+		  FROM media_versions mv
+		  LEFT JOIN episodes e ON e.id=mv.episode_id
+		  LEFT JOIN seasons sn ON sn.id=e.season_id
+		  JOIN media_titles mt ON mt.id=COALESCE(mv.media_title_id,sn.media_title_id)
+		 WHERE mv.id=$1
+	`,versionID).Scan(
+		&mediaID,&title,&poster,&quality,&codec,&hdr,
+		&episodeID,&episodeName,&seasonNumber,&episodeNumber,
+		&introEnd,&recapEnd,&creditsStart,
+	)
+	if err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"playback context not found"})
+		return
+	}
+
+	variants:=make([]map[string]any,0)
+	var rows pgx.Rows
+	if episodeID!=nil {
+		rows,err=s.db.Query(r.Context(),`
+			SELECT id::text,quality_label,video_codec,hdr_type
+			  FROM media_versions
+			 WHERE episode_id=$1 AND stream_ready=true
+			 ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+		`,*episodeID)
+	} else {
+		rows,err=s.db.Query(r.Context(),`
+			SELECT id::text,quality_label,video_codec,hdr_type
+			  FROM media_versions
+			 WHERE media_title_id=$1 AND stream_ready=true
+			 ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+		`,mediaID)
+	}
+	if err==nil {
+		for rows.Next() {
+			var id,label,vCodec,vHdr string
+			if rows.Scan(&id,&label,&vCodec,&vHdr)==nil {
+				variants=append(variants,map[string]any{
+					"mediaVersionId":id,
+					"label":label,
+					"codec":vCodec,
+					"hdr":vHdr,
+				})
+			}
+		}
+		rows.Close()
+	}
+
+	displayTitle:=title
+	subtitle:=quality
+	if episodeID!=nil && seasonNumber!=nil && episodeNumber!=nil {
+		if episodeName!=nil && strings.TrimSpace(*episodeName)!="" {
+			displayTitle=*episodeName
+		}
+		subtitle=fmt.Sprintf("S%02dE%02d",*seasonNumber,*episodeNumber)
+		if quality!="" { subtitle+=" • "+quality }
+	}
+
+	var nextVersionID,nextTitle,nextSubtitle *string
+	if episodeID!=nil && seasonNumber!=nil && episodeNumber!=nil {
+		var nextName,nextQuality string
+		var nextSeason,nextEpisode int
+		var nIntroEnd,nRecapEnd,nCreditsStart *int64
+		err=s.db.QueryRow(r.Context(),`
+			SELECT mv2.id::text,e2.name,mv2.quality_label,
+			       sn2.season_number,e2.episode_number,
+			       e2.intro_end_ms,e2.recap_end_ms,e2.credits_start_ms
+			  FROM seasons sn2
+			  JOIN episodes e2 ON e2.season_id=sn2.id
+			  JOIN LATERAL (
+			    SELECT id,quality_label
+			      FROM media_versions
+			     WHERE episode_id=e2.id AND stream_ready=true
+			     ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+			     LIMIT 1
+			  ) mv2 ON true
+			 WHERE sn2.media_title_id=$1
+			   AND (
+			     sn2.season_number>$2 OR
+			     (sn2.season_number=$2 AND e2.episode_number>$3)
+			   )
+			 ORDER BY sn2.season_number,e2.episode_number
+			 LIMIT 1
+		`,mediaID,*seasonNumber,*episodeNumber).Scan(
+			&nextVersionID,&nextName,&nextQuality,
+			&nextSeason,&nextEpisode,
+			&nIntroEnd,&nRecapEnd,&nCreditsStart,
+		)
+		if err==nil && nextVersionID!=nil {
+			value:=nextName
+			if strings.TrimSpace(value)=="" {
+				value=fmt.Sprintf("%s • قسمت %d",title,nextEpisode)
+			}
+			nextTitle=&value
+			sub:=fmt.Sprintf("S%02dE%02d",nextSeason,nextEpisode)
+			if nextQuality!="" { sub+=" • "+nextQuality }
+			nextSubtitle=&sub
+		}
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"mediaVersionId":versionID,
+		"title":displayTitle,
+		"subtitle":subtitle,
+		"posterUrl":poster,
+		"variants":variants,
+		"introEndMs":introEnd,
+		"recapEndMs":recapEnd,
+		"creditsStartMs":creditsStart,
+		"nextMediaVersionId":nextVersionID,
+		"nextTitle":nextTitle,
+		"nextSubtitle":nextSubtitle,
+	})
 }
 
 func (s *Server) signPlayback(versionID string, exp int64, download bool) string {

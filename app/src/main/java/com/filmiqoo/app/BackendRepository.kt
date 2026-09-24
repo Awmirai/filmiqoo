@@ -57,6 +57,7 @@ data class PlaybackTarget(
     val variants: List<PlaybackVariant> = emptyList(),
     val introEndMs: Long? = null,
     val recapEndMs: Long? = null,
+    val creditsStartMs: Long? = null,
     val nextMediaVersionId: String? = null,
     val nextTitle: String? = null,
     val nextSubtitle: String? = null,
@@ -122,7 +123,12 @@ data class PlatformEpisode(
     val runtimeMinutes: Int,
     val mediaVersionId: String?,
     val quality: String?,
-    val streamReady: Boolean
+    val streamReady: Boolean,
+    val introStartMs: Long? = null,
+    val introEndMs: Long? = null,
+    val recapStartMs: Long? = null,
+    val recapEndMs: Long? = null,
+    val creditsStartMs: Long? = null
 )
 
 data class PlatformSeason(
@@ -320,7 +326,12 @@ class BackendRepository(context: Context) {
                                 runtimeMinutes = x.optInt("runtimeMinutes"),
                                 mediaVersionId = x.optString("mediaVersionId").takeIf(String::isNotBlank),
                                 quality = x.optString("quality").takeIf(String::isNotBlank),
-                                streamReady = x.optBoolean("streamReady")
+                                streamReady = x.optBoolean("streamReady"),
+                                introStartMs = if(x.isNull("introStartMs")) null else x.optLong("introStartMs"),
+                                introEndMs = if(x.isNull("introEndMs")) null else x.optLong("introEndMs"),
+                                recapStartMs = if(x.isNull("recapStartMs")) null else x.optLong("recapStartMs"),
+                                recapEndMs = if(x.isNull("recapEndMs")) null else x.optLong("recapEndMs"),
+                                creditsStartMs = if(x.isNull("creditsStartMs")) null else x.optLong("creditsStartMs")
                             )
                         )
                     }
@@ -555,6 +566,41 @@ class BackendRepository(context: Context) {
                 .put("download", download)
             val obj = postJson("/v1/playback/token", body, authorized = true)
             obj.getString("url")
+        }
+
+    suspend fun playbackContext(mediaVersionId:String):PlaybackTarget =
+        withContext(Dispatchers.IO) {
+            val o=getJson(
+                "/v1/playback/"+mediaVersionId+"/context",
+                authorized=true
+            )
+            val variants=buildList {
+                val arr=o.optJSONArray("variants")
+                if(arr!=null) for(i in 0 until arr.length()) {
+                    val x=arr.optJSONObject(i) ?: continue
+                    add(
+                        PlaybackVariant(
+                            mediaVersionId=x.optString("mediaVersionId"),
+                            label=x.optString("label").ifBlank{"Auto"},
+                            codec=x.optString("codec"),
+                            hdr=x.optString("hdr")
+                        )
+                    )
+                }
+            }
+            PlaybackTarget(
+                mediaVersionId=o.optString("mediaVersionId").ifBlank{mediaVersionId},
+                title=o.optString("title"),
+                subtitle=o.optString("subtitle"),
+                posterUrl=o.optString("posterUrl").takeIf(String::isNotBlank),
+                variants=variants,
+                introEndMs=if(o.isNull("introEndMs"))null else o.optLong("introEndMs"),
+                recapEndMs=if(o.isNull("recapEndMs"))null else o.optLong("recapEndMs"),
+                creditsStartMs=if(o.isNull("creditsStartMs"))null else o.optLong("creditsStartMs"),
+                nextMediaVersionId=o.optString("nextMediaVersionId").takeIf(String::isNotBlank),
+                nextTitle=o.optString("nextTitle").takeIf(String::isNotBlank),
+                nextSubtitle=o.optString("nextSubtitle").takeIf(String::isNotBlank)
+            )
         }
 
     suspend fun saveProgress(mediaVersionId: String, positionMs: Long, durationMs: Long) {

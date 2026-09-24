@@ -54,7 +54,7 @@ private data class PlayerTrackChoice(
     val selected: Boolean
 )
 
-private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, SPEED }
+private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, DISPLAY, SPEED }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +87,9 @@ fun FilmiqooPlayerScreen(
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
     var playbackSpeed by remember { mutableFloatStateOf(initialSettings.defaultPlaybackSpeed) }
+    var subtitleScale by remember { mutableFloatStateOf(initialSettings.subtitleScale) }
+    var subtitleBottomPadding by remember { mutableFloatStateOf(initialSettings.subtitleBottomPadding) }
+    var playerResizeMode by remember { mutableStateOf(initialSettings.playerResizeMode) }
     var trackRevision by remember { mutableIntStateOf(0) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
@@ -153,13 +156,17 @@ fun FilmiqooPlayerScreen(
 
     fun playNext() {
         val nextId=currentTarget.nextMediaVersionId ?: return
-        val next=PlaybackTarget(
-            mediaVersionId=nextId,
-            title=currentTarget.nextTitle ?: "قسمت بعدی",
-            subtitle=currentTarget.nextSubtitle.orEmpty(),
-            posterUrl=currentTarget.posterUrl
-        )
-        currentTarget=next
+        scope.launch {
+            val fallback=PlaybackTarget(
+                mediaVersionId=nextId,
+                title=currentTarget.nextTitle ?: "قسمت بعدی",
+                subtitle=currentTarget.nextSubtitle.orEmpty(),
+                posterUrl=currentTarget.posterUrl
+            )
+            currentTarget=runCatching {
+                backend.playbackContext(nextId)
+            }.getOrDefault(fallback)
+        }
     }
 
     DisposableEffect(player) {
@@ -228,9 +235,16 @@ fun FilmiqooPlayerScreen(
             loading=false
             bumpControls()
         } else {
+            val requestedStart=currentTarget.startPositionMs
+            val enriched=runCatching {
+                backend.playbackContext(currentTarget.mediaVersionId)
+            }.getOrNull()
+            if(enriched!=null) {
+                currentTarget=enriched.copy(startPositionMs=requestedStart)
+            }
             loadVersion(
                 versionId=currentTarget.mediaVersionId,
-                startPosition=currentTarget.startPositionMs
+                startPosition=requestedStart
             )
         }
     }
@@ -279,10 +293,16 @@ fun FilmiqooPlayerScreen(
         }
     }
 
-    LaunchedEffect(ended,currentTarget.nextMediaVersionId,autoPlayNext) {
-        if(ended && autoPlayNext && currentTarget.nextMediaVersionId!=null) {
-            delay(7_000)
-            if(ended) playNext()
+    val creditsReached=currentTarget.creditsStartMs?.let { positionMs>=it } == true
+
+    LaunchedEffect(ended,creditsReached,currentTarget.nextMediaVersionId,autoPlayNext,initialSettings.skipCredits) {
+        val canAdvance=currentTarget.nextMediaVersionId!=null &&
+            (ended || (creditsReached && initialSettings.skipCredits))
+        if(canAdvance && autoPlayNext) {
+            delay(if(ended)7_000 else 4_000)
+            val stillEligible=ended ||
+                (currentTarget.creditsStartMs?.let { player.currentPosition>=it } == true)
+            if(stillEligible) playNext()
         }
     }
 
@@ -376,11 +396,18 @@ fun FilmiqooPlayerScreen(
                         this.player=player
                         useController=false
                         keepScreenOn=true
-                        resizeMode=AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        resizeMode=playerResizeModeValue(playerResizeMode)
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                        subtitleView?.setFractionalTextSize(.0533f*subtitleScale)
+                        subtitleView?.setBottomPaddingFraction(subtitleBottomPadding)
                     }
                 },
-                update={it.player=player},
+                update={
+                    it.player=player
+                    it.resizeMode=playerResizeModeValue(playerResizeMode)
+                    it.subtitleView?.setFractionalTextSize(.0533f*subtitleScale)
+                    it.subtitleView?.setBottomPaddingFraction(subtitleBottomPadding)
+                },
                 modifier=Modifier.fillMaxSize()
             )
         }
@@ -548,7 +575,7 @@ fun FilmiqooPlayerScreen(
             }
         }
 
-        if(ended && currentTarget.nextMediaVersionId!=null) {
+        if((ended || creditsReached) && currentTarget.nextMediaVersionId!=null) {
             NextEpisodeOverlay(
                 title=currentTarget.nextTitle ?: "قسمت بعدی",
                 subtitle=currentTarget.nextSubtitle.orEmpty(),
@@ -590,6 +617,9 @@ fun FilmiqooPlayerScreen(
             audioTracks=audioTracks,
             subtitleTracks=subtitleTracks,
             speed=playbackSpeed,
+            subtitleScale=subtitleScale,
+            subtitleBottomPadding=subtitleBottomPadding,
+            resizeMode=playerResizeMode,
             autoPlayNext=autoPlayNext,
             onDismiss={settingsOpen=false},
             onVariant={ variant ->
@@ -618,6 +648,9 @@ fun FilmiqooPlayerScreen(
                 playbackSpeed=speed
                 player.setPlaybackSpeed(speed)
             },
+            onSubtitleScale={subtitleScale=it},
+            onSubtitleBottomPadding={subtitleBottomPadding=it},
+            onResizeMode={playerResizeMode=it},
             onAutoPlayNext={autoPlayNext=it}
         )
     }
@@ -993,12 +1026,18 @@ private fun PlayerSettingsSheet(
     audioTracks: List<PlayerTrackChoice>,
     subtitleTracks: List<PlayerTrackChoice>,
     speed: Float,
+    subtitleScale: Float,
+    subtitleBottomPadding: Float,
+    resizeMode: String,
     autoPlayNext: Boolean,
     onDismiss: () -> Unit,
     onVariant: (PlaybackVariant) -> Unit,
     onAudio: (PlayerTrackChoice) -> Unit,
     onSubtitle: (PlayerTrackChoice?) -> Unit,
     onSpeed: (Float) -> Unit,
+    onSubtitleScale: (Float) -> Unit,
+    onSubtitleBottomPadding: (Float) -> Unit,
+    onResizeMode: (String) -> Unit,
     onAutoPlayNext: (Boolean) -> Unit
 ) {
     ModalBottomSheet(
@@ -1027,6 +1066,7 @@ private fun PlayerSettingsSheet(
                     PlayerSettingsTab.QUALITY to "کیفیت",
                     PlayerSettingsTab.AUDIO to "صدا",
                     PlayerSettingsTab.SUBTITLE to "زیرنویس",
+                    PlayerSettingsTab.DISPLAY to "تصویر",
                     PlayerSettingsTab.SPEED to "سرعت"
                 ).forEach { item ->
                     Tab(
@@ -1085,6 +1125,83 @@ private fun PlayerSettingsSheet(
                             onClick={onSubtitle(choice)}
                         )
                     }
+
+                    HorizontalDivider(
+                        color=FqSurface3,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
+                    )
+
+                    Text(
+                        "اندازه زیرنویس • "+((subtitleScale*100).roundToInt()).toString()+"٪",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=4.dp)
+                    )
+                    Slider(
+                        value=subtitleScale.coerceIn(.7f,1.6f),
+                        onValueChange=onSubtitleScale,
+                        valueRange=.7f..1.6f,
+                        colors=SliderDefaults.colors(
+                            thumbColor=FqGold,
+                            activeTrackColor=FqGold
+                        ),
+                        modifier=Modifier.padding(horizontal=18.dp)
+                    )
+
+                    Text(
+                        "موقعیت زیرنویس",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=4.dp)
+                    )
+                    Slider(
+                        value=subtitleBottomPadding.coerceIn(.02f,.28f),
+                        onValueChange=onSubtitleBottomPadding,
+                        valueRange=.02f..0.28f,
+                        colors=SliderDefaults.colors(
+                            thumbColor=FqGold,
+                            activeTrackColor=FqGold
+                        ),
+                        modifier=Modifier.padding(horizontal=18.dp)
+                    )
+                }
+
+                PlayerSettingsTab.DISPLAY -> {
+                    Text(
+                        "نسبت تصویر",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
+                    )
+                    LazyRow(
+                        contentPadding=PaddingValues(horizontal=18.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            listOf(
+                                "fit" to "Fit",
+                                "fill" to "Fill",
+                                "zoom" to "Zoom"
+                            )
+                        ) { item ->
+                            PremiumChip(
+                                label=item.second,
+                                active=resizeMode==item.first,
+                                onClick={onResizeMode(item.first)}
+                            )
+                        }
+                    }
+                    Text(
+                        when(resizeMode) {
+                            "fill" -> "تصویر قاب را پر می‌کند و ممکن است نسبت اصلی تغییر کند."
+                            "zoom" -> "تصویر بدون کشیدگی زوم می‌شود و ممکن است لبه‌ها برش بخورند."
+                            else -> "کل تصویر با نسبت اصلی داخل قاب نمایش داده می‌شود."
+                        },
+                        color=FqMuted,
+                        fontSize=8.sp,
+                        lineHeight=14.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=14.dp)
+                    )
                 }
 
                 PlayerSettingsTab.SPEED -> {
@@ -1283,3 +1400,10 @@ private fun formatSpeed(value: Float): String =
     } else {
         String.format(Locale.US,"%.2gx",value)
     }
+
+
+private fun playerResizeModeValue(mode:String):Int=when(mode) {
+    "fill" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+    "zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+}

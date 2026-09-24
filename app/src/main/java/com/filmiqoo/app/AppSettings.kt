@@ -11,6 +11,10 @@ data class AppSettings(
     val spoilerShield: Boolean = true,
     val skipIntro: Boolean = false,
     val skipRecap: Boolean = false,
+    val skipCredits: Boolean = false,
+    val subtitleScale: Float = 1f,
+    val subtitleBottomPadding: Float = 0.08f,
+    val playerResizeMode: String = "fit",
     val defaultPlaybackSpeed: Float = 1f,
     val defaultAudioLanguage: String = "fa",
     val defaultSubtitleLanguage: String = "fa",
@@ -33,6 +37,10 @@ class AppPreferences(context: Context) {
         spoilerShield=prefs.getBoolean("spoiler_shield",true),
         skipIntro=prefs.getBoolean("skip_intro",false),
         skipRecap=prefs.getBoolean("skip_recap",false),
+        skipCredits=prefs.getBoolean("skip_credits",false),
+        subtitleScale=prefs.getFloat("subtitle_scale",1f),
+        subtitleBottomPadding=prefs.getFloat("subtitle_bottom_padding",0.08f),
+        playerResizeMode=prefs.getString("player_resize_mode","fit") ?: "fit",
         defaultPlaybackSpeed=prefs.getFloat("playback_speed",1f),
         defaultAudioLanguage=prefs.getString("audio_lang","fa") ?: "fa",
         defaultSubtitleLanguage=prefs.getString("subtitle_lang","fa") ?: "fa",
@@ -52,6 +60,10 @@ class AppPreferences(context: Context) {
             .putBoolean("spoiler_shield",s.spoilerShield)
             .putBoolean("skip_intro",s.skipIntro)
             .putBoolean("skip_recap",s.skipRecap)
+            .putBoolean("skip_credits",s.skipCredits)
+            .putFloat("subtitle_scale",s.subtitleScale)
+            .putFloat("subtitle_bottom_padding",s.subtitleBottomPadding)
+            .putString("player_resize_mode",s.playerResizeMode)
             .putFloat("playback_speed",s.defaultPlaybackSpeed)
             .putString("audio_lang",s.defaultAudioLanguage)
             .putString("subtitle_lang",s.defaultSubtitleLanguage)
@@ -91,6 +103,10 @@ class SettingsRepository(
                 .put("spoilerShield",settings.spoilerShield)
                 .put("skipIntro",settings.skipIntro)
                 .put("skipRecap",settings.skipRecap)
+                .put("skipCredits",settings.skipCredits)
+                .put("subtitleScale",settings.subtitleScale.toDouble())
+                .put("subtitleBottomPadding",settings.subtitleBottomPadding.toDouble())
+                .put("playerResizeMode",settings.playerResizeMode)
                 .put("defaultPlaybackSpeed",settings.defaultPlaybackSpeed.toDouble())
                 .put("defaultAudioLanguage",settings.defaultAudioLanguage)
                 .put("defaultSubtitleLanguage",settings.defaultSubtitleLanguage)
@@ -115,6 +131,10 @@ class SettingsRepository(
         spoilerShield=o.optBoolean("spoilerShield",true),
         skipIntro=o.optBoolean("skipIntro"),
         skipRecap=o.optBoolean("skipRecap"),
+        skipCredits=o.optBoolean("skipCredits"),
+        subtitleScale=o.optDouble("subtitleScale",1.0).toFloat(),
+        subtitleBottomPadding=o.optDouble("subtitleBottomPadding",0.08).toFloat(),
+        playerResizeMode=o.optString("playerResizeMode","fit"),
         defaultPlaybackSpeed=o.optDouble("defaultPlaybackSpeed",1.0).toFloat(),
         defaultAudioLanguage=o.optString("defaultAudioLanguage","fa"),
         defaultSubtitleLanguage=o.optString("defaultSubtitleLanguage","fa"),

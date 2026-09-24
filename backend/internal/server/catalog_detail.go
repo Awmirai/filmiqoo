@@ -72,6 +72,7 @@ func (s *Server) catalogDetail(w http.ResponseWriter, r *http.Request) {
 			episodes:=make([]map[string]any,0)
 			epRows,epErr:=s.db.Query(r.Context(),`
 				SELECT e.id::text,e.episode_number,e.name,e.overview,e.still_url,e.runtime_minutes,e.air_date,
+				       e.intro_start_ms,e.intro_end_ms,e.recap_start_ms,e.recap_end_ms,e.credits_start_ms,
 				       mv.id::text,mv.quality_label,mv.stream_ready,mv.preferred
 				  FROM episodes e
 				  LEFT JOIN LATERAL (
@@ -89,15 +90,22 @@ func (s *Server) catalogDetail(w http.ResponseWriter, r *http.Request) {
 					var epID,epName,epOverview,stillURL string
 					var epNumber,epRuntime int
 					var epAirDate any
+					var introStart,introEnd,recapStart,recapEnd,creditsStart *int64
 					var versionID,quality *string
 					var ready,preferred *bool
-					if err:=epRows.Scan(&epID,&epNumber,&epName,&epOverview,&stillURL,&epRuntime,&epAirDate,
-						&versionID,&quality,&ready,&preferred); err!=nil {
+					if err:=epRows.Scan(
+						&epID,&epNumber,&epName,&epOverview,&stillURL,&epRuntime,&epAirDate,
+						&introStart,&introEnd,&recapStart,&recapEnd,&creditsStart,
+						&versionID,&quality,&ready,&preferred,
+					); err!=nil {
 						continue
 					}
 					episodes=append(episodes,map[string]any{
 						"id":epID,"number":epNumber,"name":epName,"overview":epOverview,
 						"stillUrl":stillURL,"runtimeMinutes":epRuntime,"airDate":epAirDate,
+						"introStartMs":introStart,"introEndMs":introEnd,
+						"recapStartMs":recapStart,"recapEndMs":recapEnd,
+						"creditsStartMs":creditsStart,
 						"mediaVersionId":versionID,"quality":quality,"streamReady":ready,"preferred":preferred,
 					})
 				}

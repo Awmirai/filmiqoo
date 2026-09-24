@@ -170,6 +170,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/library/collections/{id}/delete", s.deleteCollection)
 			r.Get("/library/stats", s.libraryStats)
 			r.Post("/playback/token", s.playbackToken)
+			r.Get("/playback/{versionID}/context", s.playbackContext)
 			r.Post("/uploads/presign", s.presignUpload)
 			r.Post("/uploads/{id}/complete", s.completeUpload)
 			r.Get("/me", s.me)

@@ -1026,6 +1026,9 @@ private fun EpisodeCard(
                                         subtitle="S"+seasonNumber.toString().padStart(2,'0')+
                                             "E"+episode.number.toString().padStart(2,'0')+
                                             if(episode.quality.isNullOrBlank())"" else " • "+episode.quality,
+                                        introEndMs=episode.introEndMs,
+                                        recapEndMs=episode.recapEndMs,
+                                        creditsStartMs=episode.creditsStartMs,
                                         nextMediaVersionId=nextEpisode?.mediaVersionId,
                                         nextTitle=nextEpisode?.name?.ifBlank {
                                             title+" • قسمت "+nextEpisode.number

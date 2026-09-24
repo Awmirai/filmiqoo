@@ -14,6 +14,10 @@ type preferencePayload struct {
 	SpoilerShield *bool `json:"spoilerShield"`
 	SkipIntro *bool `json:"skipIntro"`
 	SkipRecap *bool `json:"skipRecap"`
+	SkipCredits *bool `json:"skipCredits"`
+	SubtitleScale *float64 `json:"subtitleScale"`
+	SubtitleBottomPadding *float64 `json:"subtitleBottomPadding"`
+	PlayerResizeMode *string `json:"playerResizeMode"`
 	DefaultPlaybackSpeed *float64 `json:"defaultPlaybackSpeed"`
 	DefaultAudioLanguage *string `json:"defaultAudioLanguage"`
 	DefaultSubtitleLanguage *string `json:"defaultSubtitleLanguage"`
@@ -33,14 +37,16 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
-	var autoplayNext,autoplayPreviews,wifiOnly,dataSaver,spoilerShield,skipIntro,skipRecap bool
-	var speed float64
-	var audioLang,subtitleLang string
+	var autoplayNext,autoplayPreviews,wifiOnly,dataSaver,spoilerShield,skipIntro,skipRecap,skipCredits bool
+	var speed,subtitleScale,subtitleBottomPadding float64
+	var audioLang,subtitleLang,playerResizeMode string
 	var subtitlesEnabled,notifySocial,notifyMessages,notifyReleases,privateAccount bool
 
 	err:=s.db.QueryRow(r.Context(),`
 		SELECT up.autoplay_next,up.autoplay_previews,up.wifi_only_downloads,up.data_saver,
-		       up.spoiler_shield,up.skip_intro,up.skip_recap,up.default_playback_speed,
+		       up.spoiler_shield,up.skip_intro,up.skip_recap,up.skip_credits,
+		       up.subtitle_scale,up.subtitle_bottom_padding,up.player_resize_mode,
+		       up.default_playback_speed,
 		       up.default_audio_language,up.default_subtitle_language,up.subtitles_enabled,
 		       up.notifications_social,up.notifications_messages,up.notifications_releases,
 		       p.private_account
@@ -49,7 +55,8 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		 WHERE up.user_id=$1
 	`,userID).Scan(
 		&autoplayNext,&autoplayPreviews,&wifiOnly,&dataSaver,
-		&spoilerShield,&skipIntro,&skipRecap,&speed,
+		&spoilerShield,&skipIntro,&skipRecap,&skipCredits,
+		&subtitleScale,&subtitleBottomPadding,&playerResizeMode,&speed,
 		&audioLang,&subtitleLang,&subtitlesEnabled,
 		&notifySocial,&notifyMessages,&notifyReleases,&privateAccount,
 	)
@@ -63,6 +70,10 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		"spoilerShield":spoilerShield,
 		"skipIntro":skipIntro,
 		"skipRecap":skipRecap,
+		"skipCredits":skipCredits,
+		"subtitleScale":subtitleScale,
+		"subtitleBottomPadding":subtitleBottomPadding,
+		"playerResizeMode":playerResizeMode,
 		"defaultPlaybackSpeed":speed,
 		"defaultAudioLanguage":audioLang,
 		"defaultSubtitleLanguage":subtitleLang,
@@ -85,6 +96,23 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		(*body.DefaultPlaybackSpeed<0.5 || *body.DefaultPlaybackSpeed>2.0) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid playback speed"})
 		return
+	}
+	if body.SubtitleScale!=nil && (*body.SubtitleScale<0.7 || *body.SubtitleScale>1.6) {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid subtitle scale"})
+		return
+	}
+	if body.SubtitleBottomPadding!=nil &&
+		(*body.SubtitleBottomPadding<0.02 || *body.SubtitleBottomPadding>0.28) {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid subtitle bottom padding"})
+		return
+	}
+	if body.PlayerResizeMode!=nil {
+		v:=strings.ToLower(strings.TrimSpace(*body.PlayerResizeMode))
+		if v!="fit" && v!="fill" && v!="zoom" {
+			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid player resize mode"})
+			return
+		}
+		body.PlayerResizeMode=&v
 	}
 
 	cleanLang:=func(v *string) *string {
@@ -112,19 +140,24 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		  spoiler_shield=COALESCE($6,spoiler_shield),
 		  skip_intro=COALESCE($7,skip_intro),
 		  skip_recap=COALESCE($8,skip_recap),
-		  default_playback_speed=COALESCE($9,default_playback_speed),
-		  default_audio_language=COALESCE($10,default_audio_language),
-		  default_subtitle_language=COALESCE($11,default_subtitle_language),
-		  subtitles_enabled=COALESCE($12,subtitles_enabled),
-		  notifications_social=COALESCE($13,notifications_social),
-		  notifications_messages=COALESCE($14,notifications_messages),
-		  notifications_releases=COALESCE($15,notifications_releases),
+		  skip_credits=COALESCE($9,skip_credits),
+		  subtitle_scale=COALESCE($10,subtitle_scale),
+		  subtitle_bottom_padding=COALESCE($11,subtitle_bottom_padding),
+		  player_resize_mode=COALESCE($12,player_resize_mode),
+		  default_playback_speed=COALESCE($13,default_playback_speed),
+		  default_audio_language=COALESCE($14,default_audio_language),
+		  default_subtitle_language=COALESCE($15,default_subtitle_language),
+		  subtitles_enabled=COALESCE($16,subtitles_enabled),
+		  notifications_social=COALESCE($17,notifications_social),
+		  notifications_messages=COALESCE($18,notifications_messages),
+		  notifications_releases=COALESCE($19,notifications_releases),
 		  updated_at=now()
 		WHERE user_id=$1
 	`,
 		userID,
 		body.AutoplayNext,body.AutoplayPreviews,body.WifiOnlyDownloads,body.DataSaver,
-		body.SpoilerShield,body.SkipIntro,body.SkipRecap,body.DefaultPlaybackSpeed,
+		body.SpoilerShield,body.SkipIntro,body.SkipRecap,body.SkipCredits,
+		body.SubtitleScale,body.SubtitleBottomPadding,body.PlayerResizeMode,body.DefaultPlaybackSpeed,
 		body.DefaultAudioLanguage,body.DefaultSubtitleLanguage,body.SubtitlesEnabled,
 		body.NotificationsSocial,body.NotificationsMessages,body.NotificationsReleases,
 	)
