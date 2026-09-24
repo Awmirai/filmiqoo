@@ -1102,7 +1102,7 @@ private fun CreatorRetentionMetrics(summary:CreatorAnalyticsSummary) {
             StudioMetric(
                 "Avg Watch",
                 formatCreatorDuration(summary.averageWatchMs),
-                Icons.Default.AvgTime,
+                Icons.Default.AccessTime,
                 Modifier.weight(1f)
             )
             StudioMetric(
