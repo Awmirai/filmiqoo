@@ -48,6 +48,13 @@ data class PlaybackVariant(
     val hdr: String = ""
 )
 
+data class PlaybackQueueItem(
+    val mediaVersionId: String,
+    val title: String,
+    val subtitle: String = "",
+    val posterUrl: String? = null
+)
+
 data class PlaybackTarget(
     val mediaVersionId: String,
     val title: String,
@@ -61,6 +68,10 @@ data class PlaybackTarget(
     val nextMediaVersionId: String? = null,
     val nextTitle: String? = null,
     val nextSubtitle: String? = null,
+    val previousMediaVersionId: String? = null,
+    val previousTitle: String? = null,
+    val previousSubtitle: String? = null,
+    val upNext: List<PlaybackQueueItem> = emptyList(),
     val localUri: String? = null
 )
 
@@ -589,6 +600,22 @@ class BackendRepository(context: Context) {
                     )
                 }
             }
+            val upNext=buildList {
+                val arr=o.optJSONArray("upNext")
+                if(arr!=null) for(i in 0 until arr.length()) {
+                    val x=arr.optJSONObject(i) ?: continue
+                    val id=x.optString("mediaVersionId")
+                    if(id.isBlank()) continue
+                    add(
+                        PlaybackQueueItem(
+                            mediaVersionId=id,
+                            title=x.optString("title"),
+                            subtitle=x.optString("subtitle"),
+                            posterUrl=x.optString("posterUrl").takeIf(String::isNotBlank)
+                        )
+                    )
+                }
+            }
             PlaybackTarget(
                 mediaVersionId=o.optString("mediaVersionId").ifBlank{mediaVersionId},
                 title=o.optString("title"),
@@ -600,7 +627,11 @@ class BackendRepository(context: Context) {
                 creditsStartMs=if(o.isNull("creditsStartMs"))null else o.optLong("creditsStartMs"),
                 nextMediaVersionId=o.optString("nextMediaVersionId").takeIf(String::isNotBlank),
                 nextTitle=o.optString("nextTitle").takeIf(String::isNotBlank),
-                nextSubtitle=o.optString("nextSubtitle").takeIf(String::isNotBlank)
+                nextSubtitle=o.optString("nextSubtitle").takeIf(String::isNotBlank),
+                previousMediaVersionId=o.optString("previousMediaVersionId").takeIf(String::isNotBlank),
+                previousTitle=o.optString("previousTitle").takeIf(String::isNotBlank),
+                previousSubtitle=o.optString("previousSubtitle").takeIf(String::isNotBlank),
+                upNext=upNext
             )
         }
 

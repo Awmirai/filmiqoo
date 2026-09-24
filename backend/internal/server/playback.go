@@ -227,14 +227,15 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var nextVersionID,nextTitle,nextSubtitle *string
+	var previousVersionID,previousTitle,previousSubtitle *string
+	upNext:=make([]map[string]any,0)
+
 	if episodeID!=nil && seasonNumber!=nil && episodeNumber!=nil {
 		var nextName,nextQuality string
 		var nextSeason,nextEpisode int
-		var nIntroEnd,nRecapEnd,nCreditsStart *int64
 		err=s.db.QueryRow(r.Context(),`
 			SELECT mv2.id::text,e2.name,mv2.quality_label,
-			       sn2.season_number,e2.episode_number,
-			       e2.intro_end_ms,e2.recap_end_ms,e2.credits_start_ms
+			       sn2.season_number,e2.episode_number
 			  FROM seasons sn2
 			  JOIN episodes e2 ON e2.season_id=sn2.id
 			  JOIN LATERAL (
@@ -254,7 +255,6 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 		`,mediaID,*seasonNumber,*episodeNumber).Scan(
 			&nextVersionID,&nextName,&nextQuality,
 			&nextSeason,&nextEpisode,
-			&nIntroEnd,&nRecapEnd,&nCreditsStart,
 		)
 		if err==nil && nextVersionID!=nil {
 			value:=nextName
@@ -265,6 +265,83 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 			sub:=fmt.Sprintf("S%02dE%02d",nextSeason,nextEpisode)
 			if nextQuality!="" { sub+=" • "+nextQuality }
 			nextSubtitle=&sub
+		}
+
+		var prevName,prevQuality string
+		var prevSeason,prevEpisode int
+		err=s.db.QueryRow(r.Context(),`
+			SELECT mv2.id::text,e2.name,mv2.quality_label,
+			       sn2.season_number,e2.episode_number
+			  FROM seasons sn2
+			  JOIN episodes e2 ON e2.season_id=sn2.id
+			  JOIN LATERAL (
+			    SELECT id,quality_label
+			      FROM media_versions
+			     WHERE episode_id=e2.id AND stream_ready=true
+			     ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+			     LIMIT 1
+			  ) mv2 ON true
+			 WHERE sn2.media_title_id=$1
+			   AND (
+			     sn2.season_number<$2 OR
+			     (sn2.season_number=$2 AND e2.episode_number<$3)
+			   )
+			 ORDER BY sn2.season_number DESC,e2.episode_number DESC
+			 LIMIT 1
+		`,mediaID,*seasonNumber,*episodeNumber).Scan(
+			&previousVersionID,&prevName,&prevQuality,
+			&prevSeason,&prevEpisode,
+		)
+		if err==nil && previousVersionID!=nil {
+			value:=prevName
+			if strings.TrimSpace(value)=="" {
+				value=fmt.Sprintf("%s • قسمت %d",title,prevEpisode)
+			}
+			previousTitle=&value
+			sub:=fmt.Sprintf("S%02dE%02d",prevSeason,prevEpisode)
+			if prevQuality!="" { sub+=" • "+prevQuality }
+			previousSubtitle=&sub
+		}
+
+		queueRows,qErr:=s.db.Query(r.Context(),`
+			SELECT mv2.id::text,e2.name,mv2.quality_label,
+			       sn2.season_number,e2.episode_number,COALESCE(e2.still_url,'')
+			  FROM seasons sn2
+			  JOIN episodes e2 ON e2.season_id=sn2.id
+			  JOIN LATERAL (
+			    SELECT id,quality_label
+			      FROM media_versions
+			     WHERE episode_id=e2.id AND stream_ready=true
+			     ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+			     LIMIT 1
+			  ) mv2 ON true
+			 WHERE sn2.media_title_id=$1
+			   AND (
+			     sn2.season_number>$2 OR
+			     (sn2.season_number=$2 AND e2.episode_number>$3)
+			   )
+			 ORDER BY sn2.season_number,e2.episode_number
+			 LIMIT 8
+		`,mediaID,*seasonNumber,*episodeNumber)
+		if qErr==nil {
+			for queueRows.Next() {
+				var id,name,label,still string
+				var sNum,eNum int
+				if queueRows.Scan(&id,&name,&label,&sNum,&eNum,&still)==nil {
+					if strings.TrimSpace(name)=="" {
+						name=fmt.Sprintf("%s • قسمت %d",title,eNum)
+					}
+					sub:=fmt.Sprintf("S%02dE%02d",sNum,eNum)
+					if label!="" { sub+=" • "+label }
+					upNext=append(upNext,map[string]any{
+						"mediaVersionId":id,
+						"title":name,
+						"subtitle":sub,
+						"posterUrl":still,
+					})
+				}
+			}
+			queueRows.Close()
 		}
 	}
 
@@ -280,6 +357,10 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 		"nextMediaVersionId":nextVersionID,
 		"nextTitle":nextTitle,
 		"nextSubtitle":nextSubtitle,
+		"previousMediaVersionId":previousVersionID,
+		"previousTitle":previousTitle,
+		"previousSubtitle":previousSubtitle,
+		"upNext":upNext,
 	})
 }
 

@@ -97,6 +97,7 @@ fun FilmiqooPlayerScreen(
     var settingsOpen by remember { mutableStateOf(false) }
     var momentsOpen by remember { mutableStateOf(false) }
     var dialogueSearchOpen by remember { mutableStateOf(false) }
+    var queueOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
     var playbackSpeed by remember { mutableFloatStateOf(initialSettings.defaultPlaybackSpeed) }
     var subtitleScale by remember { mutableFloatStateOf(initialSettings.subtitleScale) }
@@ -195,6 +196,36 @@ fun FilmiqooPlayerScreen(
             currentTarget=runCatching {
                 backend.playbackContext(nextId)
             }.getOrDefault(fallback)
+        }
+    }
+
+    fun playPrevious() {
+        val previousId=currentTarget.previousMediaVersionId ?: return
+        scope.launch {
+            val fallback=PlaybackTarget(
+                mediaVersionId=previousId,
+                title=currentTarget.previousTitle ?: "قسمت قبلی",
+                subtitle=currentTarget.previousSubtitle.orEmpty(),
+                posterUrl=currentTarget.posterUrl
+            )
+            currentTarget=runCatching {
+                backend.playbackContext(previousId)
+            }.getOrDefault(fallback)
+        }
+    }
+
+    fun playQueueItem(item:PlaybackQueueItem) {
+        scope.launch {
+            val fallback=PlaybackTarget(
+                mediaVersionId=item.mediaVersionId,
+                title=item.title,
+                subtitle=item.subtitle,
+                posterUrl=item.posterUrl ?: currentTarget.posterUrl
+            )
+            currentTarget=runCatching {
+                backend.playbackContext(item.mediaVersionId)
+            }.getOrDefault(fallback)
+            queueOpen=false
         }
     }
 
@@ -382,6 +413,7 @@ fun FilmiqooPlayerScreen(
         when {
             dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
+            queueOpen -> queueOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
                 locked=false
@@ -616,6 +648,7 @@ fun FilmiqooPlayerScreen(
                 },
                 onMoments={momentsOpen=true},
                 onDialogueSearch={dialogueSearchOpen=true},
+                onQueue={queueOpen=true},
                 onShare={
                     sharePlayerMoment(
                         context=context,
@@ -772,6 +805,18 @@ fun FilmiqooPlayerScreen(
         )
     }
 
+    if(queueOpen) {
+        EpisodeQueueSheet(
+            target=currentTarget,
+            onPrevious={
+                queueOpen=false
+                playPrevious()
+            },
+            onPlayItem={playQueueItem(it)},
+            onDismiss={queueOpen=false}
+        )
+    }
+
     if(settingsOpen) {
         PlayerSettingsSheet(
             tab=settingsTab,
@@ -923,6 +968,7 @@ private fun PlayerTopControls(
     onDownload: () -> Unit,
     onMoments: () -> Unit,
     onDialogueSearch: () -> Unit,
+    onQueue: () -> Unit,
     onShare: () -> Unit,
     onPip: () -> Unit,
     onSettings: () -> Unit,
@@ -958,6 +1004,10 @@ private fun PlayerTopControls(
         Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(Icons.Default.ManageSearch,onDialogueSearch)
         Spacer(Modifier.width(5.dp))
+        if(target.previousMediaVersionId!=null || target.upNext.isNotEmpty()) {
+            PlayerGlassIcon(Icons.Default.QueuePlayNext,onQueue)
+            Spacer(Modifier.width(5.dp))
+        }
         PlayerGlassIcon(Icons.Default.Share,onShare)
         Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(
@@ -1247,6 +1297,150 @@ private fun NextEpisodeOverlay(
                     colors=ButtonDefaults.buttonColors(containerColor=FqGold)
                 ) {
                     Text("الان پخش کن",color=Color.Black,fontSize=8.sp)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EpisodeQueueSheet(
+    target:PlaybackTarget,
+    onPrevious:()->Unit,
+    onPlayItem:(PlaybackQueueItem)->Unit,
+    onDismiss:()->Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest=onDismiss,
+        containerColor=FqSurface
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(bottom=26.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal=18.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("صف قسمت‌ها",fontSize=19.sp,fontWeight=FontWeight.Bold)
+                    Text(
+                        target.subtitle.ifBlank{"پخش فعلی"},
+                        color=FqMuted,
+                        fontSize=8.sp,
+                        modifier=Modifier.padding(top=3.dp)
+                    )
+                }
+                IconButton(onClick=onDismiss) {
+                    Icon(Icons.Default.Close,null)
+                }
+            }
+
+            target.previousMediaVersionId?.let {
+                Surface(
+                    color=FqSurface2,
+                    shape=RoundedCornerShape(16.dp),
+                    modifier=Modifier.fillMaxWidth()
+                        .padding(horizontal=18.dp,vertical=10.dp)
+                        .clickable { onPrevious() }
+                ) {
+                    Row(
+                        Modifier.padding(12.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.SkipPrevious,null,tint=FqGold)
+                        Spacer(Modifier.width(9.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("قسمت قبلی",color=FqGold,fontSize=8.sp)
+                            Text(
+                                target.previousTitle ?: "قسمت قبلی",
+                                fontSize=10.sp,
+                                fontWeight=FontWeight.Bold
+                            )
+                            target.previousSubtitle?.let { sub ->
+                                Text(sub,color=FqMuted,fontSize=7.sp)
+                            }
+                        }
+                        Icon(Icons.Default.PlayArrow,null)
+                    }
+                }
+            }
+
+            Surface(
+                color=FqGold.copy(alpha=.08f),
+                shape=RoundedCornerShape(16.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=4.dp)
+            ) {
+                Row(
+                    Modifier.padding(12.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.PlayCircle,null,tint=FqGold)
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("در حال پخش",color=FqGold,fontSize=8.sp)
+                        Text(target.title,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                        if(target.subtitle.isNotBlank()) {
+                            Text(target.subtitle,color=FqMuted,fontSize=7.sp)
+                        }
+                    }
+                }
+            }
+
+            if(target.upNext.isEmpty()) {
+                PlayerSettingsEmpty("قسمت بعدی دیگری در Catalog آماده پخش نیست.")
+            } else {
+                Text(
+                    "بعدی‌ها",
+                    color=FqMuted,
+                    fontSize=9.sp,
+                    modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
+                )
+                LazyColumn(
+                    modifier=Modifier.heightIn(max=420.dp),
+                    contentPadding=PaddingValues(horizontal=18.dp),
+                    verticalArrangement=Arrangement.spacedBy(7.dp)
+                ) {
+                    items(target.upNext,key={it.mediaVersionId}) { item ->
+                        Surface(
+                            color=FqSurface2,
+                            shape=RoundedCornerShape(15.dp),
+                            modifier=Modifier.fillMaxWidth()
+                                .clickable { onPlayItem(item) }
+                        ) {
+                            Row(
+                                Modifier.padding(10.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                RemoteImage(
+                                    item.posterUrl ?: target.posterUrl,
+                                    Modifier.width(72.dp).height(44.dp)
+                                        .clip(RoundedCornerShape(9.dp)),
+                                    ContentScale.Crop
+                                )
+                                Spacer(Modifier.width(9.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        item.title,
+                                        fontSize=9.sp,
+                                        fontWeight=FontWeight.Bold,
+                                        maxLines=1,
+                                        overflow=TextOverflow.Ellipsis
+                                    )
+                                    if(item.subtitle.isNotBlank()) {
+                                        Text(
+                                            item.subtitle,
+                                            color=FqMuted,
+                                            fontSize=7.sp,
+                                            maxLines=1,
+                                            overflow=TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Icon(Icons.Default.PlayArrow,null,tint=FqGold)
+                            }
+                        }
+                    }
                 }
             }
         }
