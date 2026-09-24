@@ -165,6 +165,10 @@ func (s *Server) markRoomRead(w http.ResponseWriter,r *http.Request) {
 
 func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
+	if err:=s.processDueReleaseReminders(r.Context(),userID); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT n.id::text,n.notification_type,n.entity_type,n.entity_id::text,
 		       n.title,n.body,n.read_at,n.created_at,

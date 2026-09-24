@@ -237,7 +237,8 @@ fun FilmiqooApp() {
                     backend=backend,
                     repository=repository,
                     onBack=closeOverlay,
-                    onMedia={overlay=OverlayRoute.Detail(it)}
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 is OverlayRoute.WatchParty -> ConnectedWatchPartyScreen(
                     media=route.media,

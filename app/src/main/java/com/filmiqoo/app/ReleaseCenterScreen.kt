@@ -22,19 +22,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @Composable
 fun ReleaseCenterScreen(
     backend: BackendRepository,
     repository: TmdbRepository,
     onBack: () -> Unit,
-    onMedia: (MediaItem) -> Unit
+    onMedia: (MediaItem) -> Unit,
+    onRequireAuth: () -> Unit
 ) {
     val repo=remember { ReleaseCenterRepository(backend) }
+    val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var releases by remember { mutableStateOf<List<ReleaseCenterItem>>(emptyList()) }
+    var reminderKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var reminderBusy by remember { mutableStateOf<Set<String>>(emptySet()) }
     var filter by remember { mutableIntStateOf(0) }
 
     BackHandler { onBack() }
@@ -45,6 +50,9 @@ fun ReleaseCenterScreen(
         releases=runCatching { repo.releases() }
             .onFailure { error=it.message }
             .getOrDefault(emptyList())
+        reminderKeys=if(backend.session.isLoggedIn) {
+            runCatching { repo.reminders().map { it.key }.toSet() }.getOrDefault(emptySet())
+        } else emptySet()
         loading=false
     }
 
@@ -125,15 +133,61 @@ fun ReleaseCenterScreen(
                             fontSize=8.sp,
                             modifier=Modifier.padding(top=5.dp)
                         )
-                        Button(
-                            onClick={onMedia(item.media)},
-                            colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                            shape=RoundedCornerShape(13.dp),
-                            modifier=Modifier.padding(top=12.dp)
+                        Row(
+                            Modifier.padding(top=12.dp),
+                            horizontalArrangement=Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Info,null,tint=Color.Black)
-                            Spacer(Modifier.width(5.dp))
-                            Text("جزئیات",color=Color.Black)
+                            Button(
+                                onClick={onMedia(item.media)},
+                                colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                                shape=RoundedCornerShape(13.dp)
+                            ) {
+                                Icon(Icons.Default.Info,null,tint=Color.Black)
+                                Spacer(Modifier.width(5.dp))
+                                Text("جزئیات",color=Color.Black)
+                            }
+                            if((item.daysAway ?: -1) >= 0) {
+                                val reminderKey=repo.reminderKey(item)
+                                val reminded=reminderKey in reminderKeys
+                                OutlinedButton(
+                                    enabled=reminderKey !in reminderBusy,
+                                    onClick={
+                                        if(!backend.session.isLoggedIn) {
+                                            onRequireAuth()
+                                        } else {
+                                            reminderBusy=reminderBusy+reminderKey
+                                            scope.launch {
+                                                runCatching { repo.toggleReminder(item) }
+                                                    .onSuccess { enabled->
+                                                        reminderKeys=if(enabled)
+                                                            reminderKeys+reminderKey
+                                                        else
+                                                            reminderKeys-reminderKey
+                                                    }
+                                                    .onFailure { error=it.message }
+                                                reminderBusy=reminderBusy-reminderKey
+                                            }
+                                        }
+                                    },
+                                    shape=RoundedCornerShape(13.dp)
+                                ) {
+                                    if(reminderKey in reminderBusy) {
+                                        CircularProgressIndicator(
+                                            color=FqGold,
+                                            strokeWidth=2.dp,
+                                            modifier=Modifier.size(16.dp)
+                                        )
+                                    } else {
+                                        Icon(
+                                            if(reminded)Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                                            null,
+                                            tint=if(reminded)FqGold else Color.White
+                                        )
+                                    }
+                                    Spacer(Modifier.width(5.dp))
+                                    Text(if(reminded)"یادم هست" else "یادم بنداز")
+                                }
+                            }
                         }
                     }
                 }
@@ -183,21 +237,87 @@ fun ReleaseCenterScreen(
             if(soon.isNotEmpty()) {
                 item { PremiumSectionHeader("این هفته","انتشارهای نزدیک",Icons.Default.Event) }
                 items(soon,key={it.media.key+"_"+it.releaseDate}) { item ->
-                    ReleaseRow(item,repository,onMedia)
+                    ReleaseRow(
+                        item=item,
+                        repository=repository,
+                        reminded=repo.reminderKey(item) in reminderKeys,
+                        reminderBusy=repo.reminderKey(item) in reminderBusy,
+                        onReminder={
+                            val key=repo.reminderKey(item)
+                            if(!backend.session.isLoggedIn) {
+                                onRequireAuth()
+                            } else {
+                                reminderBusy=reminderBusy+key
+                                scope.launch {
+                                    runCatching { repo.toggleReminder(item) }
+                                        .onSuccess { enabled->
+                                            reminderKeys=if(enabled) reminderKeys+key else reminderKeys-key
+                                        }
+                                        .onFailure { error=it.message }
+                                    reminderBusy=reminderBusy-key
+                                }
+                            }
+                        },
+                        onMedia=onMedia
+                    )
                 }
             }
 
             if(later.isNotEmpty()) {
                 item { PremiumSectionHeader("به‌زودی","بعد از این هفته",Icons.Default.CalendarMonth) }
                 items(later,key={it.media.key+"_"+it.releaseDate}) { item ->
-                    ReleaseRow(item,repository,onMedia)
+                    ReleaseRow(
+                        item=item,
+                        repository=repository,
+                        reminded=repo.reminderKey(item) in reminderKeys,
+                        reminderBusy=repo.reminderKey(item) in reminderBusy,
+                        onReminder={
+                            val key=repo.reminderKey(item)
+                            if(!backend.session.isLoggedIn) {
+                                onRequireAuth()
+                            } else {
+                                reminderBusy=reminderBusy+key
+                                scope.launch {
+                                    runCatching { repo.toggleReminder(item) }
+                                        .onSuccess { enabled->
+                                            reminderKeys=if(enabled) reminderKeys+key else reminderKeys-key
+                                        }
+                                        .onFailure { error=it.message }
+                                    reminderBusy=reminderBusy-key
+                                }
+                            }
+                        },
+                        onMedia=onMedia
+                    )
                 }
             }
 
             if(recent.isNotEmpty()) {
                 item { PremiumSectionHeader("تازه منتشرشده","روزهای اخیر",Icons.Default.NewReleases) }
                 items(recent,key={it.media.key+"_"+it.releaseDate}) { item ->
-                    ReleaseRow(item,repository,onMedia)
+                    ReleaseRow(
+                        item=item,
+                        repository=repository,
+                        reminded=repo.reminderKey(item) in reminderKeys,
+                        reminderBusy=repo.reminderKey(item) in reminderBusy,
+                        onReminder={
+                            val key=repo.reminderKey(item)
+                            if(!backend.session.isLoggedIn) {
+                                onRequireAuth()
+                            } else {
+                                reminderBusy=reminderBusy+key
+                                scope.launch {
+                                    runCatching { repo.toggleReminder(item) }
+                                        .onSuccess { enabled->
+                                            reminderKeys=if(enabled) reminderKeys+key else reminderKeys-key
+                                        }
+                                        .onFailure { error=it.message }
+                                    reminderBusy=reminderBusy-key
+                                }
+                            }
+                        },
+                        onMedia=onMedia
+                    )
                 }
             }
         }
@@ -208,6 +328,9 @@ fun ReleaseCenterScreen(
 private fun ReleaseRow(
     item: ReleaseCenterItem,
     repository: TmdbRepository,
+    reminded:Boolean,
+    reminderBusy:Boolean,
+    onReminder:()->Unit,
     onMedia: (MediaItem) -> Unit
 ) {
     Surface(
@@ -276,6 +399,26 @@ private fun ReleaseRow(
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=5.dp)
                     )
+                }
+            }
+            if((item.daysAway ?: -1) >= 0) {
+                IconButton(
+                    onClick=onReminder,
+                    enabled=!reminderBusy
+                ) {
+                    if(reminderBusy) {
+                        CircularProgressIndicator(
+                            color=FqGold,
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(18.dp)
+                        )
+                    } else {
+                        Icon(
+                            if(reminded)Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                            null,
+                            tint=if(reminded)FqGold else FqMuted
+                        )
+                    }
                 }
             }
             Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
