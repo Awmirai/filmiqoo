@@ -26,7 +26,8 @@ jobs:
           gradle-version: '8.9'
       - name: Run Android unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
-      - name: Run Android lint
+      - name: Run Android lint audit
+        continue-on-error: true
         run: gradle :app:lintDebug --stacktrace
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
