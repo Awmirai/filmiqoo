@@ -37,7 +37,7 @@ services:
     image: ${FILMIQOO_API_IMAGE:?FILMIQOO_API_IMAGE must be an immutable SHA tag}
     restart: unless-stopped
     env_file:
-      - .env.production
+      - ${FILMIQOO_API_ENV_FILE:-.env.production}
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-filmiqoo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-filmiqoo}
       ALLOW_INTERNAL_PLAINTEXT_DATABASE: "true"
