@@ -397,9 +397,9 @@ func (s *Server) forwardRoomMessage(w http.ResponseWriter,r *http.Request) {
 		INSERT INTO messages (
 			room_id,author_user_id,body,message_type,attachment,spoiler,
 			forwarded_from_message_id
-		) VALUES ($1,$2,$3,$4,$5,$6,$7)
+		) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7)
 		RETURNING id::text,created_at
-	`,body.TargetRoomID,userID,msgBody,msgType,attachment,spoiler,messageID).Scan(&id,&created)
+	`,body.TargetRoomID,userID,msgBody,msgType,string(attachment),spoiler,messageID).Scan(&id,&created)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	payload:=map[string]any{
