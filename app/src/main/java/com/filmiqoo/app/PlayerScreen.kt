@@ -81,6 +81,7 @@ fun FilmiqooPlayerScreen(
     val audioManager=remember {
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
+    val castController=remember { FilmiqooCastController(context.applicationContext) }
     val scope=rememberCoroutineScope()
     val initialSettings=remember { AppPreferences(context.applicationContext).read() }
     val settingsRepository=remember { SettingsRepository(context.applicationContext,backend) }
@@ -154,6 +155,10 @@ fun FilmiqooPlayerScreen(
     var telemetryLastHeartbeatAt by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     var recoveryAttempts by remember { mutableIntStateOf(0) }
     var recoveryMessage by remember { mutableStateOf<String?>(null) }
+    var castConnected by remember { mutableStateOf(false) }
+    var castDeviceName by remember { mutableStateOf("") }
+    var castLoadedVersionId by remember { mutableStateOf<String?>(null) }
+    var lastCastPositionMs by remember { mutableLongStateOf(0L) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -174,6 +179,31 @@ fun FilmiqooPlayerScreen(
             }
     }
 
+    fun activePositionMs():Long =
+        if(castConnected) castController.positionMs()
+        else player.currentPosition.coerceAtLeast(0L)
+
+    fun activeDurationMs():Long =
+        if(castConnected) castController.durationMs()
+        else player.duration.coerceAtLeast(0L)
+
+    fun activeIsPlaying():Boolean =
+        if(castConnected) castController.isPlaying()
+        else player.isPlaying
+
+    fun seekActive(position:Long) {
+        if(castConnected) castController.seekTo(position)
+        else player.seekTo(position)
+    }
+
+    fun pauseActive() {
+        if(castConnected) castController.pause() else player.pause()
+    }
+
+    fun playActive() {
+        if(castConnected) castController.play() else player.play()
+    }
+
     val mediaSession=remember(player) {
         MediaSession.Builder(context,player)
             .setId("filmiqoo-player")
@@ -183,6 +213,57 @@ fun FilmiqooPlayerScreen(
     DisposableEffect(mediaSession) {
         onDispose { mediaSession.release() }
     }
+
+    LaunchedEffect(castController) {
+        var wasConnected=false
+        while(true) {
+            val connected=castController.isConnected()
+            if(connected) {
+                lastCastPositionMs=castController.positionMs()
+                castDeviceName=castController.deviceName()
+                isPlaying=castController.isPlaying()
+            } else if(wasConnected) {
+                if(lastCastPositionMs>0L) {
+                    player.seekTo(lastCastPositionMs)
+                }
+                player.play()
+                castLoadedVersionId=null
+                castDeviceName=""
+                playerSettingsMessage="Cast قطع شد • ادامه روی گوشی"
+            }
+            castConnected=connected
+            wasConnected=connected
+            delay(700)
+        }
+    }
+
+    LaunchedEffect(castConnected,playUrl,currentVersionId,currentTarget.title) {
+        val url=playUrl
+        if(
+            castConnected &&
+            !url.isNullOrBlank() &&
+            castLoadedVersionId!=currentVersionId
+        ) {
+            val start=player.currentPosition.coerceAtLeast(0L)
+            val autoplay=player.isPlaying || player.playWhenReady
+            val loaded=castController.load(
+                url=url,
+                title=currentTarget.title,
+                subtitle=currentTarget.subtitle,
+                artworkUrl=currentTarget.posterUrl,
+                positionMs=start,
+                autoplay=autoplay
+            )
+            if(loaded) {
+                lastCastPositionMs=start
+                castLoadedVersionId=currentVersionId
+                player.pause()
+                playerSettingsMessage="Cast • پخش روی "+
+                    castController.deviceName().ifBlank { "TV" }
+            }
+        }
+    }
+
 
     fun applyExternalSubtitle(uri:String?,mime:String?,label:String?) {
         externalSubtitleUri=uri
@@ -499,8 +580,8 @@ fun FilmiqooPlayerScreen(
                 backend.endPlaybackSession(
                     sessionId=previousSession,
                     currentMediaVersionId=currentVersionId,
-                    positionMs=player.currentPosition.coerceAtLeast(0L),
-                    durationMs=player.duration.coerceAtLeast(0L),
+                    positionMs=activePositionMs(),
+                    durationMs=activeDurationMs(),
                     watchedDeltaMs=watched,
                     bufferCountDelta=telemetryBufferCountPending,
                     bufferMsDelta=telemetryBufferMsPending,
@@ -606,22 +687,29 @@ fun FilmiqooPlayerScreen(
         }
     }
 
-    LaunchedEffect(player) {
+    LaunchedEffect(player,castConnected) {
         while(true) {
             delay(500)
-            positionMs=player.currentPosition.coerceAtLeast(0L)
-            durationMs=player.duration.coerceAtLeast(0L)
+            positionMs=activePositionMs()
+            durationMs=activeDurationMs()
+            isPlaying=activeIsPlaying()
+            if(castConnected) {
+                lastCastPositionMs=positionMs
+                ended=durationMs>0L &&
+                    positionMs>=durationMs-1_200L &&
+                    !isPlaying
+            }
             if(!isScrubbing && durationMs>0) {
                 seekFraction=(positionMs.toFloat()/durationMs.toFloat()).coerceIn(0f,1f)
             }
             if(initialSettings.skipRecap) {
                 currentTarget.recapEndMs?.let { end ->
-                    if(positionMs in 1 until end) player.seekTo(end)
+                    if(positionMs in 1 until end) seekActive(end)
                 }
             }
             if(initialSettings.skipIntro) {
                 currentTarget.introEndMs?.let { end ->
-                    if(positionMs in 1 until end) player.seekTo(end)
+                    if(positionMs in 1 until end) seekActive(end)
                 }
             }
 
@@ -633,7 +721,7 @@ fun FilmiqooPlayerScreen(
                 loopEnd>loopStart+500L &&
                 positionMs>=loopEnd
             ) {
-                player.seekTo(loopStart)
+                seekActive(loopStart)
                 positionMs=loopStart
             }
         }
@@ -642,12 +730,12 @@ fun FilmiqooPlayerScreen(
     LaunchedEffect(currentVersionId) {
         while(true) {
             delay(10_000)
-            val duration=player.duration.coerceAtLeast(0L)
+            val duration=activeDurationMs()
             if(duration>0) {
                 runCatching {
                     backend.saveProgress(
                         currentVersionId,
-                        player.currentPosition.coerceAtLeast(0L),
+                        activePositionMs(),
                         duration
                     )
                 }
@@ -1078,7 +1166,7 @@ fun FilmiqooPlayerScreen(
                         context=context,
                         target=currentTarget,
                         mediaVersionId=currentVersionId,
-                        positionMs=player.currentPosition.coerceAtLeast(0L)
+                        positionMs=activePositionMs()
                     )
                 },
                 onPip={
@@ -1101,19 +1189,19 @@ fun FilmiqooPlayerScreen(
             PlayerCenterControls(
                 isPlaying=isPlaying,
                 onBack10={
-                    val next=(player.currentPosition-10_000L).coerceAtLeast(0L)
-                    player.seekTo(next)
+                    val next=(activePositionMs()-10_000L).coerceAtLeast(0L)
+                    seekActive(next)
                     bumpControls()
                 },
                 onPlayPause={
-                    if(player.isPlaying) player.pause() else player.play()
+                    if(activeIsPlaying()) pauseActive() else playActive()
                     bumpControls()
                 },
                 onForward10={
-                    val duration=player.duration.coerceAtLeast(0L)
-                    val next=(player.currentPosition+10_000L)
+                    val duration=activeDurationMs()
+                    val next=(activePositionMs()+10_000L)
                         .coerceAtMost(if(duration>0)duration else Long.MAX_VALUE)
-                    player.seekTo(next)
+                    seekActive(next)
                     bumpControls()
                 },
                 modifier=Modifier.align(Alignment.Center)
@@ -1133,7 +1221,7 @@ fun FilmiqooPlayerScreen(
                 },
                 onSeekFinished={
                     if(durationMs>0) {
-                        player.seekTo((durationMs*seekFraction).toLong())
+                        seekActive((durationMs*seekFraction).toLong())
                     }
                     isScrubbing=false
                     bumpControls()
@@ -1149,7 +1237,7 @@ fun FilmiqooPlayerScreen(
                 if(positionMs in 1 until end) {
                     PlayerSkipButton(
                         label="رد کردن مرور قبلی",
-                        onClick={player.seekTo(end)},
+                        onClick={seekActive(end)},
                         modifier=Modifier.align(Alignment.BottomEnd).padding(end=18.dp,bottom=102.dp)
                     )
                 }
@@ -1630,6 +1718,8 @@ private fun PlayerTopControls(
         }
         PlayerGlassIcon(Icons.Default.Share,onShare)
         Spacer(Modifier.width(5.dp))
+        PlayerCastRouteButton()
+        Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(
             if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
             onDownload
@@ -1641,6 +1731,20 @@ private fun PlayerTopControls(
         Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(Icons.Default.LockOpen,onLock)
     }
+}
+
+@Composable
+private fun PlayerCastRouteButton() {
+    val context=LocalContext.current
+    AndroidView(
+        factory={ctx->
+            androidx.mediarouter.app.MediaRouteButton(ctx).apply {
+                com.google.android.gms.cast.framework.CastButtonFactory
+                    .setUpMediaRouteButton(ctx,this)
+            }
+        },
+        modifier=Modifier.size(40.dp)
+    )
 }
 
 @Composable
