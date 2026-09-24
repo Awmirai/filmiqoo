@@ -33,6 +33,8 @@ data class OfflineDownloadItem(
     val localPath: String?,
     val createdAt: Long,
     val error: String?,
+    val speedBytesPerSecond: Long = 0L,
+    val etaSeconds: Long? = null,
     val nextMediaVersionId: String? = null,
     val nextTitle: String? = null,
     val nextSubtitle: String? = null,
@@ -68,6 +70,8 @@ object OfflineDownloadManager {
                         localPath=o.optString("localPath").takeIf(String::isNotBlank),
                         createdAt=o.optLong("createdAt"),
                         error=o.optString("error").takeIf(String::isNotBlank),
+                        speedBytesPerSecond=o.optLong("speedBytesPerSecond"),
+                        etaSeconds=if(o.has("etaSeconds") && !o.isNull("etaSeconds")) o.optLong("etaSeconds") else null,
                         nextMediaVersionId=o.optString("nextMediaVersionId").takeIf(String::isNotBlank),
                         nextTitle=o.optString("nextTitle").takeIf(String::isNotBlank),
                         nextSubtitle=o.optString("nextSubtitle").takeIf(String::isNotBlank),
@@ -127,6 +131,8 @@ object OfflineDownloadManager {
             localPath=downloadFile(context,id).absolutePath,
             createdAt=System.currentTimeMillis(),
             error=null,
+            speedBytesPerSecond=0L,
+            etaSeconds=null,
             nextMediaVersionId=target.nextMediaVersionId,
             nextTitle=target.nextTitle,
             nextSubtitle=target.nextSubtitle,
@@ -192,7 +198,9 @@ object OfflineDownloadManager {
         status: String,
         downloaded: Long,
         total: Long,
-        error: String?=null
+        error: String?=null,
+        speedBytesPerSecond: Long=0L,
+        etaSeconds: Long?=null
     ) {
         update(context,id) {
             it.copy(
@@ -200,7 +208,9 @@ object OfflineDownloadManager {
                 downloadedBytes=downloaded,
                 totalBytes=total,
                 localPath=it.localPath ?: downloadFile(context,id).absolutePath,
-                error=error
+                error=error,
+                speedBytesPerSecond=speedBytesPerSecond,
+                etaSeconds=etaSeconds
             )
         }
     }
@@ -259,6 +269,8 @@ object OfflineDownloadManager {
                     .put("localPath",item.localPath ?: "")
                     .put("createdAt",item.createdAt)
                     .put("error",item.error ?: "")
+                    .put("speedBytesPerSecond",item.speedBytesPerSecond)
+                    .put("etaSeconds",item.etaSeconds ?: JSONObject.NULL)
                     .put("nextMediaVersionId",item.nextMediaVersionId ?: "")
                     .put("nextTitle",item.nextTitle ?: "")
                     .put("nextSubtitle",item.nextSubtitle ?: "")
@@ -420,6 +432,8 @@ class FilmiqooDownloadWorker(
                         val buffer=ByteArray(256*1024)
                         var downloaded=existing
                         var lastUpdate=0L
+                        var sampleAt=System.currentTimeMillis()
+                        var sampleBytes=downloaded
 
                         while(true) {
                             if(isStopped) {
@@ -441,15 +455,31 @@ class FilmiqooDownloadWorker(
                                 val progress=if(total>0L) {
                                     ((downloaded*100L)/total).toInt().coerceIn(0,100)
                                 } else 0
+                                val elapsed=(now-sampleAt).coerceAtLeast(1L)
+                                val speed=(((downloaded-sampleBytes).coerceAtLeast(0L)*1000L)/elapsed)
+                                    .coerceAtLeast(0L)
+                                val eta=if(total>downloaded && speed>0L) {
+                                    ((total-downloaded)/speed).coerceAtLeast(0L)
+                                } else null
                                 setProgress(workDataOf(
                                     "downloaded" to downloaded,
                                     "total" to total,
-                                    "progress" to progress
+                                    "progress" to progress,
+                                    "speed" to speed,
+                                    "etaSeconds" to (eta ?: -1L)
                                 ))
                                 setForeground(createForegroundInfo(item,progress,total<=0L))
                                 OfflineDownloadManager.updateProgress(
-                                    applicationContext,id,"downloading",downloaded,total
+                                    applicationContext,
+                                    id,
+                                    "downloading",
+                                    downloaded,
+                                    total,
+                                    speedBytesPerSecond=speed,
+                                    etaSeconds=eta
                                 )
+                                sampleAt=now
+                                sampleBytes=downloaded
                                 lastUpdate=now
                             }
                         }

@@ -448,8 +448,23 @@ private fun DownloadCard(
                                 .clip(RoundedCornerShape(99.dp))
                         )
                         Text(
-                            if(item.totalBytes>0) ((item.progress*100).toInt()).toString()+"٪"
-                            else "در حال محاسبه حجم...",
+                            buildString {
+                                if(item.totalBytes>0) {
+                                    append(((item.progress*100).toInt()).toString())
+                                    append("٪")
+                                } else {
+                                    append("در حال محاسبه حجم...")
+                                }
+                                if(item.status=="downloading" && item.speedBytesPerSecond>0L) {
+                                    append(" • ")
+                                    append(formatDownloadSpeed(item.speedBytesPerSecond))
+                                    item.etaSeconds?.takeIf { it>0L }?.let { eta ->
+                                        append(" • ")
+                                        append(formatDownloadEta(eta))
+                                        append(" مانده")
+                                    }
+                                }
+                            },
                             color=FqMuted,
                             fontSize=7.sp,
                             modifier=Modifier.padding(top=4.dp)
@@ -551,5 +566,27 @@ private fun formatDownloadBytes(bytes: Long): String {
         String.format(Locale.US,"%.1f GB",mb/1024.0)
     } else {
         String.format(Locale.US,"%.0f MB",mb)
+    }
+}
+
+
+private fun formatDownloadSpeed(bytesPerSecond:Long):String {
+    if(bytesPerSecond<=0L) return ""
+    val mb=bytesPerSecond/1024.0/1024.0
+    return if(mb>=1.0) {
+        String.format(Locale.US,"%.1f MB/s",mb)
+    } else {
+        String.format(Locale.US,"%.0f KB/s",bytesPerSecond/1024.0)
+    }
+}
+
+private fun formatDownloadEta(seconds:Long):String = when {
+    seconds<60L -> seconds.toString()+" ثانیه"
+    seconds<3600L -> (seconds/60L).toString()+" دقیقه"
+    else -> {
+        val hours=seconds/3600L
+        val minutes=(seconds%3600L)/60L
+        if(minutes>0L) hours.toString()+"س "+minutes.toString()+"د"
+        else hours.toString()+" ساعت"
     }
 }
