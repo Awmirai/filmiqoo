@@ -84,6 +84,16 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 	dbPool:=s.db.Stat()
 	redisPool:=s.redis.PoolStats()
 
+	hourKey:=time.Now().UTC().Format("2006010215")
+	playbackSuccess,_:=s.redis.Get(
+		ctx,
+		"metrics:playback-origin:success:"+hourKey,
+	).Int64()
+	playbackErrors,_:=s.redis.Get(
+		ctx,
+		"metrics:playback-origin:error:"+hourKey,
+	).Int64()
+
 	status:="ok"
 	code:=http.StatusOK
 	if dbErr!=nil || redisErr!=nil || (s.cfg.FirebasePushEnabled && s.fcm==nil) {
@@ -143,6 +153,10 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 			"openModerationReports":openReports,
 			"criticalModerationReports":criticalReports,
 			"staleUploads":staleUploads,
+		},
+		"playbackOriginCurrentHour":map[string]any{
+			"success":playbackSuccess,
+			"errors":playbackErrors,
 		},
 	})
 }
