@@ -337,6 +337,24 @@ func (s *Server) scheduleRoomMessage(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room membership required"})
 		return
 	}
+	if roomType=="dm" {
+		var dmBlocked bool
+		_=s.db.QueryRow(r.Context(),`
+			SELECT EXISTS(
+				SELECT 1
+				  FROM room_members other
+				  JOIN blocks b ON (
+				       (b.blocker_user_id=$2 AND b.blocked_user_id=other.user_id)
+				    OR (b.blocker_user_id=other.user_id AND b.blocked_user_id=$2)
+				  )
+				 WHERE other.room_id=$1 AND other.user_id<>$2
+			)
+		`,roomID,userID).Scan(&dmBlocked)
+		if dmBlocked {
+			writeJSON(w,http.StatusForbidden,map[string]string{"error":"direct messages are unavailable"})
+			return
+		}
+	}
 
 	attachment,_:=json.Marshal(body.Attachment)
 	var id string
@@ -488,6 +506,28 @@ func (s *Server) processDueScheduledRoomMessages(ctx context.Context) error {
 			`,item.id)
 			continue
 		}
+		if roomType=="dm" {
+			var blocked bool
+			_=s.db.QueryRow(ctx,`
+				SELECT EXISTS(
+					SELECT 1
+					  FROM room_members other
+					  JOIN blocks b ON (
+					       (b.blocker_user_id=$2 AND b.blocked_user_id=other.user_id)
+					    OR (b.blocker_user_id=other.user_id AND b.blocked_user_id=$2)
+					  )
+					 WHERE other.room_id=$1 AND other.user_id<>$2
+				)
+			`,item.roomID,item.userID).Scan(&blocked)
+			if blocked {
+				_,_=s.db.Exec(ctx,`
+					UPDATE scheduled_room_messages
+					   SET status='failed',last_error='direct messages are unavailable',updated_at=now()
+					 WHERE id=$1
+				`,item.id)
+				continue
+			}
+		}
 
 		attachment:=map[string]any{}
 		_ = json.Unmarshal(item.attachment,&attachment)
@@ -620,6 +660,26 @@ func (s *Server) bulkForwardRoomMessages(w http.ResponseWriter,r *http.Request) 
 	body.MessageIDs=uniqueNonEmptyStrings(body.MessageIDs,20)
 	if body.TargetRoomID=="" || len(body.MessageIDs)==0 {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"targetRoomId and messageIds are required"})
+		return
+	}
+
+	var sourceAllowed bool
+	_=s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1
+			  FROM rooms room
+			 WHERE room.id=$1
+			   AND (
+			     room.visibility='public'
+			     OR EXISTS(
+			       SELECT 1 FROM room_members rm
+			        WHERE rm.room_id=room.id AND rm.user_id=$2
+			     )
+			   )
+		)
+	`,sourceRoomID,userID).Scan(&sourceAllowed)
+	if !sourceAllowed {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"source room access required"})
 		return
 	}
 
