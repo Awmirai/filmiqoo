@@ -48,6 +48,7 @@ fun ConnectedProfileScreen(
     onCreatorStudio: () -> Unit,
     onInbox: () -> Unit,
     onSettings: () -> Unit,
+    onViewerProfiles: () -> Unit,
     onSecurity: () -> Unit,
     onSafety: () -> Unit,
     onFollowRequests: () -> Unit,
@@ -127,6 +128,12 @@ fun ConnectedProfileScreen(
 
                 item { SectionHeader("مرکز حساب") }
                 item {
+                    ProfileActionRow(
+                        icon=Icons.Default.SwitchAccount,
+                        title="پروفایل‌های تماشا",
+                        subtitle="Multi‑Profile، Kids Mode و Library جدا",
+                        onClick=onViewerProfiles
+                    )
                     ProfileActionRow(
                         icon=Icons.Default.Edit,
                         title="ویرایش پروفایل",
