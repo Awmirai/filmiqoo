@@ -338,6 +338,54 @@ fun PremiumDetailScreen(
                                                     }
                                                 }
                                             }
+                                        },
+                                        onDownloadSeason={ selectedSeason ->
+                                            if(!backend.session.isLoggedIn) {
+                                                message="برای دانلود فصل باید وارد حساب Filmiqoo شوی."
+                                            } else {
+                                                val readyEpisodes=selectedSeason.episodes.filter {
+                                                    it.streamReady && !it.mediaVersionId.isNullOrBlank()
+                                                }
+                                                if(readyEpisodes.isEmpty()) {
+                                                    message="برای این فصل فایل آماده دانلود وجود ندارد."
+                                            } else {
+                                                    scope.launch {
+                                                        var queued=0
+                                                        var failed=0
+                                                        readyEpisodes.forEach { ep ->
+                                                            val id=ep.mediaVersionId ?: return@forEach
+                                                            runCatching {
+                                                                val fallback=PlaybackTarget(
+                                                                    mediaVersionId=id,
+                                                                    title=ep.name.ifBlank {
+                                                                        d.media.title+" • قسمت "+ep.number
+                                                                    },
+                                                                    subtitle="S"+
+                                                                        selectedSeason.number.toString().padStart(2,'0')+
+                                                                        "E"+ep.number.toString().padStart(2,'0')+
+                                                                        if(ep.quality.isNullOrBlank())"" else " • "+ep.quality,
+                                                                    posterUrl=repository.poster(d.media.posterPath)
+                                                                )
+                                                                val target=runCatching {
+                                                                    backend.playbackContext(id)
+                                                                }.getOrDefault(fallback)
+                                                                backend.enqueueDownload(context,target)
+                                                            }.onSuccess {
+                                                                queued++
+                                                            }.onFailure {
+                                                                failed++
+                                                            }
+                                                        }
+                                                        message=when {
+                                                            queued>0 && failed==0 ->
+                                                                queued.toString()+" قسمت از فصل "+selectedSeason.number+" به صف دانلود اضافه شد."
+                                                            queued>0 ->
+                                                                queued.toString()+" قسمت صف شد؛ "+failed+" قسمت خطا داشت."
+                                                            else -> "دانلود فصل شروع نشد."
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     )
                                 }
@@ -917,7 +965,8 @@ private fun PremiumSeriesPanel(
     title: String,
     seasons: List<PlatformSeason>,
     onPlay: (PlaybackTarget) -> Unit,
-    onDownload: (PlatformEpisode) -> Unit
+    onDownload: (PlatformEpisode) -> Unit,
+    onDownloadSeason: (PlatformSeason) -> Unit
 ) {
     var selectedSeason by remember(seasons) {
         mutableIntStateOf(seasons.firstOrNull()?.number ?: 0)
@@ -941,6 +990,27 @@ private fun PremiumSeriesPanel(
                     active=s.number==selectedSeason,
                     onClick={selectedSeason=s.number}
                 )
+            }
+        }
+
+        season?.let { selected ->
+            val readyCount=selected.episodes.count {
+                it.streamReady && !it.mediaVersionId.isNullOrBlank()
+            }
+            if(readyCount>0) {
+                OutlinedButton(
+                    onClick={onDownloadSeason(selected)},
+                    shape=RoundedCornerShape(14.dp),
+                    modifier=Modifier.fillMaxWidth()
+                        .padding(horizontal=16.dp,vertical=10.dp)
+                ) {
+                    Icon(Icons.Default.DownloadForOffline,null,tint=FqGold)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "دانلود فصل "+selected.number+" • "+readyCount+" قسمت",
+                        color=FqGold
+                    )
+                }
             }
         }
 
