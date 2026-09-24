@@ -390,7 +390,7 @@ private fun SocialCollectionDetailScreen(
             Column(
                 Modifier.align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal=18.dp,bottom=18.dp)
+                    .padding(start=18.dp,end=18.dp,bottom=18.dp)
             ) {
                 Text(detail.summary.emoji,fontSize=38.sp)
                 Text(
