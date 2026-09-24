@@ -74,6 +74,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	r.Get("/readyz", s.ready)
 
 	r.Route("/internal", func(r chi.Router) {
+		r.Get("/ops/status",s.opsStatus)
 		r.Post("/telegram/ingest", s.telegramIngest)
 		r.Get("/telegram/pending", s.pendingTelegramIngest)
 		r.Post("/telegram/{id}/resolve", s.resolveTelegramIngestNow)
