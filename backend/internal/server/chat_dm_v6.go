@@ -232,14 +232,23 @@ func (s *Server) updateRoomDraft(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
-	var member bool
+	var allowed bool
 	_=s.db.QueryRow(r.Context(),`
 		SELECT EXISTS(
-			SELECT 1 FROM room_members WHERE room_id=$1 AND user_id=$2
+			SELECT 1
+			  FROM rooms room
+			 WHERE room.id=$1
+			   AND (
+			     room.visibility='public'
+			     OR EXISTS(
+			       SELECT 1 FROM room_members rm
+			        WHERE rm.room_id=room.id AND rm.user_id=$2
+			     )
+			   )
 		)
-	`,roomID,userID).Scan(&member)
-	if !member {
-		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room membership required"})
+	`,roomID,userID).Scan(&allowed)
+	if !allowed {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room access required"})
 		return
 	}
 
