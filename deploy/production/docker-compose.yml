@@ -45,6 +45,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       BUILD_VERSION: ${FILMIQOO_VERSION:?FILMIQOO_VERSION is required}
       BUILD_COMMIT: ${FILMIQOO_COMMIT:?FILMIQOO_COMMIT is required}
+      ALLOW_INTERNAL_PLAINTEXT_DATABASE: "true"
     depends_on:
       postgres:
         condition: service_healthy
