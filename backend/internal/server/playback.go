@@ -184,6 +184,28 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var resumePosition,resumeDuration int64
+	var resumeCompleted bool
+	if episodeID!=nil {
+		_ = s.db.QueryRow(r.Context(),`
+			SELECT wp.position_ms,wp.duration_ms,wp.completed
+			  FROM watch_progress wp
+			  JOIN media_versions watched ON watched.id=wp.media_version_id
+			 WHERE wp.user_id=$1 AND watched.episode_id=$2
+			 ORDER BY wp.updated_at DESC
+			 LIMIT 1
+		`,userID,*episodeID).Scan(&resumePosition,&resumeDuration,&resumeCompleted)
+	} else {
+		_ = s.db.QueryRow(r.Context(),`
+			SELECT wp.position_ms,wp.duration_ms,wp.completed
+			  FROM watch_progress wp
+			  JOIN media_versions watched ON watched.id=wp.media_version_id
+			 WHERE wp.user_id=$1 AND watched.media_title_id=$2
+			 ORDER BY wp.updated_at DESC
+			 LIMIT 1
+		`,userID,mediaID).Scan(&resumePosition,&resumeDuration,&resumeCompleted)
+	}
+
 	variants:=make([]map[string]any,0)
 	var rows pgx.Rows
 	if episodeID!=nil {
@@ -354,6 +376,9 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 		"introEndMs":introEnd,
 		"recapEndMs":recapEnd,
 		"creditsStartMs":creditsStart,
+		"resumePositionMs":resumePosition,
+		"resumeDurationMs":resumeDuration,
+		"resumeCompleted":resumeCompleted,
 		"nextMediaVersionId":nextVersionID,
 		"nextTitle":nextTitle,
 		"nextSubtitle":nextSubtitle,

@@ -121,6 +121,9 @@ fun FilmiqooPlayerScreen(
     var sleepAtEpisodeEnd by remember { mutableStateOf(false) }
     var sleepTimerMessage by remember { mutableStateOf<String?>(null) }
     var dataSaverApplied by remember { mutableStateOf(false) }
+    var resumePromptPositionMs by remember { mutableStateOf<Long?>(null) }
+    var resumePromptDurationMs by remember { mutableLongStateOf(0L) }
+    var pendingResumeVersionId by remember { mutableStateOf<String?>(null) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -289,11 +292,13 @@ fun FilmiqooPlayerScreen(
     }
 
     LaunchedEffect(currentTarget.mediaVersionId,currentTarget.localUri) {
-        currentVersionId=currentTarget.mediaVersionId
         selectedVariantId=currentTarget.mediaVersionId
+        resumePromptPositionMs=null
+        pendingResumeVersionId=null
 
         val local=currentTarget.localUri
         if(!local.isNullOrBlank()) {
+            currentVersionId=currentTarget.mediaVersionId
             loading=true
             error=null
             ended=false
@@ -313,6 +318,7 @@ fun FilmiqooPlayerScreen(
             if(enriched!=null) {
                 currentTarget=enriched.copy(startPositionMs=requestedStart)
             }
+
             val saverVariant=if(
                 initialSettings.dataSaver &&
                 isMeteredConnection(context)
@@ -321,10 +327,32 @@ fun FilmiqooPlayerScreen(
             } else null
             val initialVersion=saverVariant?.mediaVersionId ?: currentTarget.mediaVersionId
             dataSaverApplied=saverVariant!=null && initialVersion!=currentTarget.mediaVersionId
-            loadVersion(
-                versionId=initialVersion,
-                startPosition=requestedStart
-            )
+
+            val resumablePosition=currentTarget.resumePositionMs
+            val resumableDuration=currentTarget.resumeDurationMs
+            val shouldPrompt=
+                requestedStart<=0L &&
+                !currentTarget.resumeCompleted &&
+                resumablePosition>=60_000L &&
+                (
+                    resumableDuration<=0L ||
+                    resumablePosition<resumableDuration-60_000L
+                )
+
+            if(shouldPrompt) {
+                player.pause()
+                playUrl=null
+                loading=false
+                resumePromptPositionMs=resumablePosition
+                resumePromptDurationMs=resumableDuration
+                pendingResumeVersionId=initialVersion
+                bumpControls()
+            } else {
+                loadVersion(
+                    versionId=initialVersion,
+                    startPosition=requestedStart.coerceAtLeast(0L)
+                )
+            }
         }
     }
 
@@ -411,6 +439,7 @@ fun FilmiqooPlayerScreen(
 
     BackHandler {
         when {
+            resumePromptPositionMs!=null -> onBack()
             dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
             queueOpen -> queueOpen=false
@@ -572,6 +601,31 @@ fun FilmiqooPlayerScreen(
                 onRetry={
                     scope.launch {
                         loadVersion(currentVersionId,player.currentPosition.coerceAtLeast(0L))
+                    }
+                },
+                onBack=onBack
+            )
+        }
+
+        val resumeAt=resumePromptPositionMs
+        val resumeVersion=pendingResumeVersionId
+        if(resumeAt!=null && resumeVersion!=null) {
+            ResumePromptOverlay(
+                target=currentTarget,
+                positionMs=resumeAt,
+                durationMs=resumePromptDurationMs,
+                onResume={
+                    resumePromptPositionMs=null
+                    pendingResumeVersionId=null
+                    scope.launch {
+                        loadVersion(resumeVersion,resumeAt)
+                    }
+                },
+                onRestart={
+                    resumePromptPositionMs=null
+                    pendingResumeVersionId=null
+                    scope.launch {
+                        loadVersion(resumeVersion,0L)
                     }
                 },
                 onBack=onBack
@@ -887,6 +941,102 @@ fun FilmiqooPlayerScreen(
                 sleepTimerMessage=if(it)"بعد از پایان قسمت پخش متوقف می‌شه" else "Sleep Timer خاموش شد"
             }
         )
+    }
+}
+
+@Composable
+private fun ResumePromptOverlay(
+    target:PlaybackTarget,
+    positionMs:Long,
+    durationMs:Long,
+    onResume:()->Unit,
+    onRestart:()->Unit,
+    onBack:()->Unit
+) {
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha=.78f)),
+        contentAlignment=Alignment.Center
+    ) {
+        Surface(
+            color=Color(0xF0191C23),
+            shape=RoundedCornerShape(24.dp),
+            modifier=Modifier.widthIn(max=430.dp).padding(22.dp)
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(54.dp).clip(RoundedCornerShape(16.dp))
+                            .background(FqGold.copy(alpha=.14f)),
+                        contentAlignment=Alignment.Center
+                    ) {
+                        Icon(Icons.Default.History,null,tint=FqGold,modifier=Modifier.size(28.dp))
+                    }
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("ادامه تماشا؟",color=FqGold,fontSize=9.sp)
+                        Text(
+                            target.title,
+                            color=Color.White,
+                            fontSize=16.sp,
+                            fontWeight=FontWeight.Bold,
+                            maxLines=1,
+                            overflow=TextOverflow.Ellipsis
+                        )
+                        if(target.subtitle.isNotBlank()) {
+                            Text(target.subtitle,color=FqMuted,fontSize=8.sp)
+                        }
+                    }
+                }
+
+                Text(
+                    "آخرین بار تا "+formatPlayerTime(positionMs)+" دیدی.",
+                    color=Color.White.copy(alpha=.78f),
+                    fontSize=10.sp,
+                    modifier=Modifier.padding(top=16.dp)
+                )
+
+                if(durationMs>0L) {
+                    LinearProgressIndicator(
+                        progress={(positionMs.toFloat()/durationMs.toFloat()).coerceIn(0f,1f)},
+                        color=FqGold,
+                        trackColor=FqSurface3,
+                        modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                    )
+                }
+
+                Button(
+                    onClick=onResume,
+                    colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                    shape=RoundedCornerShape(14.dp),
+                    modifier=Modifier.fillMaxWidth().padding(top=16.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "ادامه از "+formatPlayerTime(positionMs),
+                        color=Color.Black,
+                        fontWeight=FontWeight.Bold
+                    )
+                }
+
+                OutlinedButton(
+                    onClick=onRestart,
+                    shape=RoundedCornerShape(14.dp),
+                    modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                ) {
+                    Icon(Icons.Default.Replay,null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("از اول پخش کن")
+                }
+
+                TextButton(
+                    onClick=onBack,
+                    modifier=Modifier.align(Alignment.CenterHorizontally).padding(top=4.dp)
+                ) {
+                    Text("فعلاً نه",color=FqMuted)
+                }
+            }
+        }
     }
 }
 
