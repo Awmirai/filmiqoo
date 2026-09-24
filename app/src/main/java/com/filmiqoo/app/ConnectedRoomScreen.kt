@@ -428,6 +428,31 @@ fun ConnectedRoomScreen(
                             pinsOpen=true
                         }
                     )
+                    if(loggedIn) {
+                        DropdownMenuItem(
+                            text={Text("پیام‌های زمان‌بندی‌شده")},
+                            leadingIcon={Icon(Icons.Default.Schedule,null)},
+                            onClick={
+                                headerMenuOpen=false
+                                scheduledOpen=true
+                            }
+                        )
+                    }
+                    firstUnreadMessageId?.let { unreadId ->
+                        DropdownMenuItem(
+                            text={Text("اولین پیام خوانده‌نشده")},
+                            leadingIcon={Icon(Icons.Default.MarkChatUnread,null)},
+                            onClick={
+                                headerMenuOpen=false
+                                val index=messages.indexOfFirst { it.id==unreadId }
+                                if(index>=0) {
+                                    scope.launch { listState.animateScrollToItem(index) }
+                                } else {
+                                    actionMessage="اولین پیام خوانده‌نشده خارج از ۱۰۰ پیام اخیر است."
+                                }
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text={Text("اشتراک گفتگو")},
                         leadingIcon={Icon(Icons.Default.Share,null)},
@@ -453,6 +478,15 @@ fun ConnectedRoomScreen(
                     )
                 }
             }
+        }
+
+        if(selectedMessageIds.isNotEmpty()) {
+            BulkMessageSelectionBar(
+                count=selectedMessageIds.size,
+                onForward={bulkForwardOpen=true},
+                onDelete={bulkDeleteConfirm=true},
+                onClear={selectedMessageIds=emptySet()}
+            )
         }
 
         error?.let {
