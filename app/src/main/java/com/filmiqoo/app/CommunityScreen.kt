@@ -35,6 +35,7 @@ fun CommunityScreen(
     onCreator: (Creator) -> Unit,
     onStory: (List<SocialStory>, Int) -> Unit,
     onInbox: () -> Unit,
+    onFriendActivity: () -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -74,6 +75,7 @@ fun CommunityScreen(
                 Text("Community",fontSize=24.sp,fontWeight=FontWeight.Bold)
                 Text("آدم‌ها، داستان‌ها و بحث‌های سینمایی",color=FqMuted,fontSize=10.sp)
             }
+            IconButton(onClick=onFriendActivity) { Icon(Icons.Default.Diversity3,null) }
             IconButton(onClick=onInbox) { Icon(Icons.Default.MarkChatUnread,null) }
             IconButton(onClick={refresh++}) { Icon(Icons.Default.Refresh,null) }
         }

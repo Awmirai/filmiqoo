@@ -19,9 +19,66 @@ data class FriendWatchingNow(
         }
 }
 
+data class FriendActivityItem(
+    val type:String,
+    val entityId:String,
+    val body:String,
+    val spoiler:Boolean,
+    val createdAt:String,
+    val actor:SocialAuthor,
+    val media:MediaItem?
+)
+
 class FriendActivityRepository(
     private val backend:BackendRepository
 ) {
+    suspend fun feed():List<FriendActivityItem> {
+        val root=backend.getJson(
+            "/v1/social/activity/following/feed",
+            authorized=true
+        )
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val a=x.optJSONObject("actor") ?: JSONObject()
+                val m=x.optJSONObject("media")
+                val media=m?.let {
+                    val backendId=it.optString("id").takeIf(String::isNotBlank)
+                    if(backendId==null) null else MediaItem(
+                        id=if(it.isNull("tmdbId"))0 else it.optInt("tmdbId"),
+                        type=if(it.optString("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+                        title=it.optString("title").ifBlank{it.optString("originalTitle")},
+                        originalTitle=it.optString("originalTitle"),
+                        overview=it.optString("overview"),
+                        posterPath=it.optString("posterUrl").takeIf(String::isNotBlank),
+                        backdropPath=it.optString("backdropUrl").takeIf(String::isNotBlank),
+                        vote=it.optDouble("rating",0.0),
+                        date=if(it.isNull("year"))"" else it.optInt("year").toString(),
+                        backendId=backendId
+                    )
+                }
+                add(
+                    FriendActivityItem(
+                        type=x.optString("type"),
+                        entityId=x.optString("entityId"),
+                        body=x.optString("body"),
+                        spoiler=x.optBoolean("spoiler"),
+                        createdAt=x.optString("createdAt"),
+                        actor=SocialAuthor(
+                            id=a.optString("id"),
+                            username=a.optString("username"),
+                            displayName=a.optString("displayName"),
+                            avatarUrl=a.optString("avatarUrl"),
+                            verified=a.optBoolean("verified")
+                        ),
+                        media=media
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun followingWatching():List<FriendWatchingNow> {
         val root=backend.getJson(
             "/v1/social/activity/following",

@@ -272,6 +272,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/social/reels/personalized", s.personalizedReels)
 			r.Get("/social/stories/personalized", s.personalizedStories)
 			r.Get("/social/activity/following", s.followingWatchActivity)
+			r.Get("/social/activity/following/feed", s.followingActivityFeed)
 			r.Get("/social/following", s.followingUsers)
 		})
 	})

@@ -595,6 +595,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onCreator={overlay=OverlayRoute.CreatorPage(it)}
                 )
+                OverlayRoute.FriendActivity -> FriendActivityScreen(
+                    backend=backend,
+                    repository=repository,
+                    onBack=closeOverlay,
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)}
+                )
                 OverlayRoute.EditProfile -> EditProfileScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -716,6 +723,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onInbox={overlay=OverlayRoute.Inbox},
+                            onFriendActivity={overlay=OverlayRoute.FriendActivity},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         else -> {
