@@ -1,6 +1,5 @@
 package com.filmiqoo.app
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -97,19 +96,21 @@ fun RichMessageAttachment(
                 shape=RoundedCornerShape(14.dp),
                 modifier=Modifier.fillMaxWidth().padding(top=7.dp),
                 onClick={
-                    val url=message.attachmentUrl ?: return@Surface
-                    val uri=Uri.parse(url)
-                    val intent=Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(uri,message.attachmentMime ?: "*/*")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    runCatching { context.startActivity(intent) }
-                        .recoverCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW,uri)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
+                    val url=message.attachmentUrl
+                    if(!url.isNullOrBlank()) {
+                        val uri=Uri.parse(url)
+                        val intent=Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri,message.attachmentMime ?: "*/*")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
+                        runCatching { context.startActivity(intent) }
+                            .recoverCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW,uri)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                    }
                 }
             ) {
                 Row(
@@ -356,7 +357,9 @@ fun LocationMessageDialog(
         confirmButton={
             Button(
                 enabled=valid,
-                onClick={if(valid){{onSend(lat!!,lng!!,label.trim())}} else {{}}},
+                onClick={
+                    if(valid) onSend(lat!!,lng!!,label.trim())
+                },
                 colors=ButtonDefaults.buttonColors(containerColor=FqGold)
             ) { Text("ارسال",color=Color.Black) }
         },
