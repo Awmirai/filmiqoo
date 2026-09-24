@@ -24,6 +24,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Run Android unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Run Android lint audit
+        continue-on-error: true
+        run: gradle :app:lintDebug --stacktrace
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4

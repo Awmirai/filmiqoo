@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: filmiqoo
       POSTGRES_USER: filmiqoo
@@ -17,6 +18,7 @@ services:
       retries: 20
   redis:
     image: redis:7.4-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
@@ -29,6 +31,7 @@ services:
       retries: 20
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: filmiqoo
@@ -39,6 +42,7 @@ services:
     volumes:
       - minio_data:/data
   api:
+    restart: unless-stopped
     build:
       context: ./backend
     env_file:
@@ -50,6 +54,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
 volumes:
   postgres_data:
   redis_data:

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -28,6 +30,14 @@ type Config struct {
 	TelegramStreamHashLength int
 	AuthAccessTTLMinutes int
 	AuthRefreshTTLDays int
+	AllowedOrigins []string
+	MaxJSONBodyBytes int64
+	AuthLoginRateLimit int
+	AuthRegisterRateLimit int
+	AuthRefreshRateLimit int
+	AuthenticatedWriteRateLimit int
+	BuildVersion string
+	BuildCommit string
 }
 
 func Load() Config {
@@ -53,6 +63,14 @@ func Load() Config {
 		TelegramStreamHashLength: envInt("TELEGRAM_STREAM_HASH_LENGTH", 6),
 		AuthAccessTTLMinutes: envInt("AUTH_ACCESS_TTL_MINUTES", 15),
 		AuthRefreshTTLDays: envInt("AUTH_REFRESH_TTL_DAYS", 30),
+		AllowedOrigins: envList("ALLOWED_ORIGINS", ""),
+		MaxJSONBodyBytes: envInt64("MAX_JSON_BODY_BYTES", 2*1024*1024),
+		AuthLoginRateLimit: envInt("AUTH_LOGIN_RATE_LIMIT_PER_MINUTE", 10),
+		AuthRegisterRateLimit: envInt("AUTH_REGISTER_RATE_LIMIT_PER_HOUR", 8),
+		AuthRefreshRateLimit: envInt("AUTH_REFRESH_RATE_LIMIT_PER_MINUTE", 30),
+		AuthenticatedWriteRateLimit: envInt("AUTHENTICATED_WRITE_RATE_LIMIT_PER_MINUTE", 240),
+		BuildVersion: env("BUILD_VERSION", "dev"),
+		BuildCommit: env("BUILD_COMMIT", "unknown"),
 	}
 }
 
@@ -67,4 +85,84 @@ func envInt(key string, fallback int) int {
 	n, err := strconv.Atoi(v)
 	if err != nil { return fallback }
 	return n
+}
+
+
+func (c Config) Validate() error {
+	if strings.TrimSpace(c.DatabaseURL)=="" {
+		return errors.New("DATABASE_URL is required")
+	}
+	if strings.TrimSpace(c.RedisAddr)=="" {
+		return errors.New("REDIS_ADDR is required")
+	}
+	if c.MaxJSONBodyBytes < 64*1024 {
+		return errors.New("MAX_JSON_BODY_BYTES must be at least 65536")
+	}
+
+	envName:=strings.ToLower(strings.TrimSpace(c.Environment))
+	if envName=="production" || envName=="prod" {
+		weak:=map[string]string{
+			"JWT_SECRET":c.JWTSecret,
+			"TELEGRAM_INGEST_SECRET":c.TelegramIngestSecret,
+			"PLAYBACK_SIGNING_SECRET":c.PlaybackSigningSecret,
+			"OBJECT_STORAGE_SECRET":c.ObjectStorageSecret,
+		}
+		for name,value:=range weak {
+			v:=strings.TrimSpace(value)
+			if len(v)<32 ||
+				strings.Contains(strings.ToLower(v),"dev") ||
+				strings.Contains(strings.ToLower(v),"change-me") ||
+				strings.Contains(strings.ToLower(v),"filmiqoo-dev") {
+				return fmt.Errorf("%s must be a strong production secret",name)
+			}
+		}
+		if len(c.AllowedOrigins)==0 {
+			return errors.New("ALLOWED_ORIGINS must be configured in production")
+		}
+		for _,origin:=range c.AllowedOrigins {
+			if origin=="*" {
+				return errors.New("ALLOWED_ORIGINS cannot contain * in production")
+			}
+		}
+		if strings.Contains(strings.ToLower(c.DatabaseURL),"sslmode=disable") {
+			return errors.New("production DATABASE_URL must not disable TLS")
+		}
+	}
+
+	if c.AuthLoginRateLimit<=0 || c.AuthRegisterRateLimit<=0 || c.AuthRefreshRateLimit<=0 {
+		return errors.New("auth rate limits must be greater than zero")
+	}
+	if c.AuthenticatedWriteRateLimit<=0 {
+		return errors.New("authenticated write rate limit must be greater than zero")
+	}
+	return nil
+}
+
+func (c Config) IsProduction() bool {
+	v:=strings.ToLower(strings.TrimSpace(c.Environment))
+	return v=="production" || v=="prod"
+}
+
+func envInt64(key string, fallback int64) int64 {
+	v:=strings.TrimSpace(os.Getenv(key))
+	if v=="" { return fallback }
+	n,err:=strconv.ParseInt(v,10,64)
+	if err!=nil { return fallback }
+	return n
+}
+
+func envList(key, fallback string) []string {
+	raw:=strings.TrimSpace(os.Getenv(key))
+	if raw=="" { raw=strings.TrimSpace(fallback) }
+	if raw=="" { return nil }
+	seen:=map[string]struct{}{}
+	out:=make([]string,0)
+	for _,part:=range strings.Split(raw,",") {
+		v:=strings.TrimSpace(part)
+		if v=="" { continue }
+		if _,ok:=seen[v]; ok { continue }
+		seen[v]=struct{}{}
+		out=append(out,v)
+	}
+	return out
 }

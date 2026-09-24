@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -58,7 +59,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(cors)
+	r.Use(s.securityHeaders)
+	r.Use(s.limitJSONBody)
+	r.Use(s.cors)
 
 	r.Get("/healthz", s.health)
 	r.Get("/readyz", s.ready)
@@ -71,9 +74,27 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", s.register)
-			r.Post("/login", s.login)
-			r.Post("/refresh", s.refresh)
+			r.With(
+				s.authRateLimit(
+					"register",
+					s.cfg.AuthRegisterRateLimit,
+					time.Hour,
+				),
+			).Post("/register", s.register)
+			r.With(
+				s.authRateLimit(
+					"login",
+					s.cfg.AuthLoginRateLimit,
+					time.Minute,
+				),
+			).Post("/login", s.login)
+			r.With(
+				s.authRateLimit(
+					"refresh",
+					s.cfg.AuthRefreshRateLimit,
+					time.Minute,
+				),
+			).Post("/refresh", s.refresh)
 			r.Post("/logout", s.logout)
 		})
 
@@ -117,6 +138,12 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.auth)
+			r.Use(
+				s.authenticatedWriteRateLimit(
+					s.cfg.AuthenticatedWriteRateLimit,
+					time.Minute,
+				),
+			)
 			r.Post("/social/reels", s.createReel)
 			r.Post("/social/reels/{id}/like", s.toggleReelLike)
 			r.Post("/social/reels/{id}/save", s.toggleReelSave)
@@ -290,6 +317,10 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/creator/scheduled/{kind}/{id}/unschedule", s.unscheduleCreatorContent)
 			r.Get("/settings", s.getSettings)
 			r.Post("/settings", s.updateSettings)
+			r.Get("/privacy/export", s.privacyExport)
+			r.With(
+				s.authRateLimit("delete-account",5,time.Hour),
+			).Post("/privacy/delete-account", s.deleteAccount)
 			r.Post("/security/sessions", s.securitySessions)
 			r.Post("/security/sessions/revoke-others", s.revokeOtherSessions)
 			r.Post("/security/sessions/{id}/revoke", s.revokeSession)
@@ -331,10 +362,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"service": "filmiqoo-api",
-		"status": "ok",
-		"version": "platform-core-v1",
+	writeJSON(w,http.StatusOK,map[string]any{
+		"service":"filmiqoo-api",
+		"status":"ok",
+		"version":s.cfg.BuildVersion,
+		"commit":s.cfg.BuildCommit,
+		"environment":s.cfg.Environment,
+		"time":time.Now().UTC(),
 	})
 }
 
@@ -550,10 +584,18 @@ func (s *Server) auth(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"missing bearer token"}); return
 		}
 		tokenString := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
-		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any,error) {
-			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() { return nil, errors.New("unexpected signing method") }
-			return []byte(s.cfg.JWTSecret), nil
-		})
+		token, err := jwt.Parse(
+			tokenString,
+			func(t *jwt.Token) (any,error) {
+				if t.Method.Alg()!=jwt.SigningMethodHS256.Alg() {
+					return nil,errors.New("unexpected signing method")
+				}
+				return []byte(s.cfg.JWTSecret),nil
+			},
+			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+			jwt.WithIssuer("filmiqoo"),
+			jwt.WithAudience("filmiqoo-android"),
+		)
 		if err != nil || !token.Valid {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid token"}); return
 		}
@@ -563,9 +605,23 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		}
 		sub, err := claims.GetSubject()
 		if err != nil || sub == "" {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"missing subject"}); return
+			writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"missing subject"})
+			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey, sub)))
+		if s.redis!=nil {
+			blocked,redisErr:=s.redis.Exists(
+				r.Context(),
+				"auth:blocked-user:"+sub,
+			).Result()
+			if redisErr==nil && blocked>0 {
+				writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"account is unavailable"})
+				return
+			}
+		}
+		next.ServeHTTP(
+			w,
+			r.WithContext(context.WithValue(r.Context(),userKey,sub)),
+		)
 	})
 }
 
@@ -574,22 +630,20 @@ func userIDFromContext(ctx context.Context) string {
 	return v
 }
 
-func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Filmiqoo-Ingest-Secret, X-Filmiqoo-Viewer-Profile")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-		if r.Method == http.MethodOptions { w.WriteHeader(http.StatusNoContent); return }
-		next.ServeHTTP(w, r)
-	})
-}
-
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func writeError(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]string{"error":err.Error()})
+func writeError(w http.ResponseWriter,status int,err error) {
+	if err==nil {
+		err=errors.New(http.StatusText(status))
+	}
+	if status>=http.StatusInternalServerError {
+		log.Printf("internal server error: %v",err)
+		writeJSON(w,status,map[string]string{"error":"internal server error"})
+		return
+	}
+	writeJSON(w,status,map[string]string{"error":err.Error()})
 }
