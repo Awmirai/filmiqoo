@@ -36,6 +36,14 @@ fun SecurityScreen(
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
 
+    var sessions by remember { mutableStateOf<List<AccountSession>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var refresh by remember { mutableIntStateOf(0) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
+    var confirmOthers by remember { mutableStateOf(false) }
+    var revokeTarget by remember { mutableStateOf<AccountSession?>(null) }
+
     var exportPayload by remember { mutableStateOf<String?>(null) }
     var privacyBusy by remember { mutableStateOf(false) }
     var deleteAccountOpen by remember { mutableStateOf(false) }
@@ -64,14 +72,6 @@ fun SecurityScreen(
             }
         }
     }
-
-    var sessions by remember { mutableStateOf<List<AccountSession>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var refresh by remember { mutableIntStateOf(0) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var actionMessage by remember { mutableStateOf<String?>(null) }
-    var confirmOthers by remember { mutableStateOf(false) }
-    var revokeTarget by remember { mutableStateOf<AccountSession?>(null) }
 
     BackHandler { onBack() }
 
