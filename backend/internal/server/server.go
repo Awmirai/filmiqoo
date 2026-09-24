@@ -159,6 +159,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/rooms/{id}/messages/search", s.searchRoomMessages)
 			r.Get("/rooms/{id}/pins", s.pinnedRoomMessages)
 			r.Get("/rooms/{id}/members", s.roomMembers)
+			r.Get("/rooms/{id}/member-candidates", s.roomMemberCandidates)
 			r.Post("/rooms/{id}/members/{userID}/add", s.addRoomMember)
 			r.Post("/rooms/{id}/members/{userID}/role", s.updateRoomMemberRole)
 			r.Post("/rooms/{id}/members/{userID}/remove", s.removeRoomMember)
