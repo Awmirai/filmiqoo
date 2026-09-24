@@ -7,6 +7,9 @@ data class AppSettings(
     val autoplayNext: Boolean = true,
     val autoplayPreviews: Boolean = true,
     val wifiOnlyDownloads: Boolean = false,
+    val downloadRequiresCharging: Boolean = false,
+    val downloadBatteryNotLow: Boolean = true,
+    val downloadAvoidRoaming: Boolean = true,
     val dataSaver: Boolean = false,
     val spoilerShield: Boolean = true,
     val skipIntro: Boolean = false,
@@ -38,6 +41,9 @@ class AppPreferences(context: Context) {
         autoplayNext=prefs.getBoolean("autoplay_next",true),
         autoplayPreviews=prefs.getBoolean("autoplay_previews",true),
         wifiOnlyDownloads=prefs.getBoolean("wifi_only_downloads",false),
+        downloadRequiresCharging=prefs.getBoolean("download_requires_charging",false),
+        downloadBatteryNotLow=prefs.getBoolean("download_battery_not_low",true),
+        downloadAvoidRoaming=prefs.getBoolean("download_avoid_roaming",true),
         dataSaver=prefs.getBoolean("data_saver",false),
         spoilerShield=prefs.getBoolean("spoiler_shield",true),
         skipIntro=prefs.getBoolean("skip_intro",false),
@@ -66,6 +72,9 @@ class AppPreferences(context: Context) {
             .putBoolean("autoplay_next",s.autoplayNext)
             .putBoolean("autoplay_previews",s.autoplayPreviews)
             .putBoolean("wifi_only_downloads",s.wifiOnlyDownloads)
+            .putBoolean("download_requires_charging",s.downloadRequiresCharging)
+            .putBoolean("download_battery_not_low",s.downloadBatteryNotLow)
+            .putBoolean("download_avoid_roaming",s.downloadAvoidRoaming)
             .putBoolean("data_saver",s.dataSaver)
             .putBoolean("spoiler_shield",s.spoilerShield)
             .putBoolean("skip_intro",s.skipIntro)
@@ -100,20 +109,28 @@ class SettingsRepository(
     fun local(): AppSettings=local.read()
 
     suspend fun load(): AppSettings {
+        val before=local.read()
         val o=backend.getJson("/v1/settings",authorized=true)
         return parse(o).also {
             local.write(it)
             OfflineDownloadManager.setWifiOnly(context,it.wifiOnlyDownloads)
+            if(downloadPolicyChanged(before,it)) {
+                OfflineDownloadManager.refreshPolicy(context)
+            }
         }
     }
 
     suspend fun save(settings: AppSettings): AppSettings {
+        val before=local.read()
         val o=backend.postJson(
             "/v1/settings",
             JSONObject()
                 .put("autoplayNext",settings.autoplayNext)
                 .put("autoplayPreviews",settings.autoplayPreviews)
                 .put("wifiOnlyDownloads",settings.wifiOnlyDownloads)
+                .put("downloadRequiresCharging",settings.downloadRequiresCharging)
+                .put("downloadBatteryNotLow",settings.downloadBatteryNotLow)
+                .put("downloadAvoidRoaming",settings.downloadAvoidRoaming)
                 .put("dataSaver",settings.dataSaver)
                 .put("spoilerShield",settings.spoilerShield)
                 .put("skipIntro",settings.skipIntro)
@@ -140,13 +157,25 @@ class SettingsRepository(
         return parse(o).also {
             local.write(it)
             OfflineDownloadManager.setWifiOnly(context,it.wifiOnlyDownloads)
+            if(downloadPolicyChanged(before,it)) {
+                OfflineDownloadManager.refreshPolicy(context)
+            }
         }
     }
+
+    private fun downloadPolicyChanged(a:AppSettings,b:AppSettings):Boolean =
+        a.wifiOnlyDownloads!=b.wifiOnlyDownloads ||
+            a.downloadRequiresCharging!=b.downloadRequiresCharging ||
+            a.downloadBatteryNotLow!=b.downloadBatteryNotLow ||
+            a.downloadAvoidRoaming!=b.downloadAvoidRoaming
 
     private fun parse(o: JSONObject)=AppSettings(
         autoplayNext=o.optBoolean("autoplayNext",true),
         autoplayPreviews=o.optBoolean("autoplayPreviews",true),
         wifiOnlyDownloads=o.optBoolean("wifiOnlyDownloads"),
+        downloadRequiresCharging=o.optBoolean("downloadRequiresCharging"),
+        downloadBatteryNotLow=o.optBoolean("downloadBatteryNotLow",true),
+        downloadAvoidRoaming=o.optBoolean("downloadAvoidRoaming",true),
         dataSaver=o.optBoolean("dataSaver"),
         spoilerShield=o.optBoolean("spoilerShield",true),
         skipIntro=o.optBoolean("skipIntro"),

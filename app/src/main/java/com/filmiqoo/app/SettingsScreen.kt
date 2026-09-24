@@ -158,6 +158,27 @@ fun SettingsScreen(
                 persist(settings.copy(wifiOnlyDownloads=it))
             }
             SettingsSwitchRow(
+                "فقط هنگام شارژ",
+                "دانلودهای صف‌شده فقط وقتی دستگاه به شارژ وصل است اجرا شوند.",
+                settings.downloadRequiresCharging
+            ) {
+                persist(settings.copy(downloadRequiresCharging=it))
+            }
+            SettingsSwitchRow(
+                "Battery not low",
+                "وقتی باتری در وضعیت Low است دانلود جدید شروع نشود.",
+                settings.downloadBatteryNotLow
+            ) {
+                persist(settings.copy(downloadBatteryNotLow=it))
+            }
+            SettingsSwitchRow(
+                "جلوگیری از Roaming",
+                "روی شبکه موبایل Roaming دانلودها متوقف بمانند.",
+                settings.downloadAvoidRoaming
+            ) {
+                persist(settings.copy(downloadAvoidRoaming=it))
+            }
+            SettingsSwitchRow(
                 "Smart Downloads",
                 "قسمت دیده‌شده را از زنجیره Smart پاک کن و قسمت بعدی را خودکار به صف اضافه کن.",
                 settings.smartDownloads

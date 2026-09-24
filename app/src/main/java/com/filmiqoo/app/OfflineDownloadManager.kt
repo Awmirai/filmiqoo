@@ -97,6 +97,18 @@ object OfflineDownloadManager {
             .edit().putBoolean(KEY_WIFI_ONLY,value).apply()
     }
 
+    fun refreshPolicy(context: Context) {
+        list(context)
+            .filter { it.status=="queued" || it.status=="downloading" }
+            .forEach { item ->
+                update(context,item.id) {
+                    it.copy(status="queued",error=null)
+                }
+                WorkManager.getInstance(context).cancelUniqueWork(workName(item.id))
+                schedule(context,item.id)
+            }
+    }
+
     fun enqueue(
         context: Context,
         target: PlaybackTarget,
@@ -226,10 +238,16 @@ object OfflineDownloadManager {
     }
 
     private fun schedule(context: Context,id: String) {
+        val settings=AppPreferences(context.applicationContext).read()
+        val networkType=when {
+            wifiOnly(context) -> NetworkType.UNMETERED
+            settings.downloadAvoidRoaming -> NetworkType.NOT_ROAMING
+            else -> NetworkType.CONNECTED
+        }
         val constraints=Constraints.Builder()
-            .setRequiredNetworkType(
-                if(wifiOnly(context)) NetworkType.UNMETERED else NetworkType.CONNECTED
-            )
+            .setRequiredNetworkType(networkType)
+            .setRequiresCharging(settings.downloadRequiresCharging)
+            .setRequiresBatteryNotLow(settings.downloadBatteryNotLow)
             .build()
 
         val request=OneTimeWorkRequestBuilder<FilmiqooDownloadWorker>()

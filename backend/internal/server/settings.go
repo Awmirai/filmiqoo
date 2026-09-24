@@ -10,6 +10,9 @@ type preferencePayload struct {
 	AutoplayNext *bool `json:"autoplayNext"`
 	AutoplayPreviews *bool `json:"autoplayPreviews"`
 	WifiOnlyDownloads *bool `json:"wifiOnlyDownloads"`
+	DownloadRequiresCharging *bool `json:"downloadRequiresCharging"`
+	DownloadBatteryNotLow *bool `json:"downloadBatteryNotLow"`
+	DownloadAvoidRoaming *bool `json:"downloadAvoidRoaming"`
 	DataSaver *bool `json:"dataSaver"`
 	SpoilerShield *bool `json:"spoilerShield"`
 	SkipIntro *bool `json:"skipIntro"`
@@ -42,7 +45,7 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
-	var autoplayNext,autoplayPreviews,wifiOnly,dataSaver,spoilerShield,skipIntro,skipRecap,skipCredits bool
+	var autoplayNext,autoplayPreviews,wifiOnly,downloadRequiresCharging,downloadBatteryNotLow,downloadAvoidRoaming,dataSaver,spoilerShield,skipIntro,skipRecap,skipCredits bool
 	var speed,subtitleScale,subtitleBottomPadding,subtitleBackgroundOpacity float64
 	var downloadStorageLimitMB int64
 	var smartDownloads bool
@@ -50,7 +53,9 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 	var subtitlesEnabled,notifySocial,notifyMessages,notifyReleases,privateAccount bool
 
 	err:=s.db.QueryRow(r.Context(),`
-		SELECT up.autoplay_next,up.autoplay_previews,up.wifi_only_downloads,up.data_saver,
+		SELECT up.autoplay_next,up.autoplay_previews,up.wifi_only_downloads,
+		       up.download_requires_charging,up.download_battery_not_low,up.download_avoid_roaming,
+		       up.data_saver,
 		       up.spoiler_shield,up.skip_intro,up.skip_recap,up.skip_credits,
 		       up.subtitle_scale,up.subtitle_bottom_padding,
 		       up.subtitle_text_color,up.subtitle_background_opacity,up.subtitle_edge_style,
@@ -64,8 +69,9 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles p ON p.user_id=up.user_id
 		 WHERE up.user_id=$1
 	`,userID).Scan(
-		&autoplayNext,&autoplayPreviews,&wifiOnly,&dataSaver,
-		&spoilerShield,&skipIntro,&skipRecap,&skipCredits,
+		&autoplayNext,&autoplayPreviews,&wifiOnly,
+		&downloadRequiresCharging,&downloadBatteryNotLow,&downloadAvoidRoaming,
+		&dataSaver,&spoilerShield,&skipIntro,&skipRecap,&skipCredits,
 		&subtitleScale,&subtitleBottomPadding,
 		&subtitleTextColor,&subtitleBackgroundOpacity,&subtitleEdgeStyle,
 		&playerResizeMode,&smartDownloads,&downloadStorageLimitMB,&speed,
@@ -78,6 +84,9 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		"autoplayNext":autoplayNext,
 		"autoplayPreviews":autoplayPreviews,
 		"wifiOnlyDownloads":wifiOnly,
+		"downloadRequiresCharging":downloadRequiresCharging,
+		"downloadBatteryNotLow":downloadBatteryNotLow,
+		"downloadAvoidRoaming":downloadAvoidRoaming,
 		"dataSaver":dataSaver,
 		"spoilerShield":spoilerShield,
 		"skipIntro":skipIntro,
@@ -180,32 +189,36 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		  autoplay_next=COALESCE($2,autoplay_next),
 		  autoplay_previews=COALESCE($3,autoplay_previews),
 		  wifi_only_downloads=COALESCE($4,wifi_only_downloads),
-		  data_saver=COALESCE($5,data_saver),
-		  spoiler_shield=COALESCE($6,spoiler_shield),
-		  skip_intro=COALESCE($7,skip_intro),
-		  skip_recap=COALESCE($8,skip_recap),
-		  skip_credits=COALESCE($9,skip_credits),
-		  subtitle_scale=COALESCE($10,subtitle_scale),
-		  subtitle_bottom_padding=COALESCE($11,subtitle_bottom_padding),
-		  subtitle_text_color=COALESCE($12,subtitle_text_color),
-		  subtitle_background_opacity=COALESCE($13,subtitle_background_opacity),
-		  subtitle_edge_style=COALESCE($14,subtitle_edge_style),
-		  player_resize_mode=COALESCE($15,player_resize_mode),
-		  smart_downloads=COALESCE($16,smart_downloads),
-		  download_storage_limit_mb=COALESCE($17,download_storage_limit_mb),
-		  default_playback_speed=COALESCE($18,default_playback_speed),
-		  default_audio_language=COALESCE($19,default_audio_language),
-		  default_subtitle_language=COALESCE($20,default_subtitle_language),
-		  subtitles_enabled=COALESCE($21,subtitles_enabled),
-		  notifications_social=COALESCE($22,notifications_social),
-		  notifications_messages=COALESCE($23,notifications_messages),
-		  notifications_releases=COALESCE($24,notifications_releases),
+		  download_requires_charging=COALESCE($5,download_requires_charging),
+		  download_battery_not_low=COALESCE($6,download_battery_not_low),
+		  download_avoid_roaming=COALESCE($7,download_avoid_roaming),
+		  data_saver=COALESCE($8,data_saver),
+		  spoiler_shield=COALESCE($9,spoiler_shield),
+		  skip_intro=COALESCE($10,skip_intro),
+		  skip_recap=COALESCE($11,skip_recap),
+		  skip_credits=COALESCE($12,skip_credits),
+		  subtitle_scale=COALESCE($13,subtitle_scale),
+		  subtitle_bottom_padding=COALESCE($14,subtitle_bottom_padding),
+		  subtitle_text_color=COALESCE($15,subtitle_text_color),
+		  subtitle_background_opacity=COALESCE($16,subtitle_background_opacity),
+		  subtitle_edge_style=COALESCE($17,subtitle_edge_style),
+		  player_resize_mode=COALESCE($18,player_resize_mode),
+		  smart_downloads=COALESCE($19,smart_downloads),
+		  download_storage_limit_mb=COALESCE($20,download_storage_limit_mb),
+		  default_playback_speed=COALESCE($21,default_playback_speed),
+		  default_audio_language=COALESCE($22,default_audio_language),
+		  default_subtitle_language=COALESCE($23,default_subtitle_language),
+		  subtitles_enabled=COALESCE($24,subtitles_enabled),
+		  notifications_social=COALESCE($25,notifications_social),
+		  notifications_messages=COALESCE($26,notifications_messages),
+		  notifications_releases=COALESCE($27,notifications_releases),
 		  updated_at=now()
 		WHERE user_id=$1
 	`,
 		userID,
-		body.AutoplayNext,body.AutoplayPreviews,body.WifiOnlyDownloads,body.DataSaver,
-		body.SpoilerShield,body.SkipIntro,body.SkipRecap,body.SkipCredits,
+		body.AutoplayNext,body.AutoplayPreviews,body.WifiOnlyDownloads,
+		body.DownloadRequiresCharging,body.DownloadBatteryNotLow,body.DownloadAvoidRoaming,
+		body.DataSaver,body.SpoilerShield,body.SkipIntro,body.SkipRecap,body.SkipCredits,
 		body.SubtitleScale,body.SubtitleBottomPadding,
 		body.SubtitleTextColor,body.SubtitleBackgroundOpacity,body.SubtitleEdgeStyle,
 		body.PlayerResizeMode,body.SmartDownloads,body.DownloadStorageLimitMB,body.DefaultPlaybackSpeed,

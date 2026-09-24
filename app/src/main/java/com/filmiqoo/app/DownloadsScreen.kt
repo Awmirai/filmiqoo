@@ -73,7 +73,17 @@ fun DownloadsScreen(
                 wifiOnly=wifiOnly,
                 onWifiOnly={
                     wifiOnly=it
+                    val next=appSettings.copy(wifiOnlyDownloads=it)
+                    appSettings=next
+                    AppPreferences(context.applicationContext).write(next)
                     OfflineDownloadManager.setWifiOnly(context,it)
+                    OfflineDownloadManager.refreshPolicy(context)
+                    if(backend.session.isLoggedIn) {
+                        scope.launch {
+                            runCatching { settingsRepo.save(next) }
+                                .onSuccess { appSettings=it }
+                        }
+                    }
                 },
                 onBack=onBack
             )
@@ -95,6 +105,10 @@ fun DownloadsScreen(
                     }
                 }
             )
+        }
+
+        item {
+            DownloadPolicySummary(appSettings)
         }
 
         item {
@@ -242,6 +256,40 @@ private fun DownloadBulkActions(
                     onClick=onClearCompleted,
                     label={Text("پاک‌کردن همه • "+completed,fontSize=8.sp)},
                     leadingIcon={Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp),tint=FqDanger)}
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadPolicySummary(settings:AppSettings) {
+    val policies=buildList {
+        if(settings.wifiOnlyDownloads) add("Wi‑Fi")
+        if(settings.downloadRequiresCharging) add("Charging")
+        if(settings.downloadBatteryNotLow) add("Battery OK")
+        if(settings.downloadAvoidRoaming) add("No Roaming")
+    }
+
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(17.dp),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
+    ) {
+        Row(
+            Modifier.padding(horizontal=12.dp,vertical=10.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Policy,null,tint=FqGold,modifier=Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Download Policy",fontSize=9.sp,fontWeight=FontWeight.Bold)
+                Text(
+                    if(policies.isEmpty())"بدون محدودیت اضافی"
+                    else policies.joinToString(" • "),
+                    color=FqMuted,
+                    fontSize=7.sp,
+                    modifier=Modifier.padding(top=2.dp)
                 )
             }
         }
