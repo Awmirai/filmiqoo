@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FilmiqooCrashStore.install(applicationContext)
         deepLinkState.value=intent?.dataString
         setContent {
             FilmiqooTheme {
@@ -47,6 +48,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { TmdbRepository(context.applicationContext) }
     val backend = remember { BackendRepository(context.applicationContext) }
+    val telemetry = remember {
+        TelemetryRepository(context.applicationContext,backend)
+    }
     val social = remember { SocialRepository(backend) }
     val messaging = remember { MessagingRepository(backend) }
     val creatorChannels = remember { CreatorChannelRepository(backend) }
@@ -70,6 +74,15 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var deepLinkReelId by remember { mutableStateOf<String?>(null) }
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        telemetry.flushPendingCrash()
+        telemetry.event(
+            type="app_started",
+            metadata=org.json.JSONObject()
+                .put("authenticated",backend.session.isLoggedIn)
+        )
+    }
 
     LaunchedEffect(authenticated) {
         if(!authenticated) {
