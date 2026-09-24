@@ -141,8 +141,9 @@ func (s *Server) sendFCM(
 	payload:=map[string]any{
 		"message":map[string]any{
 			"token":token,
-			"notification":map[string]any{"title":title,"body":body},
 			"data":map[string]string{
+				"title":title,
+				"body":body,
 				"notificationId":notificationID,
 				"type":notificationType,
 				"entityType":entityType,
@@ -150,11 +151,7 @@ func (s *Server) sendFCM(
 			},
 			"android":map[string]any{
 				"priority":"high",
-				"notification":map[string]any{
-					"channel_id":"filmiqoo_default",
-					"click_action":"OPEN_FILMIQOO",
-					"default_sound":true,
-				},
+				"ttl":"86400s",
 			},
 		},
 	}
