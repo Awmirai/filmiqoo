@@ -147,6 +147,8 @@ fun FilmiqooPlayerScreen(
     var telemetryBufferMsPending by remember { mutableLongStateOf(0L) }
     var telemetryQualitySwitchPending by remember { mutableIntStateOf(0) }
     var telemetryLastHeartbeatAt by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var recoveryAttempts by remember { mutableIntStateOf(0) }
+    var recoveryMessage by remember { mutableStateOf<String?>(null) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -303,9 +305,42 @@ fun FilmiqooPlayerScreen(
             }
 
             override fun onPlayerError(playerError: PlaybackException) {
-                error=playerError.localizedMessage ?: "خطای پخش"
                 buffering=false
                 telemetryBufferStartedAt=0L
+
+                val canRecover=currentTarget.localUri.isNullOrBlank() && recoveryAttempts<2
+                if(canRecover) {
+                    val position=player.currentPosition.coerceAtLeast(0L)
+                    val attempt=recoveryAttempts+1
+                    recoveryAttempts=attempt
+                    error=null
+
+                    scope.launch {
+                        if(attempt==1) {
+                            recoveryMessage="اتصال پخش قطع شد • تلاش دوباره از "+formatPlayerTime(position)
+                            delay(900)
+                            loadVersion(currentVersionId,position)
+                        } else {
+                            val fallback=lowerQualityVariant(
+                                currentTarget.variants,
+                                currentVersionId
+                            )
+                            if(fallback!=null) {
+                                telemetryQualitySwitchPending++
+                                recoveryMessage="Recovery • تغییر خودکار به "+fallback.label
+                                delay(1200)
+                                loadVersion(fallback.mediaVersionId,position)
+                            } else {
+                                recoveryMessage="Recovery • تلاش دوباره با منبع فعلی"
+                                delay(1200)
+                                loadVersion(currentVersionId,position)
+                            }
+                        }
+                    }
+                    return
+                }
+
+                error=playerError.localizedMessage ?: "خطای پخش"
                 val sid=playbackSessionId
                 if(sid!=null) {
                     val now=SystemClock.elapsedRealtime()
@@ -617,6 +652,16 @@ fun FilmiqooPlayerScreen(
             telemetryBufferCountPending=0
             telemetryBufferMsPending=0L
             telemetryQualitySwitchPending=0
+        }
+    }
+
+    LaunchedEffect(isPlaying,currentVersionId) {
+        if(isPlaying) {
+            delay(12_000)
+            if(player.isPlaying) {
+                recoveryAttempts=0
+                recoveryMessage=null
+            }
         }
     }
 
@@ -1088,6 +1133,15 @@ fun FilmiqooPlayerScreen(
                 modifier=Modifier.align(Alignment.BottomCenter).padding(16.dp),
                 action={
                     TextButton(onClick={playerSettingsMessage=null}) { Text("باشه") }
+                }
+            ) { Text(message) }
+        }
+
+        recoveryMessage?.let { message ->
+            Snackbar(
+                modifier=Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                action={
+                    TextButton(onClick={recoveryMessage=null}) { Text("باشه") }
                 }
             ) { Text(message) }
         }
@@ -2839,6 +2893,36 @@ private fun formatSpeed(value: Float): String =
         String.format(Locale.US,"%.2gx",value)
     }
 
+
+private fun lowerQualityVariant(
+    variants:List<PlaybackVariant>,
+    currentVersionId:String
+):PlaybackVariant? {
+    if(variants.isEmpty()) return null
+    val sorted=variants.sortedByDescending { variantQualityRank(it.label) }
+    val currentIndex=sorted.indexOfFirst { it.mediaVersionId==currentVersionId }
+    return when {
+        currentIndex>=0 && currentIndex<sorted.lastIndex -> sorted[currentIndex+1]
+        currentIndex<0 -> sorted.lastOrNull()
+        else -> null
+    }
+}
+
+private fun variantQualityRank(label:String):Int {
+    val normalized=label.lowercase(Locale.US)
+    return when {
+        "4320" in normalized || "8k" in normalized -> 4320
+        "2160" in normalized || "4k" in normalized -> 2160
+        "1440" in normalized || "2k" in normalized -> 1440
+        "1080" in normalized -> 1080
+        "720" in normalized -> 720
+        "576" in normalized -> 576
+        "480" in normalized -> 480
+        "360" in normalized -> 360
+        "240" in normalized -> 240
+        else -> normalized.filter(Char::isDigit).toIntOrNull() ?: 0
+    }
+}
 
 private fun playerMediaItem(
     uri:String,
