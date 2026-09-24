@@ -57,6 +57,7 @@ fun ConnectedRoomScreen(
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var roomMembersOpen by remember { mutableStateOf(false) }
     var roomSettingsOpen by remember { mutableStateOf(false) }
+    var headerMenuOpen by remember { mutableStateOf(false) }
     var roomTitle by remember(roomId,title) { mutableStateOf(title) }
     var forwardTarget by remember { mutableStateOf<RoomMessageItem?>(null) }
     var memberState by remember(roomId) { mutableStateOf<RoomMembersState?>(null) }
@@ -275,31 +276,66 @@ fun ConnectedRoomScreen(
                 }
             }
             if(loggedIn) {
-                IconButton(onClick={roomSettingsOpen=true}) {
-                    Icon(Icons.Default.Settings,null)
-                }
                 IconButton(onClick={roomMembersOpen=true}) {
                     Icon(Icons.Default.Group,null)
                 }
-            }
-            IconButton(onClick={pinsOpen=true}) {
-                Icon(Icons.Default.PushPin,null)
             }
             IconButton(onClick={
                 if(!loggedIn) onRequireAuth() else searchOpen=true
             }) {
                 Icon(Icons.Default.Search,null)
             }
-            IconButton(
-                onClick={
-                    FilmiqooDeepLinks.share(
-                        context,
-                        roomTitle,
-                        FilmiqooDeepLinks.room(roomId,roomTitle)
+            Box {
+                IconButton(onClick={headerMenuOpen=true}) {
+                    Icon(Icons.Default.MoreVert,null)
+                }
+                DropdownMenu(
+                    expanded=headerMenuOpen,
+                    onDismissRequest={headerMenuOpen=false}
+                ) {
+                    if(loggedIn) {
+                        DropdownMenuItem(
+                            text={Text("تنظیمات گفتگو")},
+                            leadingIcon={Icon(Icons.Default.Settings,null)},
+                            onClick={
+                                headerMenuOpen=false
+                                roomSettingsOpen=true
+                            }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text={Text("پیام‌های Pin شده")},
+                        leadingIcon={Icon(Icons.Default.PushPin,null)},
+                        onClick={
+                            headerMenuOpen=false
+                            pinsOpen=true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text={Text("اشتراک گفتگو")},
+                        leadingIcon={Icon(Icons.Default.Share,null)},
+                        onClick={
+                            headerMenuOpen=false
+                            FilmiqooDeepLinks.share(
+                                context,
+                                roomTitle,
+                                FilmiqooDeepLinks.room(roomId,roomTitle)
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text={Text("همگام‌سازی")},
+                        leadingIcon={Icon(Icons.Default.Refresh,null)},
+                        onClick={
+                            headerMenuOpen=false
+                            scope.launch {
+                                refresh()
+                                if(loggedIn) refreshMembers()
+                            }
+                        }
                     )
                 }
-            ) { Icon(Icons.Default.Share,null) }
-            IconButton(onClick={scope.launch{refresh()}}) { Icon(Icons.Default.Refresh,null) }
+            }
         }
 
         error?.let {
