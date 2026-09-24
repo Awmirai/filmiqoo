@@ -127,12 +127,17 @@ func (s *Server) createWatchParty(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"mediaTitleId or episodeId is required"}); return
 	}
 	if body.Visibility=="" { body.Visibility="public" }
-	switch body.Visibility { case "public","private","invite": default:
+	switch body.Visibility {
+	case "public","private","invite":
+	default:
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid visibility"}); return
 	}
 
 	state:="live"
-	if body.ScheduledAt!=nil && body.ScheduledAt.After(time.Now()) { state="scheduled" }
+	if body.ScheduledAt!=nil && body.ScheduledAt.After(time.Now()) {
+		state="scheduled"
+	}
+	inviteCode:=newWatchPartyInviteCode()
 
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
@@ -156,10 +161,13 @@ func (s *Server) createWatchParty(w http.ResponseWriter,r *http.Request) {
 	err=tx.QueryRow(r.Context(),`
 		INSERT INTO watch_parties (
 			host_user_id,media_title_id,episode_id,room_id,title,visibility,state,scheduled_at,
-			playback_position_ms,is_playing,participant_count
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,false,1)
+			playback_position_ms,is_playing,participant_count,invite_code
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,false,1,$9)
 		RETURNING id::text
-	`,userID,body.MediaTitleID,body.EpisodeID,roomID,body.Title,body.Visibility,state,body.ScheduledAt).Scan(&partyID)
+	`,
+		userID,body.MediaTitleID,body.EpisodeID,roomID,body.Title,
+		body.Visibility,state,body.ScheduledAt,inviteCode,
+	).Scan(&partyID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	_,err=tx.Exec(r.Context(),`
@@ -168,24 +176,69 @@ func (s *Server) createWatchParty(w http.ResponseWriter,r *http.Request) {
 	`,partyID,userID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
+	if state=="scheduled" {
+		_,err=tx.Exec(r.Context(),`
+			INSERT INTO watch_party_reminders (watch_party_id,user_id)
+			VALUES ($1,$2)
+			ON CONFLICT DO NOTHING
+		`,partyID,userID)
+		if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	}
+
 	if err:=tx.Commit(r.Context()); err!=nil {
 		writeError(w,http.StatusInternalServerError,err); return
 	}
-	writeJSON(w,http.StatusCreated,map[string]any{"id":partyID,"roomId":roomID,"state":state})
+
+	writeJSON(w,http.StatusCreated,map[string]any{
+		"id":partyID,
+		"roomId":roomID,
+		"state":state,
+		"inviteCode":inviteCode,
+		"scheduledAt":body.ScheduledAt,
+	})
 }
 
 func (s *Server) joinWatchParty(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	id:=chi.URLParam(r,"id")
+
+	var body struct {
+		InviteCode string `json:"inviteCode"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	body.InviteCode=strings.TrimSpace(body.InviteCode)
+
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer tx.Rollback(r.Context())
 
-	var roomID string
-	if err:=tx.QueryRow(r.Context(),
-		"SELECT room_id::text FROM watch_parties WHERE id=$1 AND state<>'ended' AND state<>'cancelled'",
-		id).Scan(&roomID); err!=nil {
+	var roomID,visibility,inviteCode,state,hostID string
+	err=tx.QueryRow(r.Context(),`
+		SELECT room_id::text,visibility,COALESCE(invite_code,''),state,host_user_id::text
+		  FROM watch_parties
+		 WHERE id=$1 AND state NOT IN ('ended','cancelled')
+	`,id).Scan(&roomID,&visibility,&inviteCode,&state,&hostID)
+	if err!=nil {
 		writeJSON(w,http.StatusNotFound,map[string]string{"error":"watch party unavailable"}); return
+	}
+
+	var existing bool
+	_=tx.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1 FROM watch_party_members
+			 WHERE watch_party_id=$1 AND user_id=$2
+		)
+	`,id,userID).Scan(&existing)
+
+	if !existing {
+		switch visibility {
+		case "private":
+			writeJSON(w,http.StatusForbidden,map[string]string{"error":"this watch party is private"}); return
+		case "invite":
+			if body.InviteCode=="" || inviteCode=="" || body.InviteCode!=inviteCode {
+				writeJSON(w,http.StatusForbidden,map[string]string{"error":"valid invite code required"}); return
+			}
+		}
 	}
 
 	tag,err:=tx.Exec(r.Context(),`
@@ -203,13 +256,27 @@ func (s *Server) joinWatchParty(w http.ResponseWriter,r *http.Request) {
 				VALUES ($1,$2,'member') ON CONFLICT DO NOTHING
 			`,roomID,userID)
 		}
+		if err==nil && state=="scheduled" {
+			_,err=tx.Exec(r.Context(),`
+				INSERT INTO watch_party_reminders (watch_party_id,user_id)
+				VALUES ($1,$2)
+				ON CONFLICT DO NOTHING
+			`,id,userID)
+		}
 	}
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
-	writeJSON(w,http.StatusOK,map[string]any{"joined":true,"roomId":roomID})
+	if err:=tx.Commit(r.Context()); err!=nil {
+		writeError(w,http.StatusInternalServerError,err); return
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"joined":true,
+		"roomId":roomID,
+		"state":state,
+		"host":hostID==userID,
+	})
 }
-
 func (s *Server) updateWatchPartyState(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	id:=chi.URLParam(r,"id")

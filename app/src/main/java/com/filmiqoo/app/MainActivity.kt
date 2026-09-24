@@ -207,7 +207,12 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
                     "party" -> {
                         require(id.isNotBlank())
-                        overlay=OverlayRoute.WatchParty(media=null,partyId=id)
+                        overlay=OverlayRoute.WatchParty(
+                            media=null,
+                            partyId=id,
+                            inviteCode=uri.getQueryParameter("invite")
+                                ?.takeIf(String::isNotBlank)
+                        )
                     }
 
                     "room" -> {
@@ -630,6 +635,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 is OverlayRoute.WatchParty -> ConnectedWatchPartyScreen(
                     media=route.media,
                     initialPartyId=route.partyId,
+                    initialInviteCode=route.inviteCode,
                     backend=backend,
                     social=social,
                     repository=repository,
@@ -651,6 +657,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onOpenCreator={overlay=OverlayRoute.CreatorPage(it)},
                     onOpenMedia={overlay=OverlayRoute.Detail(it)},
                     onOpenCollection={overlay=OverlayRoute.SocialCollections(it)},
+                    onOpenWatchParty={overlay=OverlayRoute.WatchParty(partyId=it)},
                     onFollowRequests={overlay=OverlayRoute.FollowRequests}
                 )
             }

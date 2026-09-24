@@ -19,6 +19,21 @@ data class WatchPartyMedia(
     val quality: String?
 )
 
+data class WatchPartyCreateResult(
+    val id:String,
+    val roomId:String,
+    val state:String,
+    val inviteCode:String,
+    val scheduledAt:String?
+)
+
+data class WatchPartyInviteInfo(
+    val inviteCode:String,
+    val visibility:String,
+    val state:String,
+    val scheduledAt:String?
+)
+
 data class WatchPartyInfo(
     val id: String,
     val title: String,
@@ -53,23 +68,71 @@ class WatchPartyRepository(
     suspend fun create(
         mediaTitleId: String,
         title: String,
-        visibility: String="public"
-    ): String =
-        backend.postJson(
-            "/v1/watch-parties",
-            JSONObject()
-                .put("mediaTitleId",mediaTitleId)
-                .put("title",title)
-                .put("visibility",visibility),
-            authorized=true
-        ).getString("id")
+        visibility: String="public",
+        scheduledAt: String?=null
+    ): WatchPartyCreateResult {
+        val body=JSONObject()
+            .put("mediaTitleId",mediaTitleId)
+            .put("title",title)
+            .put("visibility",visibility)
+        if(!scheduledAt.isNullOrBlank()) body.put("scheduledAt",scheduledAt)
 
-    suspend fun join(id: String): String =
-        backend.postJson(
+        val root=backend.postJson(
+            "/v1/watch-parties",
+            body,
+            authorized=true
+        )
+        return WatchPartyCreateResult(
+            id=root.optString("id"),
+            roomId=root.optString("roomId"),
+            state=root.optString("state"),
+            inviteCode=root.optString("inviteCode"),
+            scheduledAt=root.optString("scheduledAt").takeIf(String::isNotBlank)
+        )
+    }
+
+    suspend fun join(id: String,inviteCode:String?=null): String {
+        val body=JSONObject()
+        if(!inviteCode.isNullOrBlank()) body.put("inviteCode",inviteCode.trim())
+        return backend.postJson(
             "/v1/watch-parties/"+id+"/join",
-            JSONObject(),
+            body,
             authorized=true
         ).optString("roomId")
+    }
+
+    suspend fun inviteInfo(id:String):WatchPartyInviteInfo {
+        val root=backend.getJson(
+            "/v1/watch-parties/"+id+"/invite",
+            authorized=true
+        )
+        return WatchPartyInviteInfo(
+            inviteCode=root.optString("inviteCode"),
+            visibility=root.optString("visibility"),
+            state=root.optString("state"),
+            scheduledAt=root.optString("scheduledAt").takeIf(String::isNotBlank)
+        )
+    }
+
+    suspend fun regenerateInvite(id:String):String =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/invite/regenerate",
+            JSONObject(),
+            authorized=true
+        ).optString("inviteCode")
+
+    suspend fun reminderEnabled(id:String):Boolean =
+        backend.getJson(
+            "/v1/watch-parties/"+id+"/reminder",
+            authorized=true
+        ).optBoolean("enabled")
+
+    suspend fun toggleReminder(id:String):Boolean =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/reminder",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("enabled")
 
     suspend fun updateState(
         id: String,

@@ -35,9 +35,14 @@ object FilmiqooDeepLinks {
         Uri.Builder().scheme("filmiqoo").authority("collection")
             .appendPath(collectionId).build().toString()
 
-    fun watchParty(partyId:String):String =
+    fun watchParty(partyId:String,inviteCode:String?=null):String =
         Uri.Builder().scheme("filmiqoo").authority("party")
-            .appendPath(partyId).build().toString()
+            .appendPath(partyId)
+            .apply {
+                if(!inviteCode.isNullOrBlank()) appendQueryParameter("invite",inviteCode)
+            }
+            .build()
+            .toString()
 
     fun room(roomId:String,title:String=""):String =
         Uri.Builder().scheme("filmiqoo").authority("room")

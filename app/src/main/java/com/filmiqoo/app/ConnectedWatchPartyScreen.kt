@@ -36,6 +36,7 @@ import kotlin.math.abs
 fun ConnectedWatchPartyScreen(
     media: MediaItem?,
     initialPartyId: String? = null,
+    initialInviteCode: String? = null,
     backend: BackendRepository,
     social: SocialRepository,
     repository: TmdbRepository,
@@ -56,6 +57,10 @@ fun ConnectedWatchPartyScreen(
     var creating by remember { mutableStateOf(false) }
     var syncing by remember { mutableStateOf(false) }
     var loadedVersion by remember { mutableStateOf<String?>(null) }
+    var inviteInfo by remember { mutableStateOf<WatchPartyInviteInfo?>(null) }
+    var reminderEnabled by remember { mutableStateOf(false) }
+    var reminderBusy by remember { mutableStateOf(false) }
+    var showInviteDialog by remember { mutableStateOf(false) }
 
     val player=remember {
         ExoPlayer.Builder(context).build().apply {
@@ -76,10 +81,30 @@ fun ConnectedWatchPartyScreen(
         }
     }
 
+
+    LaunchedEffect(partyId,party?.state,party?.host?.id,meId) {
+        val id=partyId ?: return@LaunchedEffect
+        val p=party ?: return@LaunchedEffect
+        if(!backend.session.isLoggedIn) return@LaunchedEffect
+
+        if(p.state=="scheduled") {
+            reminderEnabled=runCatching {
+                partyRepo.reminderEnabled(id)
+            }.getOrDefault(false)
+        } else {
+            reminderEnabled=false
+        }
+
+        inviteInfo=if(p.host.id==meId) {
+            runCatching { partyRepo.inviteInfo(id) }.getOrNull()
+        } else null
+    }
+
     LaunchedEffect(partyId) {
         val id=partyId ?: return@LaunchedEffect
         if(backend.session.isLoggedIn) {
-            runCatching { partyRepo.join(id) }
+            runCatching { partyRepo.join(id,initialInviteCode) }
+                .onFailure { error=it.message ?: "ورود به Watch Party ناموفق بود" }
         }
         while(isActive && partyId==id) {
             val fresh=runCatching { partyRepo.detail(id) }
@@ -152,7 +177,7 @@ fun ConnectedWatchPartyScreen(
             creating=creating,
             error=error,
             onBack=onBack,
-            onStart={
+            onStart={visibility,scheduledAt->
                 val backendId=media?.backendId
                 if(!backend.session.isLoggedIn) {
                     onRequireAuth()
@@ -164,10 +189,20 @@ fun ConnectedWatchPartyScreen(
                         runCatching {
                             partyRepo.create(
                                 mediaTitleId=backendId,
-                                title="Watch Party • "+media.title
+                                title="Watch Party • "+media.title,
+                                visibility=visibility,
+                                scheduledAt=scheduledAt
                             )
-                        }.onSuccess {
-                            partyId=it
+                        }.onSuccess { created->
+                            partyId=created.id
+                            if(created.inviteCode.isNotBlank()) {
+                                inviteInfo=WatchPartyInviteInfo(
+                                    inviteCode=created.inviteCode,
+                                    visibility=visibility,
+                                    state=created.state,
+                                    scheduledAt=created.scheduledAt
+                                )
+                            }
                             error=null
                         }.onFailure {
                             error=it.message
@@ -222,12 +257,25 @@ fun ConnectedWatchPartyScreen(
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
                 ) { Icon(Icons.Default.Close,null) }
                 Spacer(Modifier.weight(1f))
+                if(isHost && p.visibility in setOf("invite","private")) {
+                    IconButton(
+                        onClick={showInviteDialog=true},
+                        modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
+                    ) {
+                        Icon(Icons.Default.Key,null)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                }
                 IconButton(
                     onClick={
+                        val code=when {
+                            p.visibility=="invite" -> inviteInfo?.inviteCode ?: initialInviteCode
+                            else -> null
+                        }
                         FilmiqooDeepLinks.share(
                             context,
                             p.title,
-                            FilmiqooDeepLinks.watchParty(p.id)
+                            FilmiqooDeepLinks.watchParty(p.id,code)
                         )
                     },
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
@@ -264,27 +312,53 @@ fun ConnectedWatchPartyScreen(
                     if(isHost) {
                         Button(
                             onClick={
-                                if(player.isPlaying) player.pause() else player.play()
-                                scope.launch {
-                                    runCatching {
-                                        partyRepo.updateState(
-                                            p.id,
-                                            player.currentPosition.coerceAtLeast(0),
-                                            player.isPlaying
-                                        )
+                                if(p.state=="scheduled") {
+                                    player.play()
+                                    scope.launch {
+                                        runCatching {
+                                            partyRepo.updateState(
+                                                p.id,
+                                                player.currentPosition.coerceAtLeast(0),
+                                                true,
+                                                state="live"
+                                            )
+                                        }.onFailure { error=it.message }
+                                    }
+                                } else {
+                                    if(player.isPlaying) player.pause() else player.play()
+                                    scope.launch {
+                                        runCatching {
+                                            partyRepo.updateState(
+                                                p.id,
+                                                player.currentPosition.coerceAtLeast(0),
+                                                player.isPlaying
+                                            )
+                                        }.onFailure { error=it.message }
                                     }
                                 }
                             },
                             colors=ButtonDefaults.buttonColors(containerColor=FqGold)
                         ) {
-                            Icon(if(player.isPlaying)Icons.Default.Pause else Icons.Default.PlayArrow,null)
+                            Icon(
+                                if(p.state=="scheduled")Icons.Default.RocketLaunch
+                                else if(player.isPlaying)Icons.Default.Pause
+                                else Icons.Default.PlayArrow,
+                                null
+                            )
                             Spacer(Modifier.width(5.dp))
-                            Text(if(player.isPlaying)"Pause for all" else "Play for all")
+                            Text(
+                                if(p.state=="scheduled")"شروع الان"
+                                else if(player.isPlaying)"Pause for all"
+                                else "Play for all"
+                            )
                         }
                     } else {
                         Surface(color=Color.Black.copy(alpha=.55f),shape=RoundedCornerShape(11.dp)) {
                             Text(
-                                "کنترل پخش با میزبان • Sync فعال",
+                                if(p.state=="scheduled")
+                                    "Party زمان‌بندی شده • منتظر شروع میزبان"
+                                else
+                                    "کنترل پخش با میزبان • Sync فعال",
                                 fontSize=8.sp,
                                 modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp)
                             )
@@ -310,6 +384,58 @@ fun ConnectedWatchPartyScreen(
                 Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(p.participants.toString(),fontSize=8.sp)
+            }
+        }
+
+        if(p.state=="scheduled") {
+            Surface(
+                color=FqGold.copy(alpha=.08f),
+                shape=RoundedCornerShape(15.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,bottom=8.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(10.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Event,null,tint=FqGold)
+                    Spacer(Modifier.width(7.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("زمان‌بندی شده",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            p.scheduledAt?.let(::formatPartySchedule) ?: "زمان شروع ثبت شده",
+                            color=FqMuted,
+                            fontSize=7.sp,
+                            modifier=Modifier.padding(top=2.dp)
+                        )
+                    }
+                    OutlinedButton(
+                        enabled=!reminderBusy,
+                        onClick={
+                            if(!backend.session.isLoggedIn) {
+                                onRequireAuth()
+                            } else {
+                                reminderBusy=true
+                                scope.launch {
+                                    runCatching { partyRepo.toggleReminder(p.id) }
+                                        .onSuccess { reminderEnabled=it }
+                                        .onFailure { error=it.message }
+                                    reminderBusy=false
+                                }
+                            }
+                        },
+                        contentPadding=PaddingValues(horizontal=9.dp,vertical=4.dp)
+                    ) {
+                        Icon(
+                            if(reminderEnabled)Icons.Default.NotificationsActive
+                            else Icons.Default.NotificationsNone,
+                            null,
+                            tint=if(reminderEnabled)FqGold else FqMuted,
+                            modifier=Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(if(reminderEnabled)"Reminder روشن" else "یادم بنداز",fontSize=7.sp)
+                    }
+                }
             }
         }
 
@@ -373,6 +499,32 @@ fun ConnectedWatchPartyScreen(
             )
         }
     }
+    if(showInviteDialog && inviteInfo!=null) {
+        WatchPartyInviteDialog(
+            party=p,
+            info=inviteInfo!!,
+            busy=reminderBusy,
+            onShare={
+                FilmiqooDeepLinks.share(
+                    context,
+                    p.title,
+                    FilmiqooDeepLinks.watchParty(p.id,inviteInfo?.inviteCode)
+                )
+            },
+            onRegenerate={
+                reminderBusy=true
+                scope.launch {
+                    runCatching { partyRepo.regenerateInvite(p.id) }
+                        .onSuccess { code->
+                            inviteInfo=inviteInfo?.copy(inviteCode=code)
+                        }
+                        .onFailure { error=it.message }
+                    reminderBusy=false
+                }
+            },
+            onDismiss={showInviteDialog=false}
+        )
+    }
 }
 
 @Composable
@@ -383,8 +535,17 @@ private fun WatchPartyStartScreen(
     creating: Boolean,
     error: String?,
     onBack: () -> Unit,
-    onStart: () -> Unit
+    onStart: (String,String?) -> Unit
 ) {
+    var visibility by remember { mutableStateOf("public") }
+    var schedule by remember { mutableStateOf("now") }
+
+    val scheduledAt=when(schedule) {
+        "30m" -> java.time.Instant.now().plusSeconds(30*60L).toString()
+        "1h" -> java.time.Instant.now().plusSeconds(60*60L).toString()
+        "tomorrow" -> java.time.Instant.now().plusSeconds(24*60*60L).toString()
+        else -> null
+    }
     Box(Modifier.fillMaxSize().background(FqBg)) {
         RemoteImage(
             repository.backdrop(media?.backdropPath ?: media?.posterPath),
@@ -421,14 +582,71 @@ private fun WatchPartyStartScreen(
                 modifier=Modifier.padding(top=5.dp)
             )
             Text(
-                "تماشای همزمان، کنترل میزبان، Sync موقعیت پخش و Chat واقعی.",
+                "تماشای همزمان، کنترل میزبان، Sync موقعیت پخش، دعوت خصوصی و Reminder.",
                 color=Color.White.copy(alpha=.72f),
                 fontSize=9.sp,
                 lineHeight=16.sp,
                 modifier=Modifier.padding(top=9.dp)
             )
+
+            Text(
+                "دسترسی",
+                fontSize=10.sp,
+                fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier=Modifier.align(Alignment.Start).padding(top=18.dp)
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top=7.dp),
+                horizontalArrangement=Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "public" to "Public",
+                    "invite" to "Invite",
+                    "private" to "Private"
+                ).forEach { option ->
+                    FilterChip(
+                        selected=visibility==option.first,
+                        onClick={visibility=option.first},
+                        label={Text(option.second,fontSize=7.sp)}
+                    )
+                }
+            }
+
+            Text(
+                "زمان شروع",
+                fontSize=10.sp,
+                fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier=Modifier.align(Alignment.Start).padding(top=10.dp)
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top=7.dp),
+                horizontalArrangement=Arrangement.spacedBy(5.dp)
+            ) {
+                listOf(
+                    "now" to "الان",
+                    "30m" to "۳۰ دقیقه",
+                    "1h" to "۱ ساعت",
+                    "tomorrow" to "فردا"
+                ).forEach { option ->
+                    FilterChip(
+                        selected=schedule==option.first,
+                        onClick={schedule=option.first},
+                        label={Text(option.second,fontSize=7.sp)}
+                    )
+                }
+            }
+
+            if(scheduledAt!=null) {
+                Text(
+                    "شروع: "+formatPartySchedule(scheduledAt),
+                    color=FqGold,
+                    fontSize=8.sp,
+                    modifier=Modifier.padding(top=6.dp)
+                )
+            }
+
             Button(
-                onClick=onStart,
+                onClick={onStart(visibility,scheduledAt)},
                 enabled=!creating,
                 colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                 shape=RoundedCornerShape(15.dp),
@@ -441,7 +659,9 @@ private fun WatchPartyStartScreen(
                 }
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    if(loggedIn)"شروع Watch Party" else "ورود و شروع",
+                    if(!loggedIn)"ورود و شروع"
+                    else if(scheduledAt==null)"شروع Watch Party"
+                    else "زمان‌بندی Watch Party",
                     color=Color.Black
                 )
             }
@@ -451,3 +671,92 @@ private fun WatchPartyStartScreen(
         }
     }
 }
+
+
+@Composable
+private fun WatchPartyInviteDialog(
+    party:WatchPartyInfo,
+    info:WatchPartyInviteInfo,
+    busy:Boolean,
+    onShare:()->Unit,
+    onRegenerate:()->Unit,
+    onDismiss:()->Unit
+) {
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        icon={Icon(Icons.Default.VpnKey,null,tint=FqGold)},
+        title={Text("دعوت به Watch Party")},
+        text={
+            Column {
+                Text(
+                    when(info.visibility) {
+                        "invite" -> "فقط افرادی که لینک دارای کد دعوت رو دارن می‌تونن وارد بشن."
+                        "private" -> "این Party خصوصی است و ورود عمومی بسته است."
+                        else -> "این Party عمومی است."
+                    },
+                    color=FqMuted,
+                    fontSize=9.sp,
+                    lineHeight=15.sp
+                )
+                if(info.inviteCode.isNotBlank()) {
+                    Surface(
+                        color=FqSurface2,
+                        shape=RoundedCornerShape(13.dp),
+                        modifier=Modifier.fillMaxWidth().padding(top=12.dp)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Invite Code",color=FqMuted,fontSize=7.sp)
+                            Text(
+                                info.inviteCode.uppercase(),
+                                color=FqGold,
+                                fontSize=20.sp,
+                                fontWeight=androidx.compose.ui.text.font.FontWeight.Black,
+                                modifier=Modifier.padding(top=4.dp)
+                            )
+                        }
+                    }
+                }
+                Text(
+                    party.title,
+                    fontSize=9.sp,
+                    modifier=Modifier.padding(top=10.dp)
+                )
+            }
+        },
+        confirmButton={
+            Button(
+                onClick=onShare,
+                colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+            ) {
+                Icon(Icons.Default.Share,null,tint=Color.Black)
+                Spacer(Modifier.width(5.dp))
+                Text("اشتراک لینک",color=Color.Black)
+            }
+        },
+        dismissButton={
+            Row {
+                if(info.visibility=="invite") {
+                    TextButton(
+                        enabled=!busy,
+                        onClick=onRegenerate
+                    ) {
+                        Icon(Icons.Default.Refresh,null)
+                        Spacer(Modifier.width(3.dp))
+                        Text("کد جدید",fontSize=8.sp)
+                    }
+                }
+                TextButton(onClick=onDismiss){Text("بستن")}
+            }
+        }
+    )
+}
+
+private fun formatPartySchedule(value:String):String =
+    runCatching {
+        val instant=java.time.Instant.parse(value)
+        val formatter=java.time.format.DateTimeFormatter.ofPattern(
+            "yyyy/MM/dd • HH:mm",
+            java.util.Locale.forLanguageTag("fa")
+        ).withZone(java.time.ZoneId.systemDefault())
+        formatter.format(instant)
+    }.getOrDefault(value)

@@ -212,6 +212,7 @@ fun ConnectedNotificationsScreen(
     onOpenCreator: (Creator) -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
     onOpenCollection: (String) -> Unit,
+    onOpenWatchParty: (String) -> Unit,
     onFollowRequests: () -> Unit
 ) {
     val repo=remember { MessagingRepository(backend) }
@@ -283,6 +284,8 @@ fun ConnectedNotificationsScreen(
                                     item.type=="follow_request" -> onFollowRequests()
                                     item.entityType=="collection" && !item.entityId.isNullOrBlank() ->
                                         onOpenCollection(item.entityId)
+                                    item.entityType=="watch_party" && !item.entityId.isNullOrBlank() ->
+                                        onOpenWatchParty(item.entityId)
                                     item.entityType=="room" && !item.entityId.isNullOrBlank() ->
                                         onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
                                     item.media!=null ->
@@ -379,6 +382,7 @@ private fun notificationIcon(type:String)=when(type) {
     "episode_stream_ready" -> Icons.Default.PlayCircle
     "availability_ready" -> Icons.Default.HighQuality
     "collection_update" -> Icons.Default.CollectionsBookmark
+    "watch_party_reminder" -> Icons.Default.Groups
     else -> Icons.Default.Notifications
 }
 
@@ -394,6 +398,7 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "episode_stream_ready" -> "آماده تماشا"
     "availability_ready" -> "نسخه جدید"
     "collection_update" -> "Collection"
+    "watch_party_reminder" -> "Watch Party"
     else -> "Filmiqoo"
 }
 
