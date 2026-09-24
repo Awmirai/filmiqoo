@@ -46,6 +46,7 @@ type Config struct {
 	TelegramIngestMaxAttempts int
 	TelegramIngestRetryBaseSeconds int
 	TelemetryRetentionDays int
+	OpsSecret string
 }
 
 func Load() Config {
@@ -86,6 +87,7 @@ func Load() Config {
 		TelegramIngestMaxAttempts: envInt("TELEGRAM_INGEST_MAX_ATTEMPTS", 8),
 		TelegramIngestRetryBaseSeconds: envInt("TELEGRAM_INGEST_RETRY_BASE_SECONDS", 30),
 		TelemetryRetentionDays: envInt("TELEMETRY_RETENTION_DAYS", 30),
+		OpsSecret: env("OPS_SECRET", "dev-ops-change-me"),
 	}
 }
 
@@ -121,6 +123,7 @@ func (c Config) Validate() error {
 			"TELEGRAM_INGEST_SECRET":c.TelegramIngestSecret,
 			"PLAYBACK_SIGNING_SECRET":c.PlaybackSigningSecret,
 			"OBJECT_STORAGE_SECRET":c.ObjectStorageSecret,
+			"OPS_SECRET":c.OpsSecret,
 		}
 		for name,value:=range weak {
 			v:=strings.TrimSpace(value)
