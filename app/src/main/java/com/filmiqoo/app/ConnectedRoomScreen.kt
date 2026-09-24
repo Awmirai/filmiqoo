@@ -1054,6 +1054,177 @@ fun ConnectedRoomScreen(
         }
     }
 
+    if(attachmentMenuOpen) {
+        ChatAttachmentMenuSheet(
+            onDismiss={attachmentMenuOpen=false},
+            onMedia={
+                mediaPicker.launch(
+                    PickVisualMediaRequest(
+                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                    )
+                )
+            },
+            onDocument={
+                documentPicker.launch(
+                    arrayOf(
+                        "application/pdf",
+                        "text/plain",
+                        "text/csv",
+                        "application/msword",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "application/vnd.ms-excel",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "application/vnd.ms-powerpoint",
+                        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "application/zip"
+                    )
+                )
+            },
+            onLocation={locationDialogOpen=true},
+            onContact={contactDialogOpen=true}
+        )
+    }
+
+    if(locationDialogOpen) {
+        LocationMessageDialog(
+            onDismiss={locationDialogOpen=false},
+            onSend={lat,lng,label->
+                locationDialogOpen=false
+                uploading=true
+                val replyId=replyTo?.id
+                val sendingSpoiler=spoiler
+                scope.launch {
+                    runCatching {
+                        social.sendLocationMessage(
+                            roomId=roomId,
+                            latitude=lat,
+                            longitude=lng,
+                            label=label,
+                            spoiler=sendingSpoiler,
+                            replyToMessageId=replyId
+                        )
+                    }.onSuccess {
+                        replyTo=null
+                        draftReplyId=null
+                        spoiler=false
+                        runCatching { messaging.deleteRoomDraft(roomId) }
+                        refresh()
+                    }.onFailure {
+                        error=it.message
+                    }
+                    uploading=false
+                }
+            }
+        )
+    }
+
+    if(contactDialogOpen) {
+        ContactMessageDialog(
+            onDismiss={contactDialogOpen=false},
+            onSend={name,phone,email->
+                contactDialogOpen=false
+                uploading=true
+                val replyId=replyTo?.id
+                val sendingSpoiler=spoiler
+                scope.launch {
+                    runCatching {
+                        social.sendContactMessage(
+                            roomId=roomId,
+                            name=name,
+                            phone=phone,
+                            email=email,
+                            spoiler=sendingSpoiler,
+                            replyToMessageId=replyId
+                        )
+                    }.onSuccess {
+                        replyTo=null
+                        draftReplyId=null
+                        spoiler=false
+                        runCatching { messaging.deleteRoomDraft(roomId) }
+                        refresh()
+                    }.onFailure {
+                        error=it.message
+                    }
+                    uploading=false
+                }
+            }
+        )
+    }
+
+    if(scheduledOpen) {
+        ScheduledMessagesSheet(
+            roomId=roomId,
+            currentText=text,
+            spoiler=spoiler,
+            replyToMessageId=replyTo?.id,
+            messaging=messaging,
+            onDismiss={scheduledOpen=false},
+            onScheduled={
+                text=""
+                replyTo=null
+                draftReplyId=null
+                spoiler=false
+                actionMessage="پیام زمان‌بندی شد."
+                scope.launch { runCatching { messaging.deleteRoomDraft(roomId) } }
+            },
+            onError={error=it}
+        )
+    }
+
+    if(bulkForwardOpen) {
+        ForwardMessageSheet(
+            currentRoomId=roomId,
+            messaging=messaging,
+            onDismiss={bulkForwardOpen=false},
+            onForward={targetRoomId->
+                val count=social.bulkForwardMessages(
+                    roomId=roomId,
+                    messageIds=selectedMessageIds,
+                    targetRoomId=targetRoomId
+                )
+                selectedMessageIds=emptySet()
+                actionMessage=count.toString()+" پیام فوروارد شد."
+            }
+        )
+    }
+
+    if(bulkDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest={bulkDeleteConfirm=false},
+            icon={Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)},
+            title={Text("حذف پیام‌های انتخاب‌شده؟")},
+            text={
+                Text(
+                    selectedMessageIds.size.toString()+
+                        " پیام حذف می‌شود. برای پیام‌های دیگران دسترسی مدیریت لازم است."
+                )
+            },
+            confirmButton={
+                Button(
+                    onClick={
+                        bulkDeleteConfirm=false
+                        val ids=selectedMessageIds
+                        scope.launch {
+                            runCatching {
+                                social.bulkDeleteMessages(roomId,ids)
+                            }.onSuccess { count ->
+                                selectedMessageIds=emptySet()
+                                actionMessage=count.toString()+" پیام حذف شد."
+                                refresh()
+                            }.onFailure {
+                                error=it.message
+                            }
+                        }
+                    },
+                    colors=ButtonDefaults.buttonColors(containerColor=FqDanger)
+                ) { Text("حذف",color=Color.White) }
+            },
+            dismissButton={
+                TextButton(onClick={bulkDeleteConfirm=false}){Text("لغو")}
+            }
+        )
+    }
+
     if(roomSettingsOpen) {
         RoomConversationSettingsSheet(
             roomId=roomId,
