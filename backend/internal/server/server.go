@@ -368,6 +368,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	go s.runPushDeliveryWorker(workerCtx)
 	go s.runTelegramIngestWorker(workerCtx)
 	go s.runTelemetryMaintenanceWorker(workerCtx)
+	go s.runUploadCleanupWorker(workerCtx)
 	return s
 }
 
