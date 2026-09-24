@@ -81,6 +81,51 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is too long"}); return
 	}
 
+	var roomType,visibility,memberRole string
+	var slowModeSeconds int
+	var mutedUntil *time.Time
+	if err:=s.db.QueryRow(r.Context(),`
+		SELECT rm.room_type,rm.visibility,rm.slow_mode_seconds,
+		       COALESCE(member.role,''),member.muted_until
+		  FROM rooms rm
+		  LEFT JOIN room_members member
+		    ON member.room_id=rm.id AND member.user_id=$2
+		 WHERE rm.id=$1
+	`,roomID,userID).Scan(
+		&roomType,&visibility,&slowModeSeconds,&memberRole,&mutedUntil,
+	); err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"room not found"}); return
+	}
+
+	if (roomType=="group" || visibility!="public") && memberRole=="" {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room membership required"}); return
+	}
+	if mutedUntil!=nil && mutedUntil.After(time.Now()) {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"you are temporarily muted in this room"}); return
+	}
+	if roomType=="group" && slowModeSeconds>0 && memberRole=="member" {
+		var elapsedSeconds float64
+		_=s.db.QueryRow(r.Context(),`
+			SELECT COALESCE(
+				EXTRACT(EPOCH FROM (now()-MAX(created_at))),
+				999999
+			)
+			  FROM messages
+			 WHERE room_id=$1
+			   AND author_user_id=$2
+			   AND deleted_at IS NULL
+		`,roomID,userID).Scan(&elapsedSeconds)
+		if elapsedSeconds<float64(slowModeSeconds) {
+			remaining:=slowModeSeconds-int(elapsedSeconds)
+			if remaining<1 { remaining=1 }
+			writeJSON(w,http.StatusTooManyRequests,map[string]any{
+				"error":"slow mode is active",
+				"retryAfterSeconds":remaining,
+			})
+			return
+		}
+	}
+
 	var dmBlocked bool
 	_=s.db.QueryRow(r.Context(),`
 		SELECT EXISTS(
