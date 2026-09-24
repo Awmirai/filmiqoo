@@ -198,21 +198,22 @@ func (s *Server) updateRoomPreferences(w http.ResponseWriter,r *http.Request) {
 		}
 	}
 	if body.Archived!=nil {
+		var archiveErr error
 		if *body.Archived {
-			_,err=s.db.Exec(r.Context(),`
+			_,archiveErr=s.db.Exec(r.Context(),`
 				UPDATE room_members
 				   SET archived_at=COALESCE(archived_at,now())
 				 WHERE room_id=$1 AND user_id=$2
 			`,roomID,userID)
 		} else {
-			_,err=s.db.Exec(r.Context(),`
+			_,archiveErr=s.db.Exec(r.Context(),`
 				UPDATE room_members
 				   SET archived_at=NULL
 				 WHERE room_id=$1 AND user_id=$2
 			`,roomID,userID)
 		}
-		if err!=nil {
-			writeError(w,http.StatusInternalServerError,err)
+		if archiveErr!=nil {
+			writeError(w,http.StatusInternalServerError,archiveErr)
 			return
 		}
 	}
