@@ -1,5 +1,6 @@
 package com.filmiqoo.app
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,7 @@ fun CommunityScreen(
     onRequireAuth: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
+    val context=LocalContext.current
     var tab by remember { mutableIntStateOf(0) }
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(false) }
@@ -124,10 +127,43 @@ fun CommunityScreen(
                                                 .onSuccess { liked ->
                                                     feed=feed.map {
                                                         if(it.id==post.id) it.copy(
-                                                            likes=(it.likes + if(liked)1 else -1).coerceAtLeast(0)
+                                                            likes=(it.likes + if(liked)1 else -1).coerceAtLeast(0),
+                                                            likedByMe=liked
                                                         ) else it
                                                     }
                                                 }
+                                        }
+                                    }
+                                },
+                                onSave={
+                                    if(!loggedIn) {
+                                        onRequireAuth()
+                                    } else {
+                                        scope.launch {
+                                            runCatching { social.togglePostSave(post.id) }
+                                                .onSuccess { state ->
+                                                    feed=feed.map {
+                                                        if(it.id==post.id) it.copy(
+                                                            saves=state.second,
+                                                            savedByMe=state.first
+                                                        ) else it
+                                                    }
+                                                }
+                                        }
+                                    }
+                                },
+                                onShare={
+                                    if(!loggedIn) {
+                                        onRequireAuth()
+                                    } else {
+                                        scope.launch {
+                                            runCatching { social.sharePost(post.id,"system") }
+                                                .onSuccess { count ->
+                                                    feed=feed.map {
+                                                        if(it.id==post.id) it.copy(shares=count) else it
+                                                    }
+                                                }
+                                            shareCommunityPost(context,post)
                                         }
                                     }
                                 },
@@ -348,6 +384,8 @@ private fun SocialPostCard(
     loggedIn: Boolean,
     onRequireAuth: () -> Unit,
     onLike: () -> Unit,
+    onSave: () -> Unit,
+    onShare: () -> Unit,
     onComments: () -> Unit,
     onSafety: () -> Unit,
     onCreator: () -> Unit
@@ -420,7 +458,12 @@ private fun SocialPostCard(
 
             Row(Modifier.fillMaxWidth().padding(top=10.dp),verticalAlignment=Alignment.CenterVertically) {
                 TextButton(onClick=onLike,contentPadding=PaddingValues(horizontal=8.dp)) {
-                    Icon(Icons.Default.FavoriteBorder,null,modifier=Modifier.size(18.dp))
+                    Icon(
+                        if(post.likedByMe)Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        null,
+                        tint=if(post.likedByMe)FqDanger else LocalContentColor.current,
+                        modifier=Modifier.size(18.dp)
+                    )
                     Spacer(Modifier.width(4.dp))
                     Text(post.likes.toString(),fontSize=9.sp)
                 }
@@ -430,8 +473,25 @@ private fun SocialPostCard(
                     Text(post.comments.toString(),fontSize=9.sp)
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick={}) { Icon(Icons.Default.BookmarkBorder,null) }
-                IconButton(onClick={}) { Icon(Icons.Default.Share,null) }
+                TextButton(onClick=onSave,contentPadding=PaddingValues(horizontal=6.dp)) {
+                    Icon(
+                        if(post.savedByMe)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        null,
+                        tint=if(post.savedByMe)FqGold else LocalContentColor.current,
+                        modifier=Modifier.size(18.dp)
+                    )
+                    if(post.saves>0) {
+                        Spacer(Modifier.width(3.dp))
+                        Text(post.saves.toString(),fontSize=8.sp)
+                    }
+                }
+                TextButton(onClick=onShare,contentPadding=PaddingValues(horizontal=6.dp)) {
+                    Icon(Icons.Default.Share,null,modifier=Modifier.size(18.dp))
+                    if(post.shares>0) {
+                        Spacer(Modifier.width(3.dp))
+                        Text(post.shares.toString(),fontSize=8.sp)
+                    }
+                }
             }
         }
     }
@@ -643,4 +703,19 @@ private fun EmptyCommunityState(
             Text(body,color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=6.dp))
         }
     }
+}
+
+
+private fun shareCommunityPost(
+    context: android.content.Context,
+    post: SocialPost
+) {
+    val mediaLine=post.media?.title?.takeIf(String::isNotBlank)?.let { "\n🎬 "+it }.orEmpty()
+    val body=post.body.trim().take(700)
+    val text="Filmiqoo • "+post.author.displayName+"\n"+body+mediaLine+"\n\nfilmiqoo://post/"+post.id
+    val intent=Intent(Intent.ACTION_SEND).apply {
+        type="text/plain"
+        putExtra(Intent.EXTRA_TEXT,text)
+    }
+    context.startActivity(Intent.createChooser(intent,"اشتراک‌گذاری پست"))
 }

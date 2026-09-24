@@ -51,6 +51,8 @@ data class SocialPost(
     val saves: Long,
     val shares: Long,
     val publishedAt: String?,
+    val likedByMe: Boolean = false,
+    val savedByMe: Boolean = false,
     val author: SocialAuthor,
     val media: SocialMediaRef?
 )
@@ -277,6 +279,8 @@ class SocialRepository(
                         saves=x.optLong("saves"),
                         shares=x.optLong("shares"),
                         publishedAt=x.optString("publishedAt").takeIf(String::isNotBlank),
+                        likedByMe=x.optBoolean("likedByMe"),
+                        savedByMe=x.optBoolean("savedByMe"),
                         author=author,
                         media=mediaObj?.let(::parseMedia)
                     )
@@ -386,6 +390,23 @@ class SocialRepository(
     suspend fun togglePostLike(id: String): Boolean =
         backend.postJson("/v1/social/posts/"+id+"/like",JSONObject(),authorized=true)
             .optBoolean("liked")
+
+    suspend fun togglePostSave(id: String): Pair<Boolean,Long> {
+        val o=backend.postJson(
+            "/v1/social/posts/"+id+"/save",
+            JSONObject(),
+            authorized=true
+        )
+        return o.optBoolean("saved") to o.optLong("saves")
+    }
+
+    suspend fun sharePost(id: String, destination: String="system"): Long =
+        backend.postJson(
+            "/v1/social/posts/"+id+"/share",
+            JSONObject().put("destination",destination),
+            authorized=true
+        ).optLong("shares")
+
 
     suspend fun comments(postId: String): List<SocialComment> {
         val root=backend.getJson("/v1/social/posts/"+postId+"/comments",authorized=false)

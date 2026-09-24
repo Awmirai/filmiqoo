@@ -11,7 +11,9 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
 		       p.save_count,p.share_count,p.published_at,
 		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
-		       mt.id::text,mt.title,mt.poster_url
+		       mt.id::text,mt.title,mt.poster_url,
+		       EXISTS(SELECT 1 FROM post_reactions prx WHERE prx.post_id=p.id AND prx.user_id=$1),
+		       EXISTS(SELECT 1 FROM post_saves psx WHERE psx.post_id=p.id AND psx.user_id=$1)
 		  FROM posts p
 		  JOIN profiles pr ON pr.user_id=p.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
@@ -72,18 +74,19 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 	items:=make([]map[string]any,0)
 	for rows.Next() {
 		var id,postType,body,authorID,username,displayName,avatar string
-		var spoiler,verified bool
+		var spoiler,verified,likedByMe,savedByMe bool
 		var likes,comments,saves,shares int64
 		var publishedAt *time.Time
 		var mediaID,title,poster *string
 		if err:=rows.Scan(
 			&id,&postType,&body,&spoiler,&likes,&comments,&saves,&shares,&publishedAt,
 			&authorID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster,
+			&likedByMe,&savedByMe,
 		); err!=nil { continue }
 		items=append(items,map[string]any{
 			"id":id,"type":postType,"body":body,"spoiler":spoiler,
 			"likes":likes,"comments":comments,"saves":saves,"shares":shares,
-			"publishedAt":publishedAt,
+			"publishedAt":publishedAt,"likedByMe":likedByMe,"savedByMe":savedByMe,
 			"author":map[string]any{
 				"id":authorID,"username":username,"displayName":displayName,
 				"avatarUrl":avatar,"verified":verified,
