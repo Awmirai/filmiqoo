@@ -49,6 +49,7 @@ fun ConnectedProfileScreen(
     onSettings: () -> Unit,
     onSecurity: () -> Unit,
     onSafety: () -> Unit,
+    onFollowRequests: () -> Unit,
     onEditProfile: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
@@ -172,6 +173,12 @@ fun ConnectedProfileScreen(
                         title="زبان، دوبله و زیرنویس",
                         subtitle="ترجیحات پخش فارسی و انگلیسی",
                         onClick={}
+                    )
+                    ProfileActionRow(
+                        icon=Icons.Default.PersonAddAlt1,
+                        title="درخواست‌های Follow",
+                        subtitle="Accept یا Decline درخواست‌های حساب خصوصی",
+                        onClick=onFollowRequests
                     )
                     ProfileActionRow(
                         icon=Icons.Default.Shield,

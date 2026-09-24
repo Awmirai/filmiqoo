@@ -96,6 +96,7 @@ sealed interface OverlayRoute {
     data object Settings : OverlayRoute
     data object Security : OverlayRoute
     data object Safety : OverlayRoute
+    data object FollowRequests : OverlayRoute
     data object EditProfile : OverlayRoute
     data object Releases : OverlayRoute
     data class ChannelManage(val channelId:String,val name:String) : OverlayRoute

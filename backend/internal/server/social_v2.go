@@ -416,6 +416,7 @@ func (s *Server) toggleUserFollow(w http.ResponseWriter,r *http.Request) {
 	if userID==targetID {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"cannot follow yourself"}); return
 	}
+
 	var blocked bool
 	_ = s.db.QueryRow(r.Context(),`
 		SELECT EXISTS(
@@ -427,27 +428,128 @@ func (s *Server) toggleUserFollow(w http.ResponseWriter,r *http.Request) {
 	if blocked {
 		writeJSON(w,http.StatusForbidden,map[string]string{"error":"follow unavailable because one of these accounts has blocked the other"}); return
 	}
+
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer tx.Rollback(r.Context())
+
+	var targetPrivate bool
+	if err:=tx.QueryRow(r.Context(),`
+		SELECT private_account FROM profiles WHERE user_id=$1
+	`,targetID).Scan(&targetPrivate); err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"user not found"}); return
+	}
+
 	var exists bool
-	_ = tx.QueryRow(r.Context(),"SELECT EXISTS(SELECT 1 FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2)",userID,targetID).Scan(&exists)
+	_ = tx.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1 FROM user_follows
+			 WHERE follower_user_id=$1 AND followed_user_id=$2
+		)
+	`,userID,targetID).Scan(&exists)
+
 	if exists {
-		_,err=tx.Exec(r.Context(),"DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2",userID,targetID)
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE profiles SET following_count=GREATEST(following_count-1,0) WHERE user_id=$1",userID) }
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE profiles SET follower_count=GREATEST(follower_count-1,0) WHERE user_id=$1",targetID) }
-	} else {
-		_,err=tx.Exec(r.Context(),"INSERT INTO user_follows (follower_user_id,followed_user_id) VALUES ($1,$2)",userID,targetID)
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE profiles SET following_count=following_count+1 WHERE user_id=$1",userID) }
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE profiles SET follower_count=follower_count+1 WHERE user_id=$1",targetID) }
+		_,err=tx.Exec(r.Context(),`
+			DELETE FROM user_follows
+			 WHERE follower_user_id=$1 AND followed_user_id=$2
+		`,userID,targetID)
+		if err==nil {
+			_,err=tx.Exec(r.Context(),`
+				UPDATE profiles
+				   SET following_count=GREATEST(following_count-1,0),updated_at=now()
+				 WHERE user_id=$1
+			`,userID)
+		}
+		if err==nil {
+			_,err=tx.Exec(r.Context(),`
+				UPDATE profiles
+				   SET follower_count=GREATEST(follower_count-1,0),updated_at=now()
+				 WHERE user_id=$1
+			`,targetID)
+		}
 		if err==nil {
 			_,_=tx.Exec(r.Context(),`
-				INSERT INTO notifications (user_id,actor_user_id,notification_type,entity_type,entity_id,title)
-				VALUES ($1,$2,'follow','user',$2,'دنبال‌کننده جدید')
-			`,targetID,userID)
+				UPDATE follow_requests
+				   SET status='cancelled',updated_at=now()
+				 WHERE requester_user_id=$1 AND target_user_id=$2
+			`,userID,targetID)
 		}
+		if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+		if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+		writeJSON(w,http.StatusOK,map[string]any{"following":false,"pending":false})
+		return
+	}
+
+	if targetPrivate {
+		var pending bool
+		_ = tx.QueryRow(r.Context(),`
+			SELECT EXISTS(
+				SELECT 1 FROM follow_requests
+				 WHERE requester_user_id=$1 AND target_user_id=$2 AND status='pending'
+			)
+		`,userID,targetID).Scan(&pending)
+
+		if pending {
+			_,err=tx.Exec(r.Context(),`
+				UPDATE follow_requests
+				   SET status='cancelled',updated_at=now()
+				 WHERE requester_user_id=$1 AND target_user_id=$2
+			`,userID,targetID)
+			if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+			if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+			writeJSON(w,http.StatusOK,map[string]any{"following":false,"pending":false})
+			return
+		}
+
+		_,err=tx.Exec(r.Context(),`
+			INSERT INTO follow_requests (
+				requester_user_id,target_user_id,status,created_at,updated_at
+			) VALUES ($1,$2,'pending',now(),now())
+			ON CONFLICT (requester_user_id,target_user_id)
+			DO UPDATE SET status='pending',updated_at=now()
+		`,userID,targetID)
+		if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+		_,_=tx.Exec(r.Context(),`
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title
+			) VALUES ($1,$2,'follow_request','user',$2,'درخواست دنبال‌کردن جدید')
+		`,targetID,userID)
+
+		if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+		writeJSON(w,http.StatusOK,map[string]any{"following":false,"pending":true})
+		return
+	}
+
+	_,err=tx.Exec(r.Context(),`
+		INSERT INTO user_follows (follower_user_id,followed_user_id)
+		VALUES ($1,$2)
+	`,userID,targetID)
+	if err==nil {
+		_,err=tx.Exec(r.Context(),`
+			UPDATE profiles
+			   SET following_count=following_count+1,updated_at=now()
+			 WHERE user_id=$1
+		`,userID)
+	}
+	if err==nil {
+		_,err=tx.Exec(r.Context(),`
+			UPDATE profiles
+			   SET follower_count=follower_count+1,updated_at=now()
+			 WHERE user_id=$1
+		`,targetID)
+	}
+	if err==nil {
+		_,_=tx.Exec(r.Context(),`
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title
+			) VALUES ($1,$2,'follow','user',$2,'دنبال‌کننده جدید')
+		`,targetID,userID)
 	}
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	writeJSON(w,http.StatusOK,map[string]any{"following":!exists})
+
+	if err:=tx.Commit(r.Context()); err!=nil {
+		writeError(w,http.StatusInternalServerError,err); return
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"following":true,"pending":false})
 }

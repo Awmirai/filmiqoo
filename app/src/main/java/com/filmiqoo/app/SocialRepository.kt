@@ -80,6 +80,41 @@ data class PollData(
     val totalVotes: Long
 )
 
+data class FollowActionState(
+    val following:Boolean,
+    val pending:Boolean
+)
+
+data class UserRelationship(
+    val following:Boolean,
+    val pending:Boolean,
+    val privateAccount:Boolean,
+    val blocked:Boolean
+)
+
+data class FollowRequestItem(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val bio:String,
+    val avatarUrl:String,
+    val verified:Boolean,
+    val followers:Long,
+    val following:Long,
+    val createdAt:String
+) {
+    fun asCreator()=Creator(
+        name=displayName,
+        handle="@"+username,
+        followers=compactFollowCount(followers),
+        bio=bio,
+        verified=verified,
+        id=id,
+        entityType="user",
+        avatarUrl=avatarUrl
+    )
+}
+
 data class SocialChannel(
     val id: String,
     val slug: String,
@@ -469,9 +504,70 @@ class SocialRepository(
         ).getString("id")
 
 
+    suspend fun toggleUserFollowState(id:String):FollowActionState {
+        val o=backend.postJson(
+            "/v1/social/users/"+id+"/follow",
+            JSONObject(),
+            authorized=true
+        )
+        return FollowActionState(
+            following=o.optBoolean("following"),
+            pending=o.optBoolean("pending")
+        )
+    }
+
     suspend fun toggleUserFollow(id: String): Boolean =
-        backend.postJson("/v1/social/users/"+id+"/follow",JSONObject(),authorized=true)
-            .optBoolean("following")
+        toggleUserFollowState(id).following
+
+    suspend fun userRelationship(id:String):UserRelationship {
+        val o=backend.getJson(
+            "/v1/social/users/"+id+"/relationship",
+            authorized=true
+        )
+        return UserRelationship(
+            following=o.optBoolean("following"),
+            pending=o.optBoolean("pending"),
+            privateAccount=o.optBoolean("private"),
+            blocked=o.optBoolean("blocked")
+        )
+    }
+
+    suspend fun followRequests():List<FollowRequestItem> {
+        val root=backend.getJson("/v1/social/follow-requests",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    FollowRequestItem(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        bio=x.optString("bio"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified"),
+                        followers=x.optLong("followers"),
+                        following=x.optLong("following"),
+                        createdAt=x.optString("createdAt")
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun acceptFollowRequest(userId:String):Boolean =
+        backend.postJson(
+            "/v1/social/follow-requests/"+userId+"/accept",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("accepted")
+
+    suspend fun declineFollowRequest(userId:String):Boolean =
+        backend.postJson(
+            "/v1/social/follow-requests/"+userId+"/decline",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("declined")
 
     suspend fun rooms(): List<SocialRoom> {
         val root=backend.getJson("/v1/rooms",authorized=false)
@@ -668,4 +764,11 @@ class SocialRepository(
             rating=if(o.isNull("rating")) null else o.optDouble("rating")
         )
     }
+}
+
+
+private fun compactFollowCount(value:Long):String=when {
+    value>=1_000_000 -> String.format(java.util.Locale.US,"%.1fM",value/1_000_000.0)
+    value>=1_000 -> String.format(java.util.Locale.US,"%.1fK",value/1_000.0)
+    else -> value.toString()
 }

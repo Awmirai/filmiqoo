@@ -237,6 +237,11 @@ fun FilmiqooApp() {
                     onBack=closeOverlay,
                     onCreator={overlay=OverlayRoute.CreatorPage(it)}
                 )
+                OverlayRoute.FollowRequests -> FollowRequestsScreen(
+                    social=social,
+                    onBack=closeOverlay,
+                    onCreator={overlay=OverlayRoute.CreatorPage(it)}
+                )
                 OverlayRoute.EditProfile -> EditProfileScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -271,7 +276,8 @@ fun FilmiqooApp() {
                     onBack=closeOverlay,
                     onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
                     onOpenCreator={overlay=OverlayRoute.CreatorPage(it)},
-                    onOpenMedia={overlay=OverlayRoute.Detail(it)}
+                    onOpenMedia={overlay=OverlayRoute.Detail(it)},
+                    onFollowRequests={overlay=OverlayRoute.FollowRequests}
                 )
             }
             else -> Scaffold(
@@ -340,6 +346,7 @@ fun FilmiqooApp() {
                                     onSettings={overlay=OverlayRoute.Settings},
                                     onSecurity={overlay=OverlayRoute.Security},
                                     onSafety={overlay=OverlayRoute.Safety},
+                                    onFollowRequests={overlay=OverlayRoute.FollowRequests},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onLoggedOut={
                                         authenticated=false

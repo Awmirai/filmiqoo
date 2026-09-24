@@ -210,7 +210,8 @@ fun ConnectedNotificationsScreen(
     onBack: () -> Unit,
     onOpenRoom: (String,String) -> Unit,
     onOpenCreator: (Creator) -> Unit,
-    onOpenMedia: (MediaItem) -> Unit
+    onOpenMedia: (MediaItem) -> Unit,
+    onFollowRequests: () -> Unit
 ) {
     val repo=remember { MessagingRepository(backend) }
     val scope=rememberCoroutineScope()
@@ -278,6 +279,7 @@ fun ConnectedNotificationsScreen(
                             scope.launch {
                                 if(!item.read) runCatching { repo.markNotificationRead(item.id) }
                                 when {
+                                    item.type=="follow_request" -> onFollowRequests()
                                     item.entityType=="room" && !item.entityId.isNullOrBlank() ->
                                         onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
                                     item.media!=null ->
@@ -364,6 +366,8 @@ private fun NotificationCard(
 
 private fun notificationIcon(type:String)=when(type) {
     "follow" -> Icons.Default.PersonAdd
+    "follow_request" -> Icons.Default.PersonAddAlt1
+    "follow_accepted" -> Icons.Default.HowToReg
     "story_reaction" -> Icons.Default.Favorite
     "story_reply" -> Icons.Default.Reply
     "dm_message" -> Icons.Default.MarkChatUnread
@@ -373,6 +377,8 @@ private fun notificationIcon(type:String)=when(type) {
 
 private fun notificationTypeLabel(type:String)=when(type) {
     "follow" -> "Follow"
+    "follow_request" -> "درخواست Follow"
+    "follow_accepted" -> "Follow پذیرفته شد"
     "story_reaction" -> "Story Reaction"
     "story_reply" -> "Story Reply"
     "dm_message" -> "پیام"

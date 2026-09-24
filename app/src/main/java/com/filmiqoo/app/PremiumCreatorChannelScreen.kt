@@ -33,7 +33,8 @@ private sealed interface CreatorEntityState {
     data class User(
         val profile: PublicCreatorProfile,
         val posts: List<SocialPost>,
-        val reels: List<ReelFeedItem>
+        val reels: List<ReelFeedItem>,
+        val relationship: UserRelationship?
     ): CreatorEntityState
     data class Channel(
         val profile: PublicChannelProfile,
@@ -68,6 +69,7 @@ fun PremiumCreatorChannelScreen(
         mutableStateOf<CreatorEntityState>(CreatorEntityState.Loading)
     }
     var followed by remember(creator.id) { mutableStateOf(false) }
+    var followPending by remember(creator.id) { mutableStateOf(false) }
     var followBusy by remember { mutableStateOf(false) }
     var tab by remember { mutableIntStateOf(0) }
     var safetyTargetType by remember { mutableStateOf<String?>(null) }
@@ -101,7 +103,10 @@ fun PremiumCreatorChannelScreen(
                 CreatorEntityState.User(
                     profile=repo.userProfile(creator.id),
                     posts=repo.userPosts(creator.id),
-                    reels=repo.userReels(creator.id)
+                    reels=repo.userReels(creator.id),
+                    relationship=if(backend.session.isLoggedIn) {
+                        runCatching { social.userRelationship(creator.id) }.getOrNull()
+                    } else null
                 )
             }
         }.getOrElse {
@@ -127,6 +132,10 @@ fun PremiumCreatorChannelScreen(
         }
         is CreatorEntityState.User -> {
             val p=s.profile
+            LaunchedEffect(p.id,s.relationship) {
+                followed=s.relationship?.following == true
+                followPending=s.relationship?.pending == true
+            }
             CreatorEntityScaffold(
                 name=p.displayName,
                 handle="@"+p.username,
@@ -140,6 +149,7 @@ fun PremiumCreatorChannelScreen(
                 reelsCount=p.reels,
                 isChannel=false,
                 followed=followed,
+                followPending=followPending,
                 followBusy=followBusy,
                 tab=tab,
                 tabs=listOf("Reels","پست‌ها","درباره"),
@@ -163,8 +173,11 @@ fun PremiumCreatorChannelScreen(
                     } else if(!followBusy) {
                         followBusy=true
                         scope.launch {
-                            runCatching { social.toggleUserFollow(p.id) }
-                                .onSuccess { followed=it }
+                            runCatching { social.toggleUserFollowState(p.id) }
+                                .onSuccess {
+                                    followed=it.following
+                                    followPending=it.pending
+                                }
                             followBusy=false
                         }
                     }
@@ -199,6 +212,7 @@ fun PremiumCreatorChannelScreen(
                 reelsCount=p.reels,
                 isChannel=true,
                 followed=followed,
+                followPending=false,
                 followBusy=followBusy,
                 tab=tab,
                 tabs=listOf("Reels","پست‌ها","Stories","اعضا","چت"),
@@ -273,6 +287,7 @@ private fun CreatorEntityScaffold(
     reelsCount: Long,
     isChannel: Boolean,
     followed: Boolean,
+    followPending: Boolean,
     followBusy: Boolean,
     tab: Int,
     tabs: List<String>,
@@ -387,8 +402,16 @@ private fun CreatorEntityScaffold(
                         onClick=onFollow,
                         enabled=!followBusy,
                         colors=ButtonDefaults.buttonColors(
-                            containerColor=if(followed)FqSurface2 else FqGold,
-                            contentColor=if(followed)Color.White else Color.Black
+                            containerColor=when {
+                                followed -> FqSurface2
+                                followPending -> FqGold.copy(alpha=.2f)
+                                else -> FqGold
+                            },
+                            contentColor=when {
+                                followed -> Color.White
+                                followPending -> FqGold
+                                else -> Color.Black
+                            }
                         ),
                         shape=RoundedCornerShape(14.dp),
                         modifier=Modifier.weight(1f)
@@ -397,13 +420,23 @@ private fun CreatorEntityScaffold(
                             CircularProgressIndicator(strokeWidth=2.dp,modifier=Modifier.size(18.dp))
                         } else {
                             Icon(
-                                if(followed)Icons.Default.Check else Icons.Default.PersonAdd,
+                                when {
+                                    followed -> Icons.Default.Check
+                                    followPending -> Icons.Default.Schedule
+                                    else -> Icons.Default.PersonAdd
+                                },
                                 null,
                                 modifier=Modifier.size(18.dp)
                             )
                         }
                         Spacer(Modifier.width(6.dp))
-                        Text(if(followed)"دنبال می‌کنی" else "دنبال کردن")
+                        Text(
+                            when {
+                                followed -> "دنبال می‌کنی"
+                                followPending -> "درخواست ارسال شد"
+                                else -> "دنبال کردن"
+                            }
+                        )
                     }
 
                     if(onMessage!=null) {
