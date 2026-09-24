@@ -16,6 +16,7 @@ func strongProductionConfig() Config {
 		AuthLoginRateLimit:10,
 		AuthRegisterRateLimit:8,
 		AuthRefreshRateLimit:30,
+		AuthenticatedWriteRateLimit:240,
 	}
 }
 
@@ -63,6 +64,7 @@ func TestDevelopmentAllowsDefaultStyleSettings(t *testing.T) {
 		AuthLoginRateLimit:10,
 		AuthRegisterRateLimit:8,
 		AuthRefreshRateLimit:30,
+		AuthenticatedWriteRateLimit:240,
 	}
 	if err:=cfg.Validate(); err!=nil {
 		t.Fatalf("development config should remain usable: %v",err)
