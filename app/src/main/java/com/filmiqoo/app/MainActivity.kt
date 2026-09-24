@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -50,6 +51,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val messaging = remember { MessagingRepository(backend) }
     val creatorChannels = remember { CreatorChannelRepository(backend) }
     val viewerProfilesRepository = remember { ViewerProfilesRepository(backend) }
+    val playbackHandoffRepository = remember {
+        PlaybackHandoffRepository(context.applicationContext,backend)
+    }
     val viewerStore = remember { backend.viewerProfiles }
     val store = remember { LocalStore(context.applicationContext) }
     val appScope = rememberCoroutineScope()
@@ -64,6 +68,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var viewerReady by remember { mutableStateOf(!authenticated) }
     var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
     var deepLinkReelId by remember { mutableStateOf<String?>(null) }
+    var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
+    var handoffActionBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(authenticated) {
         if(!authenticated) {
@@ -88,6 +94,23 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     }
                 }
             viewerReady=true
+        }
+    }
+
+    LaunchedEffect(authenticated,viewerReady,activeViewer?.id) {
+        if(!authenticated || !viewerReady || activeViewer==null) return@LaunchedEffect
+
+        while(true) {
+            runCatching { playbackHandoffRepository.heartbeat() }
+
+            runCatching { playbackHandoffRepository.pending() }
+                .onSuccess { incoming->
+                    if(incoming!=null && pendingHandoff?.id!=incoming.id) {
+                        pendingHandoff=incoming
+                    }
+                }
+
+            delay(5_000)
         }
     }
 
@@ -219,6 +242,105 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
     BackHandler(enabled = overlay != null || showSearch) {
         closeOverlay()
+    }
+
+    pendingHandoff?.let { handoff ->
+        AlertDialog(
+            onDismissRequest={
+                if(!handoffActionBusy) {
+                    handoffActionBusy=true
+                    appScope.launch {
+                        runCatching { playbackHandoffRepository.cancel(handoff.id) }
+                        pendingHandoff=null
+                        handoffActionBusy=false
+                    }
+                }
+            },
+            icon={
+                Icon(
+                    Icons.Default.SendToMobile,
+                    null,
+                    tint=FqGold
+                )
+            },
+            title={Text("ادامه تماشا روی این دستگاه؟")},
+            text={
+                Column {
+                    Text(
+                        handoff.title,
+                        fontWeight=androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    if(handoff.subtitle.isNotBlank()) {
+                        Text(
+                            handoff.subtitle,
+                            color=FqMuted,
+                            fontSize=11.sp,
+                            modifier=Modifier.padding(top=4.dp)
+                        )
+                    }
+                    Text(
+                        "از "+formatSceneTime(handoff.positionMs)+
+                            if(handoff.sourceDeviceName.isNotBlank())
+                                " • از "+handoff.sourceDeviceName
+                            else "",
+                        color=FqGold,
+                        fontSize=11.sp,
+                        modifier=Modifier.padding(top=9.dp)
+                    )
+                }
+            },
+            confirmButton={
+                Button(
+                    enabled=!handoffActionBusy,
+                    onClick={
+                        handoffActionBusy=true
+                        appScope.launch {
+                            val target=runCatching {
+                                backend.playbackContext(handoff.mediaVersionId)
+                            }.getOrElse {
+                                handoff.asTarget()
+                            }.copy(startPositionMs=handoff.positionMs)
+
+                            runCatching {
+                                playbackHandoffRepository.accept(handoff.id)
+                            }.onSuccess {
+                                pendingHandoff=null
+                                overlay=OverlayRoute.Player(target)
+                            }.onFailure {
+                                pendingHandoff=null
+                            }
+                            handoffActionBusy=false
+                        }
+                    },
+                    colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+                ) {
+                    if(handoffActionBusy) {
+                        CircularProgressIndicator(
+                            color=Color.Black,
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(17.dp)
+                        )
+                    } else {
+                        Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
+                    }
+                    Spacer(Modifier.width(5.dp))
+                    Text("ادامه تماشا",color=Color.Black)
+                }
+            },
+            dismissButton={
+                TextButton(
+                    enabled=!handoffActionBusy,
+                    onClick={
+                        handoffActionBusy=true
+                        appScope.launch {
+                            runCatching { playbackHandoffRepository.cancel(handoff.id) }
+                            pendingHandoff=null
+                            handoffActionBusy=false
+                        }
+                    }
+                ) { Text("رد کردن") }
+            }
+        )
     }
 
     Surface(Modifier.fillMaxSize(),color=FqBg) {

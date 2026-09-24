@@ -82,6 +82,9 @@ fun FilmiqooPlayerScreen(
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
     val castController=remember { FilmiqooCastController(context.applicationContext) }
+    val handoffRepository=remember {
+        PlaybackHandoffRepository(context.applicationContext,backend)
+    }
     val scope=rememberCoroutineScope()
     val initialSettings=remember { AppPreferences(context.applicationContext).read() }
     val settingsRepository=remember { SettingsRepository(context.applicationContext,backend) }
@@ -109,6 +112,7 @@ fun FilmiqooPlayerScreen(
     var settingsOpen by remember { mutableStateOf(false) }
     var momentsOpen by remember { mutableStateOf(false) }
     var bookmarksOpen by remember { mutableStateOf(false) }
+    var handoffOpen by remember { mutableStateOf(false) }
     var dialogueSearchOpen by remember { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
@@ -747,6 +751,12 @@ fun FilmiqooPlayerScreen(
     LaunchedEffect(playbackSessionId,currentVersionId) {
         while(true) {
             delay(15_000)
+            runCatching {
+                handoffRepository.heartbeat(
+                    mediaVersionId=currentVersionId,
+                    positionMs=activePositionMs()
+                )
+            }
             val sid=playbackSessionId ?: continue
             val now=SystemClock.elapsedRealtime()
             val activeBufferMs=if(telemetryBufferStartedAt>0L)
@@ -1163,6 +1173,7 @@ fun FilmiqooPlayerScreen(
                 onBookmarks={bookmarksOpen=true},
                 onDialogueSearch={dialogueSearchOpen=true},
                 onQueue={queueOpen=true},
+                onHandoff={handoffOpen=true},
                 onShare={
                     sharePlayerMoment(
                         context=context,
@@ -1348,6 +1359,15 @@ fun FilmiqooPlayerScreen(
                 bumpControls()
             },
             onDismiss={bookmarksOpen=false}
+        )
+    }
+
+    if(handoffOpen) {
+        PlaybackHandoffSheet(
+            repository=handoffRepository,
+            mediaVersionId=currentVersionId,
+            positionMs=activePositionMs(),
+            onDismiss={handoffOpen=false}
         )
     }
 
@@ -1694,6 +1714,7 @@ private fun PlayerTopControls(
     onBookmarks: () -> Unit,
     onDialogueSearch: () -> Unit,
     onQueue: () -> Unit,
+    onHandoff: () -> Unit,
     onShare: () -> Unit,
     onPip: () -> Unit,
     onSettings: () -> Unit,
@@ -1735,6 +1756,8 @@ private fun PlayerTopControls(
             PlayerGlassIcon(Icons.Default.QueuePlayNext,onQueue)
             Spacer(Modifier.width(5.dp))
         }
+        PlayerGlassIcon(Icons.Default.DevicesOther,onHandoff)
+        Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(Icons.Default.Share,onShare)
         Spacer(Modifier.width(5.dp))
         PlayerCastRouteButton()
