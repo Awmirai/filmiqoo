@@ -37,6 +37,7 @@ func (s *Server) roomsList(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
+	_ = s.processDueScheduledRoomMessages(r.Context())
 	roomID:=chi.URLParam(r,"id")
 	items,err:=s.queryRoomMessages(
 		r.Context(),
