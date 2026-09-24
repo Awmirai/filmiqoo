@@ -1672,7 +1672,7 @@ private fun PlayerSearchHint(
             color=FqMuted,
             fontSize=8.sp,
             lineHeight=14.sp,
-            modifier=Modifier.padding(top=4.dp,horizontal=18.dp)
+            modifier=Modifier.padding(start=18.dp,end=18.dp,top=4.dp)
         )
     }
 }
