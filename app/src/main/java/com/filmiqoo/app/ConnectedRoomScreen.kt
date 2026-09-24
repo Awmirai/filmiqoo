@@ -56,6 +56,8 @@ fun ConnectedRoomScreen(
     var editTarget by remember { mutableStateOf<RoomMessageItem?>(null) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var roomMembersOpen by remember { mutableStateOf(false) }
+    var roomSettingsOpen by remember { mutableStateOf(false) }
+    var roomTitle by remember(roomId,title) { mutableStateOf(title) }
     var forwardTarget by remember { mutableStateOf<RoomMessageItem?>(null) }
     var memberState by remember(roomId) { mutableStateOf<RoomMembersState?>(null) }
     var socket by remember(roomId) { mutableStateOf<WebSocket?>(null) }
@@ -195,9 +197,15 @@ fun ConnectedRoomScreen(
                                     }
                                 }
                             }
-                            "member.joined","member.removed","member.role_changed" -> {
+                            "member.joined","member.removed","member.role_changed","member.owner_changed" -> {
                                 refreshMembers()
                                 refresh()
+                            }
+                            "room.settings_changed" -> {
+                                event.optString("name")
+                                    .takeIf(String::isNotBlank)
+                                    ?.let { roomTitle=it }
+                                refreshMembers()
                             }
                             "connected" -> Unit
                             else -> refresh()
@@ -236,7 +244,7 @@ fun ConnectedRoomScreen(
             }
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
-                Text(title,fontSize=14.sp)
+                Text(roomTitle,fontSize=14.sp)
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Box(
                         Modifier.size(6.dp).background(
@@ -267,6 +275,9 @@ fun ConnectedRoomScreen(
                 }
             }
             if(loggedIn) {
+                IconButton(onClick={roomSettingsOpen=true}) {
+                    Icon(Icons.Default.Settings,null)
+                }
                 IconButton(onClick={roomMembersOpen=true}) {
                     Icon(Icons.Default.Group,null)
                 }
@@ -283,8 +294,8 @@ fun ConnectedRoomScreen(
                 onClick={
                     FilmiqooDeepLinks.share(
                         context,
-                        title,
-                        FilmiqooDeepLinks.room(roomId,title)
+                        roomTitle,
+                        FilmiqooDeepLinks.room(roomId,roomTitle)
                     )
                 }
             ) { Icon(Icons.Default.Share,null) }
@@ -703,10 +714,24 @@ fun ConnectedRoomScreen(
         }
     }
 
+    if(roomSettingsOpen) {
+        RoomConversationSettingsSheet(
+            roomId=roomId,
+            messaging=messaging,
+            onDismiss={roomSettingsOpen=false},
+            onTitleChanged={roomTitle=it},
+            onLeave={
+                roomSettingsOpen=false
+                onBack()
+            }
+        )
+    }
+
     if(roomMembersOpen) {
         RoomMembersSheet(
             roomId=roomId,
             social=social,
+            messaging=messaging,
             meId=meId,
             onDismiss={roomMembersOpen=false},
             onChanged={scope.launch{refreshMembers()}}
