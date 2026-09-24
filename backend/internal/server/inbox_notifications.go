@@ -10,6 +10,7 @@ import (
 )
 
 func (s *Server) inbox(w http.ResponseWriter,r *http.Request) {
+	_ = s.processDueScheduledRoomMessages(r.Context())
 	userID:=userIDFromContext(r.Context())
 	archivedParam:=strings.ToLower(strings.TrimSpace(r.URL.Query().Get("archived")))
 	archived:=archivedParam=="1" || archivedParam=="true" || archivedParam=="yes"
@@ -50,6 +51,9 @@ func (s *Server) inbox(w http.ResponseWriter,r *http.Request) {
 		             WHEN m.message_type='voice' THEN '🎙 پیام صوتی'
 		             WHEN m.message_type='image' THEN '🖼 تصویر'
 		             WHEN m.message_type='video' THEN '🎬 ویدیو'
+		             WHEN m.message_type='document' THEN '📎 فایل'
+		             WHEN m.message_type='location' THEN '📍 موقعیت مکانی'
+		             WHEN m.message_type='contact' THEN '👤 مخاطب'
 		             ELSE 'پیام'
 		           END AS body,
 		           m.created_at
@@ -181,6 +185,7 @@ func (s *Server) markRoomRead(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
+	_ = s.processDueScheduledRoomMessages(r.Context())
 	userID:=userIDFromContext(r.Context())
 	if err:=s.processDueReleaseReminders(r.Context(),userID); err!=nil {
 		writeError(w,http.StatusInternalServerError,err)
