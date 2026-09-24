@@ -1,13 +1,34 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 	query:=strings.TrimSpace(r.URL.Query().Get("q"))
-	pattern:="%"+query+"%"
+	if len([]rune(query))>120 {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"search query is too long"})
+		return
+	}
+	cacheKey:="search:v2:"+strings.ToLower(query)
+	if s.redis!=nil {
+		if cached,err:=s.redis.Get(r.Context(),cacheKey).Bytes(); err==nil && len(cached)>0 {
+			w.Header().Set("Content-Type","application/json; charset=utf-8")
+			w.Header().Set("X-Filmiqoo-Cache","HIT")
+			w.WriteHeader(http.StatusOK)
+			_,_ = w.Write(cached)
+			return
+		}
+	}
+	escaped:=strings.NewReplacer(
+		"\\","\\\\",
+		"%","\\%",
+		"_","\\_",
+	).Replace(query)
+	pattern:="%"+escaped+"%"
 
 	media:=make([]map[string]any,0)
 	mediaRows,err:=s.db.Query(r.Context(),`
@@ -23,7 +44,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 			 LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
-		   AND ($1='' OR mt.title ILIKE $2 OR mt.original_title ILIKE $2 OR mt.overview ILIKE $2)
+		   AND ($1='' OR mt.title ILIKE $2 ESCAPE '\\' OR mt.original_title ILIKE $2 ESCAPE '\\' OR mt.overview ILIKE $2 ESCAPE '\\')
 		 ORDER BY
 		   CASE WHEN $1<>'' AND lower(mt.title)=lower($1) THEN 0 ELSE 1 END,
 		   mt.rating DESC NULLS LAST,
@@ -58,7 +79,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		       p.verified,p.follower_count,p.following_count,p.post_count,p.reel_count
 		  FROM profiles p
 		 WHERE p.private_account=false
-		   AND ($1='' OR p.username::text ILIKE $2 OR p.display_name ILIKE $2 OR p.bio ILIKE $2)
+		   AND ($1='' OR p.username::text ILIKE $2 ESCAPE '\\' OR p.display_name ILIKE $2 ESCAPE '\\' OR p.bio ILIKE $2 ESCAPE '\\')
 		 ORDER BY
 		   CASE WHEN $1<>'' AND lower(p.username::text)=lower($1) THEN 0 ELSE 1 END,
 		   p.follower_count DESC,
@@ -89,7 +110,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		       follower_count,post_count,reel_count
 		  FROM channels
 		 WHERE visibility='public'
-		   AND ($1='' OR slug::text ILIKE $2 OR name ILIKE $2 OR bio ILIKE $2)
+		   AND ($1='' OR slug::text ILIKE $2 ESCAPE '\\' OR name ILIKE $2 ESCAPE '\\' OR bio ILIKE $2 ESCAPE '\\')
 		 ORDER BY
 		   CASE WHEN $1<>'' AND lower(slug::text)=lower($1) THEN 0 ELSE 1 END,
 		   follower_count DESC,
@@ -122,7 +143,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles p ON p.user_id=r.creator_user_id
 		  LEFT JOIN media_titles mt ON mt.id=r.media_title_id
 		 WHERE r.status='published'
-		   AND ($1='' OR r.caption ILIKE $2 OR p.username::text ILIKE $2 OR p.display_name ILIKE $2 OR mt.title ILIKE $2)
+		   AND ($1='' OR r.caption ILIKE $2 ESCAPE '\\' OR p.username::text ILIKE $2 ESCAPE '\\' OR p.display_name ILIKE $2 ESCAPE '\\' OR mt.title ILIKE $2 ESCAPE '\\')
 		 ORDER BY r.view_count DESC,r.published_at DESC NULLS LAST
 		 LIMIT 20
 	`,query,pattern)
@@ -150,11 +171,18 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		}
 	}
 
-	writeJSON(w,http.StatusOK,map[string]any{
+	payload:=map[string]any{
 		"query":query,
 		"media":media,
 		"users":users,
 		"channels":channels,
 		"reels":reels,
-	})
+	}
+	if s.redis!=nil {
+		if raw,err:=json.Marshal(payload); err==nil {
+			_ = s.redis.Set(r.Context(),cacheKey,raw,30*time.Second).Err()
+		}
+	}
+	w.Header().Set("X-Filmiqoo-Cache","MISS")
+	writeJSON(w,http.StatusOK,payload)
 }
