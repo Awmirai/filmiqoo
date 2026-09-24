@@ -174,6 +174,14 @@ data class RoomMembersState(
     val items:List<RoomMemberItem>
 )
 
+data class RoomMemberCandidate(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val avatarUrl:String,
+    val verified:Boolean
+)
+
 data class RoomMessageItem(
     val id: String,
     val body: String,
@@ -850,6 +858,32 @@ class SocialRepository(
             online=root.optLong("online"),
             items=items
         )
+    }
+
+    suspend fun searchRoomMemberCandidates(
+        roomId:String,
+        query:String
+    ):List<RoomMemberCandidate> {
+        val q=java.net.URLEncoder.encode(query.trim(),"UTF-8")
+        val root=backend.getJson(
+            "/v1/rooms/"+roomId+"/member-candidates?q="+q,
+            authorized=true
+        )
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    RoomMemberCandidate(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified")
+                    )
+                )
+            }
+        }
     }
 
     suspend fun addRoomMember(roomId:String,userId:String):Boolean =
