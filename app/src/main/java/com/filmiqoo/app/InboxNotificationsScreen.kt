@@ -498,6 +498,7 @@ private fun notificationIcon(type:String)=when(type) {
     "story_reaction" -> Icons.Default.Favorite
     "story_reply" -> Icons.Default.Reply
     "dm_message" -> Icons.Default.MarkChatUnread
+    "room_message" -> Icons.Default.Forum
     "release_ready" -> Icons.Default.NewReleases
     "new_episode" -> Icons.Default.LiveTv
     "episode_stream_ready" -> Icons.Default.PlayCircle
@@ -517,7 +518,8 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "follow_accepted" -> "Follow پذیرفته شد"
     "story_reaction" -> "Story Reaction"
     "story_reply" -> "Story Reply"
-    "dm_message" -> "پیام"
+    "dm_message" -> "پیام خصوصی"
+    "room_message" -> "پیام گروه"
     "release_ready" -> "انتشار"
     "new_episode" -> "قسمت جدید"
     "episode_stream_ready" -> "آماده تماشا"
