@@ -210,6 +210,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/parental/verify", s.verifyParentalGate)
 			r.Post("/me", s.updateProfile)
 			r.Get("/creator/studio", s.creatorStudio)
+			r.Get("/creator/scheduled", s.scheduledCreatorContent)
+			r.Post("/creator/scheduled/{kind}/{id}/publish-now", s.publishScheduledNow)
+			r.Post("/creator/scheduled/{kind}/{id}/unschedule", s.unscheduleCreatorContent)
 			r.Get("/settings", s.getSettings)
 			r.Post("/settings", s.updateSettings)
 			r.Post("/security/sessions", s.securitySessions)
@@ -307,6 +310,7 @@ func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
+	_ = s.processScheduledContent(r.Context())
 	rows, err := s.db.Query(r.Context(), `
 		SELECT r.id::text,r.caption,r.playback_url,r.cover_url,r.duration_ms,
 		       r.like_count,r.comment_count,r.save_count,r.share_count,r.view_count,r.spoiler,

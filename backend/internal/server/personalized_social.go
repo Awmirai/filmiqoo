@@ -6,6 +6,7 @@ import (
 )
 
 func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
+	_ = s.processScheduledContent(r.Context())
 	userID:=userIDFromContext(r.Context())
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
@@ -98,6 +99,7 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
+	_ = s.processScheduledContent(r.Context())
 	userID:=userIDFromContext(r.Context())
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT rl.id::text,rl.caption,rl.playback_url,rl.cover_url,rl.duration_ms,

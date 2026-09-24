@@ -111,6 +111,7 @@ func (s *Server) createReel(w http.ResponseWriter,r *http.Request) {
 		EpisodeID *string `json:"episodeId"`
 		Spoiler bool `json:"spoiler"`
 		AllowComments bool `json:"allowComments"`
+		ScheduledAt *time.Time `json:"scheduledAt"`
 	}
 	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
 	body.Caption=strings.TrimSpace(body.Caption)
@@ -128,29 +129,43 @@ func (s *Server) createReel(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"completed video upload is required"}); return
 	}
 
+	contentStatus:="published"
+	publishedAt:=time.Now()
+	if body.ScheduledAt!=nil && body.ScheduledAt.After(time.Now().Add(2*time.Minute)) {
+		if body.ScheduledAt.After(time.Now().Add(365*24*time.Hour)) {
+			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"scheduledAt is too far in the future"}); return
+		}
+		contentStatus="scheduled"
+		publishedAt=*body.ScheduledAt
+	}
+
 	playback:=s.mediaURL(key)
 	var id string
 	err=s.db.QueryRow(r.Context(),`
 		INSERT INTO reels (
 			creator_user_id,channel_id,media_title_id,episode_id,caption,source_url,playback_url,
 			cover_url,duration_ms,spoiler,allow_comments,status,published_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10,'published',now())
+		) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id::text
 	`,userID,body.ChannelID,body.MediaTitleID,body.EpisodeID,body.Caption,playback,
-		body.CoverURL,body.DurationMS,body.Spoiler,body.AllowComments).Scan(&id)
+		body.CoverURL,body.DurationMS,body.Spoiler,body.AllowComments,contentStatus,publishedAt).Scan(&id)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
-	_,_=s.db.Exec(r.Context(),"UPDATE profiles SET reel_count=reel_count+1,updated_at=now() WHERE user_id=$1",userID)
-	if body.ChannelID!=nil {
-		_,_=s.db.Exec(r.Context(),"UPDATE channels SET reel_count=reel_count+1,updated_at=now() WHERE id=$1",*body.ChannelID)
+	if contentStatus=="published" {
+		_,_=s.db.Exec(r.Context(),"UPDATE profiles SET reel_count=reel_count+1,updated_at=now() WHERE user_id=$1",userID)
+		if body.ChannelID!=nil {
+			_,_=s.db.Exec(r.Context(),"UPDATE channels SET reel_count=reel_count+1,updated_at=now() WHERE id=$1",*body.ChannelID)
+		}
 	}
 	_,_=s.db.Exec(r.Context(),"UPDATE ugc_uploads SET status='attached' WHERE id=$1",body.UploadID)
 
 	writeJSON(w,http.StatusCreated,map[string]any{
-		"id":id,"playbackUrl":playback,"status":"published",
+		"id":id,
+		"playbackUrl":playback,
+		"status":contentStatus,
+		"publishedAt":publishedAt,
 	})
 }
-
 func (s *Server) mediaURL(key string) string {
 	base:=strings.TrimRight(s.cfg.PublicAPIBaseURL,"/")
 	return base+"/v1/media/"+key

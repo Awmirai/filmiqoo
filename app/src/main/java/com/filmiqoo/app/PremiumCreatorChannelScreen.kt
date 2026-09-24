@@ -758,8 +758,10 @@ fun CreatorStudioScreen(
     onLive: () -> Unit
 ) {
     val repo=remember { CreatorChannelRepository(backend) }
+    val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
     var data by remember { mutableStateOf<CreatorStudioAnalytics?>(null) }
+    var scheduled by remember { mutableStateOf<List<ScheduledCreatorItem>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
 
     BackHandler { onBack() }
@@ -769,6 +771,7 @@ fun CreatorStudioScreen(
         data=runCatching { repo.creatorStudio() }
             .onFailure { error=it.message }
             .getOrNull()
+        scheduled=runCatching { repo.scheduledContent() }.getOrDefault(emptyList())
     }
 
     if(data==null && error==null) {
@@ -852,6 +855,58 @@ fun CreatorStudioScreen(
         }
 
         item {
+            PremiumSectionHeader(
+                "Scheduled",
+                if(scheduled.isEmpty())"محتوای زمان‌بندی‌شده‌ای نداری" else scheduled.size.toString()+" محتوای در صف",
+                Icons.Default.ScheduleSend
+            )
+        }
+
+        if(scheduled.isEmpty()) {
+            item {
+                Surface(
+                    color=FqSurface,
+                    shape=RoundedCornerShape(18.dp),
+                    modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
+                ) {
+                    Row(
+                        Modifier.padding(14.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.EventAvailable,null,tint=FqMuted)
+                        Spacer(Modifier.width(9.dp))
+                        Text(
+                            "از Filmiqoo Studio می‌تونی Post، Review، Poll و Reel رو برای زمان دقیق برنامه‌ریزی کنی.",
+                            color=FqMuted,
+                            fontSize=8.sp,
+                            lineHeight=14.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            items(scheduled,key={it.kind+"_"+it.id}) { item ->
+                ScheduledCreatorCard(
+                    item=item,
+                    onPublishNow={
+                        scope.launch {
+                            runCatching { repo.publishScheduledNow(item.kind,item.id) }
+                                .onSuccess { refresh++ }
+                                .onFailure { error=it.message }
+                        }
+                    },
+                    onUnschedule={
+                        scope.launch {
+                            runCatching { repo.unschedule(item.kind,item.id) }
+                                .onSuccess { refresh++ }
+                                .onFailure { error=it.message }
+                        }
+                    }
+                )
+            }
+        }
+
+        item {
             PremiumSectionHeader("نمای کلی","آمار واقعی حساب و محتوای منتشرشده",Icons.Default.Analytics)
         }
 
@@ -916,6 +971,115 @@ fun CreatorStudioScreen(
                             lineHeight=14.sp
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduledCreatorCard(
+    item:ScheduledCreatorItem,
+    onPublishNow:()->Unit,
+    onUnschedule:()->Unit
+) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
+    ) {
+        Column(Modifier.padding(13.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(42.dp).background(
+                        FqGold.copy(alpha=.12f),
+                        RoundedCornerShape(13.dp)
+                    ),
+                    contentAlignment=Alignment.Center
+                ) {
+                    Icon(
+                        if(item.kind=="reel")Icons.Default.VideoLibrary else Icons.Default.PostAdd,
+                        null,
+                        tint=FqGold
+                    )
+                }
+                Spacer(Modifier.width(9.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        when(item.contentType) {
+                            "review" -> "Review"
+                            "poll" -> "Poll"
+                            "announcement" -> "Announcement"
+                            "reel" -> "Reel"
+                            else -> "Post"
+                        },
+                        fontSize=10.sp,
+                        fontWeight=FontWeight.Bold
+                    )
+                    Text(
+                        item.scheduledAt.replace("T"," ").take(16),
+                        color=FqGold,
+                        fontSize=8.sp,
+                        modifier=Modifier.padding(top=2.dp)
+                    )
+                }
+                if(item.spoiler) {
+                    Surface(
+                        color=FqDanger.copy(alpha=.1f),
+                        shape=RoundedCornerShape(7.dp)
+                    ) {
+                        Text(
+                            "Spoiler",
+                            color=FqDanger,
+                            fontSize=6.sp,
+                            modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
+                        )
+                    }
+                }
+            }
+
+            if(item.preview.isNotBlank()) {
+                Text(
+                    item.preview,
+                    fontSize=8.sp,
+                    maxLines=3,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=9.dp)
+                )
+            }
+
+            val meta=listOf(item.channelName,item.mediaTitle).filter(String::isNotBlank)
+            if(meta.isNotEmpty()) {
+                Text(
+                    meta.joinToString(" • "),
+                    color=FqMuted,
+                    fontSize=7.sp,
+                    modifier=Modifier.padding(top=5.dp)
+                )
+            }
+
+            Row(
+                Modifier.fillMaxWidth().padding(top=9.dp),
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
+                Button(
+                    onClick=onPublishNow,
+                    colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                    shape=RoundedCornerShape(11.dp),
+                    modifier=Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Publish,null,tint=Color.Black,modifier=Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Publish Now",color=Color.Black,fontSize=7.sp)
+                }
+                OutlinedButton(
+                    onClick=onUnschedule,
+                    shape=RoundedCornerShape(11.dp),
+                    modifier=Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.EditCalendar,null,modifier=Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("برگردان به Draft",fontSize=7.sp)
                 }
             }
         }

@@ -34,6 +34,7 @@ func (s *Server) publicUserProfile(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) publicUserPosts(w http.ResponseWriter,r *http.Request) {
+	_ = s.processScheduledContent(r.Context())
 	id:=chi.URLParam(r,"id")
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
@@ -85,6 +86,7 @@ func (s *Server) channelReels(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) reelsByOwner(w http.ResponseWriter,r *http.Request,userID string,channelID string) {
+	_ = s.processScheduledContent(r.Context())
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT r.id::text,r.caption,r.playback_url,r.cover_url,r.duration_ms,
 		       r.like_count,r.comment_count,r.save_count,r.share_count,r.view_count,r.spoiler,
@@ -219,6 +221,7 @@ func (s *Server) channelMembers(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) creatorStudio(w http.ResponseWriter,r *http.Request) {
+	_ = s.processScheduledContent(r.Context())
 	userID:=userIDFromContext(r.Context())
 
 	var username,displayName,avatar string

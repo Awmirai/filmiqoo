@@ -13,6 +13,7 @@ import (
 var channelSlugPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]{3,40}$`)
 
 func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
+	_ = s.processScheduledContent(r.Context())
 	limit:=30
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
@@ -60,6 +61,7 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		EpisodeID *string `json:"episodeId"`
 		Spoiler bool `json:"spoiler"`
 		PollOptions []string `json:"pollOptions"`
+		ScheduledAt *time.Time `json:"scheduledAt"`
 	}
 	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
 		writeError(w,http.StatusBadRequest,err); return
@@ -92,6 +94,16 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		body.PollOptions=clean
 	}
 
+	status:="published"
+	publishedAt:=time.Now()
+	if body.ScheduledAt!=nil && body.ScheduledAt.After(time.Now().Add(2*time.Minute)) {
+		if body.ScheduledAt.After(time.Now().Add(365*24*time.Hour)) {
+			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"scheduledAt is too far in the future"}); return
+		}
+		status="scheduled"
+		publishedAt=*body.ScheduledAt
+	}
+
 	tx,err:=s.db.Begin(r.Context())
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer tx.Rollback(r.Context())
@@ -100,9 +112,9 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 	err=tx.QueryRow(r.Context(),`
 		INSERT INTO posts (
 			author_user_id,channel_id,media_title_id,episode_id,post_type,body,spoiler,status,published_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,'published',now())
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		RETURNING id::text
-	`,userID,body.ChannelID,body.MediaTitleID,body.EpisodeID,body.Type,body.Body,body.Spoiler).Scan(&id)
+	`,userID,body.ChannelID,body.MediaTitleID,body.EpisodeID,body.Type,body.Body,body.Spoiler,status,publishedAt).Scan(&id)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	if body.Type=="poll" {
@@ -116,23 +128,29 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		}
 	}
 
-	if _,err=tx.Exec(r.Context(),
-		"UPDATE profiles SET post_count=post_count+1,updated_at=now() WHERE user_id=$1",
-		userID); err!=nil {
-		writeError(w,http.StatusInternalServerError,err); return
-	}
-	if body.ChannelID!=nil {
+	if status=="published" {
 		if _,err=tx.Exec(r.Context(),
-			"UPDATE channels SET post_count=post_count+1,updated_at=now() WHERE id=$1",
-			*body.ChannelID); err!=nil {
+			"UPDATE profiles SET post_count=post_count+1,updated_at=now() WHERE user_id=$1",
+			userID); err!=nil {
 			writeError(w,http.StatusInternalServerError,err); return
+		}
+		if body.ChannelID!=nil {
+			if _,err=tx.Exec(r.Context(),
+				"UPDATE channels SET post_count=post_count+1,updated_at=now() WHERE id=$1",
+				*body.ChannelID); err!=nil {
+				writeError(w,http.StatusInternalServerError,err); return
+			}
 		}
 	}
 
 	if err:=tx.Commit(r.Context()); err!=nil {
 		writeError(w,http.StatusInternalServerError,err); return
 	}
-	writeJSON(w,http.StatusCreated,map[string]any{"id":id,"status":"published"})
+	writeJSON(w,http.StatusCreated,map[string]any{
+		"id":id,
+		"status":status,
+		"publishedAt":publishedAt,
+	})
 }
 func (s *Server) togglePostLike(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())

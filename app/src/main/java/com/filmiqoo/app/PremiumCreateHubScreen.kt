@@ -1,5 +1,7 @@
 package com.filmiqoo.app
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -31,6 +33,11 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 private enum class CreateKind(
     val label:String,
@@ -57,7 +64,8 @@ private data class CreateDraft(
     val poll2:String="",
     val poll3:String="",
     val mediaBackendId:String?=null,
-    val mediaTitle:String?=null
+    val mediaTitle:String?=null,
+    val scheduledAtMillis:Long=0L
 )
 
 private class CreateDraftStore(context:Context) {
@@ -76,7 +84,8 @@ private class CreateDraftStore(context:Context) {
         poll2=prefs.getString("poll2","") ?: "",
         poll3=prefs.getString("poll3","") ?: "",
         mediaBackendId=prefs.getString("media_id",null),
-        mediaTitle=prefs.getString("media_title",null)
+        mediaTitle=prefs.getString("media_title",null),
+        scheduledAtMillis=prefs.getLong("scheduled_at_ms",0L)
     )
 
     fun write(d:CreateDraft) {
@@ -94,6 +103,7 @@ private class CreateDraftStore(context:Context) {
             .putString("poll3",d.poll3)
             .putString("media_id",d.mediaBackendId)
             .putString("media_title",d.mediaTitle)
+            .putLong("scheduled_at_ms",d.scheduledAtMillis)
             .apply()
     }
 
@@ -129,6 +139,9 @@ fun PremiumCreateHubScreen(
     var channelSlug by remember { mutableStateOf(savedDraft.channelSlug) }
     var channelBio by remember { mutableStateOf(savedDraft.channelBio) }
     var visibility by remember { mutableStateOf(savedDraft.visibility) }
+    var scheduledAtMillis by remember {
+        mutableStateOf(savedDraft.scheduledAtMillis.takeIf { it>System.currentTimeMillis()+120_000L })
+    }
 
     val pollOptions=remember {
         mutableStateListOf(savedDraft.poll1,savedDraft.poll2,savedDraft.poll3)
@@ -173,7 +186,8 @@ fun PremiumCreateHubScreen(
         poll2=pollOptions.getOrElse(1){""},
         poll3=pollOptions.getOrElse(2){""},
         mediaBackendId=taggedMedia?.backendId,
-        mediaTitle=taggedMedia?.title
+        mediaTitle=taggedMedia?.title,
+        scheduledAtMillis=scheduledAtMillis ?: 0L
     )
 
     val canPublish=when(kind) {
@@ -458,6 +472,82 @@ fun PremiumCreateHubScreen(
                                 }
                             }
                         }
+
+                        if(kind in listOf(CreateKind.POST,CreateKind.REVIEW,CreateKind.POLL,CreateKind.REEL)) {
+                            Surface(
+                                color=if(scheduledAtMillis!=null)FqGold.copy(alpha=.08f) else FqSurface2,
+                                shape=RoundedCornerShape(15.dp),
+                                modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                                    .clickable {
+                                        val base=Calendar.getInstance()
+                                        scheduledAtMillis?.let { base.timeInMillis=it }
+                                        DatePickerDialog(
+                                            context,
+                                            { _,year,month,day ->
+                                                val chosen=Calendar.getInstance().apply {
+                                                    set(Calendar.YEAR,year)
+                                                    set(Calendar.MONTH,month)
+                                                    set(Calendar.DAY_OF_MONTH,day)
+                                                }
+                                                TimePickerDialog(
+                                                    context,
+                                                    { _,hour,minute ->
+                                                        chosen.set(Calendar.HOUR_OF_DAY,hour)
+                                                        chosen.set(Calendar.MINUTE,minute)
+                                                        chosen.set(Calendar.SECOND,0)
+                                                        chosen.set(Calendar.MILLISECOND,0)
+                                                        if(chosen.timeInMillis>System.currentTimeMillis()+120_000L) {
+                                                            scheduledAtMillis=chosen.timeInMillis
+                                                            error=null
+                                                        } else {
+                                                            error="زمان انتشار باید حداقل چند دقیقه در آینده باشد."
+                                                        }
+                                                    },
+                                                    base.get(Calendar.HOUR_OF_DAY),
+                                                    base.get(Calendar.MINUTE),
+                                                    true
+                                                ).show()
+                                            },
+                                            base.get(Calendar.YEAR),
+                                            base.get(Calendar.MONTH),
+                                            base.get(Calendar.DAY_OF_MONTH)
+                                        ).show()
+                                    }
+                            ) {
+                                Row(
+                                    Modifier.padding(11.dp),
+                                    verticalAlignment=Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if(scheduledAtMillis!=null)Icons.Default.ScheduleSend else Icons.Default.Schedule,
+                                        null,
+                                        tint=if(scheduledAtMillis!=null)FqGold else Color.White
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            if(scheduledAtMillis==null)"زمان‌بندی انتشار" else "انتشار زمان‌بندی‌شده",
+                                            fontSize=9.sp,
+                                            fontWeight=FontWeight.Bold
+                                        )
+                                        Text(
+                                            scheduledAtMillis?.let(::formatCreatorSchedule)
+                                                ?: "اختیاری • تاریخ و ساعت دقیق انتخاب کن",
+                                            color=if(scheduledAtMillis!=null)FqGold else FqMuted,
+                                            fontSize=7.sp,
+                                            modifier=Modifier.padding(top=2.dp)
+                                        )
+                                    }
+                                    if(scheduledAtMillis!=null) {
+                                        IconButton(onClick={scheduledAtMillis=null}) {
+                                            Icon(Icons.Default.Close,null)
+                                        }
+                                    } else {
+                                        Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -510,6 +600,9 @@ fun PremiumCreateHubScreen(
                     scope.launch {
                         runCatching {
                             val mediaId=taggedMedia?.backendId
+                            val scheduledIso=scheduledAtMillis?.let { Instant.ofEpochMilli(it).toString() }
+                            val isScheduled=scheduledAtMillis!=null &&
+                                scheduledAtMillis!!>System.currentTimeMillis()+120_000L
                             when(kind) {
                                 CreateKind.POST -> {
                                     publishStage="در حال ثبت Post..."
@@ -517,9 +610,10 @@ fun PremiumCreateHubScreen(
                                         body=caption.trim(),
                                         type="post",
                                         spoiler=spoiler,
-                                        mediaTitleId=mediaId
+                                        mediaTitleId=mediaId,
+                                        scheduledAt=scheduledIso
                                     )
-                                    "Post منتشر شد."
+                                    if(isScheduled)"Post زمان‌بندی شد." else "Post منتشر شد."
                                 }
                                 CreateKind.REVIEW -> {
                                     publishStage="در حال انتشار Review..."
@@ -527,9 +621,10 @@ fun PremiumCreateHubScreen(
                                         body=caption.trim(),
                                         type="review",
                                         spoiler=spoiler,
-                                        mediaTitleId=mediaId
+                                        mediaTitleId=mediaId,
+                                        scheduledAt=scheduledIso
                                     )
-                                    "Review منتشر شد."
+                                    if(isScheduled)"Review زمان‌بندی شد." else "Review منتشر شد."
                                 }
                                 CreateKind.POLL -> {
                                     publishStage="در حال ساخت Poll..."
@@ -540,9 +635,10 @@ fun PremiumCreateHubScreen(
                                         mediaTitleId=mediaId,
                                         pollOptions=pollOptions.map(String::trim)
                                             .filter(String::isNotBlank)
-                                            .distinct()
+                                            .distinct(),
+                                        scheduledAt=scheduledIso
                                     )
-                                    "Poll منتشر شد."
+                                    if(isScheduled)"Poll زمان‌بندی شد." else "Poll منتشر شد."
                                 }
                                 CreateKind.STORY -> {
                                     if(selectedUri!=null) {
@@ -574,9 +670,10 @@ fun PremiumCreateHubScreen(
                                         caption=caption.trim(),
                                         spoiler=spoiler,
                                         allowComments=allowComments,
-                                        mediaTitleId=mediaId
+                                        mediaTitleId=mediaId,
+                                        scheduledAt=scheduledIso
                                     )
-                                    "Reel روی Explore منتشر شد."
+                                    if(isScheduled)"Reel زمان‌بندی شد." else "Reel روی Explore منتشر شد."
                                 }
                                 CreateKind.CHANNEL -> {
                                     publishStage="در حال ساخت Channel..."
@@ -596,6 +693,7 @@ fun PremiumCreateHubScreen(
                             selectedUri=null
                             spoiler=false
                             taggedMedia=null
+                            scheduledAtMillis=null
                             pollOptions.clear()
                             pollOptions.add("")
                             pollOptions.add("")
@@ -615,11 +713,11 @@ fun PremiumCreateHubScreen(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     when(kind) {
-                        CreateKind.REEL -> "آپلود و انتشار Reel"
+                        CreateKind.REEL -> if(scheduledAtMillis!=null)"آپلود و زمان‌بندی Reel" else "آپلود و انتشار Reel"
                         CreateKind.STORY -> "انتشار Story"
-                        CreateKind.POLL -> "انتشار Poll"
+                        CreateKind.POLL -> if(scheduledAtMillis!=null)"زمان‌بندی Poll" else "انتشار Poll"
                         CreateKind.CHANNEL -> "ساخت Channel"
-                        else -> "انتشار"
+                        else -> if(scheduledAtMillis!=null)"زمان‌بندی انتشار" else "انتشار"
                     },
                     color=Color.Black,
                     fontWeight=FontWeight.Bold
@@ -812,3 +910,7 @@ fun MediaTagPickerDialog(
         confirmButton={TextButton(onClick=onDismiss){Text("بستن")}}
     )
 }
+
+
+private fun formatCreatorSchedule(value:Long):String =
+    SimpleDateFormat("yyyy/MM/dd • HH:mm",Locale.getDefault()).format(Date(value))

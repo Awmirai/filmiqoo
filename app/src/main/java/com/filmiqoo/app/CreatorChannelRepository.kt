@@ -67,6 +67,19 @@ data class ChannelManageOverview(
     val myRole:String
 )
 
+data class ScheduledCreatorItem(
+    val id:String,
+    val kind:String,
+    val contentType:String,
+    val preview:String,
+    val scheduledAt:String,
+    val channelId:String?,
+    val channelName:String,
+    val mediaTitleId:String?,
+    val mediaTitle:String,
+    val spoiler:Boolean
+)
+
 data class CreatorStudioAnalytics(
     val id: String,
     val username: String,
@@ -305,6 +318,44 @@ class CreatorChannelRepository(
             authorized=true
         )
     }
+
+    suspend fun scheduledContent():List<ScheduledCreatorItem> {
+        val root=backend.getJson("/v1/creator/scheduled",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    ScheduledCreatorItem(
+                        id=x.optString("id"),
+                        kind=x.optString("kind"),
+                        contentType=x.optString("contentType"),
+                        preview=x.optString("preview"),
+                        scheduledAt=x.optString("scheduledAt"),
+                        channelId=x.optString("channelId").takeIf(String::isNotBlank),
+                        channelName=x.optString("channelName"),
+                        mediaTitleId=x.optString("mediaTitleId").takeIf(String::isNotBlank),
+                        mediaTitle=x.optString("mediaTitle"),
+                        spoiler=x.optBoolean("spoiler")
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun publishScheduledNow(kind:String,id:String):Boolean =
+        backend.postJson(
+            "/v1/creator/scheduled/"+kind+"/"+id+"/publish-now",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("published")
+
+    suspend fun unschedule(kind:String,id:String):Boolean =
+        backend.postJson(
+            "/v1/creator/scheduled/"+kind+"/"+id+"/unschedule",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("unscheduled")
 
     suspend fun creatorStudio(): CreatorStudioAnalytics {
         val root=backend.getJson("/v1/creator/studio",authorized=true)

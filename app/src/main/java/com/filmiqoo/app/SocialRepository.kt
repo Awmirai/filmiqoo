@@ -419,7 +419,8 @@ class SocialRepository(
         spoiler: Boolean=false,
         channelId: String?=null,
         mediaTitleId: String?=null,
-        pollOptions: List<String> = emptyList()
+        pollOptions: List<String> = emptyList(),
+        scheduledAt: String? = null
     ): String {
         val o=JSONObject()
             .put("type",type)
@@ -427,6 +428,7 @@ class SocialRepository(
             .put("spoiler",spoiler)
         if(!channelId.isNullOrBlank()) o.put("channelId",channelId)
         if(!mediaTitleId.isNullOrBlank()) o.put("mediaTitleId",mediaTitleId)
+        if(!scheduledAt.isNullOrBlank()) o.put("scheduledAt",scheduledAt)
         if(pollOptions.isNotEmpty()) {
             val arr=JSONArray()
             pollOptions.forEach { arr.put(it) }
@@ -537,7 +539,8 @@ class SocialRepository(
         caption: String,
         spoiler: Boolean=false,
         allowComments: Boolean=true,
-        mediaTitleId: String?=null
+        mediaTitleId: String?=null,
+        scheduledAt: String?=null
     ): String {
         val body=JSONObject()
             .put("uploadId",uploadId)
@@ -546,6 +549,7 @@ class SocialRepository(
             .put("allowComments",allowComments)
             .put("durationMs",0)
         if(!mediaTitleId.isNullOrBlank()) body.put("mediaTitleId",mediaTitleId)
+        if(!scheduledAt.isNullOrBlank()) body.put("scheduledAt",scheduledAt)
         return backend.postJson("/v1/social/reels",body,authorized=true).getString("id")
     }
 
