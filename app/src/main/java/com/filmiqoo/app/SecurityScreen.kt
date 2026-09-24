@@ -1,6 +1,8 @@
 package com.filmiqoo.app
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,11 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SecurityScreen(
@@ -28,6 +34,36 @@ fun SecurityScreen(
 ) {
     val repo=remember { SecurityRepository(backend) }
     val scope=rememberCoroutineScope()
+    val context=LocalContext.current
+
+    var exportPayload by remember { mutableStateOf<String?>(null) }
+    var privacyBusy by remember { mutableStateOf(false) }
+    var deleteAccountOpen by remember { mutableStateOf(false) }
+    var deletePassword by remember { mutableStateOf("") }
+    var deleteConfirmation by remember { mutableStateOf("") }
+
+    val exportLauncher=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val payload=exportPayload
+        exportPayload=null
+        if(uri==null || payload==null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.writer(Charsets.UTF_8).use { writer ->
+                            writer.write(payload)
+                        }
+                    } ?: error("فایل قابل ایجاد نیست")
+                }
+            }.onSuccess {
+                actionMessage="نسخه اطلاعات حساب ذخیره شد."
+            }.onFailure {
+                error=it.message
+            }
+        }
+    }
 
     var sessions by remember { mutableStateOf<List<AccountSession>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -109,6 +145,60 @@ fun SecurityScreen(
             }
         }
 
+        Surface(
+            color=FqSurface,
+            shape=RoundedCornerShape(20.dp),
+            modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
+        ) {
+            Column(Modifier.padding(14.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Icon(Icons.Default.PrivacyTip,null,tint=FqGold)
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("حریم خصوصی و حساب",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text(
+                            "دریافت نسخه داده‌ها یا حذف کامل دسترسی حساب.",
+                            color=FqMuted,
+                            fontSize=8.sp,
+                            lineHeight=14.sp
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    enabled=!privacyBusy,
+                    onClick={
+                        privacyBusy=true
+                        scope.launch {
+                            runCatching { repo.accountExportJson() }
+                                .onSuccess { payload ->
+                                    exportPayload=payload
+                                    exportLauncher.launch("filmiqoo-account-export.json")
+                                }
+                                .onFailure { error=it.message }
+                            privacyBusy=false
+                        }
+                    },
+                    modifier=Modifier.fillMaxWidth().padding(top=12.dp)
+                ) {
+                    Icon(Icons.Default.Download,null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("دریافت نسخه اطلاعات من")
+                }
+
+                OutlinedButton(
+                    enabled=!privacyBusy,
+                    onClick={deleteAccountOpen=true},
+                    colors=ButtonDefaults.outlinedButtonColors(contentColor=FqDanger),
+                    modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                ) {
+                    Icon(Icons.Default.DeleteForever,null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("حذف حساب")
+                }
+            }
+        }
+
         Text(
             "دستگاه‌های فعال",
             fontSize=14.sp,
@@ -170,6 +260,92 @@ fun SecurityScreen(
                 }) { Text("قطع Session",color=FqDanger) }
             },
             dismissButton={TextButton(onClick={revokeTarget=null}){Text("لغو")}}
+        )
+    }
+
+    if(deleteAccountOpen) {
+        AlertDialog(
+            onDismissRequest={
+                if(!privacyBusy) {
+                    deleteAccountOpen=false
+                    deletePassword=""
+                    deleteConfirmation=""
+                }
+            },
+            icon={Icon(Icons.Default.DeleteForever,null,tint=FqDanger)},
+            title={Text("حذف حساب Filmiqoo")},
+            text={
+                Column {
+                    Text(
+                        "Sessionها و داده‌های خصوصی حذف می‌شوند و محتوای قبلی به حالت ناشناس/حذف‌شده می‌رود."
+                    )
+                    OutlinedTextField(
+                        value=deletePassword,
+                        onValueChange={deletePassword=it.take(128)},
+                        label={Text("رمز عبور")},
+                        visualTransformation=PasswordVisualTransformation(),
+                        singleLine=true,
+                        modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                    )
+                    OutlinedTextField(
+                        value=deleteConfirmation,
+                        onValueChange={deleteConfirmation=it.take(6)},
+                        label={Text("برای تأیید DELETE بنویس")},
+                        singleLine=true,
+                        modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                    )
+                }
+            },
+            confirmButton={
+                Button(
+                    enabled=!privacyBusy &&
+                        deletePassword.isNotBlank() &&
+                        deleteConfirmation=="DELETE",
+                    onClick={
+                        privacyBusy=true
+                        scope.launch {
+                            runCatching {
+                                repo.deleteAccount(
+                                    password=deletePassword,
+                                    confirmation=deleteConfirmation
+                                )
+                            }.onSuccess { deleted ->
+                                if(deleted) {
+                                    backend.session.clear()
+                                    deleteAccountOpen=false
+                                    deletePassword=""
+                                    deleteConfirmation=""
+                                    onCurrentSessionRevoked()
+                                }
+                            }.onFailure {
+                                error=it.message
+                            }
+                            privacyBusy=false
+                        }
+                    },
+                    colors=ButtonDefaults.buttonColors(containerColor=FqDanger)
+                ) {
+                    if(privacyBusy) {
+                        CircularProgressIndicator(
+                            color=Color.White,
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text("حذف حساب",color=Color.White)
+                }
+            },
+            dismissButton={
+                TextButton(
+                    enabled=!privacyBusy,
+                    onClick={
+                        deleteAccountOpen=false
+                        deletePassword=""
+                        deleteConfirmation=""
+                    }
+                ) { Text("لغو") }
+            }
         )
     }
 
