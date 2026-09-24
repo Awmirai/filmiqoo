@@ -467,283 +467,384 @@ fun ConnectedRoomScreen(
         ) {
             items(messages.size,key={messages[it].id}) { index ->
                 val msg=messages[index]
+                val selected=selectedMessageIds.contains(msg.id)
                 var reveal by remember(msg.id) { mutableStateOf(!msg.spoiler) }
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Top) {
-                    RemoteImage(msg.author.avatarUrl.takeIf(String::isNotBlank),Modifier.size(34.dp).background(FqSurface2,CircleShape))
-                    Spacer(Modifier.width(8.dp))
-                    Surface(color=FqSurface,shape=RoundedCornerShape(16.dp),modifier=Modifier.weight(1f)) {
-                        Column(Modifier.padding(10.dp)) {
-                            var menuOpen by remember(msg.id) { mutableStateOf(false) }
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment=Alignment.CenterVertically
+
+                if(msg.id==firstUnreadMessageId) {
+                    UnreadMessagesDivider(initialUnreadCount)
+                }
+
+                SwipeToReplyMessage(
+                    key=msg.id,
+                    enabled=loggedIn && selectedMessageIds.isEmpty(),
+                    onReply={
+                        replyTo=msg
+                        draftReplyId=msg.id
+                    }
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().combinedClickable(
+                            onClick={
+                                if(selectedMessageIds.isNotEmpty()) {
+                                    selectedMessageIds=
+                                        if(selected) selectedMessageIds-msg.id
+                                        else selectedMessageIds+msg.id
+                                }
+                            },
+                            onLongClick={
+                                selectedMessageIds=
+                                    if(selected) selectedMessageIds-msg.id
+                                    else selectedMessageIds+msg.id
+                            }
+                        ),
+                        verticalAlignment=Alignment.Top
+                    ) {
+                        if(selected) {
+                            Box(
+                                Modifier.size(28.dp)
+                                    .background(FqGold,CircleShape),
+                                contentAlignment=Alignment.Center
                             ) {
-                                Text(msg.author.displayName,color=FqGold,fontSize=9.sp)
-                                if(msg.author.verified) {
-                                    Spacer(Modifier.width(3.dp))
-                                    Icon(
-                                        Icons.Default.Verified,
-                                        null,
-                                        tint=Color(0xFF4AB7FF),
-                                        modifier=Modifier.size(12.dp)
-                                    )
-                                }
-                                if(msg.pinned) {
-                                    Spacer(Modifier.width(5.dp))
-                                    Icon(
-                                        Icons.Default.PushPin,
-                                        null,
-                                        tint=FqGold,
-                                        modifier=Modifier.size(12.dp)
-                                    )
-                                }
-                                Spacer(Modifier.weight(1f))
-                                Box {
-                                    IconButton(
-                                        onClick={menuOpen=true},
-                                        modifier=Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.MoreVert,
-                                            null,
-                                            tint=FqMuted,
-                                            modifier=Modifier.size(17.dp)
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded=menuOpen,
-                                        onDismissRequest={menuOpen=false}
-                                    ) {
-                                        DropdownMenuItem(
-                                            text={Text("پاسخ")},
-                                            leadingIcon={Icon(Icons.Default.Reply,null)},
-                                            onClick={
-                                                menuOpen=false
-                                                replyTo=msg
-                                            }
-                                        )
-                                        if(loggedIn) {
-                                            DropdownMenuItem(
-                                                text={Text("فوروارد")},
-                                                leadingIcon={Icon(Icons.Default.Forward,null)},
-                                                onClick={
-                                                    menuOpen=false
-                                                    forwardTarget=msg
-                                                }
-                                            )
-                                        }
-                                        if(meId==msg.author.id && msg.type=="text") {
-                                            DropdownMenuItem(
-                                                text={Text("ویرایش")},
-                                                leadingIcon={Icon(Icons.Default.Edit,null)},
-                                                onClick={
-                                                    menuOpen=false
-                                                    editTarget=msg
-                                                }
-                                            )
-                                        }
-                                        if(loggedIn) {
-                                            DropdownMenuItem(
-                                                text={Text(if(msg.pinned)"برداشتن Pin" else "Pin پیام")},
-                                                leadingIcon={Icon(Icons.Default.PushPin,null)},
-                                                onClick={
-                                                    menuOpen=false
-                                                    scope.launch {
-                                                        runCatching {
-                                                            social.toggleMessagePin(roomId,msg.id)
-                                                        }.onSuccess {
-                                                            actionMessage=if(it)"پیام Pin شد." else "Pin برداشته شد."
-                                                            refresh()
-                                                        }.onFailure {
-                                                            error=it.message
-                                                        }
-                                                    }
-                                                }
-                                            )
-                                        }
-                                        if(meId==msg.author.id) {
-                                            DropdownMenuItem(
-                                                text={Text("حذف",color=FqDanger)},
-                                                leadingIcon={Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)},
-                                                onClick={
-                                                    menuOpen=false
-                                                    scope.launch {
-                                                        runCatching {
-                                                            social.deleteMessage(roomId,msg.id)
-                                                        }.onSuccess {
-                                                            actionMessage="پیام حذف شد."
-                                                            refresh()
-                                                        }.onFailure {
-                                                            error=it.message
-                                                        }
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            msg.forwardedFrom?.let { forwarded ->
-                                Surface(
-                                    color=FqGold.copy(alpha=.08f),
-                                    shape=RoundedCornerShape(10.dp),
-                                    modifier=Modifier.fillMaxWidth().padding(top=6.dp)
-                                ) {
-                                    Row(
-                                        Modifier.padding(8.dp),
-                                        verticalAlignment=Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Forward,
-                                            null,
-                                            tint=FqGold,
-                                            modifier=Modifier.size(14.dp)
-                                        )
-                                        Spacer(Modifier.width(5.dp))
-                                        Column {
-                                            Text(
-                                                "فوروارد شده از "+forwarded.author,
-                                                color=FqGold,
-                                                fontSize=7.sp
-                                            )
-                                            Text(
-                                                forwarded.body.ifBlank {
-                                                    when(forwarded.type) {
-                                                        "voice" -> "پیام صوتی"
-                                                        "image" -> "تصویر"
-                                                        "video" -> "ویدیو"
-                                                        else -> "پیام"
-                                                    }
-                                                },
-                                                color=FqMuted,
-                                                fontSize=7.sp,
-                                                maxLines=1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if(!msg.replyPreview.isNullOrBlank()) {
-                                Surface(
-                                    color=FqSurface2,
-                                    shape=RoundedCornerShape(10.dp),
-                                    modifier=Modifier.fillMaxWidth().padding(top=6.dp)
-                                ) {
-                                    Column(Modifier.padding(8.dp)) {
-                                        Text(msg.replyAuthor ?: "Reply",color=FqGold,fontSize=7.sp)
-                                        Text(
-                                            msg.replyPreview,
-                                            color=FqMuted,
-                                            fontSize=7.sp,
-                                            maxLines=2
-                                        )
-                                    }
-                                }
-                            }
-
-                            if(msg.spoiler && !reveal) {
-                                Text(
-                                    "⚠ Spoiler Shield • نمایش پیام",
-                                    color=FqDanger,fontSize=9.sp,
-                                    modifier=Modifier.padding(top=5.dp).clickable { reveal=true }
+                                Icon(
+                                    Icons.Default.Check,
+                                    null,
+                                    tint=Color.Black,
+                                    modifier=Modifier.size(18.dp)
                                 )
-                            } else {
-                                if(!msg.attachmentUrl.isNullOrBlank()) {
-                                    if(msg.type=="voice") {
-                                        VoiceMessagePlayer(
-                                            url=msg.attachmentUrl,
-                                            declaredDurationMs=msg.attachmentDurationMs
-                                        )
-                                    } else {
-                                        Box(
-                                            Modifier.fillMaxWidth().height(190.dp)
-                                                .padding(top=7.dp).clip(RoundedCornerShape(12.dp))
-                                        ) {
-                                            RemoteImage(
-                                                msg.attachmentUrl,
-                                                Modifier.fillMaxSize(),
-                                                ContentScale.Crop
-                                            )
-                                            if(msg.type=="video") {
-                                                Box(
-                                                    Modifier.size(46.dp).align(Alignment.Center)
-                                                        .background(Color.Black.copy(alpha=.55f),CircleShape),
-                                                    contentAlignment=Alignment.Center
-                                                ) {
-                                                    Icon(Icons.Default.PlayArrow,null,tint=Color.White)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                if(msg.body.isNotBlank()) {
-                                    Text(
-                                        msg.body,
-                                        fontSize=10.sp,
-                                        lineHeight=17.sp,
-                                        modifier=Modifier.padding(top=5.dp)
-                                    )
-                                }
                             }
+                            Spacer(Modifier.width(6.dp))
+                        } else {
+                            RemoteImage(
+                                msg.author.avatarUrl.takeIf(String::isNotBlank),
+                                Modifier.size(34.dp).background(FqSurface2,CircleShape)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
 
-                            if(msg.editedAt!=null || (meId==msg.author.id && msg.seenBy>0)) {
+                        Surface(
+                            color=if(selected)FqGold.copy(alpha=.10f) else FqSurface,
+                            shape=RoundedCornerShape(16.dp),
+                            modifier=Modifier.weight(1f)
+                        ) {
+                            Column(Modifier.padding(10.dp)) {
+                                var menuOpen by remember(msg.id) { mutableStateOf(false) }
                                 Row(
-                                    Modifier.fillMaxWidth().padding(top=4.dp),
+                                    Modifier.fillMaxWidth(),
                                     verticalAlignment=Alignment.CenterVertically
                                 ) {
-                                    if(msg.editedAt!=null) {
-                                        Text("ویرایش شده",color=FqMuted,fontSize=6.sp)
-                                    }
-                                    Spacer(Modifier.weight(1f))
-                                    if(meId==msg.author.id && msg.seenBy>0) {
+                                    Text(msg.author.displayName,color=FqGold,fontSize=9.sp)
+                                    if(msg.author.verified) {
+                                        Spacer(Modifier.width(3.dp))
                                         Icon(
-                                            Icons.Default.DoneAll,
+                                            Icons.Default.Verified,
+                                            null,
+                                            tint=Color(0xFF4AB7FF),
+                                            modifier=Modifier.size(12.dp)
+                                        )
+                                    }
+                                    if(msg.pinned) {
+                                        Spacer(Modifier.width(5.dp))
+                                        Icon(
+                                            Icons.Default.PushPin,
                                             null,
                                             tint=FqGold,
-                                            modifier=Modifier.size(13.dp)
-                                        )
-                                        Spacer(Modifier.width(3.dp))
-                                        Text(
-                                            "دیده‌شده توسط "+msg.seenBy,
-                                            color=FqMuted,
-                                            fontSize=6.sp
+                                            modifier=Modifier.size(12.dp)
                                         )
                                     }
+                                    Spacer(Modifier.weight(1f))
+                                    if(selectedMessageIds.isEmpty()) {
+                                        Box {
+                                            IconButton(
+                                                onClick={menuOpen=true},
+                                                modifier=Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.MoreVert,
+                                                    null,
+                                                    tint=FqMuted,
+                                                    modifier=Modifier.size(17.dp)
+                                                )
+                                            }
+                                            DropdownMenu(
+                                                expanded=menuOpen,
+                                                onDismissRequest={menuOpen=false}
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text={Text("پاسخ")},
+                                                    leadingIcon={Icon(Icons.Default.Reply,null)},
+                                                    onClick={
+                                                        menuOpen=false
+                                                        replyTo=msg
+                                                        draftReplyId=msg.id
+                                                    }
+                                                )
+                                                if(loggedIn) {
+                                                    DropdownMenuItem(
+                                                        text={Text("فوروارد")},
+                                                        leadingIcon={Icon(Icons.Default.Forward,null)},
+                                                        onClick={
+                                                            menuOpen=false
+                                                            forwardTarget=msg
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text={Text("انتخاب پیام")},
+                                                        leadingIcon={Icon(Icons.Default.CheckCircle,null)},
+                                                        onClick={
+                                                            menuOpen=false
+                                                            selectedMessageIds=setOf(msg.id)
+                                                        }
+                                                    )
+                                                }
+                                                if(meId==msg.author.id && msg.type=="text") {
+                                                    DropdownMenuItem(
+                                                        text={Text("ویرایش")},
+                                                        leadingIcon={Icon(Icons.Default.Edit,null)},
+                                                        onClick={
+                                                            menuOpen=false
+                                                            editTarget=msg
+                                                        }
+                                                    )
+                                                }
+                                                if(loggedIn) {
+                                                    DropdownMenuItem(
+                                                        text={Text(if(msg.pinned)"برداشتن Pin" else "Pin پیام")},
+                                                        leadingIcon={Icon(Icons.Default.PushPin,null)},
+                                                        onClick={
+                                                            menuOpen=false
+                                                            scope.launch {
+                                                                runCatching {
+                                                                    social.toggleMessagePin(roomId,msg.id)
+                                                                }.onSuccess {
+                                                                    actionMessage=if(it)"پیام Pin شد." else "Pin برداشته شد."
+                                                                    refresh()
+                                                                }.onFailure {
+                                                                    error=it.message
+                                                                }
+                                                            }
+                                                        }
+                                                    )
+                                                }
+                                                if(meId==msg.author.id) {
+                                                    DropdownMenuItem(
+                                                        text={Text("حذف",color=FqDanger)},
+                                                        leadingIcon={Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)},
+                                                        onClick={
+                                                            menuOpen=false
+                                                            scope.launch {
+                                                                runCatching {
+                                                                    social.deleteMessage(roomId,msg.id)
+                                                                }.onSuccess {
+                                                                    actionMessage="پیام حذف شد."
+                                                                    refresh()
+                                                                }.onFailure {
+                                                                    error=it.message
+                                                                }
+                                                            }
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                            }
 
-                            Row(
-                                Modifier.fillMaxWidth().padding(top=7.dp),
-                                verticalAlignment=Alignment.CenterVertically
-                            ) {
-                                TextButton(
-                                    onClick={replyTo=msg},
-                                    contentPadding=PaddingValues(horizontal=4.dp,vertical=0.dp)
-                                ) {
-                                    Icon(Icons.Default.Reply,null,modifier=Modifier.size(14.dp))
-                                    Spacer(Modifier.width(3.dp))
-                                    Text("پاسخ",fontSize=7.sp)
+                                msg.forwardedFrom?.let { forwarded ->
+                                    Surface(
+                                        color=FqGold.copy(alpha=.08f),
+                                        shape=RoundedCornerShape(10.dp),
+                                        modifier=Modifier.fillMaxWidth().padding(top=6.dp)
+                                    ) {
+                                        Row(
+                                            Modifier.padding(8.dp),
+                                            verticalAlignment=Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Forward,
+                                                null,
+                                                tint=FqGold,
+                                                modifier=Modifier.size(14.dp)
+                                            )
+                                            Spacer(Modifier.width(5.dp))
+                                            Column {
+                                                Text(
+                                                    "فوروارد شده از "+forwarded.author,
+                                                    color=FqGold,
+                                                    fontSize=7.sp
+                                                )
+                                                Text(
+                                                    forwarded.body.ifBlank {
+                                                        when(forwarded.type) {
+                                                            "voice" -> "پیام صوتی"
+                                                            "image" -> "تصویر"
+                                                            "video" -> "ویدیو"
+                                                            "document" -> "فایل"
+                                                            "location" -> "موقعیت مکانی"
+                                                            "contact" -> "مخاطب"
+                                                            else -> "پیام"
+                                                        }
+                                                    },
+                                                    color=FqMuted,
+                                                    fontSize=7.sp,
+                                                    maxLines=1
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
-                                listOf("❤️","🔥","😂","👍").forEach { reaction ->
-                                    val count=msg.reactions[reaction] ?: 0L
+
+                                if(!msg.replyPreview.isNullOrBlank()) {
+                                    Surface(
+                                        color=FqSurface2,
+                                        shape=RoundedCornerShape(10.dp),
+                                        modifier=Modifier.fillMaxWidth().padding(top=6.dp)
+                                    ) {
+                                        Column(Modifier.padding(8.dp)) {
+                                            Text(msg.replyAuthor ?: "Reply",color=FqGold,fontSize=7.sp)
+                                            Text(
+                                                msg.replyPreview,
+                                                color=FqMuted,
+                                                fontSize=7.sp,
+                                                maxLines=2
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if(msg.spoiler && !reveal) {
                                     Text(
-                                        reaction + if(count>0)" "+count else "",
-                                        fontSize=8.sp,
-                                        modifier=Modifier.padding(horizontal=3.dp)
-                                            .clickable {
-                                                if(!loggedIn) {
-                                                    onRequireAuth()
-                                                } else {
-                                                    scope.launch {
-                                                        runCatching {
-                                                            social.toggleMessageReaction(roomId,msg.id,reaction)
-                                                        }.onSuccess { refresh() }
+                                        "⚠ Spoiler Shield • نمایش پیام",
+                                        color=FqDanger,
+                                        fontSize=9.sp,
+                                        modifier=Modifier.padding(top=5.dp).clickable { reveal=true }
+                                    )
+                                } else {
+                                    when(msg.type) {
+                                        "voice" -> {
+                                            msg.attachmentUrl?.let { url ->
+                                                VoiceMessagePlayer(
+                                                    url=url,
+                                                    declaredDurationMs=msg.attachmentDurationMs,
+                                                    waveform=msg.attachmentWaveform
+                                                )
+                                            }
+                                        }
+                                        "document","location","contact" -> {
+                                            RichMessageAttachment(msg)
+                                        }
+                                        "image","video" -> {
+                                            if(!msg.attachmentUrl.isNullOrBlank()) {
+                                                Box(
+                                                    Modifier.fillMaxWidth().height(190.dp)
+                                                        .padding(top=7.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                ) {
+                                                    RemoteImage(
+                                                        msg.attachmentUrl,
+                                                        Modifier.fillMaxSize(),
+                                                        ContentScale.Crop
+                                                    )
+                                                    if(msg.type=="video") {
+                                                        Box(
+                                                            Modifier.size(46.dp).align(Alignment.Center)
+                                                                .background(
+                                                                    Color.Black.copy(alpha=.55f),
+                                                                    CircleShape
+                                                                ),
+                                                            contentAlignment=Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.PlayArrow,
+                                                                null,
+                                                                tint=Color.White
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
-                                    )
+                                        }
+                                    }
+
+                                    if(
+                                        msg.body.isNotBlank() &&
+                                        !(msg.type=="contact" && msg.body==msg.contactName) &&
+                                        !(msg.type=="location" && msg.body==msg.locationLabel)
+                                    ) {
+                                        Text(
+                                            msg.body,
+                                            fontSize=10.sp,
+                                            lineHeight=17.sp,
+                                            modifier=Modifier.padding(top=5.dp)
+                                        )
+                                    }
+                                }
+
+                                if(msg.editedAt!=null || (meId==msg.author.id && msg.seenBy>0)) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(top=4.dp),
+                                        verticalAlignment=Alignment.CenterVertically
+                                    ) {
+                                        if(msg.editedAt!=null) {
+                                            Text("ویرایش شده",color=FqMuted,fontSize=6.sp)
+                                        }
+                                        Spacer(Modifier.weight(1f))
+                                        if(meId==msg.author.id && msg.seenBy>0) {
+                                            Icon(
+                                                Icons.Default.DoneAll,
+                                                null,
+                                                tint=FqGold,
+                                                modifier=Modifier.size(13.dp)
+                                            )
+                                            Spacer(Modifier.width(3.dp))
+                                            Text(
+                                                "دیده‌شده توسط "+msg.seenBy,
+                                                color=FqMuted,
+                                                fontSize=6.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if(selectedMessageIds.isEmpty()) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(top=7.dp),
+                                        verticalAlignment=Alignment.CenterVertically
+                                    ) {
+                                        TextButton(
+                                            onClick={
+                                                replyTo=msg
+                                                draftReplyId=msg.id
+                                            },
+                                            contentPadding=PaddingValues(horizontal=4.dp,vertical=0.dp)
+                                        ) {
+                                            Icon(Icons.Default.Reply,null,modifier=Modifier.size(14.dp))
+                                            Spacer(Modifier.width(3.dp))
+                                            Text("پاسخ",fontSize=7.sp)
+                                        }
+                                        listOf("❤️","🔥","😂","👍").forEach { reaction ->
+                                            val count=msg.reactions[reaction] ?: 0L
+                                            Text(
+                                                reaction + if(count>0)" "+count else "",
+                                                fontSize=8.sp,
+                                                modifier=Modifier.padding(horizontal=3.dp)
+                                                    .clickable {
+                                                        if(!loggedIn) {
+                                                            onRequireAuth()
+                                                        } else {
+                                                            scope.launch {
+                                                                runCatching {
+                                                                    social.toggleMessageReaction(
+                                                                        roomId,
+                                                                        msg.id,
+                                                                        reaction
+                                                                    )
+                                                                }.onSuccess { refresh() }
+                                                            }
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
