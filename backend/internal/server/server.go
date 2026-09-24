@@ -173,6 +173,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/watch-parties/{id}/queue/{itemID}/vote", s.voteWatchPartyQueueItem)
 			r.Post("/watch-parties/{id}/queue/{itemID}/play", s.playWatchPartyQueueItem)
 			r.Post("/watch-parties/{id}/queue/{itemID}/remove", s.removeWatchPartyQueueItem)
+			r.Get("/watch-parties/{id}/direct-invites", s.watchPartyDirectInvites)
+			r.Post("/watch-parties/{id}/invite-user/{userID}", s.inviteUserToWatchParty)
+			r.Post("/watch-parties/{id}/invite-response", s.respondWatchPartyInvite)
 			r.Post("/live-events", s.createLiveEvent)
 			r.Post("/live-events/{id}/join", s.joinLiveEvent)
 			r.Post("/live-events/{id}/leave", s.leaveLiveEvent)
@@ -269,6 +272,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/social/reels/personalized", s.personalizedReels)
 			r.Get("/social/stories/personalized", s.personalizedStories)
 			r.Get("/social/activity/following", s.followingWatchActivity)
+			r.Get("/social/following", s.followingUsers)
 		})
 	})
 

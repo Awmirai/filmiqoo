@@ -231,12 +231,23 @@ func (s *Server) joinWatchParty(w http.ResponseWriter,r *http.Request) {
 	`,id,userID).Scan(&existing)
 
 	if !existing {
-		switch visibility {
-		case "private":
-			writeJSON(w,http.StatusForbidden,map[string]string{"error":"this watch party is private"}); return
-		case "invite":
-			if body.InviteCode=="" || inviteCode=="" || body.InviteCode!=inviteCode {
-				writeJSON(w,http.StatusForbidden,map[string]string{"error":"valid invite code required"}); return
+		var directInvite bool
+		_=tx.QueryRow(r.Context(),`
+			SELECT EXISTS(
+				SELECT 1 FROM watch_party_direct_invites
+				 WHERE watch_party_id=$1 AND invited_user_id=$2
+				   AND status='pending'
+			)
+		`,id,userID).Scan(&directInvite)
+
+		if !directInvite {
+			switch visibility {
+			case "private":
+				writeJSON(w,http.StatusForbidden,map[string]string{"error":"this watch party is private"}); return
+			case "invite":
+				if body.InviteCode=="" || inviteCode=="" || body.InviteCode!=inviteCode {
+					writeJSON(w,http.StatusForbidden,map[string]string{"error":"valid invite code required"}); return
+				}
 			}
 		}
 	}
@@ -261,6 +272,14 @@ func (s *Server) joinWatchParty(w http.ResponseWriter,r *http.Request) {
 				INSERT INTO watch_party_reminders (watch_party_id,user_id)
 				VALUES ($1,$2)
 				ON CONFLICT DO NOTHING
+			`,id,userID)
+		}
+		if err==nil {
+			_,_=tx.Exec(r.Context(),`
+				UPDATE watch_party_direct_invites
+				   SET status='accepted',responded_at=now()
+				 WHERE watch_party_id=$1 AND invited_user_id=$2
+				   AND status='pending'
 			`,id,userID)
 		}
 	}

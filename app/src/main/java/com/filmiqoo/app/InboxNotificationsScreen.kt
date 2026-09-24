@@ -383,6 +383,10 @@ private fun notificationIcon(type:String)=when(type) {
     "availability_ready" -> Icons.Default.HighQuality
     "collection_update" -> Icons.Default.CollectionsBookmark
     "watch_party_reminder" -> Icons.Default.Groups
+    "watch_party_invite" -> Icons.Default.GroupAdd
+    "watch_party_join_request" -> Icons.Default.PersonAddAlt1
+    "watch_party_join_approved" -> Icons.Default.HowToReg
+    "watch_party_join_declined" -> Icons.Default.PersonOff
     else -> Icons.Default.Notifications
 }
 
@@ -399,6 +403,10 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "availability_ready" -> "نسخه جدید"
     "collection_update" -> "Collection"
     "watch_party_reminder" -> "Watch Party"
+    "watch_party_invite" -> "دعوت Watch Party"
+    "watch_party_join_request" -> "درخواست ورود"
+    "watch_party_join_approved" -> "ورود تأیید شد"
+    "watch_party_join_declined" -> "درخواست رد شد"
     else -> "Filmiqoo"
 }
 

@@ -80,6 +80,18 @@ data class WatchPartyQueueItem(
     val suggestedBy:SocialAuthor
 )
 
+data class WatchPartyInviteUser(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val avatarUrl:String,
+    val verified:Boolean,
+    val bio:String="",
+    val followers:Long=0,
+    val watchingNow:Boolean=false,
+    val inviteStatus:String?=null
+)
+
 data class WatchPartyInfo(
     val id: String,
     val title: String,
@@ -367,6 +379,57 @@ class WatchPartyRepository(
             JSONObject(),
             authorized=true
         ).optBoolean("removed")
+
+    suspend fun followingUsers():List<WatchPartyInviteUser> {
+        val root=backend.getJson("/v1/social/following",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    WatchPartyInviteUser(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified"),
+                        bio=x.optString("bio"),
+                        followers=x.optLong("followers"),
+                        watchingNow=x.optBoolean("watchingNow")
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun directInvites(id:String):Map<String,String> {
+        val root=backend.getJson(
+            "/v1/watch-parties/"+id+"/direct-invites",
+            authorized=true
+        )
+        val arr=root.optJSONArray("items") ?: return emptyMap()
+        return buildMap {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val userId=x.optString("id")
+                if(userId.isNotBlank()) put(userId,x.optString("status"))
+            }
+        }
+    }
+
+    suspend fun inviteUser(id:String,userId:String):Boolean =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/invite-user/"+userId,
+            JSONObject(),
+            authorized=true
+        ).optBoolean("invited")
+
+    suspend fun respondInvite(id:String,accept:Boolean):String =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/invite-response",
+            JSONObject().put("accept",accept),
+            authorized=true
+        ).optString("status")
 
     suspend fun updateState(
         id: String,

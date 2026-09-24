@@ -61,6 +61,7 @@ fun ConnectedWatchPartyScreen(
     var reminderEnabled by remember { mutableStateOf(false) }
     var reminderBusy by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showFriendsInvite by remember { mutableStateOf(false) }
     var showLobby by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
     var lobby by remember { mutableStateOf<WatchPartyLobby?>(null) }
@@ -747,6 +748,14 @@ fun ConnectedWatchPartyScreen(
         )
     }
 
+    if(showFriendsInvite) {
+        WatchPartyFriendsInviteSheet(
+            partyId=p.id,
+            partyRepo=partyRepo,
+            onDismiss={showFriendsInvite=false}
+        )
+    }
+
     if(showQueue && lobby!=null) {
         WatchPartyQueueSheet(
             partyId=p.id,
@@ -770,6 +779,10 @@ fun ConnectedWatchPartyScreen(
                     p.title,
                     FilmiqooDeepLinks.watchParty(p.id,inviteInfo?.inviteCode)
                 )
+            },
+            onInviteFriends={
+                showInviteDialog=false
+                showFriendsInvite=true
             },
             onRegenerate={
                 reminderBusy=true
@@ -939,6 +952,7 @@ private fun WatchPartyInviteDialog(
     info:WatchPartyInviteInfo,
     busy:Boolean,
     onShare:()->Unit,
+    onInviteFriends:()->Unit,
     onRegenerate:()->Unit,
     onDismiss:()->Unit
 ) {
@@ -984,13 +998,20 @@ private fun WatchPartyInviteDialog(
             }
         },
         confirmButton={
-            Button(
-                onClick=onShare,
-                colors=ButtonDefaults.buttonColors(containerColor=FqGold)
-            ) {
-                Icon(Icons.Default.Share,null,tint=Color.Black)
-                Spacer(Modifier.width(5.dp))
-                Text("اشتراک لینک",color=Color.Black)
+            Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) {
+                OutlinedButton(onClick=onInviteFriends) {
+                    Icon(Icons.Default.GroupAdd,null,modifier=Modifier.size(17.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("دعوت دوست‌ها",fontSize=8.sp)
+                }
+                Button(
+                    onClick=onShare,
+                    colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+                ) {
+                    Icon(Icons.Default.Share,null,tint=Color.Black)
+                    Spacer(Modifier.width(5.dp))
+                    Text("اشتراک لینک",color=Color.Black,fontSize=8.sp)
+                }
             }
         },
         dismissButton={
