@@ -151,3 +151,58 @@ func (s *Server) cors(next http.Handler) http.Handler {
 		next.ServeHTTP(w,r)
 	})
 }
+
+
+func (s *Server) authenticatedWriteRateLimit(limit int,window time.Duration) func(http.Handler) http.Handler {
+	if limit<=0 { limit=240 }
+	if window<=0 { window=time.Minute }
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request) {
+			switch r.Method {
+			case http.MethodGet,http.MethodHead,http.MethodOptions:
+				next.ServeHTTP(w,r)
+				return
+			}
+			if s.redis==nil {
+				next.ServeHTTP(w,r)
+				return
+			}
+
+			userID:=strings.TrimSpace(userIDFromContext(r.Context()))
+			if userID=="" {
+				next.ServeHTTP(w,r)
+				return
+			}
+
+			windowID:=time.Now().UTC().Unix()/int64(window.Seconds())
+			key:=fmt.Sprintf("ratelimit:write:%s:%d",userID,windowID)
+			count,err:=s.redis.Incr(r.Context(),key).Result()
+			if err!=nil {
+				next.ServeHTTP(w,r)
+				return
+			}
+			if count==1 {
+				_ = s.redis.Expire(r.Context(),key,window+5*time.Second).Err()
+			}
+
+			remaining:=int64(limit)-count
+			if remaining<0 { remaining=0 }
+			w.Header().Set("X-RateLimit-Limit",strconv.Itoa(limit))
+			w.Header().Set("X-RateLimit-Remaining",strconv.FormatInt(remaining,10))
+
+			if count>int64(limit) {
+				ttl,_:=s.redis.TTL(r.Context(),key).Result()
+				retry:=int64(ttl.Seconds())
+				if retry<1 { retry=1 }
+				w.Header().Set("Retry-After",strconv.FormatInt(retry,10))
+				writeJSON(w,http.StatusTooManyRequests,map[string]any{
+					"error":"too many write requests",
+					"retryAfterSeconds":retry,
+				})
+				return
+			}
+			next.ServeHTTP(w,r)
+		})
+	}
+}
