@@ -35,6 +35,7 @@ type Config struct {
 	AuthLoginRateLimit int
 	AuthRegisterRateLimit int
 	AuthRefreshRateLimit int
+	AuthenticatedWriteRateLimit int
 	BuildVersion string
 	BuildCommit string
 }
@@ -67,6 +68,7 @@ func Load() Config {
 		AuthLoginRateLimit: envInt("AUTH_LOGIN_RATE_LIMIT_PER_MINUTE", 10),
 		AuthRegisterRateLimit: envInt("AUTH_REGISTER_RATE_LIMIT_PER_HOUR", 8),
 		AuthRefreshRateLimit: envInt("AUTH_REFRESH_RATE_LIMIT_PER_MINUTE", 30),
+		AuthenticatedWriteRateLimit: envInt("AUTHENTICATED_WRITE_RATE_LIMIT_PER_MINUTE", 240),
 		BuildVersion: env("BUILD_VERSION", "dev"),
 		BuildCommit: env("BUILD_COMMIT", "unknown"),
 	}
@@ -129,6 +131,9 @@ func (c Config) Validate() error {
 
 	if c.AuthLoginRateLimit<=0 || c.AuthRegisterRateLimit<=0 || c.AuthRefreshRateLimit<=0 {
 		return errors.New("auth rate limits must be greater than zero")
+	}
+	if c.AuthenticatedWriteRateLimit<=0 {
+		return errors.New("authenticated write rate limit must be greater than zero")
 	}
 	return nil
 }
