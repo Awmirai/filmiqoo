@@ -42,6 +42,23 @@ ALTER TABLE reports
         CHECK (priority BETWEEN 0 AND 100),
     ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+WITH ranked AS (
+    SELECT id,
+           ROW_NUMBER() OVER (
+               PARTITION BY reporter_user_id,target_type,target_id,reason
+               ORDER BY created_at ASC,id ASC
+           ) AS rn
+      FROM reports
+     WHERE status IN ('open','reviewing')
+)
+UPDATE reports r
+   SET status='dismissed',
+       resolved_at=COALESCE(resolved_at,now()),
+       updated_at=now()
+  FROM ranked d
+ WHERE r.id=d.id
+   AND d.rn>1;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_reports_active_reporter_target_reason
     ON reports (reporter_user_id,target_type,target_id,reason)
     WHERE status IN ('open','reviewing');
