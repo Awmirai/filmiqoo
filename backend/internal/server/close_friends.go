@@ -90,12 +90,14 @@ func (s *Server) toggleCloseFriend(w http.ResponseWriter,r *http.Request) {
         return
     }
 
-    _,err=s.db.Exec(r.Context(),`
+    if _,err:=s.db.Exec(r.Context(),`
         INSERT INTO close_friends (owner_user_id,friend_user_id)
         VALUES ($1,$2)
         ON CONFLICT DO NOTHING
-    `,userID,friendID)
-    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+    `,userID,friendID); err!=nil {
+        writeError(w,http.StatusInternalServerError,err)
+        return
+    }
 
     writeJSON(w,http.StatusOK,map[string]any{"closeFriend":true})
 }
