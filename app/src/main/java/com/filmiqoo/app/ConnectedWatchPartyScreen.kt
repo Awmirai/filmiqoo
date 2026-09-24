@@ -61,6 +61,12 @@ fun ConnectedWatchPartyScreen(
     var reminderEnabled by remember { mutableStateOf(false) }
     var reminderBusy by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showLobby by remember { mutableStateOf(false) }
+    var lobby by remember { mutableStateOf<WatchPartyLobby?>(null) }
+    var reactions by remember { mutableStateOf<List<WatchPartyReaction>>(emptyList()) }
+    var privateJoinRequired by remember { mutableStateOf(false) }
+    var joinRequestPending by remember { mutableStateOf(false) }
+    var lobbyBusy by remember { mutableStateOf(false) }
 
     val player=remember {
         ExoPlayer.Builder(context).build().apply {
@@ -82,7 +88,7 @@ fun ConnectedWatchPartyScreen(
     }
 
 
-    LaunchedEffect(partyId,party?.state,party?.host?.id,meId) {
+    LaunchedEffect(partyId,party?.state,party?.host?.id,meId,lobby?.myRole) {
         val id=partyId ?: return@LaunchedEffect
         val p=party ?: return@LaunchedEffect
         if(!backend.session.isLoggedIn) return@LaunchedEffect
@@ -95,7 +101,7 @@ fun ConnectedWatchPartyScreen(
             reminderEnabled=false
         }
 
-        inviteInfo=if(p.host.id==meId) {
+        inviteInfo=if(p.host.id==meId || lobby?.myRole=="cohost") {
             runCatching { partyRepo.inviteInfo(id) }.getOrNull()
         } else null
     }
@@ -104,7 +110,15 @@ fun ConnectedWatchPartyScreen(
         val id=partyId ?: return@LaunchedEffect
         if(backend.session.isLoggedIn) {
             runCatching { partyRepo.join(id,initialInviteCode) }
-                .onFailure { error=it.message ?: "ورود به Watch Party ناموفق بود" }
+                .onSuccess {
+                    privateJoinRequired=false
+                    joinRequestPending=false
+                }
+                .onFailure {
+                    val message=it.message ?: "ورود به Watch Party ناموفق بود"
+                    privateJoinRequired=message.contains("private",ignoreCase=true)
+                    error=if(privateJoinRequired) null else message
+                }
         }
         while(isActive && partyId==id) {
             val fresh=runCatching { partyRepo.detail(id) }
@@ -149,12 +163,26 @@ fun ConnectedWatchPartyScreen(
         }
     }
 
-    LaunchedEffect(partyId,party?.host?.id,meId) {
+    LaunchedEffect(partyId,backend.session.isLoggedIn) {
+        val id=partyId ?: return@LaunchedEffect
+        if(!backend.session.isLoggedIn) return@LaunchedEffect
+        while(isActive && partyId==id) {
+            runCatching { partyRepo.lobby(id) }
+                .onSuccess {
+                    lobby=it
+                    privateJoinRequired=false
+                }
+            reactions=runCatching { partyRepo.reactions(id) }.getOrDefault(emptyList())
+            delay(2000)
+        }
+    }
+
+    LaunchedEffect(partyId,party?.host?.id,meId,lobby?.myRole) {
         val id=partyId ?: return@LaunchedEffect
         while(isActive && partyId==id) {
             delay(2000)
             val p=party ?: continue
-            if(p.host.id==meId && p.state=="live" && player.duration>0) {
+            if((p.host.id==meId || lobby?.myRole=="cohost") && p.state=="live" && player.duration>0) {
                 syncing=true
                 runCatching {
                     partyRepo.updateState(
@@ -222,6 +250,7 @@ fun ConnectedWatchPartyScreen(
     }
 
     val isHost=p.host.id==meId
+    val canHostControl=isHost || lobby?.myRole=="cohost"
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
         Box(
@@ -257,7 +286,7 @@ fun ConnectedWatchPartyScreen(
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
                 ) { Icon(Icons.Default.Close,null) }
                 Spacer(Modifier.weight(1f))
-                if(isHost && p.visibility in setOf("invite","private")) {
+                if(canHostControl && p.visibility in setOf("invite","private")) {
                     IconButton(
                         onClick={showInviteDialog=true},
                         modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
@@ -309,7 +338,7 @@ fun ConnectedWatchPartyScreen(
                     Modifier.fillMaxWidth().padding(top=10.dp),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    if(isHost) {
+                    if(canHostControl) {
                         Button(
                             onClick={
                                 if(p.state=="scheduled") {
@@ -337,6 +366,11 @@ fun ConnectedWatchPartyScreen(
                                     }
                                 }
                             },
+                            enabled=!(
+                                p.state=="scheduled" &&
+                                lobby?.readyCheckEnabled==true &&
+                                (lobby?.readyCount ?: 0L) < (lobby?.participantCount ?: 0L)
+                            ),
                             colors=ButtonDefaults.buttonColors(containerColor=FqGold)
                         ) {
                             Icon(
@@ -380,10 +414,59 @@ fun ConnectedWatchPartyScreen(
                 Text(p.host.displayName,fontSize=10.sp)
                 Text("میزبان • @"+p.host.username,color=FqMuted,fontSize=7.sp)
             }
-            Row(verticalAlignment=Alignment.CenterVertically) {
+            TextButton(
+                onClick={showLobby=true},
+                enabled=lobby!=null
+            ) {
                 Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(p.participants.toString(),fontSize=8.sp)
+                Text(
+                    (lobby?.participantCount ?: p.participants).toString()+" نفر",
+                    fontSize=8.sp
+                )
+            }
+        }
+
+        if(privateJoinRequired) {
+            Surface(
+                color=FqDanger.copy(alpha=.08f),
+                shape=RoundedCornerShape(15.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,bottom=8.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(11.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Lock,null,tint=FqGold)
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Watch Party خصوصی",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            if(joinRequestPending)"درخواست ورود ارسال شده؛ منتظر تأیید میزبان."
+                            else "برای ورود باید میزبان درخواستت رو تأیید کنه.",
+                            color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=2.dp)
+                        )
+                    }
+                    Button(
+                        enabled=!joinRequestPending && !lobbyBusy,
+                        onClick={
+                            if(!backend.session.isLoggedIn) {
+                                onRequireAuth()
+                            } else {
+                                lobbyBusy=true
+                                scope.launch {
+                                    runCatching { partyRepo.requestJoin(p.id) }
+                                        .onSuccess { joinRequestPending=it=="pending" }
+                                        .onFailure { error=it.message }
+                                    lobbyBusy=false
+                                }
+                            }
+                        },
+                        colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+                    ) {
+                        Text(if(joinRequestPending)"ارسال شد" else "درخواست ورود",color=Color.Black,fontSize=7.sp)
+                    }
+                }
             }
         }
 
@@ -439,6 +522,70 @@ fun ConnectedWatchPartyScreen(
             }
         }
 
+        if(p.state=="scheduled" && lobby?.readyCheckEnabled==true && lobby!=null) {
+            val currentLobby=lobby!!
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(15.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,bottom=8.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(10.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.HowToReg,null,tint=FqGold)
+                    Spacer(Modifier.width(7.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Ready Check",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            currentLobby.readyCount.toString()+" از "+currentLobby.participantCount+" نفر آماده‌اند",
+                            color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=2.dp)
+                        )
+                    }
+                    OutlinedButton(
+                        enabled=!lobbyBusy,
+                        onClick={
+                            lobbyBusy=true
+                            scope.launch {
+                                runCatching { partyRepo.toggleReady(p.id) }
+                                    .onSuccess { ready->
+                                        lobby=lobby?.copy(
+                                            myReady=ready,
+                                            readyCount=(
+                                                (lobby?.readyCount ?: 0L) +
+                                                if(ready)1 else -1
+                                            ).coerceAtLeast(0L)
+                                        )
+                                    }
+                                    .onFailure { error=it.message }
+                                lobbyBusy=false
+                            }
+                        }
+                    ) {
+                        Icon(
+                            if(currentLobby.myReady)Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                            null,
+                            tint=if(currentLobby.myReady)FqGreen else FqMuted,
+                            modifier=Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(if(currentLobby.myReady)"آماده‌ام" else "Ready",fontSize=7.sp)
+                    }
+                }
+            }
+        }
+
+        WatchPartyReactionBar(
+            reactions=reactions,
+            enabled=lobby!=null && !privateJoinRequired,
+            onReact={emoji->
+                scope.launch {
+                    runCatching { partyRepo.react(p.id,emoji) }
+                        .onFailure { error=it.message }
+                }
+            }
+        )
+
         HorizontalDivider(color=FqSurface3)
 
         LazyColumn(
@@ -477,7 +624,12 @@ fun ConnectedWatchPartyScreen(
             IconButton(onClick={
                 if(!backend.session.isLoggedIn) {
                     onRequireAuth()
-                } else if(text.isNotBlank() && p.roomId.isNotBlank()) {
+                } else if(
+                    text.isNotBlank() &&
+                    p.roomId.isNotBlank() &&
+                    lobby!=null &&
+                    !privateJoinRequired
+                ) {
                     val sending=text.trim()
                     text=""
                     scope.launch {
@@ -499,6 +651,93 @@ fun ConnectedWatchPartyScreen(
             )
         }
     }
+    if(showLobby && lobby!=null) {
+        WatchPartyLobbySheet(
+            lobby=lobby!!,
+            busy=lobbyBusy,
+            onToggleReadyCheck={enabled->
+                lobbyBusy=true
+                scope.launch {
+                    runCatching { partyRepo.setReadyCheck(p.id,enabled) }
+                        .onSuccess {
+                            lobby=lobby?.copy(readyCheckEnabled=it)
+                        }
+                        .onFailure { error=it.message }
+                    lobbyBusy=false
+                }
+            },
+            onReady={
+                lobbyBusy=true
+                scope.launch {
+                    runCatching { partyRepo.toggleReady(p.id) }
+                        .onSuccess { ready->
+                            val before=lobby?.myReady ?: false
+                            val delta=when {
+                                ready && !before -> 1
+                                !ready && before -> -1
+                                else -> 0
+                            }
+                            lobby=lobby?.copy(
+                                myReady=ready,
+                                readyCount=((lobby?.readyCount ?: 0L)+delta).coerceAtLeast(0L)
+                            )
+                        }
+                        .onFailure { error=it.message }
+                    lobbyBusy=false
+                }
+            },
+            onResolve={userId,accept->
+                lobbyBusy=true
+                scope.launch {
+                    runCatching { partyRepo.resolveJoinRequest(p.id,userId,accept) }
+                        .onSuccess {
+                            lobby=runCatching { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
+                        }
+                        .onFailure { error=it.message }
+                    lobbyBusy=false
+                }
+            },
+            onRole={userId,role->
+                lobbyBusy=true
+                scope.launch {
+                    runCatching { partyRepo.setMemberRole(p.id,userId,role) }
+                        .onSuccess {
+                            lobby=runCatching { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
+                        }
+                        .onFailure { error=it.message }
+                    lobbyBusy=false
+                }
+            },
+            onLeaveOrEnd={
+                lobbyBusy=true
+                scope.launch {
+                    if(canHostControl) {
+                        runCatching {
+                            partyRepo.updateState(
+                                p.id,
+                                player.currentPosition.coerceAtLeast(0),
+                                false,
+                                "ended"
+                            )
+                        }.onSuccess {
+                            showLobby=false
+                            onBack()
+                        }.onFailure { error=it.message }
+                    } else {
+                        runCatching { partyRepo.leave(p.id) }
+                            .onSuccess {
+                                showLobby=false
+                                onBack()
+                            }
+                            .onFailure { error=it.message }
+                    }
+                    lobbyBusy=false
+                }
+            },
+            onDismiss={showLobby=false}
+        )
+    }
+
     if(showInviteDialog && inviteInfo!=null) {
         WatchPartyInviteDialog(
             party=p,
@@ -749,6 +988,242 @@ private fun WatchPartyInviteDialog(
             }
         }
     )
+}
+
+@Composable
+private fun WatchPartyReactionBar(
+    reactions:List<WatchPartyReaction>,
+    enabled:Boolean,
+    onReact:(String)->Unit
+) {
+    val emojis=listOf("❤️","😂","😮","🔥","👏","😢","🤯")
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=6.dp)
+    ) {
+        if(reactions.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement=Arrangement.spacedBy(5.dp)
+            ) {
+                reactions.take(7).forEach { reaction ->
+                    Surface(
+                        color=FqSurface2,
+                        shape=RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            reaction.emoji,
+                            fontSize=14.sp,
+                            modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                        )
+                    }
+                }
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top=if(reactions.isEmpty())0.dp else 5.dp),
+            horizontalArrangement=Arrangement.SpaceEvenly
+        ) {
+            emojis.forEach { emoji ->
+                Text(
+                    emoji,
+                    fontSize=20.sp,
+                    modifier=Modifier
+                        .clip(CircleShape)
+                        .clickable(enabled=enabled) { onReact(emoji) }
+                        .padding(5.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WatchPartyLobbySheet(
+    lobby:WatchPartyLobby,
+    busy:Boolean,
+    onToggleReadyCheck:(Boolean)->Unit,
+    onReady:()->Unit,
+    onResolve:(String,Boolean)->Unit,
+    onRole:(String,String)->Unit,
+    onLeaveOrEnd:()->Unit,
+    onDismiss:()->Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest=onDismiss,
+        containerColor=FqSurface
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(start=14.dp,end=14.dp,bottom=28.dp)
+        ) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Waiting Room",fontSize=20.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Black)
+                    Text(
+                        lobby.participantCount.toString()+" نفر • "+
+                            lobby.readyCount+" Ready",
+                        color=FqMuted,fontSize=8.sp
+                    )
+                }
+                if(lobby.myRole=="host" || lobby.myRole=="cohost") {
+                    FilterChip(
+                        selected=lobby.readyCheckEnabled,
+                        onClick={onToggleReadyCheck(!lobby.readyCheckEnabled)},
+                        label={Text("Ready Check",fontSize=7.sp)},
+                        leadingIcon={
+                            Icon(Icons.Default.HowToReg,null,modifier=Modifier.size(15.dp))
+                        }
+                    )
+                }
+            }
+
+            if(lobby.readyCheckEnabled) {
+                Button(
+                    onClick=onReady,
+                    enabled=!busy,
+                    colors=ButtonDefaults.buttonColors(
+                        containerColor=if(lobby.myReady)FqGreen else FqGold,
+                        contentColor=Color.Black
+                    ),
+                    modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                ) {
+                    Icon(
+                        if(lobby.myReady)Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        null
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(if(lobby.myReady)"Ready هستم" else "من آماده‌ام")
+                }
+            }
+
+            if(lobby.requests.isNotEmpty() && (lobby.myRole=="host" || lobby.myRole=="cohost")) {
+                Text(
+                    "درخواست‌های ورود",
+                    fontSize=11.sp,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier=Modifier.padding(top=14.dp,bottom=6.dp)
+                )
+                lobby.requests.forEach { request ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical=5.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        RemoteImage(
+                            request.avatarUrl.takeIf(String::isNotBlank),
+                            Modifier.size(38.dp).clip(CircleShape)
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(request.displayName,fontSize=9.sp)
+                            Text("@"+request.username,color=FqMuted,fontSize=7.sp)
+                        }
+                        IconButton(
+                            enabled=!busy,
+                            onClick={onResolve(request.id,false)}
+                        ) { Icon(Icons.Default.Close,null,tint=FqDanger) }
+                        IconButton(
+                            enabled=!busy,
+                            onClick={onResolve(request.id,true)}
+                        ) { Icon(Icons.Default.Check,null,tint=FqGreen) }
+                    }
+                }
+            }
+
+            Text(
+                "اعضا",
+                fontSize=11.sp,
+                fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier=Modifier.padding(top=14.dp,bottom=5.dp)
+            )
+
+            LazyColumn(
+                modifier=Modifier.heightIn(max=340.dp),
+                verticalArrangement=Arrangement.spacedBy(5.dp)
+            ) {
+                items(lobby.members,key={it.id}) { member ->
+                    Surface(
+                        color=FqSurface2,
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            Modifier.padding(9.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            RemoteImage(
+                                member.avatarUrl.takeIf(String::isNotBlank),
+                                Modifier.size(38.dp).clip(CircleShape)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment=Alignment.CenterVertically) {
+                                    Text(member.displayName,fontSize=9.sp)
+                                    if(member.verified) {
+                                        Spacer(Modifier.width(3.dp))
+                                        Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(12.dp))
+                                    }
+                                }
+                                Text(
+                                    when(member.role) {
+                                        "host" -> "Host"
+                                        "cohost" -> "Co-host"
+                                        "moderator" -> "Moderator"
+                                        else -> "Viewer"
+                                    }+" • @"+member.username,
+                                    color=FqMuted,fontSize=7.sp
+                                )
+                            }
+                            if(lobby.readyCheckEnabled) {
+                                Icon(
+                                    if(member.ready)Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    null,
+                                    tint=if(member.ready)FqGreen else FqMuted,
+                                    modifier=Modifier.size(17.dp)
+                                )
+                                Spacer(Modifier.width(5.dp))
+                            }
+                            if(lobby.myRole=="host" && member.role!="host") {
+                                TextButton(
+                                    enabled=!busy,
+                                    onClick={
+                                        onRole(
+                                            member.id,
+                                            if(member.role=="cohost")"viewer" else "cohost"
+                                        )
+                                    }
+                                ) {
+                                    Text(
+                                        if(member.role=="cohost")"Viewer" else "Co-host",
+                                        fontSize=7.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                enabled=!busy,
+                onClick=onLeaveOrEnd,
+                colors=ButtonDefaults.outlinedButtonColors(contentColor=FqDanger),
+                modifier=Modifier.fillMaxWidth().padding(top=14.dp)
+            ) {
+                Icon(
+                    if(lobby.myRole=="host" || lobby.myRole=="cohost")Icons.Default.StopCircle
+                    else Icons.Default.ExitToApp,
+                    null
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    if(lobby.myRole=="host" || lobby.myRole=="cohost")
+                        "پایان Watch Party"
+                    else
+                        "خروج از Watch Party"
+                )
+            }
+        }
+    }
 }
 
 private fun formatPartySchedule(value:String):String =

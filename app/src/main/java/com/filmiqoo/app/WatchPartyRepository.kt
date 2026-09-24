@@ -34,6 +34,43 @@ data class WatchPartyInviteInfo(
     val scheduledAt:String?
 )
 
+data class WatchPartyMember(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val avatarUrl:String,
+    val verified:Boolean,
+    val role:String,
+    val ready:Boolean
+)
+
+data class WatchPartyJoinRequest(
+    val id:String,
+    val username:String,
+    val displayName:String,
+    val avatarUrl:String,
+    val verified:Boolean
+)
+
+data class WatchPartyLobby(
+    val myRole:String,
+    val myReady:Boolean,
+    val readyCheckEnabled:Boolean,
+    val readyCount:Long,
+    val participantCount:Long,
+    val state:String,
+    val members:List<WatchPartyMember>,
+    val requests:List<WatchPartyJoinRequest>
+)
+
+data class WatchPartyReaction(
+    val id:String,
+    val emoji:String,
+    val userId:String,
+    val displayName:String,
+    val avatarUrl:String
+)
+
 data class WatchPartyInfo(
     val id: String,
     val title: String,
@@ -133,6 +170,125 @@ class WatchPartyRepository(
             JSONObject(),
             authorized=true
         ).optBoolean("enabled")
+
+    suspend fun lobby(id:String):WatchPartyLobby {
+        val root=backend.getJson("/v1/watch-parties/"+id+"/lobby",authorized=true)
+        val membersArray=root.optJSONArray("members")
+        val requestsArray=root.optJSONArray("requests")
+
+        val members=buildList {
+            if(membersArray!=null) for(i in 0 until membersArray.length()) {
+                val x=membersArray.optJSONObject(i) ?: continue
+                add(
+                    WatchPartyMember(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified"),
+                        role=x.optString("role"),
+                        ready=x.optBoolean("ready")
+                    )
+                )
+            }
+        }
+
+        val requests=buildList {
+            if(requestsArray!=null) for(i in 0 until requestsArray.length()) {
+                val x=requestsArray.optJSONObject(i) ?: continue
+                add(
+                    WatchPartyJoinRequest(
+                        id=x.optString("id"),
+                        username=x.optString("username"),
+                        displayName=x.optString("displayName"),
+                        avatarUrl=x.optString("avatarUrl"),
+                        verified=x.optBoolean("verified")
+                    )
+                )
+            }
+        }
+
+        return WatchPartyLobby(
+            myRole=root.optString("myRole"),
+            myReady=root.optBoolean("myReady"),
+            readyCheckEnabled=root.optBoolean("readyCheckEnabled"),
+            readyCount=root.optLong("readyCount"),
+            participantCount=root.optLong("participantCount"),
+            state=root.optString("state"),
+            members=members,
+            requests=requests
+        )
+    }
+
+    suspend fun requestJoin(id:String):String =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/join-request",
+            JSONObject(),
+            authorized=true
+        ).optString("status")
+
+    suspend fun resolveJoinRequest(id:String,userId:String,accept:Boolean):String =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/join-requests/"+userId+"/resolve",
+            JSONObject().put("accept",accept),
+            authorized=true
+        ).optString("status")
+
+    suspend fun toggleReady(id:String):Boolean =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/ready",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("ready")
+
+    suspend fun setReadyCheck(id:String,enabled:Boolean):Boolean =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/ready-check",
+            JSONObject().put("enabled",enabled),
+            authorized=true
+        ).optBoolean("enabled")
+
+    suspend fun setMemberRole(id:String,userId:String,role:String):String =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/members/"+userId+"/role",
+            JSONObject().put("role",role),
+            authorized=true
+        ).optString("role")
+
+    suspend fun leave(id:String):Boolean =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/leave",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("left")
+
+    suspend fun react(id:String,emoji:String) {
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/reactions",
+            JSONObject().put("emoji",emoji),
+            authorized=true
+        )
+    }
+
+    suspend fun reactions(id:String):List<WatchPartyReaction> {
+        val root=backend.getJson("/v1/watch-parties/"+id+"/reactions",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val u=x.optJSONObject("user") ?: JSONObject()
+                add(
+                    WatchPartyReaction(
+                        id=x.optString("id"),
+                        emoji=x.optString("emoji"),
+                        userId=u.optString("id"),
+                        displayName=u.optString("displayName"),
+                        avatarUrl=u.optString("avatarUrl")
+                    )
+                )
+            }
+        }
+    }
 
     suspend fun updateState(
         id: String,
