@@ -173,9 +173,21 @@ func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 		SELECT n.id::text,n.notification_type,n.entity_type,n.entity_id::text,
 		       n.title,n.body,n.read_at,n.created_at,
 		       COALESCE(p.user_id::text,''),COALESCE(p.username::text,''),
-		       COALESCE(p.display_name,''),COALESCE(p.avatar_url,''),COALESCE(p.verified,false)
+		       COALESCE(p.display_name,''),COALESCE(p.avatar_url,''),COALESCE(p.verified,false),
+		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,
+		       mt.poster_url,mt.backdrop_url,mt.year,mt.rating,
+		       mv.id::text,mv.quality_label,mv.stream_ready
 		  FROM notifications n
 		  LEFT JOIN profiles p ON p.user_id=n.actor_user_id
+		  LEFT JOIN media_titles mt
+		    ON n.entity_type='release' AND mt.id=n.entity_id
+		  LEFT JOIN LATERAL (
+		    SELECT id,quality_label,stream_ready
+		      FROM media_versions
+		     WHERE media_title_id=mt.id
+		     ORDER BY preferred DESC,stream_ready DESC,height DESC,file_size_bytes DESC
+		     LIMIT 1
+		  ) mv ON true
 		 WHERE n.user_id=$1
 		 ORDER BY n.created_at DESC
 		 LIMIT 100
@@ -191,10 +203,21 @@ func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 		var readAt *time.Time
 		var created time.Time
 		var verified bool
+
+		var mediaID,kind,mediaTitle,originalTitle,overview,poster,backdrop *string
+		var tmdbID *int64
+		var year *int
+		var rating *float64
+		var versionID,quality *string
+		var streamReady *bool
+
 		if err:=rows.Scan(
 			&id,&typ,&entityType,&entityID,&title,&body,&readAt,&created,
 			&actorID,&username,&displayName,&avatar,&verified,
+			&mediaID,&tmdbID,&kind,&mediaTitle,&originalTitle,&overview,
+			&poster,&backdrop,&year,&rating,&versionID,&quality,&streamReady,
 		); err!=nil { continue }
+
 		if readAt==nil { unread++ }
 		items=append(items,map[string]any{
 			"id":id,"type":typ,"entityType":entityType,"entityId":entityID,
@@ -203,11 +226,17 @@ func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 				"id":actorID,"username":username,"displayName":displayName,
 				"avatarUrl":avatar,"verified":verified,
 			},
+			"media":map[string]any{
+				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":mediaTitle,
+				"originalTitle":originalTitle,"overview":overview,
+				"posterUrl":poster,"backdropUrl":backdrop,
+				"year":year,"rating":rating,
+				"mediaVersionId":versionID,"quality":quality,"streamReady":streamReady,
+			},
 		})
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"items":items,"unread":unread})
 }
-
 func (s *Server) markNotificationRead(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	id:=chi.URLParam(r,"id")

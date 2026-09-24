@@ -209,7 +209,8 @@ fun ConnectedNotificationsScreen(
     backend: BackendRepository,
     onBack: () -> Unit,
     onOpenRoom: (String,String) -> Unit,
-    onOpenCreator: (Creator) -> Unit
+    onOpenCreator: (Creator) -> Unit,
+    onOpenMedia: (MediaItem) -> Unit
 ) {
     val repo=remember { MessagingRepository(backend) }
     val scope=rememberCoroutineScope()
@@ -279,6 +280,8 @@ fun ConnectedNotificationsScreen(
                                 when {
                                     item.entityType=="room" && !item.entityId.isNullOrBlank() ->
                                         onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
+                                    item.media!=null ->
+                                        onOpenMedia(item.media)
                                     item.entityType=="user" && item.actor!=null ->
                                         onOpenCreator(
                                             Creator(
@@ -314,14 +317,23 @@ private fun NotificationCard(
         modifier=Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
-            if(item.actor?.avatarUrl?.isNotBlank()==true) {
-                RemoteImage(item.actor.avatarUrl,Modifier.size(50.dp).clip(CircleShape))
-            } else {
-                Box(
-                    Modifier.size(50.dp).clip(CircleShape).background(FqSurface2),
-                    contentAlignment=Alignment.Center
-                ) {
-                    Icon(notificationIcon(item.type),null,tint=FqGold)
+            when {
+                item.media?.posterPath!=null -> {
+                    RemoteImage(
+                        item.media.posterPath,
+                        Modifier.size(50.dp).clip(RoundedCornerShape(12.dp))
+                    )
+                }
+                item.actor?.avatarUrl?.isNotBlank()==true -> {
+                    RemoteImage(item.actor.avatarUrl,Modifier.size(50.dp).clip(CircleShape))
+                }
+                else -> {
+                    Box(
+                        Modifier.size(50.dp).clip(CircleShape).background(FqSurface2),
+                        contentAlignment=Alignment.Center
+                    ) {
+                        Icon(notificationIcon(item.type),null,tint=FqGold)
+                    }
                 }
             }
             Spacer(Modifier.width(10.dp))
@@ -355,6 +367,7 @@ private fun notificationIcon(type:String)=when(type) {
     "story_reaction" -> Icons.Default.Favorite
     "story_reply" -> Icons.Default.Reply
     "dm_message" -> Icons.Default.MarkChatUnread
+    "release_ready" -> Icons.Default.NewReleases
     else -> Icons.Default.Notifications
 }
 
@@ -363,6 +376,7 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "story_reaction" -> "Story Reaction"
     "story_reply" -> "Story Reply"
     "dm_message" -> "پیام"
+    "release_ready" -> "انتشار"
     else -> "Filmiqoo"
 }
 

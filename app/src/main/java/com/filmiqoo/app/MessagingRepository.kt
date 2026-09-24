@@ -30,7 +30,8 @@ data class FilmiqooNotification(
     val body: String,
     val read: Boolean,
     val createdAt: String,
-    val actor: SocialAuthor?
+    val actor: SocialAuthor?,
+    val media: MediaItem?
 )
 
 class MessagingRepository(
@@ -90,6 +91,25 @@ class MessagingRepository(
                         verified=it.optBoolean("verified")
                     )
                 }
+                val m=x.optJSONObject("media")
+                val media=m?.let {
+                    val backendId=it.optString("id").takeIf(String::isNotBlank)
+                    if(backendId==null) null else MediaItem(
+                        id=if(it.isNull("tmdbId"))0 else it.optInt("tmdbId"),
+                        type=if(it.optString("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+                        title=it.optString("title").ifBlank{it.optString("originalTitle")},
+                        originalTitle=it.optString("originalTitle"),
+                        overview=it.optString("overview"),
+                        posterPath=it.optString("posterUrl").takeIf(String::isNotBlank),
+                        backdropPath=it.optString("backdropUrl").takeIf(String::isNotBlank),
+                        vote=it.optDouble("rating",0.0),
+                        date=if(it.isNull("year"))"" else it.optInt("year").toString(),
+                        backendId=backendId,
+                        mediaVersionId=it.optString("mediaVersionId").takeIf(String::isNotBlank),
+                        streamReady=it.optBoolean("streamReady"),
+                        quality=it.optString("quality")
+                    )
+                }
                 add(
                     FilmiqooNotification(
                         id=x.optString("id"),
@@ -100,7 +120,8 @@ class MessagingRepository(
                         body=x.optString("body"),
                         read=x.optBoolean("read"),
                         createdAt=x.optString("createdAt"),
-                        actor=actor
+                        actor=actor,
+                        media=media
                     )
                 )
             }

@@ -261,7 +261,8 @@ fun FilmiqooApp() {
                     backend=backend,
                     onBack=closeOverlay,
                     onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
-                    onOpenCreator={overlay=OverlayRoute.CreatorPage(it)}
+                    onOpenCreator={overlay=OverlayRoute.CreatorPage(it)},
+                    onOpenMedia={overlay=OverlayRoute.Detail(it)}
                 )
             }
             else -> Scaffold(
