@@ -15,6 +15,10 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err:=cfg.Validate(); err!=nil {
+		log.Fatalf("config: %v",err)
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -28,7 +32,10 @@ func main() {
 	srv := server.New(cfg, db, redisClient)
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("Filmiqoo API listening on %s", cfg.HTTPAddr)
+		log.Printf(
+			"Filmiqoo API listening on %s env=%s version=%s commit=%s",
+			cfg.HTTPAddr,cfg.Environment,cfg.BuildVersion,cfg.BuildCommit,
+		)
 		errCh <- srv.ListenAndServe()
 	}()
 
