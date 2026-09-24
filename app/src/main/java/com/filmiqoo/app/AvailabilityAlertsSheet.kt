@@ -63,7 +63,7 @@ fun AvailabilityAlertsSheet(
                 key="uhd_4k",
                 title="نسخه 4K",
                 subtitle="وقتی 2160p / 4K آماده شد خبرم کن",
-                icon=Icons.Default.FourK,
+                icon=Icons.Default.HighQuality,
                 available={it.uhd4k},
                 subscribed={it.uhd4k}
             ),
