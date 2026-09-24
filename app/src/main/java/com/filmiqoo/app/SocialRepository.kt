@@ -191,7 +191,16 @@ data class RoomMessageItem(
     val author: SocialAuthor,
     val attachmentUrl: String? = null,
     val attachmentMime: String? = null,
+    val attachmentFileName: String? = null,
+    val attachmentSizeBytes: Long = 0L,
     val attachmentDurationMs: Long = 0L,
+    val attachmentWaveform: List<Int> = emptyList(),
+    val locationLatitude: Double? = null,
+    val locationLongitude: Double? = null,
+    val locationLabel: String? = null,
+    val contactName: String? = null,
+    val contactPhone: String? = null,
+    val contactEmail: String? = null,
     val replyToId: String? = null,
     val replyPreview: String? = null,
     val replyAuthor: String? = null,
@@ -978,10 +987,13 @@ class SocialRepository(
         roomId:String,
         file:File,
         durationMs:Long,
+        waveform:List<Int> = emptyList(),
         spoiler:Boolean=false,
         replyToMessageId:String?=null
     ):String {
         val ticket=backend.uploadFile(file,"audio/mp4","chat")
+        val wave=JSONArray()
+        waveform.take(64).forEach { wave.put(it.coerceIn(0,100)) }
         val payload=JSONObject()
             .put("body","")
             .put("type","voice")
@@ -994,6 +1006,7 @@ class SocialRepository(
                     .put("fileName",ticket.fileName)
                     .put("sizeBytes",ticket.sizeBytes)
                     .put("durationMs",durationMs.coerceAtLeast(0L))
+                    .put("waveform",wave)
             )
         if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
         return backend.postJson(
@@ -1001,6 +1014,118 @@ class SocialRepository(
             payload,
             authorized=true
         ).optString("id")
+    }
+
+    suspend fun sendDocumentMessage(
+        context:Context,
+        roomId:String,
+        uri:Uri,
+        caption:String="",
+        spoiler:Boolean=false,
+        replyToMessageId:String?=null
+    ):String {
+        val ticket=backend.uploadMedia(context,uri,"document")
+        val payload=JSONObject()
+            .put("body",caption.trim())
+            .put("type","document")
+            .put("spoiler",spoiler)
+            .put(
+                "attachment",
+                JSONObject()
+                    .put("url",ticket.mediaUrl)
+                    .put("mimeType",ticket.mimeType)
+                    .put("fileName",ticket.fileName)
+                    .put("sizeBytes",ticket.sizeBytes)
+            )
+        if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages",
+            payload,
+            authorized=true
+        ).optString("id")
+    }
+
+    suspend fun sendLocationMessage(
+        roomId:String,
+        latitude:Double,
+        longitude:Double,
+        label:String="",
+        spoiler:Boolean=false,
+        replyToMessageId:String?=null
+    ):String {
+        val payload=JSONObject()
+            .put("body",label.trim())
+            .put("type","location")
+            .put("spoiler",spoiler)
+            .put(
+                "attachment",
+                JSONObject()
+                    .put("latitude",latitude)
+                    .put("longitude",longitude)
+                    .put("label",label.trim())
+            )
+        if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages",
+            payload,
+            authorized=true
+        ).optString("id")
+    }
+
+    suspend fun sendContactMessage(
+        roomId:String,
+        name:String,
+        phone:String,
+        email:String="",
+        spoiler:Boolean=false,
+        replyToMessageId:String?=null
+    ):String {
+        val payload=JSONObject()
+            .put("body",name.trim())
+            .put("type","contact")
+            .put("spoiler",spoiler)
+            .put(
+                "attachment",
+                JSONObject()
+                    .put("name",name.trim())
+                    .put("phone",phone.trim())
+                    .put("email",email.trim())
+            )
+        if(!replyToMessageId.isNullOrBlank()) payload.put("replyToMessageId",replyToMessageId)
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages",
+            payload,
+            authorized=true
+        ).optString("id")
+    }
+
+    suspend fun bulkDeleteMessages(
+        roomId:String,
+        messageIds:Collection<String>
+    ):Int {
+        val arr=JSONArray()
+        messageIds.filter(String::isNotBlank).distinct().take(50).forEach { arr.put(it) }
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/bulk-delete",
+            JSONObject().put("messageIds",arr),
+            authorized=true
+        ).optInt("deleted")
+    }
+
+    suspend fun bulkForwardMessages(
+        roomId:String,
+        messageIds:Collection<String>,
+        targetRoomId:String
+    ):Int {
+        val arr=JSONArray()
+        messageIds.filter(String::isNotBlank).distinct().take(20).forEach { arr.put(it) }
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/messages/bulk-forward",
+            JSONObject()
+                .put("messageIds",arr)
+                .put("targetRoomId",targetRoomId),
+            authorized=true
+        ).optInt("count")
     }
 
     suspend fun toggleMessageReaction(
@@ -1113,7 +1238,25 @@ class SocialRepository(
             author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
             attachmentUrl=attachment?.optString("url")?.takeIf(String::isNotBlank),
             attachmentMime=attachment?.optString("mimeType")?.takeIf(String::isNotBlank),
+            attachmentFileName=attachment?.optString("fileName")?.takeIf(String::isNotBlank),
+            attachmentSizeBytes=attachment?.optLong("sizeBytes") ?: 0L,
             attachmentDurationMs=attachment?.optLong("durationMs") ?: 0L,
+            attachmentWaveform=buildList {
+                val wave=attachment?.optJSONArray("waveform")
+                if(wave!=null) {
+                    for(i in 0 until wave.length()) add(wave.optInt(i).coerceIn(0,100))
+                }
+            },
+            locationLatitude=attachment
+                ?.takeIf { it.has("latitude") && !it.isNull("latitude") }
+                ?.optDouble("latitude"),
+            locationLongitude=attachment
+                ?.takeIf { it.has("longitude") && !it.isNull("longitude") }
+                ?.optDouble("longitude"),
+            locationLabel=attachment?.optString("label")?.takeIf(String::isNotBlank),
+            contactName=attachment?.optString("name")?.takeIf(String::isNotBlank),
+            contactPhone=attachment?.optString("phone")?.takeIf(String::isNotBlank),
+            contactEmail=attachment?.optString("email")?.takeIf(String::isNotBlank),
             replyToId=reply?.optString("id")?.takeIf(String::isNotBlank),
             replyPreview=reply?.optString("body")?.takeIf(String::isNotBlank),
             replyAuthor=reply?.optString("author")?.takeIf(String::isNotBlank),
