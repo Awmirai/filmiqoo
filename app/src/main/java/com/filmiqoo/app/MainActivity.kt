@@ -39,6 +39,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val backend = remember { BackendRepository(context.applicationContext) }
     val social = remember { SocialRepository(backend) }
     val messaging = remember { MessagingRepository(backend) }
+    val viewerProfilesRepository = remember { ViewerProfilesRepository(backend) }
+    val viewerStore = remember { backend.viewerProfiles }
     val store = remember { LocalStore(context.applicationContext) }
     val appScope = rememberCoroutineScope()
 
@@ -48,7 +50,29 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var tab by remember { mutableIntStateOf(0) }
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
     var showSearch by remember { mutableStateOf(false) }
+    var activeViewer by remember { mutableStateOf(viewerStore.active()) }
+    var viewerReady by remember { mutableStateOf(!authenticated) }
     var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
+
+    LaunchedEffect(authenticated) {
+        if(!authenticated) {
+            activeViewer=null
+            viewerReady=true
+        } else {
+            viewerReady=false
+            runCatching { viewerProfilesRepository.list() }
+                .onSuccess { profiles->
+                    val currentId=viewerStore.activeId()
+                    val resolved=profiles.firstOrNull { it.id==currentId }
+                        ?: profiles.firstOrNull()
+                    if(resolved!=null) {
+                        viewerStore.activate(resolved)
+                        activeViewer=resolved
+                    }
+                }
+            viewerReady=true
+        }
+    }
 
     LaunchedEffect(initialDeepLink,authenticated) {
         val raw=initialDeepLink
@@ -92,7 +116,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         if (!authenticated && !previewMode && overlay !is OverlayRoute.Auth) {
             AuthScreen(
                 backend=backend,
-                onSuccess={ authenticated=true },
+                onSuccess={
+                    viewerReady=false
+                    authenticated=true
+                },
                 onPreview={ previewMode=true }
             )
             return@Surface
@@ -106,6 +133,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 },
                 onSkip = { configuredPreview=true }
             )
+            return@Surface
+        }
+
+        if(authenticated && !viewerReady) {
+            LoadingPage("در حال آماده‌سازی پروفایل تماشا...")
             return@Surface
         }
 
@@ -178,6 +210,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 is OverlayRoute.Auth -> AuthScreen(
                     backend=backend,
                     onSuccess={
+                        viewerReady=false
                         authenticated=true
                         overlay=null
                     },
@@ -265,6 +298,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     backend=backend,
                     onBack=closeOverlay
                 )
+                OverlayRoute.ViewerProfiles -> ViewerProfilesScreen(
+                    backend=backend,
+                    onBack=closeOverlay,
+                    onActivated={ profile->
+                        viewerStore.activate(profile)
+                        activeViewer=profile
+                        tab=0
+                        overlay=null
+                    }
+                )
                 OverlayRoute.Security -> SecurityScreen(
                     backend=backend,
                     onBack=closeOverlay,
@@ -327,6 +370,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 bottomBar={
                     FilmiqooBottomBar(
                         selected=tab,
+                        kidsMode=activeViewer?.kidsMode==true,
                         onSelected={ index ->
                             if(index==2) {
                                 overlay=OverlayRoute.Create
@@ -377,6 +421,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                 ConnectedProfileScreen(
                                     backend=backend,
                                     repository=repository,
+                                    kidsMode=activeViewer?.kidsMode==true,
                                     onMedia={overlay=OverlayRoute.Detail(it)},
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onCommunity={tab=3},
@@ -386,11 +431,14 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
                                     onInbox={overlay=OverlayRoute.Inbox},
                                     onSettings={overlay=OverlayRoute.Settings},
+                                    onViewerProfiles={overlay=OverlayRoute.ViewerProfiles},
                                     onSecurity={overlay=OverlayRoute.Security},
                                     onSafety={overlay=OverlayRoute.Safety},
                                     onFollowRequests={overlay=OverlayRoute.FollowRequests},
                                     onEditProfile={overlay=OverlayRoute.EditProfile},
                                     onLoggedOut={
+                                        backend.viewerProfiles.clear()
+                                        activeViewer=null
                                         authenticated=false
                                         previewMode=false
                                     }
@@ -420,15 +468,23 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 @Composable
 private fun FilmiqooBottomBar(
     selected: Int,
+    kidsMode: Boolean = false,
     onSelected: (Int) -> Unit
 ) {
-    val entries = listOf(
-        Triple(Icons.Default.Home,"خانه",0),
-        Triple(Icons.Default.Explore,"اکسپلور",1),
-        Triple(Icons.Default.Add,"",2),
-        Triple(Icons.Default.Groups,"اجتماعی",3),
-        Triple(Icons.Default.PersonOutline,"پروفایل",4)
-    )
+    val entries = if(kidsMode) {
+        listOf(
+            Triple(Icons.Default.Home,"خانه",0),
+            Triple(Icons.Default.PersonOutline,"پروفایل",4)
+        )
+    } else {
+        listOf(
+            Triple(Icons.Default.Home,"خانه",0),
+            Triple(Icons.Default.Explore,"اکسپلور",1),
+            Triple(Icons.Default.Add,"",2),
+            Triple(Icons.Default.Groups,"اجتماعی",3),
+            Triple(Icons.Default.PersonOutline,"پروفایل",4)
+        )
+    }
 
     NavigationBar(
         containerColor=Color(0xFF0B0D11),

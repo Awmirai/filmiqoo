@@ -180,6 +180,7 @@ class SessionStore(context: Context) {
 class BackendRepository(context: Context) {
     private val appContext = context.applicationContext
     val session = SessionStore(appContext)
+    val viewerProfiles = ViewerProfileStore(appContext)
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val client = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -645,7 +646,12 @@ class BackendRepository(context: Context) {
             if (authorized) {
                 ensureAccessToken()
                 val access = session.accessToken
-                if (!access.isNullOrBlank()) requestBuilder = requestBuilder.header("Authorization", "Bearer " + access)
+                if (!access.isNullOrBlank()) {
+                    requestBuilder = requestBuilder.header("Authorization", "Bearer " + access)
+                }
+                viewerProfiles.activeId()?.let {
+                    requestBuilder = requestBuilder.header("X-Filmiqoo-Viewer-Profile", it)
+                }
             }
 
             var request = requestBuilder.build()

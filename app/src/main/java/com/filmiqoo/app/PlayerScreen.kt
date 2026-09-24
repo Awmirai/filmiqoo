@@ -72,6 +72,13 @@ fun FilmiqooPlayerScreen(
     }
     val scope=rememberCoroutineScope()
     val initialSettings=remember { AppPreferences(context.applicationContext).read() }
+    val activeViewer=remember { backend.viewerProfiles.active() }
+    val preferredAudioLanguage=activeViewer?.preferredAudioLanguage
+        ?.takeIf(String::isNotBlank)
+        ?: initialSettings.defaultAudioLanguage
+    val preferredSubtitleLanguage=activeViewer?.preferredSubtitleLanguage
+        ?.takeIf(String::isNotBlank)
+        ?: initialSettings.defaultSubtitleLanguage
 
     var currentTarget by remember(target.mediaVersionId) { mutableStateOf(target) }
     var currentVersionId by remember(target.mediaVersionId) { mutableStateOf(target.mediaVersionId) }
@@ -100,7 +107,9 @@ fun FilmiqooPlayerScreen(
     var seekFraction by remember { mutableFloatStateOf(0f) }
     var isScrubbing by remember { mutableStateOf(false) }
     var downloadQueued by remember { mutableStateOf(false) }
-    var autoPlayNext by remember { mutableStateOf(initialSettings.autoplayNext) }
+    var autoPlayNext by remember {
+        mutableStateOf(activeViewer?.autoplayNext ?: initialSettings.autoplayNext)
+    }
     var gestureLabel by remember { mutableStateOf<String?>(null) }
     var gestureValue by remember { mutableFloatStateOf(0f) }
 
@@ -112,6 +121,14 @@ fun FilmiqooPlayerScreen(
             .apply {
                 playWhenReady=true
                 repeatMode=Player.REPEAT_MODE_OFF
+                trackSelectionParameters=trackSelectionParameters.buildUpon()
+                    .setPreferredAudioLanguage(preferredAudioLanguage)
+                    .setPreferredTextLanguage(preferredSubtitleLanguage)
+                    .setTrackTypeDisabled(
+                        C.TRACK_TYPE_TEXT,
+                        !initialSettings.subtitlesEnabled
+                    )
+                    .build()
             }
     }
 

@@ -178,6 +178,10 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/uploads/presign", s.presignUpload)
 			r.Post("/uploads/{id}/complete", s.completeUpload)
 			r.Get("/me", s.me)
+			r.Get("/viewer-profiles", s.viewerProfiles)
+			r.Post("/viewer-profiles", s.createViewerProfile)
+			r.Post("/viewer-profiles/{id}", s.updateViewerProfile)
+			r.Post("/viewer-profiles/{id}/delete", s.deleteViewerProfile)
 			r.Post("/me", s.updateProfile)
 			r.Get("/creator/studio", s.creatorStudio)
 			r.Get("/settings", s.getSettings)
@@ -397,13 +401,29 @@ func (s *Server) saveProgress(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err); return
 	}
 	completed := body.DurationMS > 0 && float64(body.PositionMS)/float64(body.DurationMS) >= 0.95
-	_, err := s.db.Exec(r.Context(),
-		"INSERT INTO watch_progress (user_id,media_version_id,position_ms,duration_ms,completed,updated_at) " +
-		"VALUES ($1,$2,$3,$4,$5,now()) ON CONFLICT (user_id,media_version_id) DO UPDATE SET " +
-		"position_ms=EXCLUDED.position_ms,duration_ms=EXCLUDED.duration_ms,completed=EXCLUDED.completed,updated_at=now()",
-		userID, body.MediaVersionID, body.PositionMS, body.DurationMS, completed)
+	viewerID:=s.viewerProfileID(r,userID)
+	var err error
+	if viewerID!="" {
+		_,err=s.db.Exec(r.Context(),`
+			INSERT INTO viewer_watch_progress (
+				viewer_profile_id,media_version_id,position_ms,duration_ms,completed,updated_at
+			) VALUES ($1,$2,$3,$4,$5,now())
+			ON CONFLICT (viewer_profile_id,media_version_id)
+			DO UPDATE SET
+				position_ms=EXCLUDED.position_ms,
+				duration_ms=EXCLUDED.duration_ms,
+				completed=EXCLUDED.completed,
+				updated_at=now()
+		`,viewerID,body.MediaVersionID,body.PositionMS,body.DurationMS,completed)
+	} else {
+		_,err=s.db.Exec(r.Context(),
+			"INSERT INTO watch_progress (user_id,media_version_id,position_ms,duration_ms,completed,updated_at) " +
+			"VALUES ($1,$2,$3,$4,$5,now()) ON CONFLICT (user_id,media_version_id) DO UPDATE SET " +
+			"position_ms=EXCLUDED.position_ms,duration_ms=EXCLUDED.duration_ms,completed=EXCLUDED.completed,updated_at=now()",
+			userID, body.MediaVersionID, body.PositionMS, body.DurationMS, completed)
+	}
 	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
-	writeJSON(w, http.StatusOK, map[string]any{"saved":true})
+	writeJSON(w, http.StatusOK, map[string]any{"saved":true,"viewerProfileId":viewerID})
 }
 
 type ctxKey string
@@ -443,7 +463,7 @@ func userIDFromContext(ctx context.Context) string {
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Filmiqoo-Ingest-Secret")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Filmiqoo-Ingest-Secret, X-Filmiqoo-Viewer-Profile")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions { w.WriteHeader(http.StatusNoContent); return }
 		next.ServeHTTP(w, r)

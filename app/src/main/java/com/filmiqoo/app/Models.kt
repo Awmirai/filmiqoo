@@ -105,6 +105,7 @@ sealed interface OverlayRoute {
     data object History : OverlayRoute
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
+    data object ViewerProfiles : OverlayRoute
     data object Security : OverlayRoute
     data object Safety : OverlayRoute
     data object FollowRequests : OverlayRoute

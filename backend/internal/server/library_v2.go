@@ -11,15 +11,24 @@ import (
 
 func (s *Server) watchlist(w http.ResponseWriter,r *http.Request) {
     userID:=userIDFromContext(r.Context())
+    viewerID:=s.viewerProfileID(r,userID)
     rows,err:=s.db.Query(r.Context(),`
+        WITH saved AS (
+            SELECT media_title_id,created_at
+              FROM viewer_watchlist
+             WHERE viewer_profile_id::text=$2 AND $2<>''
+            UNION ALL
+            SELECT media_title_id,created_at
+              FROM watchlist
+             WHERE user_id=$1 AND $2=''
+        )
         SELECT mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,
                mt.poster_url,mt.backdrop_url,mt.year,mt.rating,w.created_at
-          FROM watchlist w
+          FROM saved w
           JOIN media_titles mt ON mt.id=w.media_title_id
-         WHERE w.user_id=$1
          ORDER BY w.created_at DESC
          LIMIT 300
-    `,userID)
+    `,userID,viewerID)
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     defer rows.Close()
 
@@ -45,6 +54,7 @@ func (s *Server) watchlist(w http.ResponseWriter,r *http.Request) {
 
 func (s *Server) toggleWatchlist(w http.ResponseWriter,r *http.Request) {
     userID:=userIDFromContext(r.Context())
+    viewerID:=s.viewerProfileID(r,userID)
     mediaID:=chi.URLParam(r,"id")
 
     tx,err:=s.db.Begin(r.Context())
@@ -52,24 +62,47 @@ func (s *Server) toggleWatchlist(w http.ResponseWriter,r *http.Request) {
     defer tx.Rollback(r.Context())
 
     var exists bool
-    if err:=tx.QueryRow(r.Context(),`
-        SELECT EXISTS(
-            SELECT 1 FROM watchlist WHERE user_id=$1 AND media_title_id=$2
-        )
-    `,userID,mediaID).Scan(&exists); err!=nil {
-        writeError(w,http.StatusInternalServerError,err); return
-    }
+    if viewerID!="" {
+        if err:=tx.QueryRow(r.Context(),`
+            SELECT EXISTS(
+                SELECT 1 FROM viewer_watchlist
+                 WHERE viewer_profile_id=$1 AND media_title_id=$2
+            )
+        `,viewerID,mediaID).Scan(&exists); err!=nil {
+            writeError(w,http.StatusInternalServerError,err); return
+        }
 
-    if exists {
-        _,err=tx.Exec(r.Context(),
-            "DELETE FROM watchlist WHERE user_id=$1 AND media_title_id=$2",
-            userID,mediaID)
+        if exists {
+            _,err=tx.Exec(r.Context(),
+                "DELETE FROM viewer_watchlist WHERE viewer_profile_id=$1 AND media_title_id=$2",
+                viewerID,mediaID)
+        } else {
+            _,err=tx.Exec(r.Context(),`
+                INSERT INTO viewer_watchlist (viewer_profile_id,media_title_id)
+                SELECT $1,id FROM media_titles WHERE id=$2
+                ON CONFLICT DO NOTHING
+            `,viewerID,mediaID)
+        }
     } else {
-        _,err=tx.Exec(r.Context(),`
-            INSERT INTO watchlist (user_id,media_title_id)
-            SELECT $1,id FROM media_titles WHERE id=$2
-            ON CONFLICT DO NOTHING
-        `,userID,mediaID)
+        if err:=tx.QueryRow(r.Context(),`
+            SELECT EXISTS(
+                SELECT 1 FROM watchlist WHERE user_id=$1 AND media_title_id=$2
+            )
+        `,userID,mediaID).Scan(&exists); err!=nil {
+            writeError(w,http.StatusInternalServerError,err); return
+        }
+
+        if exists {
+            _,err=tx.Exec(r.Context(),
+                "DELETE FROM watchlist WHERE user_id=$1 AND media_title_id=$2",
+                userID,mediaID)
+        } else {
+            _,err=tx.Exec(r.Context(),`
+                INSERT INTO watchlist (user_id,media_title_id)
+                SELECT $1,id FROM media_titles WHERE id=$2
+                ON CONFLICT DO NOTHING
+            `,userID,mediaID)
+        }
     }
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }

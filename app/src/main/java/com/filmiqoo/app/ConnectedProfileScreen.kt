@@ -38,6 +38,7 @@ private sealed interface ProfileLoad {
 fun ConnectedProfileScreen(
     backend: BackendRepository,
     repository: TmdbRepository,
+    kidsMode: Boolean = false,
     onMedia: (MediaItem) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onCommunity: () -> Unit,
@@ -132,24 +133,26 @@ fun ConnectedProfileScreen(
                         subtitle="Avatar، Cover، Username، Bio و حریم خصوصی",
                         onClick=onEditProfile
                     )
-                    ProfileActionRow(
-                        icon=Icons.Default.Analytics,
-                        title="Creator Studio",
-                        subtitle="Analytics، Reels، Stories و عملکرد کانال‌ها",
-                        onClick=onCreatorStudio
-                    )
-                    ProfileActionRow(
-                        icon=Icons.Default.MarkChatUnread,
-                        title="پیام‌ها",
-                        subtitle="DM، گروه‌ها، Roomها و پیام‌های خوانده‌نشده",
-                        onClick=onInbox
-                    )
-                    ProfileActionRow(
-                        icon=Icons.Default.Groups,
-                        title="Community و Creator",
-                        subtitle="روم‌ها، کانال‌ها و فعالیت اجتماعی",
-                        onClick=onCommunity
-                    )
+                    if(!kidsMode) {
+                        ProfileActionRow(
+                            icon=Icons.Default.Analytics,
+                            title="Creator Studio",
+                            subtitle="Analytics، Reels، Stories و عملکرد کانال‌ها",
+                            onClick=onCreatorStudio
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.MarkChatUnread,
+                            title="پیام‌ها",
+                            subtitle="DM، گروه‌ها، Roomها و پیام‌های خوانده‌نشده",
+                            onClick=onInbox
+                        )
+                        ProfileActionRow(
+                            icon=Icons.Default.Groups,
+                            title="Community و Creator",
+                            subtitle="روم‌ها، کانال‌ها و فعالیت اجتماعی",
+                            onClick=onCommunity
+                        )
+                    }
                     ProfileActionRow(
                         icon=Icons.Default.VideoLibrary,
                         title="Library",
@@ -174,12 +177,14 @@ fun ConnectedProfileScreen(
                         subtitle="ترجیحات پخش فارسی و انگلیسی",
                         onClick={}
                     )
-                    ProfileActionRow(
-                        icon=Icons.Default.PersonAddAlt1,
-                        title="درخواست‌های Follow",
-                        subtitle="Accept یا Decline درخواست‌های حساب خصوصی",
-                        onClick=onFollowRequests
-                    )
+                    if(!kidsMode) {
+                        ProfileActionRow(
+                            icon=Icons.Default.PersonAddAlt1,
+                            title="درخواست‌های Follow",
+                            subtitle="Accept یا Decline درخواست‌های حساب خصوصی",
+                            onClick=onFollowRequests
+                        )
+                    }
                     ProfileActionRow(
                         icon=Icons.Default.Shield,
                         title="مرکز ایمنی",
