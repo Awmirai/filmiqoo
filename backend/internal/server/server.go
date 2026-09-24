@@ -172,6 +172,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/playback/token", s.playbackToken)
 			r.Get("/playback/{versionID}/context", s.playbackContext)
 			r.Get("/playback/{versionID}/moments", s.playbackMoments)
+			r.Get("/playback/{versionID}/dialogue-search", s.dialogueSearch)
 			r.Post("/playback/{versionID}/moments", s.createPlaybackMoment)
 			r.Post("/playback/moments/{id}/like", s.togglePlaybackMomentLike)
 			r.Post("/uploads/presign", s.presignUpload)

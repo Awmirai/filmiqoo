@@ -23,16 +23,17 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val launchDeepLink=intent?.dataString
         setContent {
             FilmiqooTheme {
-                FilmiqooApp()
+                FilmiqooApp(initialDeepLink=launchDeepLink)
             }
         }
     }
 }
 
 @Composable
-fun FilmiqooApp() {
+fun FilmiqooApp(initialDeepLink:String?=null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { TmdbRepository(context.applicationContext) }
     val backend = remember { BackendRepository(context.applicationContext) }
@@ -47,6 +48,36 @@ fun FilmiqooApp() {
     var tab by remember { mutableIntStateOf(0) }
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
     var showSearch by remember { mutableStateOf(false) }
+    var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
+
+    LaunchedEffect(initialDeepLink,authenticated) {
+        val raw=initialDeepLink
+        if(
+            !deepLinkHandled &&
+            authenticated &&
+            !raw.isNullOrBlank()
+        ) {
+            val uri=runCatching { android.net.Uri.parse(raw) }.getOrNull()
+            val versionId=uri?.takeIf {
+                it.scheme=="filmiqoo" && it.host=="play"
+            }?.pathSegments?.firstOrNull()
+            if(!versionId.isNullOrBlank()) {
+                val position=uri.getQueryParameter("t")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                runCatching { backend.playbackContext(versionId) }
+                    .onSuccess { target->
+                        overlay=OverlayRoute.Player(
+                            target.copy(startPositionMs=position)
+                        )
+                        deepLinkHandled=true
+                    }
+                    .onFailure {
+                        deepLinkHandled=true
+                    }
+            } else {
+                deepLinkHandled=true
+            }
+        }
+    }
 
     val closeOverlay = {
         overlay = null

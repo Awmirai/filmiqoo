@@ -3,6 +3,7 @@ package com.filmiqoo.app
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.util.Rational
@@ -13,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -86,6 +88,7 @@ fun FilmiqooPlayerScreen(
     var locked by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var momentsOpen by remember { mutableStateOf(false) }
+    var dialogueSearchOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
     var playbackSpeed by remember { mutableFloatStateOf(initialSettings.defaultPlaybackSpeed) }
     var subtitleScale by remember { mutableFloatStateOf(initialSettings.subtitleScale) }
@@ -320,6 +323,7 @@ fun FilmiqooPlayerScreen(
 
     BackHandler {
         when {
+            dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
@@ -504,6 +508,15 @@ fun FilmiqooPlayerScreen(
                     }
                 },
                 onMoments={momentsOpen=true},
+                onDialogueSearch={dialogueSearchOpen=true},
+                onShare={
+                    sharePlayerMoment(
+                        context=context,
+                        target=currentTarget,
+                        mediaVersionId=currentVersionId,
+                        positionMs=player.currentPosition.coerceAtLeast(0L)
+                    )
+                },
                 onPip={
                     activity?.enterPictureInPictureMode(
                         PictureInPictureParams.Builder()
@@ -613,6 +626,20 @@ fun FilmiqooPlayerScreen(
                 Text("دانلود به صف اضافه شد")
             }
         }
+    }
+
+    if(dialogueSearchOpen) {
+        DialogueSearchSheet(
+            backend=backend,
+            mediaVersionId=currentVersionId,
+            onSeekTo={
+                player.seekTo(it)
+                positionMs=it
+                dialogueSearchOpen=false
+                bumpControls()
+            },
+            onDismiss={dialogueSearchOpen=false}
+        )
     }
 
     if(momentsOpen) {
@@ -761,6 +788,8 @@ private fun PlayerTopControls(
     onBack: () -> Unit,
     onDownload: () -> Unit,
     onMoments: () -> Unit,
+    onDialogueSearch: () -> Unit,
+    onShare: () -> Unit,
     onPip: () -> Unit,
     onSettings: () -> Unit,
     onLock: () -> Unit
@@ -792,6 +821,10 @@ private fun PlayerTopControls(
             )
         }
         PlayerGlassIcon(Icons.Default.Forum,onMoments)
+        Spacer(Modifier.width(5.dp))
+        PlayerGlassIcon(Icons.Default.ManageSearch,onDialogueSearch)
+        Spacer(Modifier.width(5.dp))
+        PlayerGlassIcon(Icons.Default.Share,onShare)
         Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(
             if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
@@ -1410,6 +1443,261 @@ private fun languageName(code: String?): String {
         "hi","hin" -> "हिन्दी"
         else -> code.uppercase(Locale.ROOT)
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DialogueSearchSheet(
+    backend: BackendRepository,
+    mediaVersionId: String,
+    onSeekTo: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val repo=remember { DialogueSearchRepository(backend) }
+    var query by remember { mutableStateOf("") }
+    var language by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf<List<DialogueCue>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(query,language,mediaVersionId) {
+        val q=query.trim()
+        if(q.length<2) {
+            results=emptyList()
+            error=null
+            loading=false
+            return@LaunchedEffect
+        }
+        delay(320)
+        loading=true
+        error=null
+        runCatching {
+            repo.search(
+                mediaVersionId=mediaVersionId,
+                query=q,
+                language=language.takeIf(String::isNotBlank)
+            )
+        }.onSuccess {
+            results=it
+        }.onFailure {
+            error=it.message ?: "جستجو ناموفق بود"
+        }
+        loading=false
+    }
+
+    ModalBottomSheet(
+        onDismissRequest=onDismiss,
+        containerColor=FqSurface
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start=16.dp,end=16.dp,bottom=18.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "جستجو در دیالوگ",
+                        fontSize=19.sp,
+                        fontWeight=FontWeight.Black
+                    )
+                    Text(
+                        "یک جمله یا کلمه رو پیدا کن و مستقیم همون لحظه پخش رو باز کن.",
+                        color=FqMuted,
+                        fontSize=8.sp
+                    )
+                }
+                IconButton(onClick=onDismiss) {
+                    Icon(Icons.Default.Close,null)
+                }
+            }
+
+            OutlinedTextField(
+                value=query,
+                onValueChange={query=it.take(160)},
+                placeholder={Text("مثلاً: I know what I have to do")},
+                leadingIcon={Icon(Icons.Default.Search,null)},
+                trailingIcon={
+                    if(query.isNotBlank()) {
+                        IconButton(onClick={query=""}) {
+                            Icon(Icons.Default.Close,null)
+                        }
+                    }
+                },
+                singleLine=true,
+                shape=RoundedCornerShape(16.dp),
+                modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+            )
+
+            LazyRow(
+                contentPadding=PaddingValues(top=8.dp,bottom=4.dp),
+                horizontalArrangement=Arrangement.spacedBy(6.dp)
+            ) {
+                items(
+                    listOf(
+                        "" to "همه",
+                        "fa" to "فارسی",
+                        "en" to "English",
+                        "de" to "Deutsch",
+                        "ar" to "العربية",
+                        "tr" to "Türkçe",
+                        "ko" to "한국어",
+                        "ja" to "日本語"
+                    )
+                ) { item ->
+                    FilterChip(
+                        selected=language==item.first,
+                        onClick={language=item.first},
+                        label={Text(item.second,fontSize=8.sp)}
+                    )
+                }
+            }
+
+            if(loading) {
+                LinearProgressIndicator(
+                    color=FqGold,
+                    modifier=Modifier.fillMaxWidth().padding(top=6.dp)
+                )
+            }
+
+            error?.let {
+                Text(
+                    it,
+                    color=FqDanger,
+                    fontSize=8.sp,
+                    modifier=Modifier.padding(top=7.dp)
+                )
+            }
+
+            when {
+                query.trim().length<2 -> {
+                    PlayerSearchHint(
+                        icon=Icons.Default.Subtitles,
+                        title="دیالوگ رو پیدا کن",
+                        body="حداقل دو کاراکتر بنویس. نتیجه‌ها با زمان دقیق زیرنویس نمایش داده می‌شن."
+                    )
+                }
+                !loading && results.isEmpty() && error==null -> {
+                    PlayerSearchHint(
+                        icon=Icons.Default.SearchOff,
+                        title="چیزی پیدا نشد",
+                        body="عبارت کوتاه‌تر یا زبان دیگه رو امتحان کن."
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        modifier=Modifier.heightIn(max=440.dp).padding(top=7.dp),
+                        verticalArrangement=Arrangement.spacedBy(7.dp)
+                    ) {
+                        items(
+                            results,
+                            key={it.language+":"+it.startMs+":"+it.endMs+":"+it.text.hashCode()}
+                        ) { cue ->
+                            Surface(
+                                color=FqSurface2,
+                                shape=RoundedCornerShape(15.dp),
+                                modifier=Modifier.fillMaxWidth().clickable {
+                                    onSeekTo(cue.startMs)
+                                }
+                            ) {
+                                Row(
+                                    Modifier.padding(11.dp),
+                                    verticalAlignment=Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color=FqGold.copy(alpha=.12f),
+                                        shape=RoundedCornerShape(9.dp)
+                                    ) {
+                                        Text(
+                                            formatPlayerTime(cue.startMs),
+                                            color=FqGold,
+                                            fontSize=8.sp,
+                                            fontWeight=FontWeight.Bold,
+                                            modifier=Modifier.padding(horizontal=7.dp,vertical=5.dp)
+                                        )
+                                    }
+                                    Spacer(Modifier.width(9.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            cue.text,
+                                            fontSize=9.sp,
+                                            lineHeight=15.sp,
+                                            maxLines=3,
+                                            overflow=TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            cue.language.uppercase(),
+                                            color=FqMuted,
+                                            fontSize=6.sp,
+                                            modifier=Modifier.padding(top=3.dp)
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        null,
+                                        tint=FqGold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerSearchHint(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    body:String
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(vertical=34.dp),
+        horizontalAlignment=Alignment.CenterHorizontally
+    ) {
+        Icon(icon,null,tint=FqGold,modifier=Modifier.size(36.dp))
+        Text(
+            title,
+            fontSize=11.sp,
+            fontWeight=FontWeight.Bold,
+            modifier=Modifier.padding(top=8.dp)
+        )
+        Text(
+            body,
+            color=FqMuted,
+            fontSize=8.sp,
+            lineHeight=14.sp,
+            modifier=Modifier.padding(top=4.dp,horizontal=18.dp)
+        )
+    }
+}
+
+private fun sharePlayerMoment(
+    context:Context,
+    target:PlaybackTarget,
+    mediaVersionId:String,
+    positionMs:Long
+) {
+    val link="filmiqoo://play/"+mediaVersionId+"?t="+positionMs
+    val message=buildString {
+        append(target.title)
+        if(target.subtitle.isNotBlank()) append(" • ").append(target.subtitle)
+        append("\n")
+        append("از ").append(formatPlayerTime(positionMs))
+        append("\n").append(link)
+    }
+    val intent=Intent(Intent.ACTION_SEND).apply {
+        type="text/plain"
+        putExtra(Intent.EXTRA_TEXT,message)
+    }
+    context.startActivity(
+        Intent.createChooser(intent,"اشتراک این لحظه")
+    )
 }
 
 private fun formatPlayerTime(ms: Long): String {
