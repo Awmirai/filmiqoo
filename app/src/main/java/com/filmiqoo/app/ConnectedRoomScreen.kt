@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.WebSocket
+import org.json.JSONObject
 
 @Composable
 fun ConnectedRoomScreen(
@@ -53,6 +55,13 @@ fun ConnectedRoomScreen(
     var pinsOpen by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<RoomMessageItem?>(null) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
+    var roomMembersOpen by remember { mutableStateOf(false) }
+    var forwardTarget by remember { mutableStateOf<RoomMessageItem?>(null) }
+    var memberState by remember(roomId) { mutableStateOf<RoomMembersState?>(null) }
+    var socket by remember(roomId) { mutableStateOf<WebSocket?>(null) }
+    var typingUsers by remember(roomId) {
+        mutableStateOf<Map<String,Pair<String,Long>>>(emptyMap())
+    }
     val realtime=remember(backend) { RoomRealtimeClient(backend.session) }
     val messaging=remember(backend) { MessagingRepository(backend) }
 
@@ -70,6 +79,16 @@ fun ConnectedRoomScreen(
                 }
             }
             .onFailure { error=it.message }
+    }
+
+    suspend fun refreshMembers() {
+        if(!loggedIn) {
+            memberState=null
+            return
+        }
+        runCatching { social.roomMembers(roomId) }
+            .onSuccess { memberState=it }
+            .onFailure { if(error==null) error=it.message }
     }
 
     val mediaPicker=rememberLauncherForActivityResult(
@@ -104,21 +123,51 @@ fun ConnectedRoomScreen(
 
 
 
-    LaunchedEffect(loggedIn) {
+    LaunchedEffect(loggedIn,roomId) {
         meId=if(loggedIn) runCatching { backend.me().id }.getOrNull() else null
+        refreshMembers()
     }
 
-    LaunchedEffect(roomId) {
+    LaunchedEffect(roomId,loggedIn) {
         refresh()
+        if(loggedIn) refreshMembers()
         while(isActive) {
             // Safety resync; live updates normally arrive over WebSocket.
             delay(30_000)
             refresh()
+            if(loggedIn) refreshMembers()
+        }
+    }
+
+    LaunchedEffect(text,loggedIn,socket) {
+        val ws=socket ?: return@LaunchedEffect
+        if(!loggedIn) return@LaunchedEffect
+        if(text.isNotBlank()) {
+            ws.send(JSONObject().put("type","typing").put("active",true).toString())
+            delay(1_400)
+            ws.send(JSONObject().put("type","typing").put("active",false).toString())
+        } else {
+            ws.send(JSONObject().put("type","typing").put("active",false).toString())
+        }
+    }
+
+    LaunchedEffect(socket,loggedIn) {
+        while(isActive && loggedIn && socket!=null) {
+            socket?.send(JSONObject().put("type","presence").toString())
+            delay(25_000)
+        }
+    }
+
+    LaunchedEffect(roomId) {
+        while(isActive) {
+            delay(1_000)
+            val cutoff=System.currentTimeMillis()-4_500L
+            typingUsers=typingUsers.filterValues { it.second>=cutoff }
         }
     }
 
     DisposableEffect(roomId,loggedIn) {
-        val socket=if(loggedIn) {
+        val ws=if(loggedIn) {
             realtime.connect(
                 roomId=roomId,
                 onConnected={
@@ -127,21 +176,50 @@ fun ConnectedRoomScreen(
                         error=null
                     }
                 },
-                onEvent={
+                onEvent={raw->
                     scope.launch {
-                        refresh()
+                        val event=runCatching { JSONObject(raw) }.getOrNull()
+                        when(event?.optString("type")) {
+                            "typing.changed" -> {
+                                val user=event.optJSONObject("user")
+                                val userId=user?.optString("id").orEmpty()
+                                if(userId.isNotBlank() && userId!=meId) {
+                                    if(event.optBoolean("active")) {
+                                        val name=user?.optString("displayName")
+                                            ?.takeIf(String::isNotBlank)
+                                            ?: "کاربر"
+                                        typingUsers=typingUsers+
+                                            (userId to (name to System.currentTimeMillis()))
+                                    } else {
+                                        typingUsers=typingUsers-userId
+                                    }
+                                }
+                            }
+                            "member.joined","member.removed","member.role_changed" -> {
+                                refreshMembers()
+                                refresh()
+                            }
+                            "connected" -> Unit
+                            else -> refresh()
+                        }
                     }
                 },
                 onDisconnected={reason ->
                     scope.launch {
                         realtimeConnected=false
+                        socket=null
                         if(!reason.isNullOrBlank()) error=reason
                     }
                 }
             )
         } else null
+        socket=ws
         onDispose {
-            socket?.close(1000,"screen closed")
+            runCatching {
+                ws?.send(JSONObject().put("type","typing").put("active",false).toString())
+            }
+            ws?.close(1000,"screen closed")
+            if(socket===ws) socket=null
         }
     }
 
@@ -169,6 +247,16 @@ fun ConnectedRoomScreen(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         when {
+                            memberState?.roomType=="dm" -> {
+                                val other=memberState?.items?.firstOrNull { it.id!=meId }
+                                when(other?.presence) {
+                                    "watching" -> "آنلاین • در حال تماشا"
+                                    "online" -> "آنلاین"
+                                    else -> if(realtimeConnected)"آفلاین • Realtime" else "آفلاین"
+                                }
+                            }
+                            loggedIn && memberState!=null ->
+                                (memberState?.online ?: 0L).toString()+" آنلاین • Realtime"
                             realtimeConnected -> "Realtime • WebSocket"
                             syncing -> "در حال همگام‌سازی..."
                             loggedIn -> "اتصال Realtime در حال بازیابی"
@@ -176,6 +264,11 @@ fun ConnectedRoomScreen(
                         },
                         color=FqMuted,fontSize=8.sp
                     )
+                }
+            }
+            if(loggedIn) {
+                IconButton(onClick={roomMembersOpen=true}) {
+                    Icon(Icons.Default.Group,null)
                 }
             }
             IconButton(onClick={pinsOpen=true}) {
@@ -265,6 +358,16 @@ fun ConnectedRoomScreen(
                                                 replyTo=msg
                                             }
                                         )
+                                        if(loggedIn) {
+                                            DropdownMenuItem(
+                                                text={Text("فوروارد")},
+                                                leadingIcon={Icon(Icons.Default.Forward,null)},
+                                                onClick={
+                                                    menuOpen=false
+                                                    forwardTarget=msg
+                                                }
+                                            )
+                                        }
                                         if(meId==msg.author.id && msg.type=="text") {
                                             DropdownMenuItem(
                                                 text={Text("ویرایش")},
@@ -317,6 +420,47 @@ fun ConnectedRoomScreen(
                                 }
                             }
 
+                            msg.forwardedFrom?.let { forwarded ->
+                                Surface(
+                                    color=FqGold.copy(alpha=.08f),
+                                    shape=RoundedCornerShape(10.dp),
+                                    modifier=Modifier.fillMaxWidth().padding(top=6.dp)
+                                ) {
+                                    Row(
+                                        Modifier.padding(8.dp),
+                                        verticalAlignment=Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Forward,
+                                            null,
+                                            tint=FqGold,
+                                            modifier=Modifier.size(14.dp)
+                                        )
+                                        Spacer(Modifier.width(5.dp))
+                                        Column {
+                                            Text(
+                                                "فوروارد شده از "+forwarded.author,
+                                                color=FqGold,
+                                                fontSize=7.sp
+                                            )
+                                            Text(
+                                                forwarded.body.ifBlank {
+                                                    when(forwarded.type) {
+                                                        "voice" -> "پیام صوتی"
+                                                        "image" -> "تصویر"
+                                                        "video" -> "ویدیو"
+                                                        else -> "پیام"
+                                                    }
+                                                },
+                                                color=FqMuted,
+                                                fontSize=7.sp,
+                                                maxLines=1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             if(!msg.replyPreview.isNullOrBlank()) {
                                 Surface(
                                     color=FqSurface2,
@@ -343,22 +487,29 @@ fun ConnectedRoomScreen(
                                 )
                             } else {
                                 if(!msg.attachmentUrl.isNullOrBlank()) {
-                                    Box(
-                                        Modifier.fillMaxWidth().height(190.dp)
-                                            .padding(top=7.dp).clip(RoundedCornerShape(12.dp))
-                                    ) {
-                                        RemoteImage(
-                                            msg.attachmentUrl,
-                                            Modifier.fillMaxSize(),
-                                            ContentScale.Crop
+                                    if(msg.type=="voice") {
+                                        VoiceMessagePlayer(
+                                            url=msg.attachmentUrl,
+                                            declaredDurationMs=msg.attachmentDurationMs
                                         )
-                                        if(msg.type=="video") {
-                                            Box(
-                                                Modifier.size(46.dp).align(Alignment.Center)
-                                                    .background(Color.Black.copy(alpha=.55f),CircleShape),
-                                                contentAlignment=Alignment.Center
-                                            ) {
-                                                Icon(Icons.Default.PlayArrow,null,tint=Color.White)
+                                    } else {
+                                        Box(
+                                            Modifier.fillMaxWidth().height(190.dp)
+                                                .padding(top=7.dp).clip(RoundedCornerShape(12.dp))
+                                        ) {
+                                            RemoteImage(
+                                                msg.attachmentUrl,
+                                                Modifier.fillMaxSize(),
+                                                ContentScale.Crop
+                                            )
+                                            if(msg.type=="video") {
+                                                Box(
+                                                    Modifier.size(46.dp).align(Alignment.Center)
+                                                        .background(Color.Black.copy(alpha=.55f),CircleShape),
+                                                    contentAlignment=Alignment.Center
+                                                ) {
+                                                    Icon(Icons.Default.PlayArrow,null,tint=Color.White)
+                                                }
                                             }
                                         }
                                     }
@@ -455,6 +606,16 @@ fun ConnectedRoomScreen(
                 }
             }
 
+            if(typingUsers.isNotEmpty()) {
+                val names=typingUsers.values.map { it.first }.distinct().take(2)
+                Text(
+                    names.joinToString("، ")+" در حال نوشتن...",
+                    color=FqGold,
+                    fontSize=7.sp,
+                    modifier=Modifier.padding(horizontal=14.dp,vertical=3.dp)
+                )
+            }
+
             Row(
                 Modifier.fillMaxWidth().padding(8.dp),
                 verticalAlignment=Alignment.CenterVertically
@@ -487,25 +648,81 @@ fun ConnectedRoomScreen(
                     modifier=Modifier.weight(1f),
                     maxLines=4
                 )
-                IconButton(onClick={
-                    if(!loggedIn) {
-                        onRequireAuth()
-                    } else if(text.isNotBlank()) {
-                        val sending=text.trim()
-                        text=""
-                        val replyId=replyTo?.id
-                        replyTo=null
-                        scope.launch {
-                            runCatching { social.sendMessage(roomId,sending,spoiler,replyId) }
-                                .onSuccess { spoiler=false;refresh() }
-                                .onFailure { error=it.message }
+                if(text.isNotBlank()) {
+                    IconButton(onClick={
+                        if(!loggedIn) {
+                            onRequireAuth()
+                        } else {
+                            val sending=text.trim()
+                            text=""
+                            val replyId=replyTo?.id
+                            replyTo=null
+                            scope.launch {
+                                runCatching { social.sendMessage(roomId,sending,spoiler,replyId) }
+                                    .onSuccess { spoiler=false;refresh() }
+                                    .onFailure { error=it.message }
+                            }
                         }
+                    }) {
+                        Icon(Icons.Default.Send,null,tint=FqGold)
                     }
-                }) {
-                    Icon(Icons.Default.Send,null,tint=if(text.isBlank())FqMuted else FqGold)
+                } else if(!loggedIn) {
+                    IconButton(onClick=onRequireAuth) {
+                        Icon(Icons.Default.Mic,null,tint=FqMuted)
+                    }
+                } else {
+                    VoiceRecordButton(
+                        enabled=!uploading,
+                        onRecorded={file,durationMs->
+                            uploading=true
+                            val replyId=replyTo?.id
+                            replyTo=null
+                            scope.launch {
+                                runCatching {
+                                    social.sendVoiceMessage(
+                                        roomId=roomId,
+                                        file=file,
+                                        durationMs=durationMs,
+                                        spoiler=spoiler,
+                                        replyToMessageId=replyId
+                                    )
+                                }.onSuccess {
+                                    spoiler=false
+                                    refresh()
+                                }.onFailure {
+                                    error=it.message
+                                }
+                                file.delete()
+                                uploading=false
+                            }
+                        },
+                        onError={error=it}
+                    )
                 }
             }
         }
+    }
+
+    if(roomMembersOpen) {
+        RoomMembersSheet(
+            roomId=roomId,
+            social=social,
+            meId=meId,
+            onDismiss={roomMembersOpen=false},
+            onChanged={scope.launch{refreshMembers()}}
+        )
+    }
+
+    forwardTarget?.let { message ->
+        ForwardMessageSheet(
+            currentRoomId=roomId,
+            messaging=messaging,
+            onDismiss={forwardTarget=null},
+            onForward={targetRoomId->
+                social.forwardMessage(roomId,message.id,targetRoomId)
+                actionMessage="پیام فوروارد شد."
+            }
+        )
     }
 
     if(searchOpen) {
