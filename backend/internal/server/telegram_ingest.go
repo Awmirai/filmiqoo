@@ -39,14 +39,19 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parsed := ingest.ParseFileName(body.FileName)
+	fingerprint:=telegramSourceFingerprint(body)
 
-	var id string
-	err := s.db.QueryRow(r.Context(),
-		`INSERT INTO telegram_ingest_items (
+	var id,status string
+	err := s.db.QueryRow(r.Context(),`
+		INSERT INTO telegram_ingest_items (
 			telegram_chat_id,telegram_message_id,telegram_file_id,telegram_file_numeric_id,file_name,file_size_bytes,
 			mime_type,caption,stream_hash,parsed_kind,parsed_title,parsed_season,parsed_episode,
-			parsed_year,parsed_quality,parsed_source,parsed_codec,updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now())
+			parsed_year,parsed_quality,parsed_source,parsed_codec,source_fingerprint,
+			status,attempt_count,next_attempt_at,dead_lettered_at,error_text,updated_at
+		) VALUES (
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+			'pending_metadata',0,now(),NULL,'',now()
+		)
 		ON CONFLICT (telegram_chat_id,telegram_message_id)
 		DO UPDATE SET
 			telegram_file_id=EXCLUDED.telegram_file_id,
@@ -64,23 +69,54 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 			parsed_quality=EXCLUDED.parsed_quality,
 			parsed_source=EXCLUDED.parsed_source,
 			parsed_codec=EXCLUDED.parsed_codec,
+			source_fingerprint=EXCLUDED.source_fingerprint,
+			status=CASE
+				WHEN telegram_ingest_items.source_fingerprint=EXCLUDED.source_fingerprint
+				 AND telegram_ingest_items.status='ready'
+				THEN 'ready'
+				ELSE 'pending_metadata'
+			END,
+			attempt_count=CASE
+				WHEN telegram_ingest_items.source_fingerprint=EXCLUDED.source_fingerprint
+				THEN telegram_ingest_items.attempt_count
+				ELSE 0
+			END,
+			next_attempt_at=CASE
+				WHEN telegram_ingest_items.source_fingerprint=EXCLUDED.source_fingerprint
+				THEN telegram_ingest_items.next_attempt_at
+				ELSE now()
+			END,
+			dead_lettered_at=CASE
+				WHEN telegram_ingest_items.source_fingerprint=EXCLUDED.source_fingerprint
+				THEN telegram_ingest_items.dead_lettered_at
+				ELSE NULL
+			END,
+			error_text=CASE
+				WHEN telegram_ingest_items.source_fingerprint=EXCLUDED.source_fingerprint
+				THEN telegram_ingest_items.error_text
+				ELSE ''
+			END,
 			updated_at=now()
-		RETURNING id::text`,
+		RETURNING id::text,status
+	`,
 		body.ChatID,body.MessageID,body.FileID,body.FileNumericID,body.FileName,body.FileSizeBytes,
 		body.MimeType,body.Caption,body.StreamHash,parsed.Kind,parsed.Title,parsed.Season,
-		parsed.Episode,parsed.Year,parsed.Quality,parsed.Source,parsed.Codec,
-	).Scan(&id)
+		parsed.Episode,parsed.Year,parsed.Quality,parsed.Source,parsed.Codec,fingerprint,
+	).Scan(&id,&status)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	status := "pending_metadata"
-	if s.tmdb != nil && s.tmdb.Enabled() {
-		if err := s.retryTelegramResolve(r.Context(), id); err == nil {
+	if status!="ready" && s.tmdb != nil && s.tmdb.Enabled() {
+		if err := s.attemptTelegramResolve(r.Context(), id, false); err == nil {
 			status = "ready"
 		} else {
-			status = "failed"
+			_ = s.db.QueryRow(
+				r.Context(),
+				"SELECT status FROM telegram_ingest_items WHERE id=$1",
+				id,
+			).Scan(&status)
 		}
 	}
 
@@ -100,10 +136,11 @@ func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(),
 		`SELECT id::text,telegram_chat_id,telegram_message_id,file_name,parsed_kind,parsed_title,
 		        parsed_season,parsed_episode,parsed_year,parsed_quality,parsed_source,parsed_codec,
-		        stream_hash,status,error_text,received_at
+		        stream_hash,status,error_text,received_at,attempt_count,next_attempt_at,
+		        last_attempt_at,dead_lettered_at
 		   FROM telegram_ingest_items
-		  WHERE status IN ('pending_metadata','failed')
-		  ORDER BY received_at ASC
+		  WHERE status IN ('pending_metadata','failed','resolving','dead_letter')
+		  ORDER BY next_attempt_at ASC,received_at ASC
 		  LIMIT 100`)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -116,9 +153,12 @@ func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 		var id,fileName,kind,title,quality,source,codec,streamHash,status,errorText string
 		var chatID,messageID int64
 		var season,episode,year *int
-		var receivedAt any
+		var receivedAt,nextAttemptAt any
+		var lastAttemptAt,deadLetteredAt any
+		var attemptCount int
 		if err := rows.Scan(&id,&chatID,&messageID,&fileName,&kind,&title,&season,&episode,&year,
-			&quality,&source,&codec,&streamHash,&status,&errorText,&receivedAt); err != nil {
+			&quality,&source,&codec,&streamHash,&status,&errorText,&receivedAt,&attemptCount,
+			&nextAttemptAt,&lastAttemptAt,&deadLetteredAt); err != nil {
 			writeError(w,http.StatusInternalServerError,err)
 			return
 		}
@@ -127,6 +167,8 @@ func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 			"kind":kind,"title":title,"season":season,"episode":episode,"year":year,
 			"quality":quality,"source":source,"codec":codec,"hasStreamHash":streamHash!="",
 			"status":status,"error":errorText,"receivedAt":receivedAt,
+			"attemptCount":attemptCount,"nextAttemptAt":nextAttemptAt,
+			"lastAttemptAt":lastAttemptAt,"deadLetteredAt":deadLetteredAt,
 		})
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"items":items})
@@ -152,7 +194,7 @@ func (s *Server) resolveTelegramIngestNow(w http.ResponseWriter, r *http.Request
 		writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"TMDB token is not configured on backend"})
 		return
 	}
-	if err:=s.retryTelegramResolve(r.Context(),id); err!=nil {
+	if err:=s.attemptTelegramResolve(r.Context(),id,true); err!=nil {
 		writeJSON(w,http.StatusUnprocessableEntity,map[string]string{"error":err.Error()})
 		return
 	}
