@@ -597,6 +597,22 @@ class SocialRepository(
         backend.postJson("/v1/social/reels/"+id+"/view",JSONObject(),authorized=true)
     }
 
+    suspend fun feedback(
+        targetType:String,
+        targetId:String,
+        action:String
+    ) {
+        backend.postJson(
+            "/v1/social/feedback",
+            JSONObject()
+                .put("targetType",targetType)
+                .put("targetId",targetId)
+                .put("action",action),
+            authorized=true
+        )
+    }
+
+
     suspend fun reelComments(reelId: String): List<SocialComment> {
         val root=backend.getJson("/v1/social/reels/"+reelId+"/comments",authorized=false)
         val arr=root.optJSONArray("items") ?: return emptyList()

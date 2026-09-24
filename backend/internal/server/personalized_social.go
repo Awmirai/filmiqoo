@@ -25,7 +25,45 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 		     SELECT 1 FROM user_mutes m
 		      WHERE m.muter_user_id=$1 AND m.muted_user_id=p.author_user_id
 		   )
-		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
+		   AND NOT EXISTS (
+		     SELECT 1 FROM feed_feedback ff
+		      WHERE ff.user_id=$1 AND ff.target_type='post'
+		        AND ff.target_id=p.id AND ff.action='not_interested'
+		   )
+		   AND NOT EXISTS (
+		     SELECT 1 FROM feed_feedback ff
+		      WHERE ff.user_id=$1 AND ff.target_type='media'
+		        AND ff.target_id=p.media_title_id AND ff.action='not_interested'
+		   )
+		 ORDER BY
+		   (
+		     CASE WHEN EXISTS(
+		       SELECT 1 FROM user_follows uf
+		        WHERE uf.follower_user_id=$1 AND uf.followed_user_id=p.author_user_id
+		     ) THEN 120 ELSE 0 END
+		     + CASE WHEN p.channel_id IS NOT NULL AND EXISTS(
+		       SELECT 1 FROM channel_followers cf
+		        WHERE cf.user_id=$1 AND cf.channel_id=p.channel_id
+		     ) THEN 80 ELSE 0 END
+		     + CASE WHEN p.media_title_id IS NOT NULL AND EXISTS(
+		       SELECT 1 FROM favorites f
+		        WHERE f.user_id=$1 AND f.media_title_id=p.media_title_id
+		     ) THEN 65 ELSE 0 END
+		     + CASE WHEN p.media_title_id IS NOT NULL AND EXISTS(
+		       SELECT 1 FROM watchlist wl
+		        WHERE wl.user_id=$1 AND wl.media_title_id=p.media_title_id
+		     ) THEN 55 ELSE 0 END
+		     + CASE WHEN EXISTS(
+		       SELECT 1 FROM feed_feedback ff
+		        WHERE ff.user_id=$1 AND ff.target_type='post'
+		          AND ff.target_id=p.id AND ff.action='show_more'
+		     ) THEN 90 ELSE 0 END
+		     + LEAST(
+		       p.like_count*2 + p.comment_count*4 + p.save_count*5 + p.share_count*6,
+		       700
+		     )
+		   ) DESC,
+		   p.published_at DESC NULLS LAST,p.created_at DESC
 		 LIMIT 50
 	`,userID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
@@ -77,7 +115,46 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		     SELECT 1 FROM user_mutes m
 		      WHERE m.muter_user_id=$1 AND m.muted_user_id=rl.creator_user_id
 		   )
-		 ORDER BY rl.published_at DESC NULLS LAST,rl.created_at DESC
+		   AND NOT EXISTS (
+		     SELECT 1 FROM feed_feedback ff
+		      WHERE ff.user_id=$1 AND ff.target_type='reel'
+		        AND ff.target_id=rl.id AND ff.action='not_interested'
+		   )
+		   AND NOT EXISTS (
+		     SELECT 1 FROM feed_feedback ff
+		      WHERE ff.user_id=$1 AND ff.target_type='media'
+		        AND ff.target_id=rl.media_title_id AND ff.action='not_interested'
+		   )
+		 ORDER BY
+		   (
+		     CASE WHEN EXISTS(
+		       SELECT 1 FROM user_follows uf
+		        WHERE uf.follower_user_id=$1 AND uf.followed_user_id=rl.creator_user_id
+		     ) THEN 140 ELSE 0 END
+		     + CASE WHEN rl.channel_id IS NOT NULL AND EXISTS(
+		       SELECT 1 FROM channel_followers cf
+		        WHERE cf.user_id=$1 AND cf.channel_id=rl.channel_id
+		     ) THEN 90 ELSE 0 END
+		     + CASE WHEN rl.media_title_id IS NOT NULL AND EXISTS(
+		       SELECT 1 FROM favorites f
+		        WHERE f.user_id=$1 AND f.media_title_id=rl.media_title_id
+		     ) THEN 70 ELSE 0 END
+		     + CASE WHEN rl.media_title_id IS NOT NULL AND EXISTS(
+		       SELECT 1 FROM watchlist wl
+		        WHERE wl.user_id=$1 AND wl.media_title_id=rl.media_title_id
+		     ) THEN 60 ELSE 0 END
+		     + CASE WHEN EXISTS(
+		       SELECT 1 FROM feed_feedback ff
+		        WHERE ff.user_id=$1 AND ff.target_type='reel'
+		          AND ff.target_id=rl.id AND ff.action='show_more'
+		     ) THEN 100 ELSE 0 END
+		     + LEAST(
+		       rl.like_count*2 + rl.comment_count*4 + rl.save_count*5 +
+		       rl.share_count*6 + rl.view_count/20,
+		       900
+		     )
+		   ) DESC,
+		   rl.published_at DESC NULLS LAST,rl.created_at DESC
 		 LIMIT 60
 	`,userID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
@@ -140,7 +217,12 @@ func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
 		     SELECT 1 FROM user_mutes m
 		      WHERE m.muter_user_id=$1 AND m.muted_user_id=st.author_user_id
 		   )
-		 ORDER BY st.created_at DESC
+		 ORDER BY
+		   CASE WHEN EXISTS(
+		     SELECT 1 FROM user_follows uf
+		      WHERE uf.follower_user_id=$1 AND uf.followed_user_id=st.author_user_id
+		   ) THEN 0 ELSE 1 END,
+		   st.created_at DESC
 		 LIMIT 100
 	`,userID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }

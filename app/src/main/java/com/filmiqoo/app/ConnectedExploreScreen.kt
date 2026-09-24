@@ -43,6 +43,7 @@ private sealed interface ReelLoad {
 @Composable
 fun ConnectedExploreScreen(
     social: SocialRepository,
+    backend: BackendRepository,
     repository: TmdbRepository,
     store: LocalStore,
     loggedIn: Boolean,
@@ -87,6 +88,7 @@ fun ConnectedExploreScreen(
                 RealReelsPager(
                     reels=s.reels,
                     social=social,
+                    backend=backend,
                     loggedIn=loggedIn,
                     onMedia=onMedia,
                     onCreator=onCreator,
@@ -103,6 +105,7 @@ fun ConnectedExploreScreen(
 private fun RealReelsPager(
     reels: List<ReelFeedItem>,
     social: SocialRepository,
+    backend: BackendRepository,
     loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
@@ -117,6 +120,8 @@ private fun RealReelsPager(
     val followed=remember { mutableStateMapOf<String,Boolean>() }
     val revealed=remember { mutableStateMapOf<String,Boolean>() }
     var commentsFor by remember { mutableStateOf<ReelFeedItem?>(null) }
+    var safetyFor by remember { mutableStateOf<ReelFeedItem?>(null) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var muted by remember { mutableStateOf(false) }
     var followingTab by remember { mutableStateOf(false) }
 
@@ -201,8 +206,34 @@ private fun RealReelsPager(
                             handle="@"+reel.author.username,
                             followers="",
                             bio="Creator در Filmiqoo",
-                            verified=reel.author.verified
+                            verified=reel.author.verified,
+                            id=reel.author.id,
+                            entityType="user",
+                            avatarUrl=reel.author.avatarUrl
                         )
+                    )
+                },
+                onNotInterested={
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else {
+                        scope.launch {
+                            runCatching {
+                                social.feedback("reel",reel.id,"not_interested")
+                            }.onSuccess {
+                                feedbackMessage="این نوع Reel کمتر نمایش داده می‌شه."
+                                onRefresh()
+                            }
+                        }
+                    }
+                },
+                onSafety={
+                    if(!loggedIn) onRequireAuth() else safetyFor=reel
+                },
+                onShare={
+                    shareText(
+                        context,
+                        "Filmiqoo Reel • "+(reel.media?.title ?: reel.caption.ifBlank{"Reel"})
                     )
                 },
                 onToggleMute={muted=!muted},
@@ -257,6 +288,28 @@ private fun RealReelsPager(
             onDismiss={commentsFor=null}
         )
     }
+
+    safetyFor?.let { reel ->
+        SafetyActionSheet(
+            backend=backend,
+            targetType="reel",
+            targetId=reel.id,
+            targetLabel="Reel از "+reel.author.displayName,
+            userTargetId=reel.author.id,
+            onDismiss={safetyFor=null},
+            onChanged={
+                safetyFor=null
+                onRefresh()
+            }
+        )
+    }
+
+    feedbackMessage?.let {
+        Snackbar(
+            modifier=Modifier.padding(16.dp),
+            action={TextButton(onClick={feedbackMessage=null}){Text("باشه")}}
+        ) { Text(it) }
+    }
 }
 
 @Composable
@@ -275,6 +328,9 @@ private fun ReelVideoPage(
     onComment: () -> Unit,
     onMedia: () -> Unit,
     onCreator: () -> Unit,
+    onNotInterested: () -> Unit,
+    onSafety: () -> Unit,
+    onShare: () -> Unit,
     onToggleMute: () -> Unit,
     muted: Boolean
 ) {
@@ -441,10 +497,22 @@ private fun ReelVideoPage(
                 onClick=onToggleMute
             )
             ReelCircleAction(
+                icon=Icons.Default.DoNotDisturbOn,
+                tint=Color.White,
+                text="علاقه ندارم",
+                onClick=onNotInterested
+            )
+            ReelCircleAction(
+                icon=Icons.Default.MoreVert,
+                tint=Color.White,
+                text="بیشتر",
+                onClick=onSafety
+            )
+            ReelCircleAction(
                 icon=Icons.Default.Share,
                 tint=Color.White,
                 text=compactCount(reel.shares),
-                onClick={}
+                onClick=onShare
             )
         }
     }

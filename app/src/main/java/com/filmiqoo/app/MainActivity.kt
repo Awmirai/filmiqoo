@@ -296,6 +296,7 @@ fun FilmiqooApp() {
                         )
                         1 -> ConnectedExploreScreen(
                             social=social,
+                            backend=backend,
                             repository=repository,
                             store=store,
                             loggedIn=backend.session.isLoggedIn,
