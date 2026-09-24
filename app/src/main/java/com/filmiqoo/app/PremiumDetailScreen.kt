@@ -401,6 +401,10 @@ fun PremiumDetailScreen(
                                     PremiumSeriesPanel(
                                         title=d.media.title,
                                         seasons=platform!!.seasons,
+                                        backend=backend,
+                                        mediaTitleId=d.media.backendId,
+                                        loggedIn=backend.session.isLoggedIn,
+                                        onRequireAuth=onRequireAuth,
                                         onPlay=onPlay,
                                         onDownload={ ep ->
                                             val id=ep.mediaVersionId ?: return@PremiumSeriesPanel
@@ -1204,6 +1208,10 @@ private fun FranchiseWatchOrderRow(
 private fun PremiumSeriesPanel(
     title: String,
     seasons: List<PlatformSeason>,
+    backend: BackendRepository,
+    mediaTitleId: String?,
+    loggedIn: Boolean,
+    onRequireAuth: () -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onDownload: (PlatformEpisode) -> Unit,
     onDownloadSeason: (PlatformSeason) -> Unit
@@ -1211,14 +1219,92 @@ private fun PremiumSeriesPanel(
     var selectedSeason by remember(seasons) {
         mutableIntStateOf(seasons.firstOrNull()?.number ?: 0)
     }
+    val scope=rememberCoroutineScope()
+    val progressRepo=remember { SeriesProgressRepository(backend) }
+    var progressRefresh by remember { mutableIntStateOf(0) }
+    var watchProgress by remember { mutableStateOf<SeriesWatchProgress?>(null) }
+    var progressLoading by remember { mutableStateOf(false) }
+    var progressError by remember { mutableStateOf<String?>(null) }
+    var busyEpisodeId by remember { mutableStateOf<String?>(null) }
+    var busySeasonId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(mediaTitleId,loggedIn,progressRefresh) {
+        if(!loggedIn || mediaTitleId.isNullOrBlank()) {
+            watchProgress=null
+            return@LaunchedEffect
+        }
+        progressLoading=true
+        runCatching { progressRepo.load(mediaTitleId) }
+            .onSuccess {
+                watchProgress=it
+                progressError=null
+            }
+            .onFailure { progressError=it.message }
+        progressLoading=false
+    }
+
     val season=seasons.firstOrNull { it.number==selectedSeason } ?: seasons.firstOrNull()
 
     Column(Modifier.fillMaxWidth()) {
         PremiumSectionHeader(
             title="فصل‌ها و قسمت‌ها",
-            subtitle=seasons.size.toString()+" فصل",
+            subtitle=watchProgress?.let {
+                it.watchedCount.toString()+" از "+it.totalCount+" قسمت دیده شده"
+            } ?: seasons.size.toString()+" فصل",
             icon=Icons.Default.VideoLibrary
         )
+
+        watchProgress?.let { progress ->
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(18.dp),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=16.dp,vertical=6.dp)
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Icon(Icons.Default.Insights,null,tint=FqGold)
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            "پیشرفت کل سریال",
+                            fontSize=10.sp,
+                            fontWeight=FontWeight.Bold,
+                            modifier=Modifier.weight(1f)
+                        )
+                        Text(
+                            ((progress.progress*100).toInt()).toString()+"٪",
+                            color=FqGold,
+                            fontSize=9.sp,
+                            fontWeight=FontWeight.Bold
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress={progress.progress},
+                        color=FqGold,
+                        trackColor=FqSurface3,
+                        modifier=Modifier.fillMaxWidth()
+                            .height(5.dp)
+                            .padding(top=5.dp)
+                    )
+                }
+            }
+        }
+
+        if(progressLoading) {
+            LinearProgressIndicator(
+                color=FqGold,
+                modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp)
+            )
+        }
+
+        progressError?.let {
+            Text(
+                it,
+                color=FqDanger,
+                fontSize=7.sp,
+                modifier=Modifier.padding(horizontal=16.dp,vertical=4.dp)
+            )
+        }
 
         LazyRow(
             contentPadding=PaddingValues(horizontal=16.dp),
@@ -1237,19 +1323,107 @@ private fun PremiumSeriesPanel(
             val readyCount=selected.episodes.count {
                 it.streamReady && !it.mediaVersionId.isNullOrBlank()
             }
-            if(readyCount>0) {
-                OutlinedButton(
-                    onClick={onDownloadSeason(selected)},
-                    shape=RoundedCornerShape(14.dp),
-                    modifier=Modifier.fillMaxWidth()
-                        .padding(horizontal=16.dp,vertical=10.dp)
-                ) {
-                    Icon(Icons.Default.DownloadForOffline,null,tint=FqGold)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "دانلود فصل "+selected.number+" • "+readyCount+" قسمت",
-                        color=FqGold
-                    )
+            val seasonStates=selected.episodes.mapNotNull {
+                watchProgress?.episodes?.get(it.id)
+            }
+            val watchedCount=seasonStates.count { it.completed }
+            val seasonTotal=selected.episodes.size
+            val allWatched=seasonTotal>0 && watchedCount>=seasonTotal
+
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(17.dp),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=16.dp,vertical=9.dp)
+            ) {
+                Column(Modifier.padding(11.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if(selected.number==0)"قسمت‌های ویژه" else "فصل "+selected.number,
+                                fontSize=11.sp,
+                                fontWeight=FontWeight.Bold
+                            )
+                            Text(
+                                watchedCount.toString()+" از "+seasonTotal+" قسمت دیده شده",
+                                color=FqMuted,
+                                fontSize=7.sp,
+                                modifier=Modifier.padding(top=2.dp)
+                            )
+                        }
+                        if(loggedIn) {
+                            OutlinedButton(
+                                enabled=busySeasonId!=selected.id,
+                                onClick={
+                                    busySeasonId=selected.id
+                                    scope.launch {
+                                        runCatching {
+                                            progressRepo.setSeasonWatched(
+                                                selected.id,
+                                                watched=!allWatched
+                                            )
+                                        }.onSuccess {
+                                            progressRefresh++
+                                        }.onFailure {
+                                            progressError=it.message
+                                        }
+                                        busySeasonId=null
+                                    }
+                                },
+                                contentPadding=PaddingValues(horizontal=9.dp,vertical=4.dp)
+                            ) {
+                                if(busySeasonId==selected.id) {
+                                    CircularProgressIndicator(
+                                        color=FqGold,
+                                        strokeWidth=2.dp,
+                                        modifier=Modifier.size(15.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        if(allWatched)Icons.Default.RemoveDone else Icons.Default.DoneAll,
+                                        null,
+                                        modifier=Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    if(allWatched)"نادیده" else "همه دیده‌شده",
+                                    fontSize=7.sp
+                                )
+                            }
+                        } else {
+                            TextButton(onClick=onRequireAuth) {
+                                Text("ورود برای Progress",fontSize=7.sp)
+                            }
+                        }
+                    }
+
+                    if(seasonTotal>0) {
+                        LinearProgressIndicator(
+                            progress={if(seasonTotal>0) watchedCount.toFloat()/seasonTotal else 0f},
+                            color=FqGold,
+                            trackColor=FqSurface3,
+                            modifier=Modifier.fillMaxWidth()
+                                .height(4.dp)
+                                .padding(top=6.dp)
+                        )
+                    }
+
+                    if(readyCount>0) {
+                        OutlinedButton(
+                            onClick={onDownloadSeason(selected)},
+                            shape=RoundedCornerShape(13.dp),
+                            modifier=Modifier.fillMaxWidth().padding(top=9.dp)
+                        ) {
+                            Icon(Icons.Default.DownloadForOffline,null,tint=FqGold)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "دانلود فصل "+selected.number+" • "+readyCount+" قسمت",
+                                color=FqGold,
+                                fontSize=8.sp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1276,6 +1450,26 @@ private fun PremiumSeriesPanel(
                 episode=ep,
                 nextSeasonNumber=next?.first,
                 nextEpisode=next?.second,
+                watchState=watchProgress?.episodes?.get(ep.id),
+                watchBusy=busyEpisodeId==ep.id,
+                onToggleWatched={
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else {
+                        busyEpisodeId=ep.id
+                        scope.launch {
+                            val watched=watchProgress?.episodes?.get(ep.id)?.completed==true
+                            runCatching {
+                                progressRepo.setEpisodeWatched(ep.id,!watched)
+                            }.onSuccess {
+                                progressRefresh++
+                            }.onFailure {
+                                progressError=it.message
+                            }
+                            busyEpisodeId=null
+                        }
+                    }
+                },
                 onPlay=onPlay,
                 onDownload=onDownload
             )
@@ -1290,6 +1484,9 @@ private fun EpisodeCard(
     episode: PlatformEpisode,
     nextSeasonNumber: Int?,
     nextEpisode: PlatformEpisode?,
+    watchState: EpisodeWatchState?,
+    watchBusy: Boolean,
+    onToggleWatched: () -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onDownload: (PlatformEpisode) -> Unit
 ) {
@@ -1323,6 +1520,32 @@ private fun EpisodeCard(
                             "E"+episode.number.toString().padStart(2,'0'),
                         fontSize=8.sp,
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                    )
+                }
+
+                if(watchState?.completed==true) {
+                    Surface(
+                        color=FqGreen.copy(alpha=.92f),
+                        shape=CircleShape,
+                        modifier=Modifier.align(Alignment.TopEnd).padding(9.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            null,
+                            tint=Color.Black,
+                            modifier=Modifier.padding(6.dp).size(17.dp)
+                        )
+                    }
+                }
+
+                if(watchState!=null && !watchState.completed && watchState.progress>0f) {
+                    LinearProgressIndicator(
+                        progress={watchState.progress},
+                        color=FqGold,
+                        trackColor=Color.White.copy(alpha=.22f),
+                        modifier=Modifier.fillMaxWidth()
+                            .height(5.dp)
+                            .align(Alignment.BottomCenter)
                     )
                 }
 
@@ -1389,6 +1612,26 @@ private fun EpisodeCard(
                             maxLines=2,
                             overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(top=5.dp)
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick=onToggleWatched,
+                    enabled=!watchBusy
+                ) {
+                    if(watchBusy) {
+                        CircularProgressIndicator(
+                            color=FqGold,
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(18.dp)
+                        )
+                    } else {
+                        Icon(
+                            if(watchState?.completed==true)Icons.Default.CheckCircle
+                            else Icons.Default.RadioButtonUnchecked,
+                            null,
+                            tint=if(watchState?.completed==true)FqGreen else FqMuted
                         )
                     }
                 }
