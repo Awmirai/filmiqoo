@@ -55,7 +55,12 @@ fun DownloadsScreen(
     }
 
     val active=downloads.filter { it.status!="completed" }
+        .sortedWith(
+            compareByDescending<OfflineDownloadItem> { it.priority }
+                .thenBy { it.createdAt }
+        )
     val completed=downloads.filter { it.status=="completed" }
+        .sortedByDescending { it.createdAt }
     val visible=if(tab==0) active else completed
 
     LazyColumn(
@@ -140,6 +145,7 @@ fun DownloadsScreen(
                     onPause={OfflineDownloadManager.pause(context,item.id)},
                     onResume={OfflineDownloadManager.resume(context,item.id)},
                     onRetry={OfflineDownloadManager.retry(context,item.id)},
+                    onPriority={OfflineDownloadManager.setPriority(context,item.id,it)},
                     onDelete={OfflineDownloadManager.delete(context,item.id)},
                     onPlay={
                         val path=item.localPath ?: return@DownloadCard
@@ -382,9 +388,11 @@ private fun DownloadCard(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRetry: () -> Unit,
+    onPriority: (Int) -> Unit,
     onDelete: () -> Unit,
     onPlay: () -> Unit
 ) {
+    var priorityMenu by remember(item.id) { mutableStateOf(false) }
     Surface(
         color=FqSurface,
         shape=RoundedCornerShape(22.dp),
@@ -425,6 +433,10 @@ private fun DownloadCard(
                         verticalAlignment=Alignment.CenterVertically
                     ) {
                         DownloadStatusPill(item.status)
+                        if(item.status!="completed") {
+                            Spacer(Modifier.width(6.dp))
+                            DownloadPriorityPill(item.priority)
+                        }
                         Spacer(Modifier.width(7.dp))
                         Text(
                             buildString {
@@ -527,12 +539,78 @@ private fun DownloadCard(
 
                 Spacer(Modifier.weight(1f))
 
+                if(item.status!="completed") {
+                    Box {
+                        TextButton(onClick={priorityMenu=true}) {
+                            Icon(Icons.Default.Tune,null,modifier=Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(downloadPriorityLabel(item.priority),fontSize=7.sp)
+                        }
+                        DropdownMenu(
+                            expanded=priorityMenu,
+                            onDismissRequest={priorityMenu=false}
+                        ) {
+                            DropdownMenuItem(
+                                text={Text("اولویت بالا")},
+                                leadingIcon={Icon(Icons.Default.KeyboardDoubleArrowUp,null)},
+                                onClick={
+                                    priorityMenu=false
+                                    onPriority(2)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text={Text("اولویت عادی")},
+                                leadingIcon={Icon(Icons.Default.Remove,null)},
+                                onClick={
+                                    priorityMenu=false
+                                    onPriority(1)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text={Text("اولویت پایین")},
+                                leadingIcon={Icon(Icons.Default.KeyboardDoubleArrowDown,null)},
+                                onClick={
+                                    priorityMenu=false
+                                    onPriority(0)
+                                }
+                            )
+                        }
+                    }
+                }
+
                 IconButton(onClick=onDelete) {
                     Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DownloadPriorityPill(priority:Int) {
+    val pair=when(priority) {
+        2 -> "High" to FqDanger
+        0 -> "Low" to FqMuted
+        else -> "Normal" to FqBlue
+    }
+    Surface(
+        color=pair.second.copy(alpha=.12f),
+        shape=RoundedCornerShape(999.dp)
+    ) {
+        Text(
+            pair.first,
+            color=pair.second,
+            fontSize=6.sp,
+            fontWeight=FontWeight.Bold,
+            modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+        )
+    }
+}
+
+private fun downloadPriorityLabel(priority:Int):String=when(priority) {
+    2 -> "High"
+    0 -> "Low"
+    else -> "Normal"
 }
 
 @Composable

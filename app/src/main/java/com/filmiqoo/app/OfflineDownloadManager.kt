@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -38,7 +39,8 @@ data class OfflineDownloadItem(
     val nextMediaVersionId: String? = null,
     val nextTitle: String? = null,
     val nextSubtitle: String? = null,
-    val smartManaged: Boolean = false
+    val smartManaged: Boolean = false,
+    val priority: Int = 1
 ) {
     val progress: Float
         get() = if(totalBytes>0) (downloadedBytes.toFloat()/totalBytes.toFloat()).coerceIn(0f,1f) else 0f
@@ -75,7 +77,8 @@ object OfflineDownloadManager {
                         nextMediaVersionId=o.optString("nextMediaVersionId").takeIf(String::isNotBlank),
                         nextTitle=o.optString("nextTitle").takeIf(String::isNotBlank),
                         nextSubtitle=o.optString("nextSubtitle").takeIf(String::isNotBlank),
-                        smartManaged=o.optBoolean("smartManaged")
+                        smartManaged=o.optBoolean("smartManaged"),
+                        priority=o.optInt("priority",if(o.optBoolean("smartManaged"))0 else 1).coerceIn(0,2)
                     )
                 )
             }
@@ -136,7 +139,8 @@ object OfflineDownloadManager {
             nextMediaVersionId=target.nextMediaVersionId,
             nextTitle=target.nextTitle,
             nextSubtitle=target.nextSubtitle,
-            smartManaged=smartManaged
+            smartManaged=smartManaged,
+            priority=if(smartManaged)0 else 1
         )
         saveItem(context,item)
         schedule(context,id)
@@ -157,6 +161,12 @@ object OfflineDownloadManager {
     fun retry(context: Context,id: String) {
         update(context,id) { it.copy(status="queued",error=null) }
         schedule(context,id)
+    }
+
+    fun setPriority(context: Context,id: String,priority: Int) {
+        update(context,id) {
+            it.copy(priority=priority.coerceIn(0,2))
+        }
     }
 
     fun pauseAll(context: Context) {
@@ -275,6 +285,7 @@ object OfflineDownloadManager {
                     .put("nextTitle",item.nextTitle ?: "")
                     .put("nextSubtitle",item.nextSubtitle ?: "")
                     .put("smartManaged",item.smartManaged)
+                    .put("priority",item.priority)
             )
         }
         context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
@@ -395,7 +406,22 @@ class FilmiqooDownloadWorker(
         val item=OfflineDownloadManager.get(applicationContext,id)
             ?: return@withContext Result.failure()
 
-        downloadGate.acquire()
+        while(true) {
+            downloadGate.acquire()
+            val current=OfflineDownloadManager.get(applicationContext,id)
+                ?: run {
+                    downloadGate.release()
+                    return@withContext Result.failure()
+                }
+            val higherWaiting=OfflineDownloadManager.list(applicationContext).any {
+                it.id!=id &&
+                    it.status=="queued" &&
+                    it.priority>current.priority
+            }
+            if(!higherWaiting) break
+            downloadGate.release()
+            delay(300)
+        }
         try {
         try {
             setForeground(createForegroundInfo(item,0,false))
