@@ -418,29 +418,14 @@ func (s *Server) forwardRoomMessage(w http.ResponseWriter,r *http.Request) {
 	}
 	s.publishRoomMutation(r.Context(),body.TargetRoomID,payload)
 
-	var targetType string
-	if s.db.QueryRow(r.Context(),
-		"SELECT room_type FROM rooms WHERE id=$1",body.TargetRoomID,
-	).Scan(&targetType)==nil && targetType=="dm" {
-		preview:=strings.TrimSpace(msgBody)
-		if preview=="" {
-			switch msgType {
-			case "voice": preview="🎙 پیام صوتی"
-			case "image": preview="🖼 تصویر"
-			case "video": preview="🎬 ویدیو"
-			default: preview="پیام فوروارد شده"
-			}
-		}
-		if len([]rune(preview))>120 { preview=string([]rune(preview)[:120])+"…" }
-		_,_=s.db.Exec(r.Context(),`
-			INSERT INTO notifications (
-				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
-			)
-			SELECT member.user_id,$2,'dm_message','room',$1,'پیام فوروارد شده',$3
-			  FROM room_members member
-			 WHERE member.room_id=$1 AND member.user_id<>$2
-		`,body.TargetRoomID,userID,preview)
-	}
+	s.notifyRoomMessage(
+		r.Context(),
+		body.TargetRoomID,
+		userID,
+		msgBody,
+		msgType,
+		nil,
+	)
 
 	writeJSON(w,http.StatusCreated,payload["message"])
 }
