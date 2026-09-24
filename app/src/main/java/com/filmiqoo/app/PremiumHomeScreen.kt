@@ -48,12 +48,16 @@ fun PremiumHomeScreen(
     var reload by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<PremiumHomeLoad>(PremiumHomeLoad.Loading) }
     var continueItems by remember { mutableStateOf<List<ContinueWatchingItem>>(emptyList()) }
+    var personalized by remember { mutableStateOf<PersonalizedHomeBundle?>(null) }
+    val personalizationRepo=remember { HomePersonalizationRepository(backend) }
 
     LaunchedEffect(reload,loggedIn) {
         if(loggedIn) {
             continueItems=runCatching { backend.continueWatching() }.getOrDefault(emptyList())
+            personalized=runCatching { personalizationRepo.load() }.getOrNull()
         } else {
             continueItems=emptyList()
+            personalized=null
         }
         state=PremiumHomeLoad.Loading
         state=runCatching { PremiumHomeLoad.Ready(repository.home()) }
@@ -66,6 +70,7 @@ fun PremiumHomeScreen(
         is PremiumHomeLoad.Ready -> PremiumHomeContent(
             data=s.data,
             continueItems=continueItems,
+            personalized=personalized,
             repository=repository,
             loggedIn=loggedIn,
             onMedia=onMedia,
@@ -84,6 +89,7 @@ fun PremiumHomeScreen(
 private fun PremiumHomeContent(
     data: HomeBundle,
     continueItems: List<ContinueWatchingItem>,
+    personalized: PersonalizedHomeBundle?,
     repository: TmdbRepository,
     loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit,
@@ -165,6 +171,50 @@ private fun PremiumHomeContent(
                     body="وقتی یک فیلم یا قسمت رو شروع کنی، اینجا با زمان دقیق ادامه نمایش داده می‌شه."
                 )
             }
+        }
+
+        personalized?.forYou?.takeIf { it.isNotEmpty() }?.let { items ->
+            item {
+                PremiumSectionHeader(
+                    title="برای تو",
+                    subtitle=personalizationSubtitle(personalized),
+                    icon=Icons.Default.AutoAwesome
+                )
+            }
+            item { PremiumPosterRow(items,repository,onMedia) }
+        }
+
+        personalized?.watchlist?.takeIf { it.isNotEmpty() }?.let { items ->
+            item {
+                PremiumSectionHeader(
+                    title="از Watchlist تو",
+                    subtitle="چیزهایی که برای بعد ذخیره کردی",
+                    icon=Icons.Default.Bookmark
+                )
+            }
+            item { PremiumWideRow(items,repository,onMedia) }
+        }
+
+        personalized?.communityHot?.takeIf { it.isNotEmpty() }?.let { items ->
+            item {
+                PremiumSectionHeader(
+                    title="داغ در Community",
+                    subtitle="بر اساس Post، Reel، Like، Save و Share",
+                    icon=Icons.Default.LocalFireDepartment
+                )
+            }
+            item { PremiumPosterRow(items,repository,onMedia) }
+        }
+
+        personalized?.newForYou?.takeIf { it.isNotEmpty() }?.let { items ->
+            item {
+                PremiumSectionHeader(
+                    title="تازه برای تو",
+                    subtitle="جدیدترین عنوان‌های Catalog متناسب با سلیقه‌ات",
+                    icon=Icons.Default.NewReleases
+                )
+            }
+            item { PremiumWideRow(items,repository,onMedia) }
         }
 
         if(top10.isNotEmpty()) {
@@ -585,4 +635,30 @@ private fun PremiumWideRow(
             }
         }
     }
+}
+
+
+private fun personalizationSubtitle(bundle: PersonalizedHomeBundle?):String {
+    if(bundle==null) return "پیشنهاد شخصی Filmiqoo"
+    val parts=buildList {
+        when(bundle.preferredKind) {
+            "movie" -> add("فیلم")
+            "series","tv" -> add("سریال")
+            "anime" -> add("انیمه")
+        }
+        if(bundle.preferredLanguage.isNotBlank()) {
+            add(
+                when(bundle.preferredLanguage) {
+                    "fa" -> "فارسی"
+                    "ko" -> "کره‌ای"
+                    "ja" -> "ژاپنی"
+                    "hi" -> "هندی"
+                    "en" -> "انگلیسی"
+                    else -> bundle.preferredLanguage.uppercase()
+                }
+            )
+        }
+    }
+    return if(parts.isEmpty()) "بر اساس تماشا، Favorite و Watchlist تو"
+    else "بر اساس علاقه‌ات به "+parts.joinToString(" و ")
 }

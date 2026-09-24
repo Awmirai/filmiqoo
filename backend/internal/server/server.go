@@ -134,6 +134,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/rooms/{id}/read", s.markRoomRead)
 			r.Get("/notifications", s.notifications)
 			r.Get("/release-reminders", s.releaseReminders)
+			r.Get("/home/personalized", s.personalizedHome)
 			r.Post("/release-reminders/toggle", s.toggleReleaseReminder)
 			r.Post("/notifications/read-all", s.markAllNotificationsRead)
 			r.Post("/notifications/{id}/read", s.markNotificationRead)
