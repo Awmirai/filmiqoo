@@ -66,6 +66,24 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 	_ = s.db.QueryRow(ctx,"SELECT COUNT(*) FROM media_versions WHERE stream_ready=true").Scan(&readyMedia)
 	_ = s.db.QueryRow(ctx,"SELECT COUNT(*) FROM push_devices WHERE enabled=true").Scan(&enabledPushDevices)
 
+	var openReports,criticalReports,staleUploads int64
+	_ = s.db.QueryRow(ctx,`
+		SELECT COUNT(*),
+		       COUNT(*) FILTER (WHERE priority>=90)
+		  FROM reports
+		 WHERE status IN ('open','reviewing')
+	`).Scan(&openReports,&criticalReports)
+	_ = s.db.QueryRow(ctx,`
+		SELECT COUNT(*)
+		  FROM ugc_uploads
+		 WHERE (status='presigned' AND created_at<now()-interval '2 hours')
+		    OR (status='uploaded' AND created_at<now()-interval '24 hours')
+		    OR (status='failed' AND created_at<now()-interval '1 hour')
+	`).Scan(&staleUploads)
+
+	dbPool:=s.db.Stat()
+	redisPool:=s.redis.PoolStats()
+
 	status:="ok"
 	code:=http.StatusOK
 	if dbErr!=nil || redisErr!=nil || (s.cfg.FirebasePushEnabled && s.fcm==nil) {
@@ -88,6 +106,21 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 			"redis":map[string]any{
 				"ok":redisErr==nil,
 				"latencyMs":redisLatency.Milliseconds(),
+				"pool":map[string]any{
+					"hits":redisPool.Hits,
+					"misses":redisPool.Misses,
+					"timeouts":redisPool.Timeouts,
+					"totalConns":redisPool.TotalConns,
+					"idleConns":redisPool.IdleConns,
+					"staleConns":redisPool.StaleConns,
+				},
+			},
+			"postgresPool":map[string]any{
+				"maxConns":dbPool.MaxConns(),
+				"totalConns":dbPool.TotalConns(),
+				"acquiredConns":dbPool.AcquiredConns(),
+				"idleConns":dbPool.IdleConns(),
+				"constructingConns":dbPool.ConstructingConns(),
 			},
 			"firebasePush":map[string]any{
 				"enabled":s.cfg.FirebasePushEnabled,
@@ -107,6 +140,9 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 			"activeSessions":activeSessions,
 			"enabledPushDevices":enabledPushDevices,
 			"streamReadyMediaVersions":readyMedia,
+			"openModerationReports":openReports,
+			"criticalModerationReports":criticalReports,
+			"staleUploads":staleUploads,
 		},
 	})
 }
