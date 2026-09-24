@@ -28,6 +28,8 @@ type Server struct {
 	upstreamClient *http.Client
 	tmdb *tmdb.Client
 	objects *objectstore.Store
+	fcm *fcmClient
+	fcmInitError string
 	workersCancel context.CancelFunc
 }
 
@@ -55,6 +57,11 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			},
 		},
 	}
+	if err:=s.configureFCM(); err!=nil {
+		s.fcmInitError=err.Error()
+		log.Printf("firebase push disabled: %v",err)
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -73,6 +80,10 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	})
 
 	r.Route("/v1", func(r chi.Router) {
+		r.With(
+			s.authRateLimit("telemetry",30,time.Minute),
+		).Post("/telemetry/events",s.telemetryEvent)
+
 		r.Route("/auth", func(r chi.Router) {
 			r.With(
 				s.authRateLimit(
@@ -347,6 +358,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	workerCtx,workerCancel:=context.WithCancel(context.Background())
 	s.workersCancel=workerCancel
 	go s.runRoomMessageScheduler(workerCtx)
+	go s.runPushDeliveryWorker(workerCtx)
+	go s.runTelegramIngestWorker(workerCtx)
+	go s.runTelemetryMaintenanceWorker(workerCtx)
 	return s
 }
 
@@ -383,7 +397,17 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"redis unavailable"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status":"ready"})
+	if s.cfg.FirebasePushEnabled && s.fcm==nil {
+		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
+			"status":"firebase push unavailable",
+			"detail":s.fcmInitError,
+		})
+		return
+	}
+	writeJSON(w,http.StatusOK,map[string]string{
+		"status":"ready",
+		"push":map[bool]string{true:"enabled",false:"disabled"}[s.fcm!=nil],
+	})
 }
 
 func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
