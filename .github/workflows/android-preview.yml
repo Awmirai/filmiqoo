@@ -26,8 +26,7 @@ jobs:
           gradle-version: '8.9'
       - name: Run Android unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
-      - name: Run Android lint audit
-        continue-on-error: true
+      - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace
       - name: Print Android lint report
         if: always()
