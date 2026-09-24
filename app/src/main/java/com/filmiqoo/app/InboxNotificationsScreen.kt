@@ -32,16 +32,17 @@ fun InboxScreen(
     val repo=remember { MessagingRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
+    var archivedView by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<InboxConversation>>(emptyList()) }
 
     BackHandler { onBack() }
 
-    LaunchedEffect(refresh) {
+    LaunchedEffect(refresh,archivedView) {
         loading=true
         error=null
-        runCatching { repo.inbox() }
+        runCatching { repo.inbox(archived=archivedView) }
             .onSuccess { items=it }
             .onFailure { error=it.message ?: "خطا در دریافت پیام‌ها" }
         loading=false
@@ -53,16 +54,41 @@ fun InboxScreen(
                 Brush.linearGradient(listOf(Color(0xFF111827),Color(0xFF231B09),FqBg))
             )
         ) {
-            Row(
-                Modifier.fillMaxWidth().padding(10.dp),
-                verticalAlignment=Alignment.CenterVertically
-            ) {
-                IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
-                Column(Modifier.weight(1f)) {
-                    Text("پیام‌ها",fontSize=23.sp,fontWeight=FontWeight.Black)
-                    Text("DM، گروه‌ها و Roomهای عضو‌شده",color=FqMuted,fontSize=8.sp)
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().padding(10.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+                    Column(Modifier.weight(1f)) {
+                        Text("پیام‌ها",fontSize=23.sp,fontWeight=FontWeight.Black)
+                        Text(
+                            if(archivedView)"گفتگوهای آرشیوشده" else "DM، گروه‌ها و Roomهای عضو‌شده",
+                            color=FqMuted,
+                            fontSize=8.sp
+                        )
+                    }
+                    IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
                 }
-                IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
+
+                Row(
+                    Modifier.fillMaxWidth()
+                        .padding(start=14.dp,end=14.dp,bottom=10.dp),
+                    horizontalArrangement=Arrangement.spacedBy(7.dp)
+                ) {
+                    FilterChip(
+                        selected=!archivedView,
+                        onClick={archivedView=false},
+                        label={Text("Inbox",fontSize=8.sp)},
+                        leadingIcon={Icon(Icons.Default.Inbox,null,modifier=Modifier.size(15.dp))}
+                    )
+                    FilterChip(
+                        selected=archivedView,
+                        onClick={archivedView=true},
+                        label={Text("آرشیو",fontSize=8.sp)},
+                        leadingIcon={Icon(Icons.Default.Archive,null,modifier=Modifier.size(15.dp))}
+                    )
+                }
             }
         }
 
@@ -75,15 +101,20 @@ fun InboxScreen(
                 it,
                 color=FqDanger,
                 fontSize=9.sp,
-                modifier=Modifier.fillMaxWidth().background(FqDanger.copy(alpha=.09f)).padding(10.dp)
+                modifier=Modifier.fillMaxWidth()
+                    .background(FqDanger.copy(alpha=.09f))
+                    .padding(10.dp)
             )
         }
 
         if(!loading && items.isEmpty()) {
             PremiumEmptyState(
-                icon=Icons.Default.MarkChatUnread,
-                title="هنوز مکالمه‌ای نداری",
-                body="از پروفایل یک Creator روی «پیام» بزن یا وارد Roomهای Community شو."
+                icon=if(archivedView)Icons.Default.Archive else Icons.Default.MarkChatUnread,
+                title=if(archivedView)"آرشیو خالیه" else "هنوز مکالمه‌ای نداری",
+                body=if(archivedView)
+                    "گفتگوهایی که آرشیو می‌کنی اینجا می‌مونن."
+                else
+                    "از پروفایل یک Creator روی «پیام» بزن یا وارد Roomهای Community شو."
             )
         } else {
             LazyColumn(
@@ -98,6 +129,35 @@ fun InboxScreen(
                                 runCatching { repo.markRoomRead(conversation.id) }
                                 onOpenRoom(conversation)
                             }
+                        },
+                        onArchive={
+                            scope.launch {
+                                runCatching {
+                                    repo.updateRoomPreferences(
+                                        roomId=conversation.id,
+                                        archived=!conversation.archived
+                                    )
+                                }.onSuccess {
+                                    refresh++
+                                }.onFailure {
+                                    error=it.message
+                                }
+                            }
+                        },
+                        onMuteToggle={
+                            scope.launch {
+                                val next=if(conversation.notificationLevel=="off")"all" else "off"
+                                runCatching {
+                                    repo.updateRoomPreferences(
+                                        roomId=conversation.id,
+                                        notificationLevel=next
+                                    )
+                                }.onSuccess {
+                                    refresh++
+                                }.onFailure {
+                                    error=it.message
+                                }
+                            }
                         }
                     )
                 }
@@ -109,8 +169,12 @@ fun InboxScreen(
 @Composable
 private fun InboxCard(
     item: InboxConversation,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onArchive: () -> Unit,
+    onMuteToggle: () -> Unit
 ) {
+    var menuOpen by remember(item.id) { mutableStateOf(false) }
+
     Surface(
         color=if(item.unread>0)FqGold.copy(alpha=.08f) else FqSurface,
         shape=RoundedCornerShape(20.dp),
@@ -132,12 +196,6 @@ private fun InboxCard(
                         )
                     }
                 }
-                if(item.type=="dm") {
-                    Box(
-                        Modifier.size(12.dp).align(Alignment.BottomEnd)
-                            .background(FqGreen,CircleShape)
-                    )
-                }
             }
 
             Spacer(Modifier.width(11.dp))
@@ -154,6 +212,23 @@ private fun InboxCard(
                     if(item.type=="dm" && item.otherUsername.isNotBlank()) {
                         Spacer(Modifier.width(5.dp))
                         Text("@"+item.otherUsername,color=FqMuted,fontSize=7.sp)
+                    }
+                    if(item.notificationLevel=="off") {
+                        Spacer(Modifier.width(5.dp))
+                        Icon(
+                            Icons.Default.NotificationsOff,
+                            null,
+                            tint=FqMuted,
+                            modifier=Modifier.size(13.dp)
+                        )
+                    } else if(item.notificationLevel=="mentions") {
+                        Spacer(Modifier.width(5.dp))
+                        Icon(
+                            Icons.Default.AlternateEmail,
+                            null,
+                            tint=FqMuted,
+                            modifier=Modifier.size(13.dp)
+                        )
                     }
                 }
 
@@ -197,8 +272,54 @@ private fun InboxCard(
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
                 }
-            } else {
-                Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
+            }
+
+            Box {
+                IconButton(onClick={menuOpen=true}) {
+                    Icon(Icons.Default.MoreVert,null,tint=FqMuted)
+                }
+                DropdownMenu(
+                    expanded=menuOpen,
+                    onDismissRequest={menuOpen=false}
+                ) {
+                    DropdownMenuItem(
+                        text={
+                            Text(
+                                if(item.notificationLevel=="off")
+                                    "فعال کردن اعلان‌ها"
+                                else
+                                    "بی‌صدا کردن"
+                            )
+                        },
+                        leadingIcon={
+                            Icon(
+                                if(item.notificationLevel=="off")
+                                    Icons.Default.NotificationsActive
+                                else
+                                    Icons.Default.NotificationsOff,
+                                null
+                            )
+                        },
+                        onClick={
+                            menuOpen=false
+                            onMuteToggle()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text={Text(if(item.archived)"خارج کردن از آرشیو" else "آرشیو")},
+                        leadingIcon={
+                            Icon(
+                                if(item.archived)Icons.Default.Unarchive
+                                else Icons.Default.Archive,
+                                null
+                            )
+                        },
+                        onClick={
+                            menuOpen=false
+                            onArchive()
+                        }
+                    )
+                }
             }
         }
     }
