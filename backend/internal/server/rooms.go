@@ -81,6 +81,51 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is too long"}); return
 	}
 
+	var roomType,visibility,memberRole string
+	var slowModeSeconds int
+	var mutedUntil *time.Time
+	if err:=s.db.QueryRow(r.Context(),`
+		SELECT rm.room_type,rm.visibility,rm.slow_mode_seconds,
+		       COALESCE(member.role,''),member.muted_until
+		  FROM rooms rm
+		  LEFT JOIN room_members member
+		    ON member.room_id=rm.id AND member.user_id=$2
+		 WHERE rm.id=$1
+	`,roomID,userID).Scan(
+		&roomType,&visibility,&slowModeSeconds,&memberRole,&mutedUntil,
+	); err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"room not found"}); return
+	}
+
+	if (roomType=="group" || visibility!="public") && memberRole=="" {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room membership required"}); return
+	}
+	if mutedUntil!=nil && mutedUntil.After(time.Now()) {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"you are temporarily muted in this room"}); return
+	}
+	if roomType=="group" && slowModeSeconds>0 && memberRole=="member" {
+		var elapsedSeconds float64
+		_=s.db.QueryRow(r.Context(),`
+			SELECT COALESCE(
+				EXTRACT(EPOCH FROM (now()-MAX(created_at))),
+				999999
+			)
+			  FROM messages
+			 WHERE room_id=$1
+			   AND author_user_id=$2
+			   AND deleted_at IS NULL
+		`,roomID,userID).Scan(&elapsedSeconds)
+		if elapsedSeconds<float64(slowModeSeconds) {
+			remaining:=slowModeSeconds-int(elapsedSeconds)
+			if remaining<1 { remaining=1 }
+			writeJSON(w,http.StatusTooManyRequests,map[string]any{
+				"error":"slow mode is active",
+				"retryAfterSeconds":remaining,
+			})
+			return
+		}
+	}
+
 	var dmBlocked bool
 	_=s.db.QueryRow(r.Context(),`
 		SELECT EXISTS(
@@ -118,19 +163,14 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 	raw,_:=json.Marshal(payload)
 	_ = s.redis.Publish(r.Context(),"room:"+roomID,raw).Err()
 
-	var roomType string
-	if s.db.QueryRow(r.Context(),"SELECT room_type FROM rooms WHERE id=$1",roomID).Scan(&roomType)==nil && roomType=="dm" {
-		preview:=body.Body
-		if len([]rune(preview))>120 { preview=string([]rune(preview)[:120])+"…" }
-		_,_=s.db.Exec(r.Context(),`
-			INSERT INTO notifications (
-				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
-			)
-			SELECT member.user_id,$2,'dm_message','room',$1,'پیام جدید', $3
-			  FROM room_members member
-			 WHERE member.room_id=$1 AND member.user_id<>$2
-		`,roomID,userID,preview)
-	}
+	s.notifyRoomMessage(
+		r.Context(),
+		roomID,
+		userID,
+		body.Body,
+		body.Type,
+		body.ReplyToMessageID,
+	)
 
 	writeJSON(w,http.StatusCreated,payload["message"])
 }

@@ -7,13 +7,11 @@ import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
@@ -76,16 +75,20 @@ fun VoiceRecordButton(
         val duration=(SystemClock.elapsedRealtime()-startedAt).coerceAtLeast(0L)
         recorder=null
         outputFile=null
-        runCatching { current.stop() }
-            .onFailure { file?.delete() }
+
+        val stopped=runCatching {
+            current.stop()
+            true
+        }.getOrDefault(false)
         runCatching { current.release() }
         elapsedMs=0L
 
-        if(send && file!=null && file.isFile && file.length()>0L && duration>=350L) {
+        if(send && stopped && file!=null && file.isFile && file.length()>0L && duration>=350L) {
             onRecorded(file,duration)
         } else {
             file?.delete()
             if(send && duration<350L) onError("پیام صوتی خیلی کوتاه بود")
+            else if(send && !stopped) onError("ضبط پیام صوتی کامل نشد")
         }
     }
 
@@ -99,7 +102,7 @@ fun VoiceRecordButton(
     LaunchedEffect(recording) {
         while(recording) {
             elapsedMs=(SystemClock.elapsedRealtime()-startedAt).coerceAtLeast(0L)
-            delay(200)
+            delay(100)
         }
     }
 
@@ -118,15 +121,22 @@ fun VoiceRecordButton(
             verticalAlignment=Alignment.CenterVertically,
             modifier=Modifier
                 .background(FqDanger.copy(alpha=.12f),CircleShape)
-                .padding(start=8.dp)
+                .padding(start=6.dp)
         ) {
+            Box(
+                Modifier.size(8.dp).background(FqDanger,CircleShape)
+            )
+            Spacer(Modifier.width(6.dp))
             Text(
                 formatVoiceTime(elapsedMs),
                 color=FqDanger,
                 fontSize=8.sp
             )
+            IconButton(onClick={stopRecording(false)}) {
+                Icon(Icons.Default.Close,null,tint=FqMuted)
+            }
             IconButton(onClick={stopRecording(true)}) {
-                Icon(Icons.Default.Stop,null,tint=FqDanger)
+                Icon(Icons.Default.Send,null,tint=FqGold)
             }
         }
     } else {
@@ -166,23 +176,30 @@ fun VoiceMessagePlayer(
         }
     }
     var isPlaying by remember(url) { mutableStateOf(false) }
+    var isBuffering by remember(url) { mutableStateOf(true) }
     var position by remember(url) { mutableLongStateOf(0L) }
     var duration by remember(url) {
         mutableLongStateOf(declaredDurationMs.coerceAtLeast(0L))
     }
+    var speed by remember(url) { mutableFloatStateOf(1f) }
+    var showRemaining by remember(url) { mutableStateOf(false) }
 
     DisposableEffect(player) {
         val listener=object:Player.Listener {
             override fun onIsPlayingChanged(value:Boolean) {
                 isPlaying=value
             }
+
             override fun onPlaybackStateChanged(state:Int) {
+                isBuffering=state==Player.STATE_BUFFERING || state==Player.STATE_IDLE
                 if(state==Player.STATE_READY && player.duration>0L) {
                     duration=player.duration
+                    isBuffering=false
                 }
                 if(state==Player.STATE_ENDED) {
                     position=0L
                     player.seekTo(0L)
+                    isPlaying=false
                 }
             }
         }
@@ -197,53 +214,139 @@ fun VoiceMessagePlayer(
         while(isPlaying) {
             position=player.currentPosition.coerceAtLeast(0L)
             if(player.duration>0L) duration=player.duration
-            delay(250)
+            delay(200)
         }
     }
 
     val total=duration.coerceAtLeast(declaredDurationMs).coerceAtLeast(1L)
     val progress=(position.toFloat()/total.toFloat()).coerceIn(0f,1f)
+    val shownTime=if(showRemaining) {
+        "-"+formatVoiceTime((total-position).coerceAtLeast(0L))
+    } else {
+        formatVoiceTime(position.coerceAtLeast(0L))
+    }
 
     Surface(
         color=FqSurface2,
         shape=CircleShape,
         modifier=Modifier.fillMaxWidth().padding(top=7.dp)
     ) {
-        Row(
-            Modifier.padding(horizontal=8.dp,vertical=4.dp),
-            verticalAlignment=Alignment.CenterVertically
+        Column(
+            Modifier.padding(horizontal=8.dp,vertical=4.dp)
         ) {
-            IconButton(
-                onClick={
-                    if(isPlaying) player.pause()
-                    else {
-                        if(player.playbackState==Player.STATE_ENDED) player.seekTo(0L)
-                        player.play()
+            Row(
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick={
+                        if(isPlaying) {
+                            player.pause()
+                        } else {
+                            if(player.playbackState==Player.STATE_ENDED) player.seekTo(0L)
+                            player.play()
+                        }
+                    }
+                ) {
+                    if(isBuffering) {
+                        CircularProgressIndicator(
+                            color=FqGold,
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(20.dp)
+                        )
+                    } else {
+                        Icon(
+                            if(isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            null,
+                            tint=FqGold
+                        )
                     }
                 }
-            ) {
-                Icon(
-                    if(isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    null,
-                    tint=FqGold
+
+                Slider(
+                    value=progress,
+                    onValueChange={value->
+                        val next=(value*total).toLong().coerceIn(0L,total)
+                        player.seekTo(next)
+                        position=next
+                    },
+                    modifier=Modifier.weight(1f)
+                )
+
+                Text(
+                    shownTime,
+                    color=Color.White.copy(alpha=.74f),
+                    fontSize=7.sp,
+                    modifier=Modifier
+                        .padding(horizontal=7.dp)
+                        .clickable { showRemaining=!showRemaining }
                 )
             }
-            Slider(
-                value=progress,
-                onValueChange={value->
-                    player.seekTo((value*total).toLong())
-                    position=(value*total).toLong()
-                },
-                modifier=Modifier.weight(1f)
-            )
-            Text(
-                formatVoiceTime(
-                    if(position>0L) position else total
-                ),
-                color=Color.White.copy(alpha=.74f),
-                fontSize=7.sp,
-                modifier=Modifier.padding(horizontal=7.dp)
-            )
+
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal=4.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Text(
+                    formatVoiceTime(total),
+                    color=FqMuted,
+                    fontSize=6.sp
+                )
+                Spacer(Modifier.weight(1f))
+
+                IconButton(
+                    onClick={
+                        val next=(player.currentPosition-10_000L).coerceAtLeast(0L)
+                        player.seekTo(next)
+                        position=next
+                    },
+                    modifier=Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Replay10,
+                        null,
+                        tint=FqMuted,
+                        modifier=Modifier.size(18.dp)
+                    )
+                }
+
+                TextButton(
+                    onClick={
+                        speed=when(speed) {
+                            1f -> 1.5f
+                            1.5f -> 2f
+                            else -> 1f
+                        }
+                        player.setPlaybackParameters(PlaybackParameters(speed))
+                    },
+                    contentPadding=PaddingValues(horizontal=7.dp,vertical=0.dp)
+                ) {
+                    Text(
+                        when(speed) {
+                            1f -> "1×"
+                            1.5f -> "1.5×"
+                            else -> "2×"
+                        },
+                        color=FqGold,
+                        fontSize=7.sp
+                    )
+                }
+
+                IconButton(
+                    onClick={
+                        val next=(player.currentPosition+10_000L).coerceAtMost(total)
+                        player.seekTo(next)
+                        position=next
+                    },
+                    modifier=Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Forward10,
+                        null,
+                        tint=FqMuted,
+                        modifier=Modifier.size(18.dp)
+                    )
+                }
+            }
         }
     }
 }

@@ -51,6 +51,10 @@ object FilmiqooDeepLinks {
             .build()
             .toString()
 
+    fun roomInvite(code:String):String =
+        Uri.Builder().scheme("filmiqoo").authority("room-invite")
+            .appendPath(code).build().toString()
+
     fun share(context:Context,label:String,link:String) {
         shareText(
             context,

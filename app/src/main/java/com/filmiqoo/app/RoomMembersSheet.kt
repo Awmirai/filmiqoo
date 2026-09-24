@@ -30,6 +30,7 @@ import java.time.Instant
 fun RoomMembersSheet(
     roomId:String,
     social:SocialRepository,
+    messaging:MessagingRepository,
     meId:String?,
     onDismiss:()->Unit,
     onChanged:()->Unit={}
@@ -41,6 +42,7 @@ fun RoomMembersSheet(
     var query by remember { mutableStateOf("") }
     var candidates by remember { mutableStateOf<List<RoomMemberCandidate>>(emptyList()) }
     var addingId by remember { mutableStateOf<String?>(null) }
+    var transferTarget by remember { mutableStateOf<RoomMemberItem?>(null) }
 
     suspend fun reload() {
         loading=true
@@ -297,6 +299,21 @@ fun RoomMembersSheet(
                                             }
                                         )
                                     }
+                                    HorizontalDivider()
+                                    DropdownMenuItem(
+                                        text={Text("انتقال مالکیت",color=FqGold)},
+                                        leadingIcon={
+                                            Icon(
+                                                Icons.Default.Group,
+                                                null,
+                                                tint=FqGold
+                                            )
+                                        },
+                                        onClick={
+                                            roleMenu=false
+                                            transferTarget=member
+                                        }
+                                    )
                                 }
                             }
 
@@ -321,6 +338,39 @@ fun RoomMembersSheet(
                 }
             }
         }
+    }
+
+    transferTarget?.let { member ->
+        AlertDialog(
+            onDismissRequest={transferTarget=null},
+            icon={Icon(Icons.Default.Group,null,tint=FqGold)},
+            title={Text("انتقال مالکیت گروه")},
+            text={
+                Text(
+                    "مالکیت گروه به «"+member.displayName+
+                        "» منتقل می‌شود و نقش شما به ادمین تغییر می‌کند."
+                )
+            },
+            confirmButton={
+                Button(
+                    onClick={
+                        transferTarget=null
+                        scope.launch {
+                            runCatching {
+                                messaging.transferRoomOwnership(roomId,member.id)
+                            }.onSuccess {
+                                reload()
+                                onChanged()
+                            }.onFailure { error=it.message }
+                        }
+                    },
+                    colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+                ) { Text("انتقال مالکیت",color=Color.Black) }
+            },
+            dismissButton={
+                TextButton(onClick={transferTarget=null}){Text("لغو")}
+            }
+        )
     }
 }
 
