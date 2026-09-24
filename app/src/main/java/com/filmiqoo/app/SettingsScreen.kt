@@ -157,8 +157,26 @@ fun SettingsScreen(
             SettingsSwitchRow("دانلود فقط با Wi‑Fi","دانلودهای آفلاین روی دیتای موبایل شروع نشوند.",settings.wifiOnlyDownloads) {
                 persist(settings.copy(wifiOnlyDownloads=it))
             }
+            SettingsSwitchRow(
+                "Smart Downloads",
+                "قسمت دیده‌شده را از زنجیره Smart پاک کن و قسمت بعدی را خودکار به صف اضافه کن.",
+                settings.smartDownloads
+            ) {
+                persist(settings.copy(smartDownloads=it))
+            }
             SettingsSwitchRow("Data Saver","برای شبکه ضعیف مصرف داده کمتر شود.",settings.dataSaver) {
                 persist(settings.copy(dataSaver=it))
+            }
+        }
+
+        item {
+            SettingsChoiceRow(
+                title="سقف فضای Smart Downloads",
+                subtitle="فقط دانلودهای Smart برای آزادسازی خودکار فضا مدیریت می‌شوند.",
+                value=downloadLimitLabel(settings.downloadStorageLimitMb),
+                options=listOf("5 GB","10 GB","20 GB","50 GB","بدون محدودیت")
+            ) { selected ->
+                persist(settings.copy(downloadStorageLimitMb=downloadLimitValue(selected)))
             }
         }
 
@@ -331,4 +349,21 @@ private fun subtitlePositionValue(label:String)=when(label) {
     "پایین" -> .04f
     "بالاتر" -> .2f
     else -> .1f
+}
+
+
+private fun downloadLimitLabel(value:Long)=when(value) {
+    5120L -> "5 GB"
+    20480L -> "20 GB"
+    51200L -> "50 GB"
+    0L -> "بدون محدودیت"
+    else -> "10 GB"
+}
+
+private fun downloadLimitValue(label:String)=when(label) {
+    "5 GB" -> 5120L
+    "20 GB" -> 20480L
+    "50 GB" -> 51200L
+    "بدون محدودیت" -> 0L
+    else -> 10240L
 }

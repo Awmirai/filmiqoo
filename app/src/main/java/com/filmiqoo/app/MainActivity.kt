@@ -115,6 +115,7 @@ fun FilmiqooApp() {
                     onBack=closeOverlay
                 )
                 OverlayRoute.Downloads -> DownloadsScreen(
+                    backend=backend,
                     onBack=closeOverlay,
                     onPlay={overlay=OverlayRoute.Player(it)}
                 )

@@ -178,6 +178,17 @@ fun FilmiqooPlayerScreen(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 buffering=playbackState==Player.STATE_BUFFERING
                 ended=playbackState==Player.STATE_ENDED
+                if(
+                    playbackState==Player.STATE_ENDED &&
+                    !currentTarget.localUri.isNullOrBlank()
+                ) {
+                    scope.launch {
+                        OfflineDownloadManager.consumeCompleted(
+                            context,
+                            currentVersionId
+                        )
+                    }
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) {

@@ -620,7 +620,12 @@ class BackendRepository(context: Context) {
 
     suspend fun enqueueDownload(context: Context, target: PlaybackTarget): String =
         withContext(Dispatchers.IO) {
-            OfflineDownloadManager.enqueue(context,target)
+            val settings=AppPreferences(context.applicationContext).read()
+            OfflineDownloadManager.enqueue(
+                context,
+                target,
+                smartManaged=settings.smartDownloads && !target.nextMediaVersionId.isNullOrBlank()
+            )
         }
 
     internal suspend fun getJson(path: String, authorized: Boolean): JSONObject =

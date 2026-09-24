@@ -31,7 +31,11 @@ data class OfflineDownloadItem(
     val totalBytes: Long,
     val localPath: String?,
     val createdAt: Long,
-    val error: String?
+    val error: String?,
+    val nextMediaVersionId: String? = null,
+    val nextTitle: String? = null,
+    val nextSubtitle: String? = null,
+    val smartManaged: Boolean = false
 ) {
     val progress: Float
         get() = if(totalBytes>0) (downloadedBytes.toFloat()/totalBytes.toFloat()).coerceIn(0f,1f) else 0f
@@ -62,7 +66,11 @@ object OfflineDownloadManager {
                         totalBytes=o.optLong("totalBytes"),
                         localPath=o.optString("localPath").takeIf(String::isNotBlank),
                         createdAt=o.optLong("createdAt"),
-                        error=o.optString("error").takeIf(String::isNotBlank)
+                        error=o.optString("error").takeIf(String::isNotBlank),
+                        nextMediaVersionId=o.optString("nextMediaVersionId").takeIf(String::isNotBlank),
+                        nextTitle=o.optString("nextTitle").takeIf(String::isNotBlank),
+                        nextSubtitle=o.optString("nextSubtitle").takeIf(String::isNotBlank),
+                        smartManaged=o.optBoolean("smartManaged")
                     )
                 )
             }
@@ -81,12 +89,26 @@ object OfflineDownloadManager {
             .edit().putBoolean(KEY_WIFI_ONLY,value).apply()
     }
 
-    fun enqueue(context: Context,target: PlaybackTarget): String = synchronized(lock) {
+    fun enqueue(
+        context: Context,
+        target: PlaybackTarget,
+        smartManaged: Boolean = false
+    ): String = synchronized(lock) {
         val existing=list(context).firstOrNull {
             it.mediaVersionId==target.mediaVersionId &&
                 it.status in setOf("queued","downloading","paused","completed")
         }
         if(existing!=null) {
+            if(smartManaged || !target.nextMediaVersionId.isNullOrBlank()) {
+                update(context,existing.id) {
+                    it.copy(
+                        smartManaged=it.smartManaged || smartManaged,
+                        nextMediaVersionId=target.nextMediaVersionId ?: it.nextMediaVersionId,
+                        nextTitle=target.nextTitle ?: it.nextTitle,
+                        nextSubtitle=target.nextSubtitle ?: it.nextSubtitle
+                    )
+                }
+            }
             if(existing.status=="paused") resume(context,existing.id)
             return@synchronized existing.id
         }
@@ -103,7 +125,11 @@ object OfflineDownloadManager {
             totalBytes=0L,
             localPath=downloadFile(context,id).absolutePath,
             createdAt=System.currentTimeMillis(),
-            error=null
+            error=null,
+            nextMediaVersionId=target.nextMediaVersionId,
+            nextTitle=target.nextTitle,
+            nextSubtitle=target.nextSubtitle,
+            smartManaged=smartManaged
         )
         saveItem(context,item)
         schedule(context,id)
@@ -208,10 +234,95 @@ object OfflineDownloadManager {
                     .put("localPath",item.localPath ?: "")
                     .put("createdAt",item.createdAt)
                     .put("error",item.error ?: "")
+                    .put("nextMediaVersionId",item.nextMediaVersionId ?: "")
+                    .put("nextTitle",item.nextTitle ?: "")
+                    .put("nextSubtitle",item.nextSubtitle ?: "")
+                    .put("smartManaged",item.smartManaged)
             )
         }
         context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
             .edit().putString(KEY_ITEMS,arr.toString()).apply()
+    }
+
+    internal fun updatePlaybackContext(
+        context: Context,
+        id: String,
+        target: PlaybackTarget
+    ) {
+        update(context,id) {
+            it.copy(
+                nextMediaVersionId=target.nextMediaVersionId,
+                nextTitle=target.nextTitle,
+                nextSubtitle=target.nextSubtitle
+            )
+        }
+    }
+
+    fun consumeCompleted(context: Context,mediaVersionId: String): Boolean {
+        val settings=AppPreferences(context.applicationContext).read()
+        if(!settings.smartDownloads) return false
+
+        val item=list(context).firstOrNull {
+            it.mediaVersionId==mediaVersionId &&
+                it.status=="completed" &&
+                it.smartManaged
+        } ?: return false
+
+        val nextId=item.nextMediaVersionId
+        val nextTitle=item.nextTitle
+        val nextSubtitle=item.nextSubtitle
+
+        delete(context,item.id)
+
+        if(!nextId.isNullOrBlank()) {
+            enqueue(
+                context,
+                PlaybackTarget(
+                    mediaVersionId=nextId,
+                    title=nextTitle ?: "قسمت بعدی",
+                    subtitle=nextSubtitle.orEmpty()
+                ),
+                smartManaged=true
+            )
+        }
+
+        trimSmartToLimit(
+            context,
+            settings.downloadStorageLimitMb,
+            protectedId=null
+        )
+        return true
+    }
+
+    internal fun trimSmartToLimit(
+        context: Context,
+        limitMb: Long,
+        protectedId: String? = null
+    ) {
+        if(limitMb<=0L) return
+        val limitBytes=limitMb*1024L*1024L
+        synchronized(lock) {
+            var all=list(context).toMutableList()
+            fun usedBytes()=all.filter { it.status=="completed" }
+                .sumOf { if(it.totalBytes>0)it.totalBytes else it.downloadedBytes }
+
+            if(usedBytes()<=limitBytes) return@synchronized
+
+            val removable=all
+                .filter {
+                    it.status=="completed" &&
+                        it.smartManaged &&
+                        it.id!=protectedId
+                }
+                .sortedBy { it.createdAt }
+
+            for(item in removable) {
+                if(usedBytes()<=limitBytes) break
+                item.localPath?.let { path -> runCatching { File(path).delete() } }
+                all.removeAll { it.id==item.id }
+            }
+            saveAll(context,all)
+        }
     }
 
     internal fun downloadFile(context: Context,id: String): File {
@@ -313,10 +424,32 @@ class FilmiqooDownloadWorker(
                         }
 
                         output.flush()
+
+                        val contextTarget=runCatching {
+                            backend.playbackContext(item.mediaVersionId)
+                        }.getOrNull()
+                        if(contextTarget!=null) {
+                            OfflineDownloadManager.updatePlaybackContext(
+                                applicationContext,
+                                id,
+                                contextTarget
+                            )
+                        }
+
                         OfflineDownloadManager.updateProgress(
                             applicationContext,id,"completed",downloaded,
                             if(total>0L)total else downloaded
                         )
+
+                        if(item.smartManaged) {
+                            val settings=AppPreferences(applicationContext).read()
+                            OfflineDownloadManager.trimSmartToLimit(
+                                applicationContext,
+                                settings.downloadStorageLimitMb,
+                                protectedId=id
+                            )
+                        }
+
                         setForeground(createForegroundInfo(item,100,false))
                     }
                 }

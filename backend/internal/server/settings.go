@@ -18,6 +18,8 @@ type preferencePayload struct {
 	SubtitleScale *float64 `json:"subtitleScale"`
 	SubtitleBottomPadding *float64 `json:"subtitleBottomPadding"`
 	PlayerResizeMode *string `json:"playerResizeMode"`
+	SmartDownloads *bool `json:"smartDownloads"`
+	DownloadStorageLimitMB *int64 `json:"downloadStorageLimitMb"`
 	DefaultPlaybackSpeed *float64 `json:"defaultPlaybackSpeed"`
 	DefaultAudioLanguage *string `json:"defaultAudioLanguage"`
 	DefaultSubtitleLanguage *string `json:"defaultSubtitleLanguage"`
@@ -39,6 +41,8 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 
 	var autoplayNext,autoplayPreviews,wifiOnly,dataSaver,spoilerShield,skipIntro,skipRecap,skipCredits bool
 	var speed,subtitleScale,subtitleBottomPadding float64
+	var downloadStorageLimitMB int64
+	var smartDownloads bool
 	var audioLang,subtitleLang,playerResizeMode string
 	var subtitlesEnabled,notifySocial,notifyMessages,notifyReleases,privateAccount bool
 
@@ -46,6 +50,7 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		SELECT up.autoplay_next,up.autoplay_previews,up.wifi_only_downloads,up.data_saver,
 		       up.spoiler_shield,up.skip_intro,up.skip_recap,up.skip_credits,
 		       up.subtitle_scale,up.subtitle_bottom_padding,up.player_resize_mode,
+		       up.smart_downloads,up.download_storage_limit_mb,
 		       up.default_playback_speed,
 		       up.default_audio_language,up.default_subtitle_language,up.subtitles_enabled,
 		       up.notifications_social,up.notifications_messages,up.notifications_releases,
@@ -56,7 +61,8 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 	`,userID).Scan(
 		&autoplayNext,&autoplayPreviews,&wifiOnly,&dataSaver,
 		&spoilerShield,&skipIntro,&skipRecap,&skipCredits,
-		&subtitleScale,&subtitleBottomPadding,&playerResizeMode,&speed,
+		&subtitleScale,&subtitleBottomPadding,&playerResizeMode,
+		&smartDownloads,&downloadStorageLimitMB,&speed,
 		&audioLang,&subtitleLang,&subtitlesEnabled,
 		&notifySocial,&notifyMessages,&notifyReleases,&privateAccount,
 	)
@@ -74,6 +80,8 @@ func (s *Server) getSettings(w http.ResponseWriter,r *http.Request) {
 		"subtitleScale":subtitleScale,
 		"subtitleBottomPadding":subtitleBottomPadding,
 		"playerResizeMode":playerResizeMode,
+		"smartDownloads":smartDownloads,
+		"downloadStorageLimitMb":downloadStorageLimitMB,
 		"defaultPlaybackSpeed":speed,
 		"defaultAudioLanguage":audioLang,
 		"defaultSubtitleLanguage":subtitleLang,
@@ -114,6 +122,12 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		}
 		body.PlayerResizeMode=&v
 	}
+	if body.DownloadStorageLimitMB!=nil &&
+		(*body.DownloadStorageLimitMB!=0 &&
+		 (*body.DownloadStorageLimitMB<1024 || *body.DownloadStorageLimitMB>204800)) {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid download storage limit"})
+		return
+	}
 
 	cleanLang:=func(v *string) *string {
 		if v==nil { return nil }
@@ -144,20 +158,23 @@ func (s *Server) updateSettings(w http.ResponseWriter,r *http.Request) {
 		  subtitle_scale=COALESCE($10,subtitle_scale),
 		  subtitle_bottom_padding=COALESCE($11,subtitle_bottom_padding),
 		  player_resize_mode=COALESCE($12,player_resize_mode),
-		  default_playback_speed=COALESCE($13,default_playback_speed),
-		  default_audio_language=COALESCE($14,default_audio_language),
-		  default_subtitle_language=COALESCE($15,default_subtitle_language),
-		  subtitles_enabled=COALESCE($16,subtitles_enabled),
-		  notifications_social=COALESCE($17,notifications_social),
-		  notifications_messages=COALESCE($18,notifications_messages),
-		  notifications_releases=COALESCE($19,notifications_releases),
+		  smart_downloads=COALESCE($13,smart_downloads),
+		  download_storage_limit_mb=COALESCE($14,download_storage_limit_mb),
+		  default_playback_speed=COALESCE($15,default_playback_speed),
+		  default_audio_language=COALESCE($16,default_audio_language),
+		  default_subtitle_language=COALESCE($17,default_subtitle_language),
+		  subtitles_enabled=COALESCE($18,subtitles_enabled),
+		  notifications_social=COALESCE($19,notifications_social),
+		  notifications_messages=COALESCE($20,notifications_messages),
+		  notifications_releases=COALESCE($21,notifications_releases),
 		  updated_at=now()
 		WHERE user_id=$1
 	`,
 		userID,
 		body.AutoplayNext,body.AutoplayPreviews,body.WifiOnlyDownloads,body.DataSaver,
 		body.SpoilerShield,body.SkipIntro,body.SkipRecap,body.SkipCredits,
-		body.SubtitleScale,body.SubtitleBottomPadding,body.PlayerResizeMode,body.DefaultPlaybackSpeed,
+		body.SubtitleScale,body.SubtitleBottomPadding,body.PlayerResizeMode,
+		body.SmartDownloads,body.DownloadStorageLimitMB,body.DefaultPlaybackSpeed,
 		body.DefaultAudioLanguage,body.DefaultSubtitleLanguage,body.SubtitlesEnabled,
 		body.NotificationsSocial,body.NotificationsMessages,body.NotificationsReleases,
 	)

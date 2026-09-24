@@ -15,6 +15,8 @@ data class AppSettings(
     val subtitleScale: Float = 1f,
     val subtitleBottomPadding: Float = 0.08f,
     val playerResizeMode: String = "fit",
+    val smartDownloads: Boolean = false,
+    val downloadStorageLimitMb: Long = 10240L,
     val defaultPlaybackSpeed: Float = 1f,
     val defaultAudioLanguage: String = "fa",
     val defaultSubtitleLanguage: String = "fa",
@@ -41,6 +43,8 @@ class AppPreferences(context: Context) {
         subtitleScale=prefs.getFloat("subtitle_scale",1f),
         subtitleBottomPadding=prefs.getFloat("subtitle_bottom_padding",0.08f),
         playerResizeMode=prefs.getString("player_resize_mode","fit") ?: "fit",
+        smartDownloads=prefs.getBoolean("smart_downloads",false),
+        downloadStorageLimitMb=prefs.getLong("download_storage_limit_mb",10240L),
         defaultPlaybackSpeed=prefs.getFloat("playback_speed",1f),
         defaultAudioLanguage=prefs.getString("audio_lang","fa") ?: "fa",
         defaultSubtitleLanguage=prefs.getString("subtitle_lang","fa") ?: "fa",
@@ -64,6 +68,8 @@ class AppPreferences(context: Context) {
             .putFloat("subtitle_scale",s.subtitleScale)
             .putFloat("subtitle_bottom_padding",s.subtitleBottomPadding)
             .putString("player_resize_mode",s.playerResizeMode)
+            .putBoolean("smart_downloads",s.smartDownloads)
+            .putLong("download_storage_limit_mb",s.downloadStorageLimitMb)
             .putFloat("playback_speed",s.defaultPlaybackSpeed)
             .putString("audio_lang",s.defaultAudioLanguage)
             .putString("subtitle_lang",s.defaultSubtitleLanguage)
@@ -107,6 +113,8 @@ class SettingsRepository(
                 .put("subtitleScale",settings.subtitleScale.toDouble())
                 .put("subtitleBottomPadding",settings.subtitleBottomPadding.toDouble())
                 .put("playerResizeMode",settings.playerResizeMode)
+                .put("smartDownloads",settings.smartDownloads)
+                .put("downloadStorageLimitMb",settings.downloadStorageLimitMb)
                 .put("defaultPlaybackSpeed",settings.defaultPlaybackSpeed.toDouble())
                 .put("defaultAudioLanguage",settings.defaultAudioLanguage)
                 .put("defaultSubtitleLanguage",settings.defaultSubtitleLanguage)
@@ -135,6 +143,8 @@ class SettingsRepository(
         subtitleScale=o.optDouble("subtitleScale",1.0).toFloat(),
         subtitleBottomPadding=o.optDouble("subtitleBottomPadding",0.08).toFloat(),
         playerResizeMode=o.optString("playerResizeMode","fit"),
+        smartDownloads=o.optBoolean("smartDownloads"),
+        downloadStorageLimitMb=o.optLong("downloadStorageLimitMb",10240L),
         defaultPlaybackSpeed=o.optDouble("defaultPlaybackSpeed",1.0).toFloat(),
         defaultAudioLanguage=o.optString("defaultAudioLanguage","fa"),
         defaultSubtitleLanguage=o.optString("defaultSubtitleLanguage","fa"),

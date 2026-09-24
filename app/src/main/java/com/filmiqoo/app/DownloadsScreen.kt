@@ -30,10 +30,14 @@ import java.util.Locale
 
 @Composable
 fun DownloadsScreen(
+    backend: BackendRepository,
     onBack: () -> Unit,
     onPlay: (PlaybackTarget) -> Unit
 ) {
     val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    val settingsRepo=remember { SettingsRepository(context.applicationContext,backend) }
+    var appSettings by remember { mutableStateOf(AppPreferences(context.applicationContext).read()) }
     var downloads by remember { mutableStateOf(OfflineDownloadManager.list(context)) }
     var wifiOnly by remember { mutableStateOf(OfflineDownloadManager.wifiOnly(context)) }
     var tab by remember { mutableIntStateOf(0) }
@@ -64,6 +68,24 @@ fun DownloadsScreen(
                     OfflineDownloadManager.setWifiOnly(context,it)
                 },
                 onBack=onBack
+            )
+        }
+
+        item {
+            SmartDownloadsControl(
+                enabled=appSettings.smartDownloads,
+                limitMb=appSettings.downloadStorageLimitMb,
+                onEnabled={ enabled ->
+                    val next=appSettings.copy(smartDownloads=enabled)
+                    appSettings=next
+                    AppPreferences(context.applicationContext).write(next)
+                    if(backend.session.isLoggedIn) {
+                        scope.launch {
+                            runCatching { settingsRepo.save(next) }
+                                .onSuccess { appSettings=it }
+                        }
+                    }
+                }
             )
         }
 
@@ -115,6 +137,9 @@ fun DownloadsScreen(
                                 title=item.title,
                                 subtitle=item.subtitle,
                                 posterUrl=item.posterUrl,
+                                nextMediaVersionId=item.nextMediaVersionId,
+                                nextTitle=item.nextTitle,
+                                nextSubtitle=item.nextSubtitle,
                                 localUri=Uri.fromFile(file).toString()
                             )
                         )
@@ -124,6 +149,57 @@ fun DownloadsScreen(
         }
     }
 }
+
+@Composable
+private fun SmartDownloadsControl(
+    enabled:Boolean,
+    limitMb:Long,
+    onEnabled:(Boolean)->Unit
+) {
+    Surface(
+        color=if(enabled)FqGold.copy(alpha=.09f) else FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=6.dp)
+    ) {
+        Row(
+            Modifier.padding(13.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(44.dp).background(
+                    if(enabled)FqGold.copy(alpha=.14f) else FqSurface2,
+                    RoundedCornerShape(13.dp)
+                ),
+                contentAlignment=Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    null,
+                    tint=if(enabled)FqGold else FqMuted
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Smart Downloads",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                Text(
+                    if(enabled)
+                        "قسمت دیده‌شده پاک می‌شود و قسمت بعدی صف می‌شود • سقف "+smartLimitLabel(limitMb)
+                    else
+                        "مدیریت خودکار قسمت‌های سریال خاموش است.",
+                    color=FqMuted,
+                    fontSize=7.sp,
+                    lineHeight=13.sp
+                )
+            }
+            Switch(checked=enabled,onCheckedChange=onEnabled)
+        }
+    }
+}
+
+private fun smartLimitLabel(value:Long):String =
+    if(value<=0)"نامحدود"
+    else if(value>=1024)(value/1024).toString()+" GB"
+    else value.toString()+" MB"
 
 @Composable
 private fun DownloadsHero(

@@ -322,14 +322,15 @@ fun PremiumDetailScreen(
                                             } else {
                                                 scope.launch {
                                                     runCatching {
-                                                        backend.enqueueDownload(
-                                                            context,
-                                                            PlaybackTarget(
-                                                                mediaVersionId=id,
-                                                                title=ep.name.ifBlank { d.media.title+" • قسمت "+ep.number },
-                                                                subtitle=ep.quality.orEmpty()
-                                                            )
+                                                        val fallback=PlaybackTarget(
+                                                            mediaVersionId=id,
+                                                            title=ep.name.ifBlank { d.media.title+" • قسمت "+ep.number },
+                                                            subtitle=ep.quality.orEmpty()
                                                         )
+                                                        val target=runCatching {
+                                                            backend.playbackContext(id)
+                                                        }.getOrDefault(fallback)
+                                                        backend.enqueueDownload(context,target)
                                                     }.onSuccess {
                                                         message="دانلود قسمت به صف اضافه شد."
                                                     }.onFailure {
