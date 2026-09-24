@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.net.ConnectivityManager
+import android.os.Build
+import android.os.SystemClock
 import android.util.Rational
 import android.view.View
 import androidx.activity.compose.BackHandler
@@ -49,6 +51,8 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -137,6 +141,12 @@ fun FilmiqooPlayerScreen(
     var diagnosticsEnabled by remember { mutableStateOf(false) }
     var orientationMode by remember { mutableStateOf("auto") }
     var playerSettingsMessage by remember { mutableStateOf<String?>(null) }
+    var playbackSessionId by remember { mutableStateOf<String?>(null) }
+    var telemetryBufferStartedAt by remember { mutableLongStateOf(0L) }
+    var telemetryBufferCountPending by remember { mutableIntStateOf(0) }
+    var telemetryBufferMsPending by remember { mutableLongStateOf(0L) }
+    var telemetryQualitySwitchPending by remember { mutableIntStateOf(0) }
+    var telemetryLastHeartbeatAt by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -262,6 +272,17 @@ fun FilmiqooPlayerScreen(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val now=SystemClock.elapsedRealtime()
+                if(playbackState==Player.STATE_BUFFERING) {
+                    if(telemetryBufferStartedAt==0L) {
+                        telemetryBufferStartedAt=now
+                        telemetryBufferCountPending++
+                    }
+                } else if(telemetryBufferStartedAt>0L) {
+                    telemetryBufferMsPending += (now-telemetryBufferStartedAt).coerceAtLeast(0L)
+                    telemetryBufferStartedAt=0L
+                }
+
                 buffering=playbackState==Player.STATE_BUFFERING
                 ended=playbackState==Player.STATE_ENDED
                 if(
@@ -284,6 +305,33 @@ fun FilmiqooPlayerScreen(
             override fun onPlayerError(playerError: PlaybackException) {
                 error=playerError.localizedMessage ?: "خطای پخش"
                 buffering=false
+                telemetryBufferStartedAt=0L
+                val sid=playbackSessionId
+                if(sid!=null) {
+                    val now=SystemClock.elapsedRealtime()
+                    val watched=if(player.isPlaying)
+                        (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
+                    else 0L
+                    val bufferCount=telemetryBufferCountPending
+                    val bufferMs=telemetryBufferMsPending
+                    val switches=telemetryQualitySwitchPending
+                    playbackSessionId=null
+                    scope.launch {
+                        backend.endPlaybackSession(
+                            sessionId=sid,
+                            currentMediaVersionId=currentVersionId,
+                            positionMs=player.currentPosition.coerceAtLeast(0L),
+                            durationMs=player.duration.coerceAtLeast(0L),
+                            watchedDeltaMs=watched,
+                            bufferCountDelta=bufferCount,
+                            bufferMsDelta=bufferMs,
+                            qualitySwitchDelta=switches,
+                            networkType=playerNetworkLabel(context),
+                            completed=false,
+                            exitReason="error"
+                        )
+                    }
+                }
             }
         }
         player.addListener(listener)
@@ -307,6 +355,35 @@ fun FilmiqooPlayerScreen(
                     backend.saveProgress(currentVersionId,position,duration)
                 }
             }
+
+            val sid=playbackSessionId
+            if(sid!=null) {
+                val now=SystemClock.elapsedRealtime()
+                val activeBufferMs=if(telemetryBufferStartedAt>0L)
+                    (now-telemetryBufferStartedAt).coerceAtLeast(0L)
+                else 0L
+                val watched=if(player.isPlaying)
+                    (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
+                else 0L
+                val bufferCount=telemetryBufferCountPending
+                val bufferMs=telemetryBufferMsPending+activeBufferMs
+                val switches=telemetryQualitySwitchPending
+                CoroutineScope(Dispatchers.IO).launch {
+                    backend.endPlaybackSession(
+                        sessionId=sid,
+                        currentMediaVersionId=currentVersionId,
+                        positionMs=position,
+                        durationMs=duration,
+                        watchedDeltaMs=watched,
+                        bufferCountDelta=bufferCount,
+                        bufferMsDelta=bufferMs,
+                        qualitySwitchDelta=switches,
+                        networkType=playerNetworkLabel(context),
+                        completed=false,
+                        exitReason="back"
+                    )
+                }
+            }
             activity?.requestedOrientation=
                 oldOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             if(oldUi!=null) activity?.window?.decorView?.systemUiVisibility=oldUi
@@ -315,6 +392,36 @@ fun FilmiqooPlayerScreen(
     }
 
     LaunchedEffect(currentTarget.mediaVersionId,currentTarget.localUri) {
+        val previousSession=playbackSessionId
+        if(previousSession!=null) {
+            val now=SystemClock.elapsedRealtime()
+            val watched=if(player.isPlaying)
+                (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
+            else 0L
+            runCatching {
+                backend.endPlaybackSession(
+                    sessionId=previousSession,
+                    currentMediaVersionId=currentVersionId,
+                    positionMs=player.currentPosition.coerceAtLeast(0L),
+                    durationMs=player.duration.coerceAtLeast(0L),
+                    watchedDeltaMs=watched,
+                    bufferCountDelta=telemetryBufferCountPending,
+                    bufferMsDelta=telemetryBufferMsPending,
+                    qualitySwitchDelta=telemetryQualitySwitchPending,
+                    networkType=playerNetworkLabel(context),
+                    completed=false,
+                    exitReason="content_change"
+                )
+            }
+            playbackSessionId=null
+        }
+
+        telemetryBufferStartedAt=0L
+        telemetryBufferCountPending=0
+        telemetryBufferMsPending=0L
+        telemetryQualitySwitchPending=0
+        telemetryLastHeartbeatAt=SystemClock.elapsedRealtime()
+
         selectedVariantId=currentTarget.mediaVersionId
         resumePromptPositionMs=null
         pendingResumeVersionId=null
@@ -335,6 +442,19 @@ fun FilmiqooPlayerScreen(
             bumpControls()
         } else {
             val requestedStart=currentTarget.startPositionMs
+            if(backend.session.isLoggedIn) {
+                playbackSessionId=runCatching {
+                    backend.startPlaybackSession(
+                        mediaVersionId=currentTarget.mediaVersionId,
+                        positionMs=requestedStart.coerceAtLeast(0L),
+                        networkType=playerNetworkLabel(context),
+                        deviceName=(Build.MANUFACTURER+" "+Build.MODEL).trim(),
+                        appVersion=BuildConfig.VERSION_NAME
+                    )
+                }.getOrNull()
+                telemetryLastHeartbeatAt=SystemClock.elapsedRealtime()
+            }
+
             val enriched=runCatching {
                 backend.playbackContext(currentTarget.mediaVersionId)
             }.getOrNull()
@@ -425,6 +545,78 @@ fun FilmiqooPlayerScreen(
                     )
                 }
             }
+        }
+    }
+
+    LaunchedEffect(playbackSessionId,currentVersionId) {
+        while(true) {
+            delay(15_000)
+            val sid=playbackSessionId ?: continue
+            val now=SystemClock.elapsedRealtime()
+            val activeBufferMs=if(telemetryBufferStartedAt>0L)
+                (now-telemetryBufferStartedAt).coerceAtLeast(0L)
+            else 0L
+            val watched=if(player.isPlaying)
+                (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
+            else 0L
+            val bufferCount=telemetryBufferCountPending
+            val bufferMs=telemetryBufferMsPending+activeBufferMs
+            val switches=telemetryQualitySwitchPending
+
+            runCatching {
+                backend.heartbeatPlaybackSession(
+                    sessionId=sid,
+                    currentMediaVersionId=currentVersionId,
+                    positionMs=player.currentPosition.coerceAtLeast(0L),
+                    durationMs=player.duration.coerceAtLeast(0L),
+                    watchedDeltaMs=watched,
+                    bufferCountDelta=bufferCount,
+                    bufferMsDelta=bufferMs,
+                    qualitySwitchDelta=switches,
+                    networkType=playerNetworkLabel(context)
+                )
+            }.onSuccess {
+                telemetryLastHeartbeatAt=now
+                telemetryBufferCountPending=0
+                telemetryBufferMsPending=0L
+                telemetryQualitySwitchPending=0
+                if(telemetryBufferStartedAt>0L) {
+                    telemetryBufferStartedAt=now
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(ended,playbackSessionId) {
+        if(ended) {
+            val sid=playbackSessionId ?: return@LaunchedEffect
+            val now=SystemClock.elapsedRealtime()
+            val activeBufferMs=if(telemetryBufferStartedAt>0L)
+                (now-telemetryBufferStartedAt).coerceAtLeast(0L)
+            else 0L
+            val watched=if(player.isPlaying)
+                (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
+            else 0L
+            runCatching {
+                backend.endPlaybackSession(
+                    sessionId=sid,
+                    currentMediaVersionId=currentVersionId,
+                    positionMs=player.currentPosition.coerceAtLeast(0L),
+                    durationMs=player.duration.coerceAtLeast(0L),
+                    watchedDeltaMs=watched,
+                    bufferCountDelta=telemetryBufferCountPending,
+                    bufferMsDelta=telemetryBufferMsPending+activeBufferMs,
+                    qualitySwitchDelta=telemetryQualitySwitchPending,
+                    networkType=playerNetworkLabel(context),
+                    completed=true,
+                    exitReason="completed"
+                )
+            }
+            playbackSessionId=null
+            telemetryBufferStartedAt=0L
+            telemetryBufferCountPending=0
+            telemetryBufferMsPending=0L
+            telemetryQualitySwitchPending=0
         }
     }
 
@@ -975,6 +1167,9 @@ fun FilmiqooPlayerScreen(
             onDismiss={settingsOpen=false},
             onVariant={ variant ->
                 val position=player.currentPosition.coerceAtLeast(0L)
+                if(variant.mediaVersionId!=currentVersionId) {
+                    telemetryQualitySwitchPending++
+                }
                 scope.launch {
                     loadVersion(variant.mediaVersionId,position)
                 }

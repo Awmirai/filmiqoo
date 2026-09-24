@@ -656,6 +656,87 @@ class BackendRepository(context: Context) {
         }
     }
 
+    suspend fun startPlaybackSession(
+        mediaVersionId:String,
+        positionMs:Long,
+        networkType:String,
+        deviceName:String,
+        appVersion:String
+    ):String = withContext(Dispatchers.IO) {
+        postJson(
+            "/v1/playback/sessions",
+            JSONObject()
+                .put("mediaVersionId",mediaVersionId)
+                .put("positionMs",positionMs)
+                .put("networkType",networkType)
+                .put("deviceName",deviceName)
+                .put("appVersion",appVersion),
+            authorized=true
+        ).getString("id")
+    }
+
+    suspend fun heartbeatPlaybackSession(
+        sessionId:String,
+        currentMediaVersionId:String,
+        positionMs:Long,
+        durationMs:Long,
+        watchedDeltaMs:Long,
+        bufferCountDelta:Int,
+        bufferMsDelta:Long,
+        qualitySwitchDelta:Int,
+        networkType:String
+    ) {
+        withContext(Dispatchers.IO) {
+            postJson(
+                "/v1/playback/sessions/"+sessionId+"/heartbeat",
+                JSONObject()
+                    .put("currentMediaVersionId",currentMediaVersionId)
+                    .put("positionMs",positionMs)
+                    .put("durationMs",durationMs)
+                    .put("watchedDeltaMs",watchedDeltaMs)
+                    .put("bufferCountDelta",bufferCountDelta)
+                    .put("bufferMsDelta",bufferMsDelta)
+                    .put("qualitySwitchDelta",qualitySwitchDelta)
+                    .put("networkType",networkType),
+                authorized=true
+            )
+        }
+    }
+
+    suspend fun endPlaybackSession(
+        sessionId:String,
+        currentMediaVersionId:String,
+        positionMs:Long,
+        durationMs:Long,
+        watchedDeltaMs:Long,
+        bufferCountDelta:Int,
+        bufferMsDelta:Long,
+        qualitySwitchDelta:Int,
+        networkType:String,
+        completed:Boolean,
+        exitReason:String
+    ) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                postJson(
+                    "/v1/playback/sessions/"+sessionId+"/end",
+                    JSONObject()
+                        .put("currentMediaVersionId",currentMediaVersionId)
+                        .put("positionMs",positionMs)
+                        .put("durationMs",durationMs)
+                        .put("watchedDeltaMs",watchedDeltaMs)
+                        .put("bufferCountDelta",bufferCountDelta)
+                        .put("bufferMsDelta",bufferMsDelta)
+                        .put("qualitySwitchDelta",qualitySwitchDelta)
+                        .put("networkType",networkType)
+                        .put("completed",completed)
+                        .put("exitReason",exitReason),
+                    authorized=true
+                )
+            }
+        }
+    }
+
     suspend fun enqueueDownload(context: Context, target: PlaybackTarget): String =
         withContext(Dispatchers.IO) {
             val settings=AppPreferences(context.applicationContext).read()
