@@ -23,6 +23,8 @@ type playbackTokenRequest struct {
 }
 
 func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control","no-store")
+	w.Header().Set("Pragma","no-cache")
 	var body playbackTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -83,6 +85,8 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control","private, no-store")
+	w.Header().Set("Referrer-Policy","no-referrer")
 	versionID := chi.URLParam(r, "versionID")
 	exp, err := strconv.ParseInt(r.URL.Query().Get("exp"), 10, 64)
 	if err != nil || exp <= time.Now().Unix() {
