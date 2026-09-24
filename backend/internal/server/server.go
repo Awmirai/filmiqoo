@@ -27,6 +27,7 @@ type Server struct {
 	upstreamClient *http.Client
 	tmdb *tmdb.Client
 	objects *objectstore.Store
+	workersCancel context.CancelFunc
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
@@ -156,7 +157,16 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/rooms/{id}/messages/{messageID}/delete", s.deleteRoomMessage)
 			r.Post("/rooms/{id}/messages/{messageID}/pin", s.togglePinRoomMessage)
 			r.Post("/rooms/{id}/messages/{messageID}/forward", s.forwardRoomMessage)
+			r.Post("/rooms/{id}/messages/bulk-forward", s.bulkForwardRoomMessages)
+			r.Post("/rooms/{id}/messages/bulk-delete", s.bulkDeleteRoomMessages)
 			r.Get("/rooms/{id}/messages/search", s.searchRoomMessages)
+			r.Get("/rooms/{id}/read-state", s.roomReadState)
+			r.Get("/rooms/{id}/draft", s.roomDraft)
+			r.Post("/rooms/{id}/draft", s.updateRoomDraft)
+			r.Post("/rooms/{id}/draft/delete", s.deleteRoomDraft)
+			r.Get("/rooms/{id}/scheduled", s.scheduledRoomMessages)
+			r.Post("/rooms/{id}/scheduled", s.scheduleRoomMessage)
+			r.Post("/rooms/{id}/scheduled/{scheduledID}/cancel", s.cancelScheduledRoomMessage)
 			r.Get("/rooms/{id}/pins", s.pinnedRoomMessages)
 			r.Get("/rooms/{id}/members", s.roomMembers)
 			r.Get("/rooms/{id}/member-candidates", s.roomMemberCandidates)
@@ -303,6 +313,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout: 60 * time.Second,
 	}
+	workerCtx,workerCancel:=context.WithCancel(context.Background())
+	s.workersCancel=workerCancel
+	go s.runRoomMessageScheduler(workerCtx)
 	return s
 }
 
@@ -312,7 +325,10 @@ func (s *Server) ListenAndServe() error {
 	return err
 }
 
-func (s *Server) Shutdown(ctx context.Context) error { return s.http.Shutdown(ctx) }
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.workersCancel!=nil { s.workersCancel() }
+	return s.http.Shutdown(ctx)
+}
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{

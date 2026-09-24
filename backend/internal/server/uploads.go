@@ -36,10 +36,27 @@ func (s *Server) presignUpload(w http.ResponseWriter,r *http.Request) {
 	max:=int64(500*1024*1024)
 	if body.Kind=="story" { max=150*1024*1024 }
 	if body.Kind=="image" { max=25*1024*1024 }
+	if body.Kind=="document" { max=100*1024*1024 }
 	if body.SizeBytes<=0 || body.SizeBytes>max {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"file size is outside allowed range"}); return
 	}
-	if !(strings.HasPrefix(body.MimeType,"video/") || strings.HasPrefix(body.MimeType,"image/") || strings.HasPrefix(body.MimeType,"audio/")) {
+	allowedDocument:=map[string]bool{
+		"application/pdf":true,
+		"text/plain":true,
+		"text/csv":true,
+		"application/msword":true,
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document":true,
+		"application/vnd.ms-excel":true,
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":true,
+		"application/vnd.ms-powerpoint":true,
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation":true,
+		"application/zip":true,
+		"application/x-zip-compressed":true,
+	}
+	if !(strings.HasPrefix(body.MimeType,"video/") ||
+		strings.HasPrefix(body.MimeType,"image/") ||
+		strings.HasPrefix(body.MimeType,"audio/") ||
+		allowedDocument[body.MimeType]) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported media type"}); return
 	}
 
@@ -185,6 +202,17 @@ func extensionForMime(mime string) string {
 	case "image/png": return "png"
 	case "image/webp": return "webp"
 	case "audio/mpeg": return "mp3"
+	case "audio/mp4": return "m4a"
+	case "application/pdf": return "pdf"
+	case "text/plain": return "txt"
+	case "text/csv": return "csv"
+	case "application/msword": return "doc"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document": return "docx"
+	case "application/vnd.ms-excel": return "xls"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": return "xlsx"
+	case "application/vnd.ms-powerpoint": return "ppt"
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation": return "pptx"
+	case "application/zip","application/x-zip-compressed": return "zip"
 	default: return "bin"
 	}
 }

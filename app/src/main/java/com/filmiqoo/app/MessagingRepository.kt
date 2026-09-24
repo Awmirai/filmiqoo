@@ -50,6 +50,31 @@ data class RoomJoinResult(
     val existing:Boolean
 )
 
+data class RoomReadState(
+    val lastReadAt:String?,
+    val firstUnreadMessageId:String?,
+    val unread:Long
+)
+
+data class RoomDraft(
+    val exists:Boolean,
+    val body:String="",
+    val replyToMessageId:String?=null,
+    val spoiler:Boolean=false,
+    val updatedAt:String?=null
+)
+
+data class ScheduledRoomMessage(
+    val id:String,
+    val body:String,
+    val type:String,
+    val spoiler:Boolean,
+    val replyToMessageId:String?,
+    val scheduledAt:String,
+    val status:String,
+    val createdAt:String
+)
+
 data class DmRoom(
     val id: String,
     val title: String
@@ -110,6 +135,104 @@ class MessagingRepository(
     suspend fun markRoomRead(roomId: String) {
         backend.postJson("/v1/rooms/"+roomId+"/read",JSONObject(),authorized=true)
     }
+
+    suspend fun roomReadState(roomId:String):RoomReadState {
+        val o=backend.getJson("/v1/rooms/"+roomId+"/read-state",authorized=true)
+        return RoomReadState(
+            lastReadAt=o.optString("lastReadAt").takeIf(String::isNotBlank),
+            firstUnreadMessageId=o.optString("firstUnreadMessageId").takeIf(String::isNotBlank),
+            unread=o.optLong("unread")
+        )
+    }
+
+    suspend fun roomDraft(roomId:String):RoomDraft {
+        val o=backend.getJson("/v1/rooms/"+roomId+"/draft",authorized=true)
+        return RoomDraft(
+            exists=o.optBoolean("exists"),
+            body=o.optString("body"),
+            replyToMessageId=o.optString("replyToMessageId").takeIf(String::isNotBlank),
+            spoiler=o.optBoolean("spoiler"),
+            updatedAt=o.optString("updatedAt").takeIf(String::isNotBlank)
+        )
+    }
+
+    suspend fun saveRoomDraft(
+        roomId:String,
+        body:String,
+        replyToMessageId:String?,
+        spoiler:Boolean
+    ) {
+        val payload=JSONObject()
+            .put("body",body)
+            .put("spoiler",spoiler)
+        if(!replyToMessageId.isNullOrBlank()) {
+            payload.put("replyToMessageId",replyToMessageId)
+        }
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/draft",
+            payload,
+            authorized=true
+        )
+    }
+
+    suspend fun deleteRoomDraft(roomId:String) {
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/draft/delete",
+            JSONObject(),
+            authorized=true
+        )
+    }
+
+    suspend fun scheduledMessages(roomId:String):List<ScheduledRoomMessage> {
+        val root=backend.getJson("/v1/rooms/"+roomId+"/scheduled",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                add(
+                    ScheduledRoomMessage(
+                        id=x.optString("id"),
+                        body=x.optString("body"),
+                        type=x.optString("type","text"),
+                        spoiler=x.optBoolean("spoiler"),
+                        replyToMessageId=x.optString("replyToMessageId").takeIf(String::isNotBlank),
+                        scheduledAt=x.optString("scheduledAt"),
+                        status=x.optString("status"),
+                        createdAt=x.optString("createdAt")
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun scheduleTextMessage(
+        roomId:String,
+        body:String,
+        spoiler:Boolean,
+        replyToMessageId:String?,
+        scheduledAt:String
+    ):String {
+        val payload=JSONObject()
+            .put("body",body.trim())
+            .put("type","text")
+            .put("spoiler",spoiler)
+            .put("scheduledAt",scheduledAt)
+        if(!replyToMessageId.isNullOrBlank()) {
+            payload.put("replyToMessageId",replyToMessageId)
+        }
+        return backend.postJson(
+            "/v1/rooms/"+roomId+"/scheduled",
+            payload,
+            authorized=true
+        ).optString("id")
+    }
+
+    suspend fun cancelScheduledMessage(roomId:String,id:String):Boolean =
+        backend.postJson(
+            "/v1/rooms/"+roomId+"/scheduled/"+id+"/cancel",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("cancelled")
 
     suspend fun roomSettings(roomId:String):RoomConversationSettings {
         val o=backend.getJson("/v1/rooms/"+roomId+"/settings",authorized=true)

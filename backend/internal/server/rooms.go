@@ -37,6 +37,7 @@ func (s *Server) roomsList(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
+	_ = s.processDueScheduledRoomMessages(r.Context())
 	roomID:=chi.URLParam(r,"id")
 	items,err:=s.queryRoomMessages(
 		r.Context(),
@@ -70,7 +71,7 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 	body.Body=strings.TrimSpace(body.Body)
 	if body.Type=="" { body.Type="text" }
 	switch body.Type {
-	case "text","image","video","voice","reel","movie","episode":
+	case "text","image","video","voice","document","location","contact","reel","movie","episode":
 	default:
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported message type"}); return
 	}
@@ -79,6 +80,15 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 	}
 	if len([]rune(body.Body))>4000 {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is too long"}); return
+	}
+	if err:=validateRoomMessagePayloadV6(roomMessagePayloadV6{
+		Body:body.Body,
+		Type:body.Type,
+		Attachment:body.Attachment,
+		Spoiler:body.Spoiler,
+		ReplyToMessageID:body.ReplyToMessageID,
+	}); err!=nil {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":err.Error()}); return
 	}
 
 	var roomType,visibility,memberRole string
@@ -143,36 +153,31 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusForbidden,map[string]string{"error":"direct messages are unavailable because one of these accounts has blocked the other"}); return
 	}
 
-	attachment,_:=json.Marshal(body.Attachment)
-	var id string
-	var created time.Time
-	err:=s.db.QueryRow(r.Context(),`
-		INSERT INTO messages (
-			room_id,author_user_id,reply_to_message_id,body,message_type,attachment,spoiler
-		) VALUES ($1,$2,$3,$4,$5,$6,$7)
-		RETURNING id::text,created_at
-	`,roomID,userID,body.ReplyToMessageID,body.Body,body.Type,attachment,body.Spoiler).Scan(&id,&created)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-
-	payload:=map[string]any{
-		"type":"message.created","roomId":roomID,"message":map[string]any{
-			"id":id,"body":body.Body,"messageType":body.Type,"attachment":body.Attachment,
-			"spoiler":body.Spoiler,"authorUserId":userID,"createdAt":created,
-		},
-	}
-	raw,_:=json.Marshal(payload)
-	_ = s.redis.Publish(r.Context(),"room:"+roomID,raw).Err()
-
-	s.notifyRoomMessage(
+	id,created,err:=s.insertRoomMessageV6(
 		r.Context(),
 		roomID,
 		userID,
-		body.Body,
-		body.Type,
-		body.ReplyToMessageID,
+		roomMessagePayloadV6{
+			Body:body.Body,
+			Type:body.Type,
+			Attachment:body.Attachment,
+			Spoiler:body.Spoiler,
+			ReplyToMessageID:body.ReplyToMessageID,
+		},
+		nil,
 	)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
-	writeJSON(w,http.StatusCreated,payload["message"])
+	writeJSON(w,http.StatusCreated,map[string]any{
+		"id":id,
+		"body":body.Body,
+		"messageType":body.Type,
+		"attachment":body.Attachment,
+		"spoiler":body.Spoiler,
+		"authorUserId":userID,
+		"replyToMessageId":body.ReplyToMessageID,
+		"createdAt":created,
+	})
 }
 
 func (s *Server) createRoom(w http.ResponseWriter,r *http.Request) {
