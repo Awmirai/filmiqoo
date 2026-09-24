@@ -431,7 +431,7 @@ fun ConnectedWatchPartyScreen(
             Surface(
                 color=FqDanger.copy(alpha=.08f),
                 shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,bottom=8.dp)
+                modifier=Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=8.dp)
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(11.dp),
@@ -474,7 +474,7 @@ fun ConnectedWatchPartyScreen(
             Surface(
                 color=FqGold.copy(alpha=.08f),
                 shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,bottom=8.dp)
+                modifier=Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=8.dp)
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(10.dp),
@@ -527,7 +527,7 @@ fun ConnectedWatchPartyScreen(
             Surface(
                 color=FqSurface,
                 shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,bottom=8.dp)
+                modifier=Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=8.dp)
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(10.dp),
