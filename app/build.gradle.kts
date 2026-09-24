@@ -103,10 +103,12 @@ android {
     }
 
     lint {
-        abortOnError = false
-        textReport = true
-        textOutput = file("build/reports/lint-results-debug.txt")
-        htmlReport = true
+        lintConfig=file("lint.xml")
+        abortOnError=true
+        checkReleaseBuilds=true
+        textReport=true
+        textOutput=file("build/reports/lint-results-debug.txt")
+        htmlReport=true
     }
 
 }
