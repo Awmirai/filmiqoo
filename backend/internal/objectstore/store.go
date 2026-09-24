@@ -61,3 +61,24 @@ func (s *Store) PresignGet(ctx context.Context,key string,expiry time.Duration) 
 	if err:=s.ensure(ctx); err!=nil { return nil,err }
 	return s.signer.PresignedGetObject(ctx,s.bucket,key,expiry,nil)
 }
+
+
+type ObjectInfo struct {
+	Size int64
+	ContentType string
+}
+
+func (s *Store) Stat(ctx context.Context,key string) (ObjectInfo,error) {
+	if err:=s.ensure(ctx); err!=nil { return ObjectInfo{},err }
+	info,err:=s.internal.StatObject(ctx,s.bucket,key,minio.StatObjectOptions{})
+	if err!=nil { return ObjectInfo{},err }
+	return ObjectInfo{
+		Size:info.Size,
+		ContentType:strings.ToLower(strings.TrimSpace(info.ContentType)),
+	},nil
+}
+
+func (s *Store) Delete(ctx context.Context,key string) error {
+	if err:=s.ensure(ctx); err!=nil { return err }
+	return s.internal.RemoveObject(ctx,s.bucket,key,minio.RemoveObjectOptions{})
+}
