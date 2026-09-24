@@ -304,7 +304,7 @@ fun RoomMembersSheet(
                                         text={Text("انتقال مالکیت",color=FqGold)},
                                         leadingIcon={
                                             Icon(
-                                                Icons.Default.AdminPanelSettings,
+                                                Icons.Default.Star,
                                                 null,
                                                 tint=FqGold
                                             )
@@ -343,7 +343,7 @@ fun RoomMembersSheet(
     transferTarget?.let { member ->
         AlertDialog(
             onDismissRequest={transferTarget=null},
-            icon={Icon(Icons.Default.AdminPanelSettings,null,tint=FqGold)},
+            icon={Icon(Icons.Default.Star,null,tint=FqGold)},
             title={Text("انتقال مالکیت گروه")},
             text={
                 Text(
