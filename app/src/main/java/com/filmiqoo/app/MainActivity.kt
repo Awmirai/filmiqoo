@@ -66,19 +66,27 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     val resolved=profiles.firstOrNull { it.id==currentId }
                         ?: profiles.firstOrNull()
                     if(resolved!=null) {
-                        viewerStore.activate(resolved)
-                        activeViewer=resolved
+                        if(resolved.pinProtected) {
+                            viewerStore.clear()
+                            activeViewer=null
+                            overlay=OverlayRoute.ViewerProfiles
+                        } else {
+                            viewerStore.activate(resolved)
+                            activeViewer=resolved
+                        }
                     }
                 }
             viewerReady=true
         }
     }
 
-    LaunchedEffect(initialDeepLink,authenticated) {
+    LaunchedEffect(initialDeepLink,authenticated,viewerReady,activeViewer?.id) {
         val raw=initialDeepLink
         if(
             !deepLinkHandled &&
             authenticated &&
+            viewerReady &&
+            activeViewer!=null &&
             !raw.isNullOrBlank()
         ) {
             val uri=runCatching { android.net.Uri.parse(raw) }.getOrNull()

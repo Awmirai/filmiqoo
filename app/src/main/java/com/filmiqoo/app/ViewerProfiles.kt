@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,6 +21,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,7 +37,8 @@ data class ViewerProfile(
     val maturityLevel:String,
     val preferredAudioLanguage:String,
     val preferredSubtitleLanguage:String,
-    val autoplayNext:Boolean
+    val autoplayNext:Boolean,
+    val pinProtected:Boolean
 )
 
 class ViewerProfileStore(context:Context) {
@@ -53,7 +57,8 @@ class ViewerProfileStore(context:Context) {
             maturityLevel=prefs.getString("maturity","all").orEmpty().ifBlank{"all"},
             preferredAudioLanguage=prefs.getString("audio","fa").orEmpty().ifBlank{"fa"},
             preferredSubtitleLanguage=prefs.getString("subtitle","fa").orEmpty().ifBlank{"fa"},
-            autoplayNext=prefs.getBoolean("autoplay_next",true)
+            autoplayNext=prefs.getBoolean("autoplay_next",true),
+            pinProtected=prefs.getBoolean("pin_protected",false)
         )
     }
 
@@ -67,6 +72,7 @@ class ViewerProfileStore(context:Context) {
             .putString("audio",profile.preferredAudioLanguage)
             .putString("subtitle",profile.preferredSubtitleLanguage)
             .putBoolean("autoplay_next",profile.autoplayNext)
+            .putBoolean("pin_protected",profile.pinProtected)
             .apply()
     }
 
@@ -122,6 +128,22 @@ class ViewerProfilesRepository(
         )
     }
 
+    suspend fun unlock(id:String,pin:String):Boolean =
+        backend.postJson(
+            "/v1/viewer-profiles/"+id+"/unlock",
+            JSONObject().put("pin",pin),
+            authorized=true
+        ).optBoolean("unlocked")
+
+    suspend fun setPin(id:String,currentPin:String,newPin:String):Boolean =
+        backend.postJson(
+            "/v1/viewer-profiles/"+id+"/pin",
+            JSONObject()
+                .put("currentPin",currentPin)
+                .put("newPin",newPin),
+            authorized=true
+        ).optBoolean("pinProtected")
+
     suspend fun delete(id:String):Boolean =
         backend.postJson(
             "/v1/viewer-profiles/"+id+"/delete",
@@ -137,7 +159,8 @@ class ViewerProfilesRepository(
         maturityLevel=x.optString("maturityLevel","all"),
         preferredAudioLanguage=x.optString("preferredAudioLanguage","fa"),
         preferredSubtitleLanguage=x.optString("preferredSubtitleLanguage","fa"),
-        autoplayNext=x.optBoolean("autoplayNext",true)
+        autoplayNext=x.optBoolean("autoplayNext",true),
+        pinProtected=x.optBoolean("pinProtected")
     )
 }
 
@@ -157,6 +180,9 @@ fun ViewerProfilesScreen(
     var refresh by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     var editTarget by remember { mutableStateOf<ViewerProfile?>(null) }
+    var pinSettingsTarget by remember { mutableStateOf<ViewerProfile?>(null) }
+    var unlockTarget by remember { mutableStateOf<ViewerProfile?>(null) }
+    var unlockForEdit by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
 
     BackHandler { onBack() }
@@ -227,10 +253,22 @@ fun ViewerProfilesScreen(
                         profile=profile,
                         active=store.activeId()==profile.id,
                         onClick={
-                            store.activate(profile)
-                            onActivated(profile)
+                            if(profile.pinProtected && store.activeId()!=profile.id) {
+                                unlockForEdit=false
+                                unlockTarget=profile
+                            } else {
+                                store.activate(profile)
+                                onActivated(profile)
+                            }
                         },
-                        onEdit={editTarget=profile}
+                        onEdit={
+                            if(profile.pinProtected) {
+                                unlockForEdit=true
+                                unlockTarget=profile
+                            } else {
+                                editTarget=profile
+                            }
+                        }
                     )
                 }
 
@@ -265,7 +303,8 @@ fun ViewerProfilesScreen(
                     }.onFailure { error=it.message }
                 }
             },
-            onDelete={}
+            onDelete={},
+            onPinSettings={}
         )
     }
 
@@ -291,6 +330,53 @@ fun ViewerProfilesScreen(
                         .onSuccess {
                             if(store.activeId()==profile.id) store.clear()
                             editTarget=null
+                            refresh++
+                        }
+                        .onFailure { error=it.message }
+                }
+            },
+            onPinSettings={
+                pinSettingsTarget=profile
+                editTarget=null
+            }
+        )
+    }
+
+    unlockTarget?.let { profile ->
+        ViewerPinUnlockDialog(
+            profile=profile,
+            onDismiss={unlockTarget=null},
+            onUnlock={pin->
+                scope.launch {
+                    runCatching { repo.unlock(profile.id,pin) }
+                        .onSuccess { unlocked->
+                            if(unlocked) {
+                                unlockTarget=null
+                                if(unlockForEdit) {
+                                    editTarget=profile
+                                } else {
+                                    store.activate(profile)
+                                    onActivated(profile)
+                                }
+                            }
+                        }
+                        .onFailure { error=it.message }
+                }
+            }
+        )
+    }
+
+    pinSettingsTarget?.let { profile ->
+        ViewerPinSettingsDialog(
+            profile=profile,
+            onDismiss={pinSettingsTarget=null},
+            onSave={currentPin,newPin->
+                scope.launch {
+                    runCatching { repo.setPin(profile.id,currentPin,newPin) }
+                        .onSuccess { protected->
+                            val updated=profile.copy(pinProtected=protected)
+                            if(store.activeId()==profile.id) store.activate(updated)
+                            pinSettingsTarget=null
                             refresh++
                         }
                         .onFailure { error=it.message }
@@ -362,6 +448,15 @@ private fun ViewerProfileCard(
                 Modifier.padding(top=5.dp),
                 verticalAlignment=Alignment.CenterVertically
             ) {
+                if(profile.pinProtected) {
+                    Icon(
+                        Icons.Default.Lock,
+                        null,
+                        tint=FqGold,
+                        modifier=Modifier.size(13.dp)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                }
                 if(profile.kidsMode) {
                     Surface(
                         color=Color(0xFF12384E),
@@ -430,7 +525,8 @@ private fun ViewerProfileEditorDialog(
     canDelete:Boolean,
     onDismiss:()->Unit,
     onSave:(ViewerProfile)->Unit,
-    onDelete:()->Unit
+    onDelete:()->Unit,
+    onPinSettings:(ViewerProfile)->Unit
 ) {
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
     var kids by remember(existing?.id) { mutableStateOf(existing?.kidsMode ?: false) }
@@ -506,6 +602,24 @@ private fun ViewerProfileEditorDialog(
                     Switch(checked=autoplay,onCheckedChange={autoplay=it})
                 }
 
+                if(existing!=null) {
+                    OutlinedButton(
+                        onClick={onPinSettings(existing)},
+                        modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                    ) {
+                        Icon(
+                            if(existing.pinProtected)Icons.Default.Lock else Icons.Default.LockOpen,
+                            null,
+                            tint=if(existing.pinProtected)FqGold else FqMuted
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            if(existing.pinProtected)"تغییر / حذف PIN" else "تنظیم PIN پروفایل",
+                            fontSize=8.sp
+                        )
+                    }
+                }
+
                 if(canDelete && existing!=null) {
                     TextButton(
                         onClick={confirmDelete=true},
@@ -531,7 +645,8 @@ private fun ViewerProfileEditorDialog(
                             maturityLevel=maturity,
                             preferredAudioLanguage=audio,
                             preferredSubtitleLanguage=subtitle,
-                            autoplayNext=autoplay
+                            autoplayNext=autoplay,
+                            pinProtected=existing?.pinProtected ?: false
                         )
                     )
                 },
@@ -579,4 +694,132 @@ private fun ViewerLanguageRow(
             )
         }
     }
+}
+
+
+@Composable
+private fun ViewerPinUnlockDialog(
+    profile:ViewerProfile,
+    onDismiss:()->Unit,
+    onUnlock:(String)->Unit
+) {
+    var pin by remember(profile.id) { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        icon={Icon(Icons.Default.Lock,null,tint=FqGold)},
+        title={Text("PIN • "+profile.name)},
+        text={
+            Column {
+                Text(
+                    "برای ورود به این پروفایل PIN چهاررقمی رو وارد کن.",
+                    color=FqMuted,
+                    fontSize=8.sp
+                )
+                OutlinedTextField(
+                    value=pin,
+                    onValueChange={pin=it.filter(Char::isDigit).take(4)},
+                    label={Text("PIN")},
+                    singleLine=true,
+                    visualTransformation=PasswordVisualTransformation(),
+                    keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword),
+                    modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                )
+            }
+        },
+        confirmButton={
+            Button(
+                enabled=pin.length==4,
+                onClick={onUnlock(pin)},
+                colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+            ) { Text("ورود",color=Color.Black) }
+        },
+        dismissButton={TextButton(onClick=onDismiss){Text("لغو")}}
+    )
+}
+
+@Composable
+private fun ViewerPinSettingsDialog(
+    profile:ViewerProfile,
+    onDismiss:()->Unit,
+    onSave:(String,String)->Unit
+) {
+    var currentPin by remember(profile.id) { mutableStateOf("") }
+    var newPin by remember(profile.id) { mutableStateOf("") }
+    var confirmPin by remember(profile.id) { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        icon={Icon(Icons.Default.AdminPanelSettings,null,tint=FqGold)},
+        title={Text(if(profile.pinProtected)"مدیریت PIN" else "تنظیم PIN")},
+        text={
+            Column {
+                Text(
+                    if(profile.pinProtected)
+                        "برای تغییر یا حذف PIN، اول PIN فعلی رو وارد کن."
+                    else
+                        "با PIN، ورود به این پروفایل محافظت می‌شه.",
+                    color=FqMuted,
+                    fontSize=8.sp
+                )
+
+                if(profile.pinProtected) {
+                    OutlinedTextField(
+                        value=currentPin,
+                        onValueChange={currentPin=it.filter(Char::isDigit).take(4)},
+                        label={Text("PIN فعلی")},
+                        singleLine=true,
+                        visualTransformation=PasswordVisualTransformation(),
+                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword),
+                        modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                    )
+                }
+
+                OutlinedTextField(
+                    value=newPin,
+                    onValueChange={newPin=it.filter(Char::isDigit).take(4)},
+                    label={Text("PIN جدید")},
+                    singleLine=true,
+                    visualTransformation=PasswordVisualTransformation(),
+                    keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword),
+                    modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                )
+
+                OutlinedTextField(
+                    value=confirmPin,
+                    onValueChange={confirmPin=it.filter(Char::isDigit).take(4)},
+                    label={Text("تکرار PIN جدید")},
+                    singleLine=true,
+                    visualTransformation=PasswordVisualTransformation(),
+                    keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword),
+                    isError=confirmPin.isNotEmpty() && confirmPin!=newPin,
+                    modifier=Modifier.fillMaxWidth().padding(top=8.dp)
+                )
+
+                if(profile.pinProtected) {
+                    TextButton(
+                        enabled=currentPin.length==4,
+                        onClick={onSave(currentPin,"")},
+                        modifier=Modifier.padding(top=5.dp)
+                    ) {
+                        Icon(Icons.Default.LockOpen,null,tint=FqDanger)
+                        Spacer(Modifier.width(4.dp))
+                        Text("حذف PIN",color=FqDanger,fontSize=8.sp)
+                    }
+                }
+            }
+        },
+        confirmButton={
+            Button(
+                enabled=newPin.length==4 &&
+                    confirmPin==newPin &&
+                    (!profile.pinProtected || currentPin.length==4),
+                onClick={onSave(currentPin,newPin)},
+                colors=ButtonDefaults.buttonColors(containerColor=FqGold)
+            ) {
+                Text(if(profile.pinProtected)"تغییر PIN" else "فعال‌کردن PIN",color=Color.Black)
+            }
+        },
+        dismissButton={TextButton(onClick=onDismiss){Text("لغو")}}
+    )
 }

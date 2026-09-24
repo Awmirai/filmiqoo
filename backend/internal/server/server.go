@@ -181,6 +181,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/viewer-profiles", s.viewerProfiles)
 			r.Post("/viewer-profiles", s.createViewerProfile)
 			r.Post("/viewer-profiles/{id}", s.updateViewerProfile)
+			r.Post("/viewer-profiles/{id}/pin", s.setViewerProfilePIN)
+			r.Post("/viewer-profiles/{id}/unlock", s.unlockViewerProfile)
 			r.Post("/viewer-profiles/{id}/delete", s.deleteViewerProfile)
 			r.Post("/me", s.updateProfile)
 			r.Get("/creator/studio", s.creatorStudio)

@@ -8,6 +8,7 @@ import (
     "time"
 
     "github.com/go-chi/chi/v5"
+    "golang.org/x/crypto/bcrypt"
 )
 
 type viewerProfilePayload struct {
@@ -66,7 +67,7 @@ func (s *Server) viewerProfiles(w http.ResponseWriter,r *http.Request) {
     rows,err:=s.db.Query(r.Context(),`
         SELECT id::text,name,avatar_url,kids_mode,maturity_level,
                preferred_audio_language,preferred_subtitle_language,
-               autoplay_next,created_at
+               autoplay_next,(pin_hash<>''),created_at
           FROM viewer_profiles
          WHERE user_id=$1
          ORDER BY created_at ASC,id ASC
@@ -78,11 +79,11 @@ func (s *Server) viewerProfiles(w http.ResponseWriter,r *http.Request) {
     items:=make([]map[string]any,0)
     for rows.Next() {
         var id,name,avatar,maturity,audioLang,subtitleLang string
-        var kids,autoplay bool
+        var kids,autoplay,pinProtected bool
         var created time.Time
         if err:=rows.Scan(
             &id,&name,&avatar,&kids,&maturity,
-            &audioLang,&subtitleLang,&autoplay,&created,
+            &audioLang,&subtitleLang,&autoplay,&pinProtected,&created,
         ); err!=nil { continue }
         items=append(items,map[string]any{
             "id":id,
@@ -93,6 +94,7 @@ func (s *Server) viewerProfiles(w http.ResponseWriter,r *http.Request) {
             "preferredAudioLanguage":audioLang,
             "preferredSubtitleLanguage":subtitleLang,
             "autoplayNext":autoplay,
+            "pinProtected":pinProtected,
             "createdAt":created,
         })
     }
@@ -261,4 +263,168 @@ func (s *Server) deleteViewerProfile(w http.ResponseWriter,r *http.Request) {
     `,profileID,userID)
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     writeJSON(w,http.StatusOK,map[string]any{"deleted":tag.RowsAffected()>0})
+}
+
+
+type viewerPinPayload struct {
+    CurrentPIN string `json:"currentPin"`
+    NewPIN string `json:"newPin"`
+    PIN string `json:"pin"`
+}
+
+func validViewerPIN(value string) bool {
+    if len(value)!=4 { return false }
+    for _,r:=range value {
+        if r<'0' || r>'9' { return false }
+    }
+    return true
+}
+
+func (s *Server) verifyViewerPIN(ctx context.Context,userID,profileID,pin string) (bool,time.Duration,error) {
+    var hash string
+    var failures int
+    var lockedUntil *time.Time
+    err:=s.db.QueryRow(ctx,`
+        SELECT pin_hash,failed_pin_attempts,pin_locked_until
+          FROM viewer_profiles
+         WHERE id=$1 AND user_id=$2
+    `,profileID,userID).Scan(&hash,&failures,&lockedUntil)
+    if err!=nil { return false,0,err }
+
+    if hash=="" {
+        return true,0,nil
+    }
+
+    now:=time.Now()
+    if lockedUntil!=nil && lockedUntil.After(now) {
+        return false,time.Until(*lockedUntil),nil
+    }
+
+    if !validViewerPIN(pin) || bcrypt.CompareHashAndPassword([]byte(hash),[]byte(pin))!=nil {
+        failures++
+        if failures>=5 {
+            until:=now.Add(5*time.Minute)
+            _,err=s.db.Exec(ctx,`
+                UPDATE viewer_profiles
+                   SET failed_pin_attempts=0,pin_locked_until=$3,updated_at=now()
+                 WHERE id=$1 AND user_id=$2
+            `,profileID,userID,until)
+            if err!=nil { return false,0,err }
+            return false,5*time.Minute,nil
+        }
+
+        _,err=s.db.Exec(ctx,`
+            UPDATE viewer_profiles
+               SET failed_pin_attempts=$3,updated_at=now()
+             WHERE id=$1 AND user_id=$2
+        `,profileID,userID,failures)
+        if err!=nil { return false,0,err }
+        return false,0,nil
+    }
+
+    _,err=s.db.Exec(ctx,`
+        UPDATE viewer_profiles
+           SET failed_pin_attempts=0,pin_locked_until=NULL,updated_at=now()
+         WHERE id=$1 AND user_id=$2
+    `,profileID,userID)
+    if err!=nil { return false,0,err }
+    return true,0,nil
+}
+
+func (s *Server) unlockViewerProfile(w http.ResponseWriter,r *http.Request) {
+    userID:=userIDFromContext(r.Context())
+    profileID:=chi.URLParam(r,"id")
+
+    var body viewerPinPayload
+    if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
+        writeError(w,http.StatusBadRequest,err); return
+    }
+
+    ok,wait,err:=s.verifyViewerPIN(r.Context(),userID,profileID,strings.TrimSpace(body.PIN))
+    if err!=nil {
+        writeJSON(w,http.StatusNotFound,map[string]string{"error":"viewer profile not found"})
+        return
+    }
+    if !ok {
+        if wait>0 {
+            seconds:=int(wait.Seconds())
+            if seconds<1 { seconds=1 }
+            writeJSON(w,http.StatusTooManyRequests,map[string]any{
+                "error":"PIN temporarily locked",
+                "retryAfterSeconds":seconds,
+            })
+            return
+        }
+        writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"PIN اشتباه است."})
+        return
+    }
+
+    writeJSON(w,http.StatusOK,map[string]any{"unlocked":true})
+}
+
+func (s *Server) setViewerProfilePIN(w http.ResponseWriter,r *http.Request) {
+    userID:=userIDFromContext(r.Context())
+    profileID:=chi.URLParam(r,"id")
+
+    var body viewerPinPayload
+    if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
+        writeError(w,http.StatusBadRequest,err); return
+    }
+
+    var existingHash string
+    if err:=s.db.QueryRow(r.Context(),`
+        SELECT pin_hash FROM viewer_profiles WHERE id=$1 AND user_id=$2
+    `,profileID,userID).Scan(&existingHash); err!=nil {
+        writeJSON(w,http.StatusNotFound,map[string]string{"error":"viewer profile not found"})
+        return
+    }
+
+    if existingHash!="" {
+        ok,wait,err:=s.verifyViewerPIN(
+            r.Context(),userID,profileID,strings.TrimSpace(body.CurrentPIN),
+        )
+        if err!=nil {
+            writeError(w,http.StatusInternalServerError,err); return
+        }
+        if !ok {
+            if wait>0 {
+                writeJSON(w,http.StatusTooManyRequests,map[string]any{
+                    "error":"PIN temporarily locked",
+                    "retryAfterSeconds":int(wait.Seconds()),
+                })
+                return
+            }
+            writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"PIN فعلی اشتباه است."})
+            return
+        }
+    }
+
+    newPIN:=strings.TrimSpace(body.NewPIN)
+    if newPIN=="" {
+        _,err:=s.db.Exec(r.Context(),`
+            UPDATE viewer_profiles
+               SET pin_hash='',failed_pin_attempts=0,pin_locked_until=NULL,updated_at=now()
+             WHERE id=$1 AND user_id=$2
+        `,profileID,userID)
+        if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+        writeJSON(w,http.StatusOK,map[string]any{"pinProtected":false})
+        return
+    }
+
+    if !validViewerPIN(newPIN) {
+        writeJSON(w,http.StatusBadRequest,map[string]string{"error":"PIN باید دقیقاً ۴ رقم باشد."})
+        return
+    }
+
+    hash,err:=bcrypt.GenerateFromPassword([]byte(newPIN),bcrypt.DefaultCost)
+    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+    _,err=s.db.Exec(r.Context(),`
+        UPDATE viewer_profiles
+           SET pin_hash=$3,failed_pin_attempts=0,pin_locked_until=NULL,updated_at=now()
+         WHERE id=$1 AND user_id=$2
+    `,profileID,userID,string(hash))
+    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+    writeJSON(w,http.StatusOK,map[string]any{"pinProtected":true})
 }
