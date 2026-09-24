@@ -9,19 +9,61 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - ".github/workflows/backend.yml"
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: filmiqoo_ci
+          POSTGRES_USER: filmiqoo
+          POSTGRES_PASSWORD: filmiqoo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U filmiqoo -d filmiqoo_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     defaults:
       run:
         working-directory: backend
+    env:
+      DATABASE_URL: postgres://filmiqoo:filmiqoo@localhost:5432/filmiqoo_ci?sslmode=disable
+      PGPASSWORD: filmiqoo
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.x"
           cache: false
-      - run: go mod tidy
-      - run: go test ./...
-      - run: go vet ./...
+
+      - name: Check gofmt
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "Files need gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Verify Go modules
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Apply all database migrations
+        run: |
+          for file in migrations/*.sql; do
+            echo "Applying $file"
+            psql               -h localhost               -U filmiqoo               -d filmiqoo_ci               -v ON_ERROR_STOP=1               -f "$file"
+          done
+
+      - name: Unit tests with race detector
+        run: go test -race ./...
+
+      - name: Go vet
+        run: go vet ./...
