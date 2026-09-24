@@ -127,6 +127,67 @@ func (s *Server) roomMembers(w http.ResponseWriter,r *http.Request) {
 	})
 }
 
+func (s *Server) roomMemberCandidates(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	roomID:=chi.URLParam(r,"id")
+	q:=strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(q))<1 {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"query is required"})
+		return
+	}
+	if len([]rune(q))>80 { q=string([]rune(q)[:80]) }
+
+	roomType,role,err:=s.roomMembershipRole(r.Context(),roomID,userID)
+	if err!=nil || (role!="owner" && role!="admin") {
+		writeJSON(w,http.StatusForbidden,map[string]string{"error":"owner or admin permission required"})
+		return
+	}
+	if roomType=="dm" {
+		writeJSON(w,http.StatusConflict,map[string]string{"error":"direct-message membership cannot be changed"})
+		return
+	}
+
+	rows,err:=s.db.Query(r.Context(),`
+		SELECT p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified
+		  FROM profiles p
+		 WHERE NOT EXISTS(
+		       SELECT 1 FROM room_members rm
+		        WHERE rm.room_id=$1 AND rm.user_id=p.user_id
+		 )
+		   AND (
+		     p.username::text ILIKE '%' || $2 || '%'
+		     OR p.display_name ILIKE '%' || $2 || '%'
+		   )
+		   AND NOT EXISTS(
+		     SELECT 1 FROM blocks b
+		      WHERE (b.blocker_user_id=$3 AND b.blocked_user_id=p.user_id)
+		         OR (b.blocker_user_id=p.user_id AND b.blocked_user_id=$3)
+		   )
+		 ORDER BY
+		   CASE WHEN lower(p.username::text)=lower($2) THEN 0 ELSE 1 END,
+		   p.follower_count DESC,
+		   p.display_name ASC
+		 LIMIT 20
+	`,roomID,q,userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	items:=make([]map[string]any,0)
+	for rows.Next() {
+		var id,username,displayName,avatar string
+		var verified bool
+		if rows.Scan(&id,&username,&displayName,&avatar,&verified)!=nil { continue }
+		items=append(items,map[string]any{
+			"id":id,
+			"username":username,
+			"displayName":displayName,
+			"avatarUrl":avatar,
+			"verified":verified,
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+}
+
 func (s *Server) addRoomMember(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	roomID:=chi.URLParam(r,"id")
