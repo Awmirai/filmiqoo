@@ -85,6 +85,7 @@ fun FilmiqooPlayerScreen(
     var controlsEpoch by remember { mutableLongStateOf(0L) }
     var locked by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var momentsOpen by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(PlayerSettingsTab.QUALITY) }
     var playbackSpeed by remember { mutableFloatStateOf(initialSettings.defaultPlaybackSpeed) }
     var subtitleScale by remember { mutableFloatStateOf(initialSettings.subtitleScale) }
@@ -319,6 +320,7 @@ fun FilmiqooPlayerScreen(
 
     BackHandler {
         when {
+            momentsOpen -> momentsOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
                 locked=false
@@ -501,6 +503,7 @@ fun FilmiqooPlayerScreen(
                         }
                     }
                 },
+                onMoments={momentsOpen=true},
                 onPip={
                     activity?.enterPictureInPictureMode(
                         PictureInPictureParams.Builder()
@@ -610,6 +613,20 @@ fun FilmiqooPlayerScreen(
                 Text("دانلود به صف اضافه شد")
             }
         }
+    }
+
+    if(momentsOpen) {
+        PlaybackMomentsSheet(
+            backend=backend,
+            mediaVersionId=currentVersionId,
+            positionMs=positionMs,
+            onSeekTo={
+                player.seekTo(it)
+                positionMs=it
+                bumpControls()
+            },
+            onDismiss={momentsOpen=false}
+        )
     }
 
     if(settingsOpen) {
@@ -743,6 +760,7 @@ private fun PlayerTopControls(
     downloadQueued: Boolean,
     onBack: () -> Unit,
     onDownload: () -> Unit,
+    onMoments: () -> Unit,
     onPip: () -> Unit,
     onSettings: () -> Unit,
     onLock: () -> Unit
@@ -773,6 +791,8 @@ private fun PlayerTopControls(
                 overflow=TextOverflow.Ellipsis
             )
         }
+        PlayerGlassIcon(Icons.Default.Forum,onMoments)
+        Spacer(Modifier.width(5.dp))
         PlayerGlassIcon(
             if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
             onDownload
