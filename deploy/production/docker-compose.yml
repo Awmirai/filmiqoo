@@ -40,6 +40,7 @@ services:
       - .env.production
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-filmiqoo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-filmiqoo}?sslmode=disable
+      ALLOW_INTERNAL_PLAINTEXT_DATABASE: "true"
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       BUILD_VERSION: ${FILMIQOO_VERSION:?FILMIQOO_VERSION is required}
