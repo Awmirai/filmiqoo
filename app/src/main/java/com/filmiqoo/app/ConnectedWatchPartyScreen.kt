@@ -62,6 +62,7 @@ fun ConnectedWatchPartyScreen(
     var reminderBusy by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showLobby by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
     var lobby by remember { mutableStateOf<WatchPartyLobby?>(null) }
     var reactions by remember { mutableStateOf<List<WatchPartyReaction>>(emptyList()) }
     var privateJoinRequired by remember { mutableStateOf(false) }
@@ -295,6 +296,14 @@ fun ConnectedWatchPartyScreen(
                     }
                     Spacer(Modifier.width(6.dp))
                 }
+                IconButton(
+                    onClick={showQueue=true},
+                    enabled=lobby!=null,
+                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
+                ) {
+                    Icon(Icons.Default.PlaylistPlay,null)
+                }
+                Spacer(Modifier.width(6.dp))
                 IconButton(
                     onClick={
                         val code=when {
@@ -735,6 +744,18 @@ fun ConnectedWatchPartyScreen(
                 }
             },
             onDismiss={showLobby=false}
+        )
+    }
+
+    if(showQueue && lobby!=null) {
+        WatchPartyQueueSheet(
+            partyId=p.id,
+            backend=backend,
+            partyRepo=partyRepo,
+            repository=repository,
+            canHostControl=canHostControl,
+            myUserId=meId,
+            onDismiss={showQueue=false}
         )
     }
 

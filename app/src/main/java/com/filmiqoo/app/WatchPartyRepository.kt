@@ -71,6 +71,15 @@ data class WatchPartyReaction(
     val avatarUrl:String
 )
 
+data class WatchPartyQueueItem(
+    val id:String,
+    val status:String,
+    val votes:Long,
+    val voted:Boolean,
+    val media:MediaItem,
+    val suggestedBy:SocialAuthor
+)
+
 data class WatchPartyInfo(
     val id: String,
     val title: String,
@@ -289,6 +298,75 @@ class WatchPartyRepository(
             }
         }
     }
+
+    suspend fun queue(id:String):List<WatchPartyQueueItem> {
+        val root=backend.getJson("/v1/watch-parties/"+id+"/queue",authorized=true)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val m=x.optJSONObject("media") ?: JSONObject()
+                val a=x.optJSONObject("suggestedBy") ?: JSONObject()
+                add(
+                    WatchPartyQueueItem(
+                        id=x.optString("id"),
+                        status=x.optString("status"),
+                        votes=x.optLong("votes"),
+                        voted=x.optBoolean("voted"),
+                        media=MediaItem(
+                            id=if(m.isNull("tmdbId"))0 else m.optInt("tmdbId"),
+                            type=if(m.optString("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+                            title=m.optString("title").ifBlank{m.optString("originalTitle")},
+                            originalTitle=m.optString("originalTitle"),
+                            posterPath=m.optString("posterUrl").takeIf(String::isNotBlank),
+                            backdropPath=m.optString("backdropUrl").takeIf(String::isNotBlank),
+                            vote=m.optDouble("rating",0.0),
+                            date=if(m.isNull("year"))"" else m.optInt("year").toString(),
+                            backendId=m.optString("id")
+                        ),
+                        suggestedBy=SocialAuthor(
+                            id=a.optString("id"),
+                            username=a.optString("username"),
+                            displayName=a.optString("displayName"),
+                            avatarUrl=a.optString("avatarUrl"),
+                            verified=a.optBoolean("verified")
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun addQueueItem(id:String,mediaTitleId:String):String =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/queue",
+            JSONObject().put("mediaTitleId",mediaTitleId),
+            authorized=true
+        ).optString("id")
+
+    suspend fun voteQueueItem(id:String,itemId:String):Pair<Boolean,Long> {
+        val root=backend.postJson(
+            "/v1/watch-parties/"+id+"/queue/"+itemId+"/vote",
+            JSONObject(),
+            authorized=true
+        )
+        return root.optBoolean("voted") to root.optLong("votes")
+    }
+
+    suspend fun playQueueItem(id:String,itemId:String) {
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/queue/"+itemId+"/play",
+            JSONObject(),
+            authorized=true
+        )
+    }
+
+    suspend fun removeQueueItem(id:String,itemId:String):Boolean =
+        backend.postJson(
+            "/v1/watch-parties/"+id+"/queue/"+itemId+"/remove",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("removed")
 
     suspend fun updateState(
         id: String,
