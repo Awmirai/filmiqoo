@@ -60,8 +60,8 @@ func (s *Server) setWatchingPresence(
 func (s *Server) clearWatchingPresence(ctx context.Context,userID string) error {
 	_,err:=s.db.Exec(ctx,`
 		UPDATE user_presence
-		   SET state='offline',
-		       visible_until=now(),
+		   SET state='online',
+		       visible_until=now()+interval '90 seconds',
 		       last_seen_at=now(),
 		       updated_at=now()
 		 WHERE user_id=$1
