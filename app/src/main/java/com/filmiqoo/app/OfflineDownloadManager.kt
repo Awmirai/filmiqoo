@@ -153,6 +153,30 @@ object OfflineDownloadManager {
         schedule(context,id)
     }
 
+    fun pauseAll(context: Context) {
+        list(context)
+            .filter { it.status=="queued" || it.status=="downloading" }
+            .forEach { pause(context,it.id) }
+    }
+
+    fun resumeAll(context: Context) {
+        list(context)
+            .filter { it.status=="paused" }
+            .forEach { resume(context,it.id) }
+    }
+
+    fun retryFailed(context: Context) {
+        list(context)
+            .filter { it.status=="failed" }
+            .forEach { retry(context,it.id) }
+    }
+
+    fun clearCompleted(context: Context) {
+        list(context)
+            .filter { it.status=="completed" }
+            .forEach { delete(context,it.id) }
+    }
+
     fun delete(context: Context,id: String) {
         WorkManager.getInstance(context).cancelUniqueWork(workName(id))
         get(context,id)?.localPath?.let { runCatching { File(it).delete() } }

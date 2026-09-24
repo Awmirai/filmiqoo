@@ -42,6 +42,7 @@ fun DownloadsScreen(
     var downloads by remember { mutableStateOf(OfflineDownloadManager.list(context)) }
     var wifiOnly by remember { mutableStateOf(OfflineDownloadManager.wifiOnly(context)) }
     var tab by remember { mutableIntStateOf(0) }
+    var confirmClearCompleted by remember { mutableStateOf(false) }
 
     BackHandler { onBack() }
 
@@ -109,6 +110,17 @@ fun DownloadsScreen(
             }
         }
 
+        item {
+            DownloadBulkActions(
+                tab=tab,
+                downloads=downloads,
+                onPauseAll={OfflineDownloadManager.pauseAll(context)},
+                onResumeAll={OfflineDownloadManager.resumeAll(context)},
+                onRetryFailed={OfflineDownloadManager.retryFailed(context)},
+                onClearCompleted={confirmClearCompleted=true}
+            )
+        }
+
         if(visible.isEmpty()) {
             item {
                 PremiumEmptyState(
@@ -145,6 +157,84 @@ fun DownloadsScreen(
                             )
                         )
                     }
+                )
+            }
+        }
+    }
+
+    if(confirmClearCompleted) {
+        AlertDialog(
+            onDismissRequest={confirmClearCompleted=false},
+            icon={Icon(Icons.Default.DeleteSweep,null,tint=FqDanger)},
+            title={Text("حذف همه دانلودهای کامل‌شده؟")},
+            text={Text("فایل‌های آفلاین کامل‌شده از دستگاه پاک می‌شن. آیتم‌های در حال دانلود دست‌نخورده می‌مونن.")},
+            confirmButton={
+                TextButton(onClick={
+                    confirmClearCompleted=false
+                    OfflineDownloadManager.clearCompleted(context)
+                }) { Text("حذف همه",color=FqDanger) }
+            },
+            dismissButton={
+                TextButton(onClick={confirmClearCompleted=false}) { Text("لغو") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DownloadBulkActions(
+    tab:Int,
+    downloads:List<OfflineDownloadItem>,
+    onPauseAll:()->Unit,
+    onResumeAll:()->Unit,
+    onRetryFailed:()->Unit,
+    onClearCompleted:()->Unit
+) {
+    val running=downloads.count { it.status=="queued" || it.status=="downloading" }
+    val paused=downloads.count { it.status=="paused" }
+    val failed=downloads.count { it.status=="failed" }
+    val completed=downloads.count { it.status=="completed" }
+
+    if((tab==0 && running+paused+failed==0) || (tab==1 && completed==0)) return
+
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=14.dp,vertical=8.dp),
+        horizontalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
+        if(tab==0) {
+            if(running>0) {
+                item {
+                    AssistChip(
+                        onClick=onPauseAll,
+                        label={Text("توقف همه • "+running,fontSize=8.sp)},
+                        leadingIcon={Icon(Icons.Default.Pause,null,modifier=Modifier.size(16.dp))}
+                    )
+                }
+            }
+            if(paused>0) {
+                item {
+                    AssistChip(
+                        onClick=onResumeAll,
+                        label={Text("ادامه همه • "+paused,fontSize=8.sp)},
+                        leadingIcon={Icon(Icons.Default.PlayArrow,null,modifier=Modifier.size(16.dp))}
+                    )
+                }
+            }
+            if(failed>0) {
+                item {
+                    AssistChip(
+                        onClick=onRetryFailed,
+                        label={Text("تلاش دوباره • "+failed,fontSize=8.sp)},
+                        leadingIcon={Icon(Icons.Default.Refresh,null,modifier=Modifier.size(16.dp))}
+                    )
+                }
+            }
+        } else {
+            item {
+                AssistChip(
+                    onClick=onClearCompleted,
+                    label={Text("پاک‌کردن همه • "+completed,fontSize=8.sp)},
+                    leadingIcon={Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp),tint=FqDanger)}
                 )
             }
         }

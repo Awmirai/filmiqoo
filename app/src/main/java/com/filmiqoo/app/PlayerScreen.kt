@@ -56,7 +56,7 @@ private data class PlayerTrackChoice(
     val selected: Boolean
 )
 
-private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, DISPLAY, SPEED }
+private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, DISPLAY, SPEED, TIMER }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,6 +112,12 @@ fun FilmiqooPlayerScreen(
     }
     var gestureLabel by remember { mutableStateOf<String?>(null) }
     var gestureValue by remember { mutableFloatStateOf(0f) }
+    var seekGestureActive by remember { mutableStateOf(false) }
+    var seekGestureStartMs by remember { mutableLongStateOf(0L) }
+    var seekGestureTargetMs by remember { mutableLongStateOf(0L) }
+    var sleepTimerEndsAt by remember { mutableStateOf<Long?>(null) }
+    var sleepAtEpisodeEnd by remember { mutableStateOf(false) }
+    var sleepTimerMessage by remember { mutableStateOf<String?>(null) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -327,8 +333,32 @@ fun FilmiqooPlayerScreen(
 
     val creditsReached=currentTarget.creditsStartMs?.let { positionMs>=it } == true
 
-    LaunchedEffect(ended,creditsReached,currentTarget.nextMediaVersionId,autoPlayNext,initialSettings.skipCredits) {
-        val canAdvance=currentTarget.nextMediaVersionId!=null &&
+    LaunchedEffect(sleepTimerEndsAt) {
+        while(sleepTimerEndsAt!=null) {
+            delay(1_000)
+            val end=sleepTimerEndsAt ?: break
+            if(System.currentTimeMillis()>=end) {
+                player.pause()
+                sleepTimerEndsAt=null
+                sleepTimerMessage="Sleep Timer • پخش متوقف شد"
+                bumpControls()
+                break
+            }
+        }
+    }
+
+    LaunchedEffect(ended,sleepAtEpisodeEnd) {
+        if(ended && sleepAtEpisodeEnd) {
+            player.pause()
+            sleepAtEpisodeEnd=false
+            sleepTimerMessage="Sleep Timer • پایان قسمت"
+            bumpControls()
+        }
+    }
+
+    LaunchedEffect(ended,creditsReached,currentTarget.nextMediaVersionId,autoPlayNext,initialSettings.skipCredits,sleepAtEpisodeEnd) {
+        val canAdvance=!sleepAtEpisodeEnd &&
+            currentTarget.nextMediaVersionId!=null &&
             (ended || (creditsReached && initialSettings.skipCredits))
         if(canAdvance && autoPlayNext) {
             delay(if(ended)7_000 else 4_000)
@@ -384,39 +414,81 @@ fun FilmiqooPlayerScreen(
                     }
                 )
             }
-            .pointerInput(locked) {
+            .pointerInput(locked,currentVersionId) {
                 if(!locked) {
+                    var dragMode=0
+                    var horizontalPx=0f
+                    var seekStart=0L
+                    var seekTarget=0L
                     detectDragGestures(
-                        onDragStart={},
-                        onDragEnd={ gestureLabel=null },
-                        onDragCancel={ gestureLabel=null },
-                        onDrag={ change,dragAmount ->
-                            if(kotlin.math.abs(dragAmount.y) <= kotlin.math.abs(dragAmount.x)) {
-                                return@detectDragGestures
+                        onDragStart={
+                            dragMode=0
+                            horizontalPx=0f
+                            seekStart=player.currentPosition.coerceAtLeast(0L)
+                            seekTarget=seekStart
+                        },
+                        onDragEnd={
+                            if(dragMode==1 && seekGestureActive) {
+                                player.seekTo(seekTarget)
+                                positionMs=seekTarget
+                                bumpControls()
                             }
-                            val delta=(-dragAmount.y/size.height.toFloat())*1.45f
-                            if(change.position.x < size.width/2f) {
-                                val window=activity?.window ?: return@detectDragGestures
-                                val attrs=window.attributes
-                                val current=if(attrs.screenBrightness<0f) .5f else attrs.screenBrightness
-                                val next=(current+delta).coerceIn(.03f,1f)
-                                attrs.screenBrightness=next
-                                window.attributes=attrs
-                                gestureLabel="روشنایی"
-                                gestureValue=next
+                            seekGestureActive=false
+                            gestureLabel=null
+                        },
+                        onDragCancel={
+                            seekGestureActive=false
+                            gestureLabel=null
+                        },
+                        onDrag={ change,dragAmount ->
+                            if(dragMode==0) {
+                                val ax=kotlin.math.abs(dragAmount.x)
+                                val ay=kotlin.math.abs(dragAmount.y)
+                                if(ax+ay<2f) return@detectDragGestures
+                                dragMode=if(ax>ay)1 else 2
+                            }
+
+                            if(dragMode==1) {
+                                horizontalPx+=dragAmount.x
+                                val duration=player.duration.coerceAtLeast(0L)
+                                val seekWindow=when {
+                                    duration<=0L -> 120_000L
+                                    duration<30*60_000L -> 90_000L
+                                    else -> minOf(300_000L,(duration*.18f).toLong())
+                                }
+                                val ratio=(horizontalPx/size.width.toFloat()).coerceIn(-1f,1f)
+                                seekTarget=(seekStart+(seekWindow*ratio).toLong())
+                                    .coerceIn(0L,if(duration>0L)duration else Long.MAX_VALUE)
+                                seekGestureStartMs=seekStart
+                                seekGestureTargetMs=seekTarget
+                                seekGestureActive=true
+                                controlsVisible=true
+                                controlsEpoch++
                             } else {
-                                val max=audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                                    .coerceAtLeast(1)
-                                val current=audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                                    .toFloat()/max.toFloat()
-                                val next=(current+delta).coerceIn(0f,1f)
-                                audioManager.setStreamVolume(
-                                    AudioManager.STREAM_MUSIC,
-                                    (next*max).roundToInt(),
-                                    0
-                                )
-                                gestureLabel="صدا"
-                                gestureValue=next
+                                val delta=(-dragAmount.y/size.height.toFloat())*1.45f
+                                if(change.position.x < size.width/2f) {
+                                    val window=activity?.window ?: return@detectDragGestures
+                                    val attrs=window.attributes
+                                    val current=if(attrs.screenBrightness<0f) .5f else attrs.screenBrightness
+                                    val next=(current+delta).coerceIn(.03f,1f)
+                                    attrs.screenBrightness=next
+                                    window.attributes=attrs
+                                    gestureLabel="روشنایی"
+                                    gestureValue=next
+                                } else {
+                                    val max=audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                        .coerceAtLeast(1)
+                                    val current=audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                        .toFloat()/max.toFloat()
+                                    val next=(current+delta).coerceIn(0f,1f)
+                                    audioManager.setStreamVolume(
+                                        AudioManager.STREAM_MUSIC,
+                                        (next*max).roundToInt(),
+                                        0
+                                    )
+                                    gestureLabel="صدا"
+                                    gestureValue=next
+                                }
                             }
                         }
                     )
@@ -468,6 +540,14 @@ fun FilmiqooPlayerScreen(
             GestureValueOverlay(
                 label=it,
                 value=gestureValue,
+                modifier=Modifier.align(Alignment.Center)
+            )
+        }
+
+        if(seekGestureActive) {
+            SeekGestureOverlay(
+                startMs=seekGestureStartMs,
+                targetMs=seekGestureTargetMs,
                 modifier=Modifier.align(Alignment.Center)
             )
         }
@@ -643,6 +723,15 @@ fun FilmiqooPlayerScreen(
                 Text("دانلود به صف اضافه شد")
             }
         }
+
+        sleepTimerMessage?.let { message ->
+            Snackbar(
+                modifier=Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                action={
+                    TextButton(onClick={sleepTimerMessage=null}) { Text("باشه") }
+                }
+            ) { Text(message) }
+        }
     }
 
     if(dialogueSearchOpen) {
@@ -693,6 +782,8 @@ fun FilmiqooPlayerScreen(
             subtitleBottomPadding=subtitleBottomPadding,
             resizeMode=playerResizeMode,
             autoPlayNext=autoPlayNext,
+            sleepTimerEndsAt=sleepTimerEndsAt,
+            sleepAtEpisodeEnd=sleepAtEpisodeEnd,
             onDismiss={settingsOpen=false},
             onVariant={ variant ->
                 val position=player.currentPosition.coerceAtLeast(0L)
@@ -723,7 +814,22 @@ fun FilmiqooPlayerScreen(
             onSubtitleScale={subtitleScale=it},
             onSubtitleBottomPadding={subtitleBottomPadding=it},
             onResizeMode={playerResizeMode=it},
-            onAutoPlayNext={autoPlayNext=it}
+            onAutoPlayNext={autoPlayNext=it},
+            onSleepTimer={minutes->
+                sleepAtEpisodeEnd=false
+                sleepTimerEndsAt=minutes?.let {
+                    System.currentTimeMillis()+it*60_000L
+                }
+                sleepTimerMessage=when(minutes) {
+                    null -> "Sleep Timer خاموش شد"
+                    else -> "Sleep Timer برای "+minutes+" دقیقه فعال شد"
+                }
+            },
+            onSleepAtEpisodeEnd={
+                sleepTimerEndsAt=null
+                sleepAtEpisodeEnd=it
+                sleepTimerMessage=if(it)"بعد از پایان قسمت پخش متوقف می‌شه" else "Sleep Timer خاموش شد"
+            }
         )
     }
 }
@@ -1020,6 +1126,45 @@ private fun GestureValueOverlay(
 }
 
 @Composable
+private fun SeekGestureOverlay(
+    startMs:Long,
+    targetMs:Long,
+    modifier:Modifier=Modifier
+) {
+    val delta=targetMs-startMs
+    Surface(
+        color=Color.Black.copy(alpha=.78f),
+        shape=RoundedCornerShape(18.dp),
+        modifier=modifier.widthIn(min=210.dp,max=320.dp)
+    ) {
+        Column(
+            Modifier.padding(horizontal=18.dp,vertical=14.dp),
+            horizontalAlignment=Alignment.CenterHorizontally
+        ) {
+            Icon(
+                if(delta>=0)Icons.Default.FastForward else Icons.Default.FastRewind,
+                null,
+                tint=FqGold,
+                modifier=Modifier.size(28.dp)
+            )
+            Text(
+                formatPlayerTime(targetMs),
+                color=Color.White,
+                fontSize=18.sp,
+                fontWeight=FontWeight.Bold,
+                modifier=Modifier.padding(top=5.dp)
+            )
+            Text(
+                (if(delta>=0)"+ " else "− ")+formatPlayerTime(kotlin.math.abs(delta)),
+                color=FqMuted,
+                fontSize=9.sp,
+                modifier=Modifier.padding(top=3.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun PlayerSkipButton(
     label: String,
     onClick: () -> Unit,
@@ -1111,6 +1256,8 @@ private fun PlayerSettingsSheet(
     subtitleBottomPadding: Float,
     resizeMode: String,
     autoPlayNext: Boolean,
+    sleepTimerEndsAt: Long?,
+    sleepAtEpisodeEnd: Boolean,
     onDismiss: () -> Unit,
     onVariant: (PlaybackVariant) -> Unit,
     onAudio: (PlayerTrackChoice) -> Unit,
@@ -1119,7 +1266,9 @@ private fun PlayerSettingsSheet(
     onSubtitleScale: (Float) -> Unit,
     onSubtitleBottomPadding: (Float) -> Unit,
     onResizeMode: (String) -> Unit,
-    onAutoPlayNext: (Boolean) -> Unit
+    onAutoPlayNext: (Boolean) -> Unit,
+    onSleepTimer: (Int?) -> Unit,
+    onSleepAtEpisodeEnd: (Boolean) -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest=onDismiss,
@@ -1148,7 +1297,8 @@ private fun PlayerSettingsSheet(
                     PlayerSettingsTab.AUDIO to "صدا",
                     PlayerSettingsTab.SUBTITLE to "زیرنویس",
                     PlayerSettingsTab.DISPLAY to "تصویر",
-                    PlayerSettingsTab.SPEED to "سرعت"
+                    PlayerSettingsTab.SPEED to "سرعت",
+                    PlayerSettingsTab.TIMER to "تایمر"
                 ).forEach { item ->
                     Tab(
                         selected=tab==item.first,
@@ -1328,6 +1478,43 @@ private fun PlayerSettingsSheet(
                             onCheckedChange=onAutoPlayNext
                         )
                     }
+                }
+
+                PlayerSettingsTab.TIMER -> {
+                    val remainingMinutes=sleepTimerEndsAt?.let {
+                        kotlin.math.ceil(
+                            ((it-System.currentTimeMillis()).coerceAtLeast(0L))/60_000.0
+                        ).toInt()
+                    }
+
+                    PlayerSettingsRow(
+                        icon=Icons.Default.TimerOff,
+                        title="خاموش",
+                        subtitle="پخش بدون محدودیت زمانی",
+                        selected=sleepTimerEndsAt==null && !sleepAtEpisodeEnd,
+                        onClick={
+                            onSleepTimer(null)
+                            onSleepAtEpisodeEnd(false)
+                        }
+                    )
+                    listOf(15,30,45,60).forEach { minutes ->
+                        PlayerSettingsRow(
+                            icon=Icons.Default.Timer,
+                            title=minutes.toString()+" دقیقه",
+                            subtitle=if(remainingMinutes!=null && kotlin.math.abs(remainingMinutes-minutes)<=1)
+                                "فعال • حدود "+remainingMinutes+" دقیقه باقی‌مانده"
+                            else "",
+                            selected=remainingMinutes!=null && kotlin.math.abs(remainingMinutes-minutes)<=1 && !sleepAtEpisodeEnd,
+                            onClick={onSleepTimer(minutes)}
+                        )
+                    }
+                    PlayerSettingsRow(
+                        icon=Icons.Default.NightsStay,
+                        title="پایان همین قسمت",
+                        subtitle="بعد از پایان فیلم یا قسمت، پخش متوقف می‌شود.",
+                        selected=sleepAtEpisodeEnd,
+                        onClick={onSleepAtEpisodeEnd(!sleepAtEpisodeEnd)}
+                    )
                 }
             }
         }
