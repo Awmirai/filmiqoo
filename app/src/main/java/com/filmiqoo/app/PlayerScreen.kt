@@ -58,7 +58,7 @@ private data class PlayerTrackChoice(
     val selected: Boolean
 )
 
-private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, DISPLAY, SPEED, TIMER }
+private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, DISPLAY, SPEED, TIMER, ADVANCED }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +74,7 @@ fun FilmiqooPlayerScreen(
     }
     val scope=rememberCoroutineScope()
     val initialSettings=remember { AppPreferences(context.applicationContext).read() }
+    val settingsRepository=remember { SettingsRepository(context.applicationContext,backend) }
     val activeViewer=remember { backend.viewerProfiles.active() }
     val preferredAudioLanguage=activeViewer?.preferredAudioLanguage
         ?.takeIf(String::isNotBlank)
@@ -125,6 +126,11 @@ fun FilmiqooPlayerScreen(
     var resumePromptPositionMs by remember { mutableStateOf<Long?>(null) }
     var resumePromptDurationMs by remember { mutableLongStateOf(0L) }
     var pendingResumeVersionId by remember { mutableStateOf<String?>(null) }
+    var abStartMs by remember { mutableStateOf<Long?>(null) }
+    var abEndMs by remember { mutableStateOf<Long?>(null) }
+    var diagnosticsEnabled by remember { mutableStateOf(false) }
+    var orientationMode by remember { mutableStateOf("auto") }
+    var playerSettingsMessage by remember { mutableStateOf<String?>(null) }
 
     val player=remember {
         ExoPlayer.Builder(context)
@@ -374,6 +380,18 @@ fun FilmiqooPlayerScreen(
                 currentTarget.introEndMs?.let { end ->
                     if(positionMs in 1 until end) player.seekTo(end)
                 }
+            }
+
+            val loopStart=abStartMs
+            val loopEnd=abEndMs
+            if(
+                loopStart!=null &&
+                loopEnd!=null &&
+                loopEnd>loopStart+500L &&
+                positionMs>=loopEnd
+            ) {
+                player.seekTo(loopStart)
+                positionMs=loopStart
             }
         }
     }
@@ -649,6 +667,20 @@ fun FilmiqooPlayerScreen(
             )
         }
 
+        if(diagnosticsEnabled && playUrl!=null && error==null) {
+            PlayerDiagnosticsOverlay(
+                player=player,
+                variant=currentTarget.variants.firstOrNull {
+                    it.mediaVersionId==selectedVariantId
+                },
+                currentVersionId=currentVersionId,
+                positionMs=positionMs,
+                durationMs=durationMs,
+                context=context,
+                modifier=Modifier.align(Alignment.TopStart).padding(start=14.dp,top=74.dp)
+            )
+        }
+
         if(locked) {
             FilledTonalIconButton(
                 onClick={
@@ -830,6 +862,15 @@ fun FilmiqooPlayerScreen(
                 }
             ) { Text(message) }
         }
+
+        playerSettingsMessage?.let { message ->
+            Snackbar(
+                modifier=Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                action={
+                    TextButton(onClick={playerSettingsMessage=null}) { Text("باشه") }
+                }
+            ) { Text(message) }
+        }
     }
 
     if(dialogueSearchOpen) {
@@ -895,6 +936,11 @@ fun FilmiqooPlayerScreen(
             dataSaverApplied=dataSaverApplied,
             sleepTimerEndsAt=sleepTimerEndsAt,
             sleepAtEpisodeEnd=sleepAtEpisodeEnd,
+            abStartMs=abStartMs,
+            abEndMs=abEndMs,
+            diagnosticsEnabled=diagnosticsEnabled,
+            orientationMode=orientationMode,
+            currentPositionMs=positionMs,
             onDismiss={settingsOpen=false},
             onVariant={ variant ->
                 val position=player.currentPosition.coerceAtLeast(0L)
@@ -940,6 +986,55 @@ fun FilmiqooPlayerScreen(
                 sleepTimerEndsAt=null
                 sleepAtEpisodeEnd=it
                 sleepTimerMessage=if(it)"بعد از پایان قسمت پخش متوقف می‌شه" else "Sleep Timer خاموش شد"
+            },
+            onSetAbStart={
+                abStartMs=positionMs
+                if(abEndMs!=null && abEndMs!!<=positionMs+500L) abEndMs=null
+                playerSettingsMessage="نقطه A روی "+formatPlayerTime(positionMs)+" ثبت شد"
+            },
+            onSetAbEnd={
+                val start=abStartMs
+                if(start==null) {
+                    playerSettingsMessage="اول نقطه A رو ثبت کن"
+                } else if(positionMs<=start+500L) {
+                    playerSettingsMessage="نقطه B باید بعد از A باشه"
+                } else {
+                    abEndMs=positionMs
+                    playerSettingsMessage="A‑B Repeat فعال شد"
+                }
+            },
+            onClearAb={
+                abStartMs=null
+                abEndMs=null
+                playerSettingsMessage="A‑B Repeat خاموش شد"
+            },
+            onDiagnostics={diagnosticsEnabled=it},
+            onOrientation={mode->
+                orientationMode=mode
+                activity?.requestedOrientation=when(mode) {
+                    "landscape" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    "portrait" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                    else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                }
+            },
+            onSaveDefaults={
+                val next=AppPreferences(context.applicationContext).read().copy(
+                    defaultPlaybackSpeed=playbackSpeed,
+                    subtitleScale=subtitleScale,
+                    subtitleBottomPadding=subtitleBottomPadding,
+                    playerResizeMode=playerResizeMode,
+                    autoplayNext=autoPlayNext
+                )
+                AppPreferences(context.applicationContext).write(next)
+                playerSettingsMessage="تنظیمات فعلی به‌عنوان پیش‌فرض ذخیره شد"
+                if(backend.session.isLoggedIn) {
+                    scope.launch {
+                        runCatching { settingsRepository.save(next) }
+                            .onFailure {
+                                playerSettingsMessage="روی دستگاه ذخیره شد؛ Sync حساب ناموفق بود"
+                            }
+                    }
+                }
             }
         )
     }
@@ -1615,6 +1710,11 @@ private fun PlayerSettingsSheet(
     dataSaverApplied: Boolean,
     sleepTimerEndsAt: Long?,
     sleepAtEpisodeEnd: Boolean,
+    abStartMs: Long?,
+    abEndMs: Long?,
+    diagnosticsEnabled: Boolean,
+    orientationMode: String,
+    currentPositionMs: Long,
     onDismiss: () -> Unit,
     onVariant: (PlaybackVariant) -> Unit,
     onAudio: (PlayerTrackChoice) -> Unit,
@@ -1625,7 +1725,13 @@ private fun PlayerSettingsSheet(
     onResizeMode: (String) -> Unit,
     onAutoPlayNext: (Boolean) -> Unit,
     onSleepTimer: (Int?) -> Unit,
-    onSleepAtEpisodeEnd: (Boolean) -> Unit
+    onSleepAtEpisodeEnd: (Boolean) -> Unit,
+    onSetAbStart: () -> Unit,
+    onSetAbEnd: () -> Unit,
+    onClearAb: () -> Unit,
+    onDiagnostics: (Boolean) -> Unit,
+    onOrientation: (String) -> Unit,
+    onSaveDefaults: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest=onDismiss,
@@ -1655,7 +1761,8 @@ private fun PlayerSettingsSheet(
                     PlayerSettingsTab.SUBTITLE to "زیرنویس",
                     PlayerSettingsTab.DISPLAY to "تصویر",
                     PlayerSettingsTab.SPEED to "سرعت",
-                    PlayerSettingsTab.TIMER to "تایمر"
+                    PlayerSettingsTab.TIMER to "تایمر",
+                    PlayerSettingsTab.ADVANCED to "پیشرفته"
                 ).forEach { item ->
                     Tab(
                         selected=tab==item.first,
@@ -1895,6 +2002,123 @@ private fun PlayerSettingsSheet(
                         subtitle="بعد از پایان فیلم یا قسمت، پخش متوقف می‌شود.",
                         selected=sleepAtEpisodeEnd,
                         onClick={onSleepAtEpisodeEnd(!sleepAtEpisodeEnd)}
+                    )
+                }
+
+                PlayerSettingsTab.ADVANCED -> {
+                    Text(
+                        "A‑B Repeat",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
+                    )
+
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal=18.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick=onSetAbStart,
+                            modifier=Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.FirstPage,null,modifier=Modifier.size(17.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("A • "+(abStartMs?.let(::formatPlayerTime) ?: formatPlayerTime(currentPositionMs)),fontSize=8.sp)
+                        }
+                        OutlinedButton(
+                            onClick=onSetAbEnd,
+                            modifier=Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.LastPage,null,modifier=Modifier.size(17.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("B • "+(abEndMs?.let(::formatPlayerTime) ?: "ثبت"),fontSize=8.sp)
+                        }
+                    }
+
+                    if(abStartMs!=null || abEndMs!=null) {
+                        PlayerSettingsRow(
+                            icon=Icons.Default.Repeat,
+                            title=if(abStartMs!=null && abEndMs!=null)"A‑B Repeat فعال" else "A‑B Repeat آماده",
+                            subtitle=listOfNotNull(
+                                abStartMs?.let { "A "+formatPlayerTime(it) },
+                                abEndMs?.let { "B "+formatPlayerTime(it) }
+                            ).joinToString(" • "),
+                            selected=abStartMs!=null && abEndMs!=null,
+                            onClick=onClearAb
+                        )
+                    }
+
+                    HorizontalDivider(
+                        color=FqSurface3,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
+                    )
+
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Playback Diagnostics",fontSize=11.sp)
+                            Text(
+                                "Resolution، Codec، Bitrate، Buffer و Network را روی تصویر نشان بده.",
+                                color=FqMuted,
+                                fontSize=8.sp,
+                                modifier=Modifier.padding(top=3.dp)
+                            )
+                        }
+                        Switch(
+                            checked=diagnosticsEnabled,
+                            onCheckedChange=onDiagnostics
+                        )
+                    }
+
+                    Text(
+                        "جهت تصویر",
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
+                    )
+                    LazyRow(
+                        contentPadding=PaddingValues(horizontal=18.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            listOf(
+                                "auto" to "Auto",
+                                "landscape" to "Landscape",
+                                "portrait" to "Portrait"
+                            )
+                        ) { item ->
+                            PremiumChip(
+                                label=item.second,
+                                active=orientationMode==item.first,
+                                onClick={onOrientation(item.first)}
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color=FqSurface3,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=12.dp)
+                    )
+
+                    Button(
+                        onClick=onSaveDefaults,
+                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.fillMaxWidth().padding(horizontal=18.dp)
+                    ) {
+                        Icon(Icons.Default.Save,null,tint=Color.Black)
+                        Spacer(Modifier.width(6.dp))
+                        Text("ذخیره تنظیمات فعلی به‌عنوان Default",color=Color.Black)
+                    }
+
+                    Text(
+                        "سرعت، اندازه و جای زیرنویس، نسبت تصویر و Auto‑next برای دفعات بعد ذخیره می‌شن.",
+                        color=FqMuted,
+                        fontSize=7.sp,
+                        lineHeight=13.sp,
+                        modifier=Modifier.padding(horizontal=18.dp,vertical=9.dp)
                     )
                 }
             }
@@ -2305,6 +2529,104 @@ private fun formatSpeed(value: Float): String =
         String.format(Locale.US,"%.2gx",value)
     }
 
+
+@Composable
+private fun PlayerDiagnosticsOverlay(
+    player:ExoPlayer,
+    variant:PlaybackVariant?,
+    currentVersionId:String,
+    positionMs:Long,
+    durationMs:Long,
+    context:Context,
+    modifier:Modifier=Modifier
+) {
+    val video=player.videoFormat
+    val audio=player.audioFormat
+    val bufferedMs=(player.bufferedPosition-player.currentPosition).coerceAtLeast(0L)
+    val resolution=if(video!=null && video.width>0 && video.height>0)
+        video.width.toString()+"×"+video.height
+    else "—"
+    val frameRate=video?.frameRate?.takeIf { it>0f }?.let {
+        String.format(Locale.US,"%.1f fps",it)
+    } ?: "—"
+    val bitrate=video?.bitrate?.takeIf { it>0 }?.let {
+        String.format(Locale.US,"%.1f Mbps",it/1_000_000.0)
+    } ?: "—"
+    val codec=video?.codecs
+        ?.takeIf(String::isNotBlank)
+        ?: video?.sampleMimeType
+        ?: variant?.codec
+        ?: "—"
+    val audioInfo=buildList {
+        audio?.language?.takeIf(String::isNotBlank)?.let(::add)
+        audio?.channelCount?.takeIf { it>0 }?.let { add(it.toString()+"ch") }
+        audio?.sampleRate?.takeIf { it>0 }?.let { add((it/1000).toString()+"kHz") }
+    }.joinToString(" • ").ifBlank { "—" }
+
+    Surface(
+        color=Color.Black.copy(alpha=.72f),
+        shape=RoundedCornerShape(12.dp),
+        modifier=modifier.widthIn(max=300.dp)
+    ) {
+        Column(Modifier.padding(horizontal=10.dp,vertical=8.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.MonitorHeart,
+                    null,
+                    tint=FqGold,
+                    modifier=Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    "Playback Diagnostics",
+                    color=FqGold,
+                    fontSize=8.sp,
+                    fontWeight=FontWeight.Bold
+                )
+            }
+            DiagnosticLine("Quality",variant?.label ?: "Auto")
+            DiagnosticLine("Video",resolution+" • "+frameRate)
+            DiagnosticLine("Codec",codec)
+            DiagnosticLine("Bitrate",bitrate)
+            DiagnosticLine("Audio",audioInfo)
+            DiagnosticLine("Buffer",String.format(Locale.US,"%.1fs",bufferedMs/1000.0))
+            DiagnosticLine("Network",playerNetworkLabel(context))
+            DiagnosticLine("Position",formatPlayerTime(positionMs)+" / "+formatPlayerTime(durationMs))
+            DiagnosticLine("Version",currentVersionId.take(8))
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticLine(label:String,value:String) {
+    Row(
+        Modifier.fillMaxWidth().padding(top=2.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ) {
+        Text(label,color=Color.White.copy(alpha=.55f),fontSize=6.sp,modifier=Modifier.width(54.dp))
+        Text(
+            value,
+            color=Color.White.copy(alpha=.9f),
+            fontSize=6.sp,
+            maxLines=1,
+            overflow=TextOverflow.Ellipsis,
+            modifier=Modifier.weight(1f)
+        )
+    }
+}
+
+private fun playerNetworkLabel(context:Context):String {
+    val cm=context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val network=cm.activeNetwork ?: return "Offline"
+    val caps=cm.getNetworkCapabilities(network) ?: return "Unknown"
+    return when {
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi‑Fi"
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
+        else -> "Other"
+    }
+}
 
 private fun playerResizeModeValue(mode:String):Int=when(mode) {
     "fill" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
