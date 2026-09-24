@@ -11,6 +11,9 @@ import (
 
 func (s *Server) inbox(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
+	archivedParam:=strings.ToLower(strings.TrimSpace(r.URL.Query().Get("archived")))
+	archived:=archivedParam=="1" || archivedParam=="true" || archivedParam=="yes"
+
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT rm.id::text,
 		       CASE WHEN rm.room_type='dm' THEN COALESCE(otherp.display_name,rm.name) ELSE rm.name END,
@@ -27,7 +30,9 @@ func (s *Server) inbox(w http.ResponseWriter,r *http.Request) {
 		            AND um.deleted_at IS NULL
 		            AND um.author_user_id<>$1
 		            AND um.created_at>COALESCE(rr.last_read_at,to_timestamp(0))
-		       ) AS unread
+		       ) AS unread,
+		       mine.notification_level,
+		       (mine.archived_at IS NOT NULL)
 		  FROM room_members mine
 		  JOIN rooms rm ON rm.id=mine.room_id
 		  LEFT JOIN room_reads rr ON rr.room_id=rm.id AND rr.user_id=$1
@@ -53,30 +58,35 @@ func (s *Server) inbox(w http.ResponseWriter,r *http.Request) {
 		     ORDER BY m.created_at DESC
 		     LIMIT 1
 		  ) lastm ON true
+		 WHERE mine.user_id=$1
+		   AND (mine.archived_at IS NOT NULL)=$2
 		 ORDER BY lastm.created_at DESC NULLS LAST,rm.created_at DESC
 		 LIMIT 100
-	`,userID)
+	`,userID,archived)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
 	items:=make([]map[string]any,0)
 	for rows.Next() {
-		var id,title,topic,typ,otherID,otherUsername,avatar,lastMessage string
+		var id,title,topic,typ,otherID,otherUsername,avatar,lastMessage,notificationLevel string
 		var members,unread int64
 		var lastAt *time.Time
+		var isArchived bool
 		if err:=rows.Scan(
 			&id,&title,&topic,&typ,&members,
 			&otherID,&otherUsername,&avatar,
 			&lastMessage,&lastAt,&unread,
+			&notificationLevel,&isArchived,
 		); err!=nil { continue }
 
 		items=append(items,map[string]any{
 			"id":id,"title":title,"topic":topic,"type":typ,"members":members,
 			"otherUserId":otherID,"otherUsername":otherUsername,"avatarUrl":avatar,
 			"lastMessage":lastMessage,"lastMessageAt":lastAt,"unread":unread,
+			"notificationLevel":notificationLevel,"archived":isArchived,
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w,http.StatusOK,map[string]any{"items":items,"archived":archived})
 }
 
 func (s *Server) ensureDM(w http.ResponseWriter,r *http.Request) {
