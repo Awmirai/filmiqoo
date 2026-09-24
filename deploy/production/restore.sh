@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 BACKUP_DIR="${1:-}"
+BACKUP_PASSWORD_FILE="${BACKUP_PASSWORD_FILE:-./backup-password.txt}"
 
 if [[ -z "$BACKUP_DIR" || ! -d "$BACKUP_DIR" ]]; then
   echo "Usage: CONFIRM_RESTORE=YES ./restore.sh <backup-directory>" >&2
@@ -18,6 +19,10 @@ if [[ "${CONFIRM_RESTORE:-}" != "YES" ]]; then
 fi
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing $ENV_FILE" >&2
+  exit 1
+fi
+if [[ ! -s "$BACKUP_PASSWORD_FILE" ]]; then
+  echo "Missing non-empty BACKUP_PASSWORD_FILE: $BACKUP_PASSWORD_FILE" >&2
   exit 1
 fi
 
@@ -42,17 +47,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Restoring PostgreSQL backup..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
-  pg_restore \
-    --clean \
-    --if-exists \
-    --exit-on-error \
-    --no-owner \
-    --no-privileges \
-    --dbname="$db_name" \
-    --username="$db_user" \
-  < "$BACKUP_DIR/postgres.dump"
+echo "Restoring encrypted PostgreSQL backup..."
+openssl enc -d -aes-256-cbc -pbkdf2 \
+  -pass "file:$BACKUP_PASSWORD_FILE" \
+  -in "$BACKUP_DIR/postgres.dump.enc" \
+  | docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
+      pg_restore \
+        --clean \
+        --if-exists \
+        --exit-on-error \
+        --no-owner \
+        --no-privileges \
+        --dbname="$db_name" \
+        --username="$db_user"
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d api
 
