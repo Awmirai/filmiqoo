@@ -417,8 +417,8 @@ func (s *Server) leaveRoom(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room membership required"})
 		return
 	}
-	if roomType=="dm" {
-		writeJSON(w,http.StatusConflict,map[string]string{"error":"archive direct messages instead of leaving"})
+	if roomType!="group" {
+		writeJSON(w,http.StatusConflict,map[string]string{"error":"only group rooms can be left here"})
 		return
 	}
 
