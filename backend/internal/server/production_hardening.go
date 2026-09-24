@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -205,4 +206,24 @@ func (s *Server) authenticatedWriteRateLimit(limit int,window time.Duration) fun
 			next.ServeHTTP(w,r)
 		})
 	}
+}
+
+
+func (s *Server) requestDeadline(next http.Handler) http.Handler {
+	timeout:=time.Duration(s.cfg.APIRequestTimeoutSeconds)*time.Second
+	if timeout<=0 { timeout=20*time.Second }
+
+	return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request) {
+		path:=r.URL.Path
+		if strings.HasPrefix(path,"/v1/playback/") ||
+			strings.HasPrefix(path,"/v1/media/") ||
+			path=="/v1/realtime" ||
+			strings.HasPrefix(path,"/v1/realtime/rooms/") {
+			next.ServeHTTP(w,r)
+			return
+		}
+		ctx,cancel:=context.WithTimeout(r.Context(),timeout)
+		defer cancel()
+		next.ServeHTTP(w,r.WithContext(ctx))
+	})
 }
