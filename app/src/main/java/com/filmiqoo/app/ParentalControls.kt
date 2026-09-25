@@ -123,7 +123,7 @@ fun ParentalGateScreen(
                             "هنوز Parental PIN نساختی؛ رمز اصلی حساب رو وارد کن."
                     },
                     color=FqMuted,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     lineHeight=15.sp,
                     modifier=Modifier.padding(top=6.dp)
                 )
@@ -206,7 +206,7 @@ fun ParentalGateScreen(
                     Text(
                         it,
                         color=FqDanger,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=10.dp)
                     )
                 }
@@ -256,7 +256,7 @@ fun ParentalControlsScreen(
             }
             Column(Modifier.weight(1f)) {
                 Text("کنترل والدین",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text("Kids Exit Gate و PIN والدین",color=FqMuted,fontSize=8.sp)
+                Text("Kids Exit Gate و PIN والدین",color=FqMuted,fontSize=11.sp)
             }
             Icon(Icons.Default.ChildCare,null,tint=FqGold)
         }
@@ -287,7 +287,7 @@ fun ParentalControlsScreen(
                             else
                                 "تا وقتی PIN نسازی، خروج از Kids با رمز اصلی حساب تأیید می‌شه.",
                             color=FqMuted,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             lineHeight=14.sp
                         )
                     }
@@ -394,10 +394,10 @@ fun ParentalControlsScreen(
         }
 
         error?.let {
-            Text(it,color=FqDanger,fontSize=8.sp,modifier=Modifier.padding(16.dp))
+            Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(16.dp))
         }
         message?.let {
-            Text(it,color=FqGreen,fontSize=8.sp,modifier=Modifier.padding(16.dp))
+            Text(it,color=FqGreen,fontSize=11.sp,modifier=Modifier.padding(16.dp))
         }
     }
 }
