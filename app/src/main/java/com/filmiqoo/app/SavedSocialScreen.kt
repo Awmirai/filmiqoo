@@ -113,7 +113,7 @@ fun SavedSocialScreen(
                 IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                 Column(Modifier.weight(1f)) {
                     Text("ذخیره‌های اجتماعی",fontSize=22.sp,fontWeight=FontWeight.Black)
-                    Text("Postها و Reelهایی که برای بعد نگه داشتی",color=FqMuted,fontSize=8.sp)
+                    Text("Postها و Reelهایی که برای بعد نگه داشتی",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
             }
@@ -127,12 +127,12 @@ fun SavedSocialScreen(
             Tab(
                 selected=tab==0,
                 onClick={tab=0},
-                text={Text("Postها ("+posts.size+")",fontSize=8.sp)}
+                text={Text("Postها ("+posts.size+")",fontSize=11.sp)}
             )
             Tab(
                 selected=tab==1,
                 onClick={tab=1},
-                text={Text("Reelها ("+reels.size+")",fontSize=8.sp)}
+                text={Text("Reelها ("+reels.size+")",fontSize=11.sp)}
             )
         }
 
@@ -144,7 +144,7 @@ fun SavedSocialScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(10.dp)
             )
         }
@@ -251,8 +251,8 @@ private fun SavedPostCard(
                 Column(
                     Modifier.weight(1f).clickable { onCreator() }
                 ) {
-                    Text(post.author.displayName,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                    Text("@"+post.author.username,color=FqMuted,fontSize=7.sp)
+                    Text(post.author.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                    Text("@"+post.author.username,color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick=onRemove) {
                     Icon(Icons.Default.BookmarkRemove,null,tint=FqGold)
@@ -269,13 +269,13 @@ private fun SavedPostCard(
                     Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically) {
                         Icon(Icons.Default.VisibilityOff,null,tint=FqDanger)
                         Spacer(Modifier.width(6.dp))
-                        Text("Spoiler Shield • برای نمایش لمس کن",color=FqDanger,fontSize=8.sp)
+                        Text("Spoiler Shield • برای نمایش لمس کن",color=FqDanger,fontSize=11.sp)
                     }
                 }
             } else {
                 Text(
                     post.body,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     lineHeight=16.sp,
                     maxLines=7,
                     overflow=TextOverflow.Ellipsis,
@@ -297,7 +297,7 @@ private fun SavedPostCard(
                             ContentScale.Crop
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(media.title.orEmpty(),fontSize=8.sp,modifier=Modifier.weight(1f))
+                        Text(media.title.orEmpty(),fontSize=11.sp,modifier=Modifier.weight(1f))
                         Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
                     }
                 }
@@ -305,13 +305,13 @@ private fun SavedPostCard(
 
             Row(Modifier.padding(top=7.dp),verticalAlignment=Alignment.CenterVertically) {
                 Icon(Icons.Default.FavoriteBorder,null,tint=FqMuted,modifier=Modifier.size(14.dp))
-                Text(" "+post.likes,color=FqMuted,fontSize=7.sp)
+                Text(" "+post.likes,color=FqMuted,fontSize=11.sp)
                 Spacer(Modifier.width(10.dp))
                 Icon(Icons.Default.ChatBubbleOutline,null,tint=FqMuted,modifier=Modifier.size(14.dp))
-                Text(" "+post.comments,color=FqMuted,fontSize=7.sp)
+                Text(" "+post.comments,color=FqMuted,fontSize=11.sp)
                 Spacer(Modifier.width(10.dp))
                 Icon(Icons.Default.Share,null,tint=FqMuted,modifier=Modifier.size(14.dp))
-                Text(" "+post.shares,color=FqMuted,fontSize=7.sp)
+                Text(" "+post.shares,color=FqMuted,fontSize=11.sp)
             }
         }
     }
@@ -366,7 +366,7 @@ private fun SavedReelCard(
         ) {
             Text(
                 reel.caption.ifBlank { reel.media?.title.orEmpty() },
-                fontSize=8.sp,
+                fontSize=11.sp,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis
             )
@@ -413,7 +413,7 @@ private fun SavedReelViewer(
                     Column(horizontalAlignment=Alignment.CenterHorizontally) {
                         Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(52.dp))
                         Text("Spoiler Shield",color=FqDanger,fontSize=17.sp,modifier=Modifier.padding(top=8.dp))
-                        Text("برای پخش لمس کن",color=FqMuted,fontSize=9.sp)
+                        Text("برای پخش لمس کن",color=FqMuted,fontSize=11.sp)
                     }
                 }
             } else if(reel.playbackUrl.isNotBlank()) {
@@ -440,26 +440,26 @@ private fun SavedReelViewer(
                 Column(
                     Modifier.weight(1f).clickable { onCreator() }
                 ) {
-                    Text(reel.author.displayName,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                    Text("@"+reel.author.username,color=FqMuted,fontSize=7.sp)
+                    Text(reel.author.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                    Text("@"+reel.author.username,color=FqMuted,fontSize=11.sp)
                 }
                 reel.media?.asMediaItem()?.let {
                     OutlinedButton(onClick=onMedia) {
                         Icon(Icons.Default.Movie,null,modifier=Modifier.size(15.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("عنوان",fontSize=7.sp)
+                        Text("عنوان",fontSize=11.sp)
                     }
                 }
             }
             if(reel.caption.isNotBlank()) {
-                Text(reel.caption,fontSize=9.sp,lineHeight=16.sp,modifier=Modifier.padding(top=9.dp))
+                Text(reel.caption,fontSize=11.sp,lineHeight=16.sp,modifier=Modifier.padding(top=9.dp))
             }
             Row(Modifier.padding(top=8.dp)) {
-                Text("♥ "+reel.likes,color=FqMuted,fontSize=7.sp)
+                Text("♥ "+reel.likes,color=FqMuted,fontSize=11.sp)
                 Spacer(Modifier.width(12.dp))
-                Text("💬 "+reel.comments,color=FqMuted,fontSize=7.sp)
+                Text("💬 "+reel.comments,color=FqMuted,fontSize=11.sp)
                 Spacer(Modifier.width(12.dp))
-                Text("▶ "+reel.views,color=FqMuted,fontSize=7.sp)
+                Text("▶ "+reel.views,color=FqMuted,fontSize=11.sp)
             }
         }
     }
