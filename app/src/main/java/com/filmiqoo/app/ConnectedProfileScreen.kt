@@ -117,7 +117,7 @@ fun ConnectedProfileScreen(
                                 Spacer(Modifier.width(10.dp))
                                 Column {
                                     Text("هنوز چیزی ذخیره نکردی",fontSize=12.sp)
-                                    Text("از صفحه فیلم‌ها به Favorites اضافه کن.",color=FqMuted,fontSize=9.sp)
+                                    Text("از صفحه فیلم‌ها به Favorites اضافه کن.",color=FqMuted,fontSize=11.sp)
                                 }
                             }
                         }
@@ -347,9 +347,9 @@ private fun ProfileHero(
                     Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(18.dp))
                 }
             }
-            Text("@"+profile.username,color=FqMuted,fontSize=10.sp)
+            Text("@"+profile.username,color=FqMuted,fontSize=12.sp)
             if(profile.bio.isNotBlank()) {
-                Text(profile.bio,fontSize=10.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
+                Text(profile.bio,fontSize=12.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
             }
 
             Row(
@@ -399,7 +399,7 @@ private fun StatTile(
         Column(Modifier.padding(vertical=10.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(18.dp))
             Text(value,fontSize=12.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=4.dp))
-            Text(label,color=FqMuted,fontSize=7.sp)
+            Text(label,color=FqMuted,fontSize=11.sp)
         }
     }
 }
@@ -408,7 +408,7 @@ private fun StatTile(
 private fun MiniProfileMetric(value:String,label:String) {
     Column(horizontalAlignment=Alignment.CenterHorizontally) {
         Text(value,fontSize=15.sp,fontWeight=FontWeight.Bold)
-        Text(label,color=FqMuted,fontSize=8.sp)
+        Text(label,color=FqMuted,fontSize=11.sp)
     }
 }
 
@@ -434,7 +434,7 @@ private fun ContinueProfileCard(
             Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
                 Text(item.media.title,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
                 if(item.episodeLabel.isNotBlank()) {
-                    Text(item.episodeLabel,color=FqMuted,fontSize=8.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Text(item.episodeLabel,color=FqMuted,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
             }
         }
@@ -446,7 +446,7 @@ private fun ContinueProfileCard(
         )
         Text(
             formatPosition(item.positionMs)+" / "+formatPosition(item.durationMs),
-            color=FqMuted,fontSize=8.sp,modifier=Modifier.padding(top=4.dp)
+            color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=4.dp)
         )
     }
 }
@@ -470,7 +470,7 @@ private fun ProfileActionRow(
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text(title,fontSize=11.sp)
-            Text(subtitle,color=FqMuted,fontSize=8.sp,modifier=Modifier.padding(top=3.dp))
+            Text(subtitle,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
         }
         Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
     }
