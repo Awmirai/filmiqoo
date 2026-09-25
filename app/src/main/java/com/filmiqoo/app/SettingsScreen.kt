@@ -65,15 +65,35 @@ fun SettingsScreen(
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().padding(8.dp),
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=8.dp,vertical=6.dp),
                 verticalAlignment=Alignment.CenterVertically
             ) {
-                IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+                FqIconButton(
+                    icon=Icons.Default.ArrowBack,
+                    contentDescription="بازگشت",
+                    onClick=onBack
+                )
                 Column(Modifier.weight(1f)) {
-                    Text("تنظیمات",fontSize=23.sp,fontWeight=FontWeight.Black)
-                    Text("پخش، دانلود، حریم خصوصی و اعلان‌ها",color=FqMuted,fontSize=11.sp)
+                    Text(
+                        "تنظیمات",
+                        style=MaterialTheme.typography.headlineSmall,
+                        fontWeight=FontWeight.Black
+                    )
+                    Text(
+                        "پخش، دانلود، حریم خصوصی و اعلان‌ها",
+                        color=FqMuted,
+                        style=MaterialTheme.typography.bodySmall
+                    )
                 }
-                if(saving) CircularProgressIndicator(color=FqGold,strokeWidth=2.dp,modifier=Modifier.size(22.dp))
+                if(saving) {
+                    CircularProgressIndicator(
+                        color=FqGold,
+                        strokeWidth=2.dp,
+                        modifier=Modifier.size(22.dp)
+                    )
+                }
             }
         }
 
@@ -261,16 +281,38 @@ private fun SettingsSwitchRow(
     checked:Boolean,
     onChange:(Boolean)->Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
-            .background(FqSurface,RoundedCornerShape(17.dp)).padding(12.dp),
-        verticalAlignment=Alignment.CenterVertically
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+        modifier=Modifier.fillMaxWidth()
+            .padding(horizontal=FqDimens.Screen,vertical=4.dp)
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
-            Text(subtitle,color=FqMuted,fontSize=11.sp,lineHeight=13.sp,modifier=Modifier.padding(top=3.dp))
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable { onChange(!checked) }
+                .padding(horizontal=14.dp,vertical=12.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style=MaterialTheme.typography.titleSmall,
+                    fontWeight=FontWeight.SemiBold
+                )
+                Text(
+                    subtitle,
+                    color=FqMuted,
+                    style=MaterialTheme.typography.bodySmall,
+                    modifier=Modifier.padding(top=3.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked=checked,
+                onCheckedChange=onChange
+            )
         }
-        Switch(checked=checked,onCheckedChange=onChange)
     }
 }
 
@@ -284,23 +326,73 @@ private fun SettingsChoiceRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
-                .background(FqSurface,RoundedCornerShape(17.dp))
-                .clickable { expanded=true }.padding(12.dp),
-            verticalAlignment=Alignment.CenterVertically
+        Surface(
+            color=FqSurface,
+            shape=RoundedCornerShape(18.dp),
+            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+            modifier=Modifier.fillMaxWidth()
+                .padding(horizontal=FqDimens.Screen,vertical=4.dp)
+                .clickable { expanded=true }
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
-                Text(subtitle,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
+            Row(
+                Modifier.padding(horizontal=14.dp,vertical=13.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        title,
+                        style=MaterialTheme.typography.titleSmall,
+                        fontWeight=FontWeight.SemiBold
+                    )
+                    Text(
+                        subtitle,
+                        color=FqMuted,
+                        style=MaterialTheme.typography.bodySmall,
+                        modifier=Modifier.padding(top=3.dp)
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Surface(
+                    color=FqGold.copy(alpha=.10f),
+                    contentColor=FqGold,
+                    shape=RoundedCornerShape(999.dp)
+                ) {
+                    Text(
+                        value,
+                        style=MaterialTheme.typography.labelMedium,
+                        fontWeight=FontWeight.Bold,
+                        modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp)
+                    )
+                }
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription=null,
+                    tint=FqMuted,
+                    modifier=Modifier.padding(start=4.dp)
+                )
             }
-            Text(value,color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
-            Icon(Icons.Default.ExpandMore,null,tint=FqMuted)
         }
-        DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
+        DropdownMenu(
+            expanded=expanded,
+            onDismissRequest={expanded=false}
+        ) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text={Text(option)},
+                    text={
+                        Text(
+                            option,
+                            style=MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    trailingIcon={
+                        if(option==value) {
+                            Icon(
+                                Icons.Default.Check,
+                                null,
+                                tint=FqGold
+                            )
+                        }
+                    },
                     onClick={
                         expanded=false
                         onSelected(option)
