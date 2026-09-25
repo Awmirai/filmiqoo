@@ -49,44 +49,63 @@ fun InboxScreen(
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
-        Box(
-            Modifier.fillMaxWidth().background(
-                Brush.linearGradient(listOf(Color(0xFF111827),Color(0xFF231B09),FqBg))
-            )
+        Surface(
+            color=FqGlass,
+            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+            shadowElevation=5.dp
         ) {
-            Column {
+            Column(
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=8.dp,vertical=6.dp)
+            ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(10.dp),
+                    Modifier.fillMaxWidth(),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+                    FqIconButton(
+                        icon=Icons.Default.ArrowBack,
+                        contentDescription="بازگشت",
+                        onClick=onBack
+                    )
                     Column(Modifier.weight(1f)) {
-                        Text("پیام‌ها",fontSize=23.sp,fontWeight=FontWeight.Black)
                         Text(
-                            if(archivedView)"گفتگوهای آرشیوشده" else "DM، گروه‌ها و Roomهای عضو‌شده",
+                            "پیام‌ها",
+                            style=MaterialTheme.typography.headlineSmall,
+                            fontWeight=FontWeight.Black
+                        )
+                        Text(
+                            if(archivedView)
+                                "گفتگوهای آرشیوشده"
+                            else
+                                "DM، گروه‌ها و Roomهای تو",
                             color=FqMuted,
-                            fontSize=11.sp
+                            style=MaterialTheme.typography.bodySmall
                         )
                     }
-                    IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
+                    FqIconButton(
+                        icon=Icons.Default.Refresh,
+                        contentDescription="همگام‌سازی",
+                        onClick={refresh++}
+                    )
                 }
 
                 Row(
                     Modifier.fillMaxWidth()
-                        .padding(start=14.dp,end=14.dp,bottom=10.dp),
-                    horizontalArrangement=Arrangement.spacedBy(7.dp)
+                        .padding(horizontal=6.dp,bottom=6.dp),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
-                        selected=!archivedView,
-                        onClick={archivedView=false},
-                        label={Text("Inbox",fontSize=11.sp)},
-                        leadingIcon={Icon(Icons.Default.Inbox,null,modifier=Modifier.size(15.dp))}
+                    PremiumChip(
+                        icon=Icons.Default.Inbox,
+                        label="Inbox",
+                        active=!archivedView,
+                        onClick={archivedView=false}
                     )
-                    FilterChip(
-                        selected=archivedView,
-                        onClick={archivedView=true},
-                        label={Text("آرشیو",fontSize=11.sp)},
-                        leadingIcon={Icon(Icons.Default.Archive,null,modifier=Modifier.size(15.dp))}
+                    PremiumChip(
+                        icon=Icons.Default.Archive,
+                        label="آرشیو",
+                        active=archivedView,
+                        onClick={archivedView=true}
                     )
                 }
             }
@@ -176,8 +195,12 @@ private fun InboxCard(
     var menuOpen by remember(item.id) { mutableStateOf(false) }
 
     Surface(
-        color=if(item.unread>0)FqGold.copy(alpha=.08f) else FqSurface,
+        color=if(item.unread>0)FqGold.copy(alpha=.07f) else FqSurface,
         shape=RoundedCornerShape(20.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if(item.unread>0) FqGold.copy(alpha=.22f) else FqBorder
+        ),
         modifier=Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
