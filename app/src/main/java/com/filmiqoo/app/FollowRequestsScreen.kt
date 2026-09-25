@@ -58,7 +58,7 @@ fun FollowRequestsScreen(
                     if(requests.isEmpty())"درخواست جدیدی نداری"
                     else requests.size.toString()+" درخواست در انتظار",
                     color=if(requests.isEmpty())FqMuted else FqGold,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -72,7 +72,7 @@ fun FollowRequestsScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -159,12 +159,12 @@ private fun FollowRequestCard(
                             )
                         }
                     }
-                    Text("@"+request.username,color=FqMuted,fontSize=7.sp)
+                    Text("@"+request.username,color=FqMuted,fontSize=11.sp)
                     if(request.bio.isNotBlank()) {
                         Text(
                             request.bio,
                             color=Color.White.copy(alpha=.67f),
-                            fontSize=7.sp,
+                            fontSize=11.sp,
                             maxLines=1,
                             overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(top=3.dp)
@@ -173,7 +173,7 @@ private fun FollowRequestCard(
                     Text(
                         compactFollowRequestCount(request.followers)+" دنبال‌کننده",
                         color=FqMuted,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=3.dp)
                     )
                 }
@@ -201,7 +201,7 @@ private fun FollowRequestCard(
                         Icon(Icons.Default.Check,null,tint=Color.Black)
                     }
                     Spacer(Modifier.width(4.dp))
-                    Text("Accept",color=Color.Black,fontSize=8.sp)
+                    Text("Accept",color=Color.Black,fontSize=11.sp)
                 }
 
                 OutlinedButton(
@@ -212,7 +212,7 @@ private fun FollowRequestCard(
                 ) {
                     Icon(Icons.Default.Close,null,modifier=Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Decline",fontSize=8.sp)
+                    Text("Decline",fontSize=11.sp)
                 }
             }
         }
