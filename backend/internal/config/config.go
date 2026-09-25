@@ -176,6 +176,15 @@ func (c Config) Validate() error {
 				return fmt.Errorf("%s must use HTTPS in production",name)
 			}
 		}
+		for name,value:=range map[string]string{
+			"OBJECT_STORAGE_ENDPOINT":c.ObjectStorageEndpoint,
+			"OBJECT_STORAGE_BUCKET":c.ObjectStorageBucket,
+			"OBJECT_STORAGE_KEY":c.ObjectStorageKey,
+		} {
+			if strings.TrimSpace(value)=="" {
+				return fmt.Errorf("%s is required in production",name)
+			}
+		}
 	}
 
 	if c.AuthLoginRateLimit<=0 || c.AuthRegisterRateLimit<=0 || c.AuthRefreshRateLimit<=0 {
