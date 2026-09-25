@@ -227,7 +227,7 @@ private fun DownloadBulkActions(
                 item {
                     AssistChip(
                         onClick=onPauseAll,
-                        label={Text("توقف همه • "+running,fontSize=8.sp)},
+                        label={Text("توقف همه • "+running,fontSize=11.sp)},
                         leadingIcon={Icon(Icons.Default.Pause,null,modifier=Modifier.size(16.dp))}
                     )
                 }
@@ -236,7 +236,7 @@ private fun DownloadBulkActions(
                 item {
                     AssistChip(
                         onClick=onResumeAll,
-                        label={Text("ادامه همه • "+paused,fontSize=8.sp)},
+                        label={Text("ادامه همه • "+paused,fontSize=11.sp)},
                         leadingIcon={Icon(Icons.Default.PlayArrow,null,modifier=Modifier.size(16.dp))}
                     )
                 }
@@ -245,7 +245,7 @@ private fun DownloadBulkActions(
                 item {
                     AssistChip(
                         onClick=onRetryFailed,
-                        label={Text("تلاش دوباره • "+failed,fontSize=8.sp)},
+                        label={Text("تلاش دوباره • "+failed,fontSize=11.sp)},
                         leadingIcon={Icon(Icons.Default.Refresh,null,modifier=Modifier.size(16.dp))}
                     )
                 }
@@ -254,7 +254,7 @@ private fun DownloadBulkActions(
             item {
                 AssistChip(
                     onClick=onClearCompleted,
-                    label={Text("پاک‌کردن همه • "+completed,fontSize=8.sp)},
+                    label={Text("پاک‌کردن همه • "+completed,fontSize=11.sp)},
                     leadingIcon={Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp),tint=FqDanger)}
                 )
             }
@@ -283,12 +283,12 @@ private fun DownloadPolicySummary(settings:AppSettings) {
             Icon(Icons.Default.Policy,null,tint=FqGold,modifier=Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text("Download Policy",fontSize=9.sp,fontWeight=FontWeight.Bold)
+                Text("Download Policy",fontSize=11.sp,fontWeight=FontWeight.Bold)
                 Text(
                     if(policies.isEmpty())"بدون محدودیت اضافی"
                     else policies.joinToString(" • "),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=2.dp)
                 )
             }
@@ -333,7 +333,7 @@ private fun SmartDownloadsControl(
                     else
                         "مدیریت خودکار قسمت‌های سریال خاموش است.",
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     lineHeight=13.sp
                 )
             }
@@ -382,7 +382,7 @@ private fun DownloadsHero(
                 ) {
                     Icon(Icons.Default.Wifi,null,tint=FqGold,modifier=Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("فقط Wi‑Fi",fontSize=8.sp)
+                    Text("فقط Wi‑Fi",fontSize=11.sp)
                     Spacer(Modifier.width(6.dp))
                     Switch(
                         checked=wifiOnly,
@@ -402,7 +402,7 @@ private fun DownloadsHero(
             Text(
                 "فیلم و سریال‌ها رو برای تماشا بدون اینترنت نگه دار.",
                 color=FqMuted,
-                fontSize=10.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(top=4.dp)
             )
 
@@ -469,7 +469,7 @@ private fun DownloadCard(
                         Text(
                             item.subtitle,
                             color=FqMuted,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             maxLines=1,
                             overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(top=3.dp)
@@ -495,7 +495,7 @@ private fun DownloadCard(
                                 }
                             },
                             color=FqMuted,
-                            fontSize=8.sp
+                            fontSize=11.sp
                         )
                     }
 
@@ -526,7 +526,7 @@ private fun DownloadCard(
                                 }
                             },
                             color=FqMuted,
-                            fontSize=7.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.padding(top=4.dp)
                         )
                     }
@@ -535,7 +535,7 @@ private fun DownloadCard(
                         Text(
                             it,
                             color=FqDanger,
-                            fontSize=7.sp,
+                            fontSize=11.sp,
                             maxLines=2,
                             overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(top=5.dp)
@@ -555,21 +555,21 @@ private fun DownloadCard(
                         TextButton(onClick=onPause) {
                             Icon(Icons.Default.Pause,null,modifier=Modifier.size(17.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("توقف",fontSize=8.sp)
+                            Text("توقف",fontSize=11.sp)
                         }
                     }
                     "paused" -> {
                         TextButton(onClick=onResume) {
                             Icon(Icons.Default.PlayArrow,null,modifier=Modifier.size(17.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("ادامه",fontSize=8.sp)
+                            Text("ادامه",fontSize=11.sp)
                         }
                     }
                     "failed" -> {
                         TextButton(onClick=onRetry) {
                             Icon(Icons.Default.Refresh,null,modifier=Modifier.size(17.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("تلاش دوباره",fontSize=8.sp)
+                            Text("تلاش دوباره",fontSize=11.sp)
                         }
                     }
                     "completed" -> {
@@ -580,7 +580,7 @@ private fun DownloadCard(
                         ) {
                             Icon(Icons.Default.PlayArrow,null,tint=Color.Black,modifier=Modifier.size(17.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("پخش آفلاین",color=Color.Black,fontSize=8.sp)
+                            Text("پخش آفلاین",color=Color.Black,fontSize=11.sp)
                         }
                     }
                 }
@@ -592,7 +592,7 @@ private fun DownloadCard(
                         TextButton(onClick={priorityMenu=true}) {
                             Icon(Icons.Default.Tune,null,modifier=Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(downloadPriorityLabel(item.priority),fontSize=7.sp)
+                            Text(downloadPriorityLabel(item.priority),fontSize=11.sp)
                         }
                         DropdownMenu(
                             expanded=priorityMenu,
@@ -678,7 +678,7 @@ private fun DownloadStatusPill(status: String) {
         Text(
             pair.first,
             color=pair.second,
-            fontSize=7.sp,
+            fontSize=11.sp,
             fontWeight=FontWeight.Bold,
             modifier=Modifier.padding(horizontal=8.dp,vertical=4.dp)
         )
