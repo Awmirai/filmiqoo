@@ -109,19 +109,12 @@ fun PremiumSearchScreen(
         Box(Modifier.weight(1f)) {
             when(val s=state) {
                 UniversalSearchLoad.Loading -> {
-                    Column(
-                        Modifier.fillMaxSize(),
-                        horizontalAlignment=Alignment.CenterHorizontally,
-                        verticalArrangement=Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(color=FqGold)
-                        Text(
-                            if(query.isBlank())"در حال آماده‌سازی Discover..." else "در حال جستجو...",
-                            color=FqMuted,
-                            fontSize=11.sp,
-                            modifier=Modifier.padding(top=9.dp)
-                        )
-                    }
+                    FqLoadingState(
+                        if(query.isBlank())
+                            "داریم Discover رو آماده می‌کنیم..."
+                        else
+                            "در حال جستجو..."
+                    )
                 }
 
                 is UniversalSearchLoad.Error -> {
@@ -162,75 +155,115 @@ fun PremiumSearchScreen(
 
 @Composable
 private fun SearchHeader(
-    query: String,
-    onQuery: (String) -> Unit,
-    onBack: () -> Unit
+    query:String,
+    onQuery:(String)->Unit,
+    onBack:()->Unit
 ) {
-    Box(
-        Modifier.fillMaxWidth().background(
-            Brush.verticalGradient(listOf(Color(0xFF111827),FqBg))
-        )
-    ) {
-        Column(Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,top=8.dp,bottom=12.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                IconButton(onClick=onBack) {
-                    Icon(Icons.Default.ArrowBack,null)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text("جستجو و Discover",fontSize=22.sp,fontWeight=FontWeight.Black)
-                    Text(
-                        "فیلم، سریال، کاربر، کانال و Reel",
-                        color=FqMuted,
-                        fontSize=11.sp
+    Column(
+        Modifier.fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF111620),
+                        FqBg
                     )
-                }
-            }
-
-            OutlinedTextField(
-                value=query,
-                onValueChange=onQuery,
-                placeholder={Text("مثلاً: Interstellar، @nima یا نقد فیلم...")},
-                leadingIcon={Icon(Icons.Default.Search,null,tint=FqGold)},
-                trailingIcon={
-                    if(query.isNotBlank()) {
-                        IconButton(onClick={onQuery("")}) {
-                            Icon(Icons.Default.Close,null)
-                        }
-                    } else {
-                        Icon(Icons.Default.Tune,null,tint=FqMuted)
-                    }
-                },
-                singleLine=true,
-                shape=RoundedCornerShape(18.dp),
-                modifier=Modifier.fillMaxWidth().padding(top=9.dp)
+                )
             )
+            .statusBarsPadding()
+            .padding(horizontal=FqDimens.Screen)
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .padding(top=8.dp,bottom=8.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            FqIconButton(
+                icon=Icons.Default.ArrowBack,
+                contentDescription="بازگشت",
+                onClick=onBack
+            )
+            Spacer(Modifier.width(4.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "جستجو و Discover",
+                    style=MaterialTheme.typography.headlineSmall,
+                    fontWeight=FontWeight.Black
+                )
+                Text(
+                    "فیلم، سریال، کاربر، کانال و Reel",
+                    color=FqMuted,
+                    style=MaterialTheme.typography.bodySmall,
+                    modifier=Modifier.padding(top=2.dp)
+                )
+            }
         }
+
+        OutlinedTextField(
+            value=query,
+            onValueChange=onQuery,
+            placeholder={
+                Text(
+                    "اسم فیلم، سریال یا @کاربر...",
+                    color=FqMuted
+                )
+            },
+            leadingIcon={
+                Icon(
+                    Icons.Default.Search,
+                    null,
+                    tint=FqGold
+                )
+            },
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={onQuery("")}) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription="پاک کردن جستجو"
+                        )
+                    }
+                }
+            },
+            singleLine=true,
+            shape=RoundedCornerShape(18.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold,
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(bottom=12.dp)
+        )
     }
 }
 
 @Composable
 private fun SearchTabs(
-    selected: SearchTab,
-    onSelected: (SearchTab) -> Unit
+    selected:SearchTab,
+    onSelected:(SearchTab)->Unit
 ) {
-    ScrollableTabRow(
-        selectedTabIndex=selected.ordinal,
-        containerColor=FqBg,
-        contentColor=FqGold,
-        edgePadding=10.dp,
-        divider={}
+    val items=listOf(
+        SearchTab.ALL to "همه",
+        SearchTab.MEDIA to "فیلم و سریال",
+        SearchTab.USERS to "کاربران",
+        SearchTab.CHANNELS to "کانال‌ها",
+        SearchTab.REELS to "Reels"
+    )
+    LazyRow(
+        contentPadding=PaddingValues(
+            horizontal=FqDimens.Screen,
+            vertical=8.dp
+        ),
+        horizontalArrangement=Arrangement.spacedBy(8.dp),
+        modifier=Modifier.fillMaxWidth()
+            .background(FqBg)
     ) {
-        listOf(
-            SearchTab.ALL to "همه",
-            SearchTab.MEDIA to "فیلم و سریال",
-            SearchTab.USERS to "کاربران",
-            SearchTab.CHANNELS to "کانال‌ها",
-            SearchTab.REELS to "Reels"
-        ).forEach { item ->
-            Tab(
-                selected=selected==item.first,
-                onClick={onSelected(item.first)},
-                text={Text(item.second,fontSize=11.sp)}
+        items(items,key={it.first.name}) { item ->
+            PremiumChip(
+                label=item.second,
+                active=selected==item.first,
+                onClick={onSelected(item.first)}
             )
         }
     }
