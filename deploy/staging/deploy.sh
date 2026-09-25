@@ -43,6 +43,11 @@ rollback() {
   return 1
 }
 
+if [[ "${1:-}" == "--rollback" ]]; then
+  rollback
+  exit $?
+fi
+
 echo "Pulling staging images..."
 "${COMPOSE[@]}" pull
 
