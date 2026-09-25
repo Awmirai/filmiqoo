@@ -85,7 +85,7 @@ fun RoomConversationSettingsSheet(
                     Text(
                         state?.let { roomTypeLabel(it.type) } ?: "Room",
                         color=FqMuted,
-                        fontSize=8.sp
+                        fontSize=11.sp
                     )
                 }
                 IconButton(onClick=onDismiss) {
@@ -104,7 +104,7 @@ fun RoomConversationSettingsSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.fillMaxWidth()
                         .background(FqDanger.copy(alpha=.08f),RoundedCornerShape(10.dp))
                         .padding(9.dp)
@@ -148,7 +148,7 @@ fun RoomConversationSettingsSheet(
                                         saving=false
                                     }
                                 },
-                                label={Text(option.second,fontSize=8.sp)},
+                                label={Text(option.second,fontSize=11.sp)},
                                 leadingIcon={
                                     Icon(
                                         when(option.first) {
@@ -176,11 +176,11 @@ fun RoomConversationSettingsSheet(
                             Icon(Icons.Default.Archive,null,tint=FqGold)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("آرشیو گفتگو",fontSize=10.sp)
+                                Text("آرشیو گفتگو",fontSize=12.sp)
                                 Text(
                                     "از Inbox اصلی پنهان می‌شود؛ پیام‌ها حذف نمی‌شوند.",
                                     color=FqMuted,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
                             Switch(
@@ -240,7 +240,7 @@ fun RoomConversationSettingsSheet(
                     Text(
                         "دسترسی",
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=10.dp,bottom=4.dp)
                     )
                     Row(
@@ -255,7 +255,7 @@ fun RoomConversationSettingsSheet(
                             FilterChip(
                                 selected=visibility==option.first,
                                 onClick={visibility=option.first},
-                                label={Text(option.second,fontSize=8.sp)}
+                                label={Text(option.second,fontSize=11.sp)}
                             )
                         }
                     }
@@ -272,16 +272,16 @@ fun RoomConversationSettingsSheet(
                             Icon(Icons.Default.Timer,null,tint=FqGold)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("Slow Mode",fontSize=10.sp)
+                                Text("Slow Mode",fontSize=12.sp)
                                 Text(
                                     slowModeLabel(slowMode),
                                     color=FqMuted,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
                             Box {
                                 TextButton(onClick={slowMenu=true}) {
-                                    Text(slowModeLabel(slowMode),fontSize=8.sp)
+                                    Text(slowModeLabel(slowMode),fontSize=11.sp)
                                     Icon(Icons.Default.KeyboardArrowDown,null)
                                 }
                                 DropdownMenu(
@@ -355,7 +355,7 @@ fun RoomConversationSettingsSheet(
                                     else "هنوز استفاده نشده"
                                 } ?: "در حال ساخت...",
                                 color=FqMuted,
-                                fontSize=7.sp
+                                fontSize=11.sp
                             )
                         }
                     }
@@ -369,7 +369,7 @@ fun RoomConversationSettingsSheet(
                             Text(
                                 currentInvite.deepLink,
                                 color=FqGold,
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 maxLines=2,
                                 modifier=Modifier.padding(10.dp)
                             )
@@ -390,7 +390,7 @@ fun RoomConversationSettingsSheet(
                             ) {
                                 Icon(Icons.Default.Share,null)
                                 Spacer(Modifier.width(5.dp))
-                                Text("اشتراک لینک",fontSize=8.sp)
+                                Text("اشتراک لینک",fontSize=11.sp)
                             }
                             OutlinedButton(
                                 onClick={regenerateConfirm=true},
@@ -398,7 +398,7 @@ fun RoomConversationSettingsSheet(
                             ) {
                                 Icon(Icons.Default.Refresh,null)
                                 Spacer(Modifier.width(5.dp))
-                                Text("لینک جدید",fontSize=8.sp)
+                                Text("لینک جدید",fontSize=11.sp)
                             }
                         }
                     }
@@ -422,7 +422,7 @@ fun RoomConversationSettingsSheet(
                         Text(
                             "برای خروج مالک، ابتدا مالکیت را از صفحه اعضا به شخص دیگری منتقل کن.",
                             color=FqMuted,
-                            fontSize=7.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.padding(top=5.dp)
                         )
                     }
