@@ -1,0 +1,34 @@
+name: Staging Contract Checks
+
+on:
+  pull_request:
+    paths:
+      - "deploy/staging/**"
+      - ".github/workflows/staging-deploy.yml"
+      - ".github/workflows/staging-contract.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "deploy/staging/**"
+      - ".github/workflows/staging-deploy.yml"
+      - ".github/workflows/staging-contract.yml"
+
+jobs:
+  staging-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate staging scripts
+        working-directory: deploy/staging
+        run: |
+          bash -n deploy.sh
+          bash -n smoke.sh
+
+      - name: Validate staging compose
+        working-directory: deploy/staging
+        env:
+          FILMIQOO_API_ENV_FILE: .env.staging.example
+        run: |
+          docker compose --env-file .env.staging.example -f docker-compose.yml config >/tmp/filmiqoo-staging-compose.yml
+          test -s /tmp/filmiqoo-staging-compose.yml
