@@ -35,13 +35,17 @@ type Server struct {
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
-	objects,objectErr := objectstore.New(
-		cfg.ObjectStorageEndpoint,
-		cfg.ObjectStoragePublicEndpoint,
-		cfg.ObjectStorageKey,
-		cfg.ObjectStorageSecret,
-		cfg.ObjectStorageBucket,
-	)
+	var objects *objectstore.Store
+	var objectErr error
+	if strings.TrimSpace(cfg.ObjectStorageEndpoint)!="" {
+		objects,objectErr=objectstore.New(
+			cfg.ObjectStorageEndpoint,
+			cfg.ObjectStoragePublicEndpoint,
+			cfg.ObjectStorageKey,
+			cfg.ObjectStorageSecret,
+			cfg.ObjectStorageBucket,
+		)
+	}
 	s := &Server{
 		cfg: cfg,
 		db: db,
@@ -413,21 +417,23 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"redis unavailable"})
 		return
 	}
-	if s.objects==nil {
-		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
-			"status":"object storage unavailable",
-			"detail":s.objectStoreInitError,
-		})
-		return
-	}
-	objectCtx,objectCancel:=context.WithTimeout(ctx,1500*time.Millisecond)
-	objectErr:=s.objects.Health(objectCtx)
-	objectCancel()
-	if objectErr!=nil {
-		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
-			"status":"object storage unavailable",
-		})
-		return
+	if strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!="" {
+		if s.objects==nil {
+			writeJSON(w,http.StatusServiceUnavailable,map[string]string{
+				"status":"object storage unavailable",
+				"detail":s.objectStoreInitError,
+			})
+			return
+		}
+		objectCtx,objectCancel:=context.WithTimeout(ctx,1500*time.Millisecond)
+		objectErr:=s.objects.Health(objectCtx)
+		objectCancel()
+		if objectErr!=nil {
+			writeJSON(w,http.StatusServiceUnavailable,map[string]string{
+				"status":"object storage unavailable",
+			})
+			return
+		}
 	}
 	if s.cfg.FirebasePushEnabled && s.fcm==nil {
 		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
@@ -439,7 +445,10 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w,http.StatusOK,map[string]string{
 		"status":"ready",
 		"push":map[bool]string{true:"enabled",false:"disabled"}[s.fcm!=nil],
-		"objectStorage":"ready",
+		"objectStorage":map[bool]string{
+			true:"ready",
+			false:"disabled",
+		}[strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!=""],
 	})
 }
 
