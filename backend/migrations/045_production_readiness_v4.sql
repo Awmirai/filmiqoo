@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_active_user
 
 CREATE INDEX IF NOT EXISTS idx_ugc_uploads_cleanup
     ON ugc_uploads (status,created_at)
-    WHERE status IN ('presigned','uploaded','failed');
+    WHERE status IN ('presigned','failed');
 
 ALTER TABLE reports
     ADD COLUMN IF NOT EXISTS priority smallint NOT NULL DEFAULT 40
