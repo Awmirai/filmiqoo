@@ -146,7 +146,16 @@ jobs:
         env:
           FILMIQOO_STAGING_BASE_URL: ${{ vars.FILMIQOO_STAGING_BASE_URL }}
           FILMIQOO_STAGING_OPS_SECRET: ${{ secrets.STAGING_OPS_SECRET }}
-        run: bash deploy/staging/smoke.sh
+          HOST: ${{ vars.STAGING_HOST }}
+          USER: ${{ vars.STAGING_SSH_USER }}
+          PORT: ${{ vars.STAGING_SSH_PORT }}
+          DIR: ${{ vars.STAGING_DEPLOY_DIR }}
+        run: |
+          if ! bash deploy/staging/smoke.sh; then
+            echo "External smoke failed; rolling staging back."
+            ssh -p "$PORT" "$USER@$HOST" "cd '$DIR' && ./deploy.sh --rollback" || true
+            exit 1
+          fi
 
       - name: Log staging host out of GHCR
         if: always()
