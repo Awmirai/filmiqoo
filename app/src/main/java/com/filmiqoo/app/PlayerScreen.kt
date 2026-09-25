@@ -1567,7 +1567,7 @@ private fun ResumePromptOverlay(
                     }
                     Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("ادامه تماشا؟",color=FqGold,fontSize=9.sp)
+                        Text("ادامه تماشا؟",color=FqGold,fontSize=11.sp)
                         Text(
                             target.title,
                             color=Color.White,
@@ -1577,7 +1577,7 @@ private fun ResumePromptOverlay(
                             overflow=TextOverflow.Ellipsis
                         )
                         if(target.subtitle.isNotBlank()) {
-                            Text(target.subtitle,color=FqMuted,fontSize=8.sp)
+                            Text(target.subtitle,color=FqMuted,fontSize=11.sp)
                         }
                     }
                 }
@@ -1585,7 +1585,7 @@ private fun ResumePromptOverlay(
                 Text(
                     "آخرین بار تا "+formatPlayerTime(positionMs)+" دیدی.",
                     color=Color.White.copy(alpha=.78f),
-                    fontSize=10.sp,
+                    fontSize=12.sp,
                     modifier=Modifier.padding(top=16.dp)
                 )
 
@@ -1645,7 +1645,7 @@ private fun PlayerBufferingOverlay(title: String) {
         Text(
             title,
             color=Color.White,
-            fontSize=10.sp,
+            fontSize=12.sp,
             modifier=Modifier.padding(top=10.dp)
         )
     }
@@ -1682,7 +1682,7 @@ private fun PlayerErrorOverlay(
                 Text(
                     message,
                     color=FqMuted,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     lineHeight=15.sp,
                     modifier=Modifier.padding(top=6.dp)
                 )
@@ -1741,7 +1741,7 @@ private fun PlayerTopControls(
                     currentVariant?.label.orEmpty()
                 ).filter(String::isNotBlank).distinct().joinToString(" • "),
                 color=Color.White.copy(alpha=.62f),
-                fontSize=8.sp,
+                fontSize=11.sp,
                 maxLines=1,
                 overflow=TextOverflow.Ellipsis
             )
@@ -1822,7 +1822,7 @@ private fun PlayerCenterControls(
             modifier=Modifier.clickable { onBack10() }
         ) {
             Icon(Icons.Default.Replay10,null,tint=Color.White,modifier=Modifier.size(34.dp))
-            Text("10",color=Color.White.copy(alpha=.7f),fontSize=7.sp)
+            Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
         }
 
         Box(
@@ -1843,7 +1843,7 @@ private fun PlayerCenterControls(
             modifier=Modifier.clickable { onForward10() }
         ) {
             Icon(Icons.Default.Forward10,null,tint=Color.White,modifier=Modifier.size(34.dp))
-            Text("10",color=Color.White.copy(alpha=.7f),fontSize=7.sp)
+            Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
         }
     }
 }
@@ -1885,12 +1885,12 @@ private fun PlayerBottomControls(
             Text(
                 formatPlayerTime(positionMs),
                 color=Color.White,
-                fontSize=8.sp
+                fontSize=11.sp
             )
             Text(
                 " / "+formatPlayerTime(durationMs),
                 color=Color.White.copy(alpha=.55f),
-                fontSize=8.sp
+                fontSize=11.sp
             )
             Spacer(Modifier.weight(1f))
             Surface(
@@ -1901,7 +1901,7 @@ private fun PlayerBottomControls(
                 Text(
                     formatSpeed(speed),
                     color=Color.White,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp)
                 )
             }
@@ -1933,7 +1933,7 @@ private fun GestureValueOverlay(
             Text(
                 label,
                 color=Color.White,
-                fontSize=10.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(top=5.dp)
             )
             LinearProgressIndicator(
@@ -1945,7 +1945,7 @@ private fun GestureValueOverlay(
             Text(
                 (value*100).roundToInt().toString()+"٪",
                 color=FqMuted,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(top=5.dp)
             )
         }
@@ -1984,7 +1984,7 @@ private fun SeekGestureOverlay(
             Text(
                 (if(delta>=0)"+ " else "− ")+formatPlayerTime(kotlin.math.abs(delta)),
                 color=FqMuted,
-                fontSize=9.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(top=3.dp)
             )
         }
@@ -2003,10 +2003,14 @@ private fun PlayerSkipButton(
             containerColor=Color.Black.copy(alpha=.7f),
             contentColor=Color.White
         ),
-        shape=RoundedCornerShape(12.dp),
-        modifier=modifier
+        shape=RoundedCornerShape(14.dp),
+        modifier=modifier.heightIn(min=46.dp)
     ) {
-        Text(label,fontSize=9.sp)
+        Text(
+            label,
+            style=MaterialTheme.typography.labelMedium,
+            fontWeight=FontWeight.Bold
+        )
         Spacer(Modifier.width(5.dp))
         Icon(Icons.Default.FastForward,null,modifier=Modifier.size(17.dp))
     }
@@ -2028,7 +2032,7 @@ private fun NextEpisodeOverlay(
         modifier=modifier.widthIn(max=360.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text("قسمت بعدی",color=FqGold,fontSize=9.sp)
+            Text("قسمت بعدی",color=FqGold,fontSize=11.sp)
             Text(
                 title,
                 color=Color.White,
@@ -2042,7 +2046,7 @@ private fun NextEpisodeOverlay(
                 Text(
                     subtitle,
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=3.dp)
                 )
             }
@@ -2055,14 +2059,14 @@ private fun NextEpisodeOverlay(
                     onCheckedChange=onAutoPlayChange
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("پخش خودکار",fontSize=8.sp)
+                Text("پخش خودکار",fontSize=11.sp)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick=onDismiss) { Text("بستن") }
                 Button(
                     onClick=onPlayNow,
                     colors=ButtonDefaults.buttonColors(containerColor=FqGold)
                 ) {
-                    Text("الان پخش کن",color=Color.Black,fontSize=8.sp)
+                    Text("الان پخش کن",color=Color.Black,fontSize=11.sp)
                 }
             }
         }
@@ -2093,7 +2097,7 @@ private fun EpisodeQueueSheet(
                     Text(
                         target.subtitle.ifBlank{"پخش فعلی"},
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=3.dp)
                     )
                 }
@@ -2117,14 +2121,14 @@ private fun EpisodeQueueSheet(
                         Icon(Icons.Default.SkipPrevious,null,tint=FqGold)
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("قسمت قبلی",color=FqGold,fontSize=8.sp)
+                            Text("قسمت قبلی",color=FqGold,fontSize=11.sp)
                             Text(
                                 target.previousTitle ?: "قسمت قبلی",
-                                fontSize=10.sp,
+                                fontSize=12.sp,
                                 fontWeight=FontWeight.Bold
                             )
                             target.previousSubtitle?.let { sub ->
-                                Text(sub,color=FqMuted,fontSize=7.sp)
+                                Text(sub,color=FqMuted,fontSize=11.sp)
                             }
                         }
                         Icon(Icons.Default.PlayArrow,null)
@@ -2144,10 +2148,10 @@ private fun EpisodeQueueSheet(
                     Icon(Icons.Default.PlayCircle,null,tint=FqGold)
                     Spacer(Modifier.width(9.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("در حال پخش",color=FqGold,fontSize=8.sp)
-                        Text(target.title,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                        Text("در حال پخش",color=FqGold,fontSize=11.sp)
+                        Text(target.title,fontSize=12.sp,fontWeight=FontWeight.Bold)
                         if(target.subtitle.isNotBlank()) {
-                            Text(target.subtitle,color=FqMuted,fontSize=7.sp)
+                            Text(target.subtitle,color=FqMuted,fontSize=11.sp)
                         }
                     }
                 }
@@ -2159,7 +2163,7 @@ private fun EpisodeQueueSheet(
                 Text(
                     "بعدی‌ها",
                     color=FqMuted,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
                 )
                 LazyColumn(
@@ -2188,7 +2192,7 @@ private fun EpisodeQueueSheet(
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         item.title,
-                                        fontSize=9.sp,
+                                        fontSize=11.sp,
                                         fontWeight=FontWeight.Bold,
                                         maxLines=1,
                                         overflow=TextOverflow.Ellipsis
@@ -2197,7 +2201,7 @@ private fun EpisodeQueueSheet(
                                         Text(
                                             item.subtitle,
                                             color=FqMuted,
-                                            fontSize=7.sp,
+                                            fontSize=11.sp,
                                             maxLines=1,
                                             overflow=TextOverflow.Ellipsis
                                         )
@@ -2296,7 +2300,7 @@ private fun PlayerSettingsSheet(
                     Tab(
                         selected=tab==item.first,
                         onClick={onTab(item.first)},
-                        text={Text(item.second,fontSize=9.sp)}
+                        text={Text(item.second,fontSize=11.sp)}
                     )
                 }
             }
@@ -2316,11 +2320,11 @@ private fun PlayerSettingsSheet(
                                 Icon(Icons.Default.DataSaverOn,null,tint=FqGold)
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    Text("Data Saver فعال",fontSize=9.sp,fontWeight=FontWeight.Bold)
+                                    Text("Data Saver فعال",fontSize=11.sp,fontWeight=FontWeight.Bold)
                                     Text(
                                         "روی شبکه Metered کیفیت سبک‌تر به‌صورت خودکار انتخاب شده؛ هر زمان خواستی دستی عوضش کن.",
                                         color=FqMuted,
-                                        fontSize=7.sp,
+                                        fontSize=11.sp,
                                         lineHeight=13.sp
                                     )
                                 }
@@ -2399,7 +2403,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "اندازه زیرنویس • "+((subtitleScale*100).roundToInt()).toString()+"٪",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=4.dp)
                     )
                     Slider(
@@ -2416,7 +2420,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "موقعیت زیرنویس",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=4.dp)
                     )
                     Slider(
@@ -2438,7 +2442,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "رنگ زیرنویس",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=5.dp)
                     )
                     LazyRow(
@@ -2463,7 +2467,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "پس‌زمینه • "+(subtitleBackgroundOpacity*100).roundToInt()+"٪",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
                     )
                     Slider(
@@ -2480,7 +2484,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "حاشیه متن",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=5.dp)
                     )
                     LazyRow(
@@ -2507,7 +2511,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "نسبت تصویر",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
                     )
                     LazyRow(
@@ -2535,7 +2539,7 @@ private fun PlayerSettingsSheet(
                             else -> "کل تصویر با نسبت اصلی داخل قاب نمایش داده می‌شود."
                         },
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         lineHeight=14.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=14.dp)
                     )
@@ -2545,7 +2549,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "سرعت پخش",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(start=18.dp,end=18.dp,top=14.dp)
                     )
                     LazyRow(
@@ -2575,7 +2579,7 @@ private fun PlayerSettingsSheet(
                             Text(
                                 "بعد از پایان قسمت، قسمت بعدی خودکار شروع شود.",
                                 color=FqMuted,
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 modifier=Modifier.padding(top=3.dp)
                             )
                         }
@@ -2627,7 +2631,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "A‑B Repeat",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
                     )
 
@@ -2641,7 +2645,7 @@ private fun PlayerSettingsSheet(
                         ) {
                             Icon(Icons.Default.FirstPage,null,modifier=Modifier.size(17.dp))
                             Spacer(Modifier.width(5.dp))
-                            Text("A • "+(abStartMs?.let(::formatPlayerTime) ?: formatPlayerTime(currentPositionMs)),fontSize=8.sp)
+                            Text("A • "+(abStartMs?.let(::formatPlayerTime) ?: formatPlayerTime(currentPositionMs)),fontSize=11.sp)
                         }
                         OutlinedButton(
                             onClick=onSetAbEnd,
@@ -2649,7 +2653,7 @@ private fun PlayerSettingsSheet(
                         ) {
                             Icon(Icons.Default.LastPage,null,modifier=Modifier.size(17.dp))
                             Spacer(Modifier.width(5.dp))
-                            Text("B • "+(abEndMs?.let(::formatPlayerTime) ?: "ثبت"),fontSize=8.sp)
+                            Text("B • "+(abEndMs?.let(::formatPlayerTime) ?: "ثبت"),fontSize=11.sp)
                         }
                     }
 
@@ -2680,7 +2684,7 @@ private fun PlayerSettingsSheet(
                             Text(
                                 "Resolution، Codec، Bitrate، Buffer و Network را روی تصویر نشان بده.",
                                 color=FqMuted,
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 modifier=Modifier.padding(top=3.dp)
                             )
                         }
@@ -2693,7 +2697,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "جهت تصویر",
                         color=FqMuted,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=8.dp)
                     )
                     LazyRow(
@@ -2734,7 +2738,7 @@ private fun PlayerSettingsSheet(
                     Text(
                         "سرعت، اندازه و جای زیرنویس، نسبت تصویر و Auto‑next برای دفعات بعد ذخیره می‌شن.",
                         color=FqMuted,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         lineHeight=13.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=9.dp)
                     )
@@ -2771,7 +2775,7 @@ private fun PlayerSettingsRow(
                 Text(
                     subtitle,
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=2.dp)
                 )
             }
@@ -2792,7 +2796,7 @@ private fun PlayerSettingsEmpty(message: String) {
         Text(
             message,
             color=FqMuted,
-            fontSize=9.sp,
+            fontSize=11.sp,
             modifier=Modifier.padding(top=8.dp)
         )
     }
@@ -2934,7 +2938,7 @@ private fun DialogueSearchSheet(
                     Text(
                         "یک جمله یا کلمه رو پیدا کن و مستقیم همون لحظه پخش رو باز کن.",
                         color=FqMuted,
-                        fontSize=8.sp
+                        fontSize=11.sp
                     )
                 }
                 IconButton(onClick=onDismiss) {
@@ -2978,7 +2982,7 @@ private fun DialogueSearchSheet(
                     FilterChip(
                         selected=language==item.first,
                         onClick={language=item.first},
-                        label={Text(item.second,fontSize=8.sp)}
+                        label={Text(item.second,fontSize=11.sp)}
                     )
                 }
             }
@@ -2994,7 +2998,7 @@ private fun DialogueSearchSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=7.dp)
                 )
             }
@@ -3041,7 +3045,7 @@ private fun DialogueSearchSheet(
                                         Text(
                                             formatPlayerTime(cue.startMs),
                                             color=FqGold,
-                                            fontSize=8.sp,
+                                            fontSize=11.sp,
                                             fontWeight=FontWeight.Bold,
                                             modifier=Modifier.padding(horizontal=7.dp,vertical=5.dp)
                                         )
@@ -3050,7 +3054,7 @@ private fun DialogueSearchSheet(
                                     Column(Modifier.weight(1f)) {
                                         Text(
                                             cue.text,
-                                            fontSize=9.sp,
+                                            fontSize=11.sp,
                                             lineHeight=15.sp,
                                             maxLines=3,
                                             overflow=TextOverflow.Ellipsis
@@ -3097,7 +3101,7 @@ private fun PlayerSearchHint(
         Text(
             body,
             color=FqMuted,
-            fontSize=8.sp,
+            fontSize=11.sp,
             lineHeight=14.sp,
             modifier=Modifier.padding(start=18.dp,end=18.dp,top=4.dp)
         )
@@ -3296,7 +3300,7 @@ private fun PlayerDiagnosticsOverlay(
                 Text(
                     "Playback Diagnostics",
                     color=FqGold,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     fontWeight=FontWeight.Bold
                 )
             }
