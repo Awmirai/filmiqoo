@@ -13,7 +13,6 @@ func (s *Server) cleanupStaleUploads(ctx context.Context) error {
 		  FROM ugc_uploads
 		 WHERE (
 		   (status='presigned' AND created_at<now()-interval '2 hours')
-		   OR (status='uploaded' AND created_at<now()-interval '24 hours')
 		   OR (status='failed' AND created_at<now()-interval '1 hour')
 		 )
 		 ORDER BY created_at ASC
