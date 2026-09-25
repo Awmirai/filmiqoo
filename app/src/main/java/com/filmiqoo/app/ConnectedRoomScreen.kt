@@ -933,167 +933,248 @@ fun ConnectedRoomScreen(
             }
         }
 
-        Column(Modifier.fillMaxWidth().background(FqSurface)) {
-            if(selectedMessageIds.isEmpty()) {
-                replyTo?.let { reply ->
-                    Row(
-                        Modifier.fillMaxWidth().background(FqSurface2)
-                            .padding(horizontal=10.dp,vertical=7.dp),
-                        verticalAlignment=Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Reply,null,tint=FqGold,modifier=Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "پاسخ به "+reply.author.displayName,
-                                color=FqGold,
-                                fontSize=11.sp
-                            )
-                            Text(
-                                reply.body.ifBlank{"رسانه"},
-                                color=FqMuted,
-                                fontSize=11.sp,
-                                maxLines=1
-                            )
-                        }
-                        IconButton(
-                            onClick={
-                                replyTo=null
-                                draftReplyId=null
-                            },
-                            modifier=Modifier.size(28.dp)
+        Surface(
+            color=FqGlass,
+            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+            shadowElevation=8.dp
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal=8.dp,vertical=6.dp)
+            ) {
+                if(selectedMessageIds.isEmpty()) {
+                    replyTo?.let { reply ->
+                        Surface(
+                            color=FqGold.copy(alpha=.07f),
+                            shape=RoundedCornerShape(14.dp),
+                            border=androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                FqGold.copy(alpha=.16f)
+                            ),
+                            modifier=Modifier.fillMaxWidth()
+                                .padding(bottom=5.dp)
                         ) {
-                            Icon(Icons.Default.Close,null,modifier=Modifier.size(16.dp))
+                            Row(
+                                Modifier.padding(horizontal=10.dp,vertical=8.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Reply,
+                                    contentDescription=null,
+                                    tint=FqGold,
+                                    modifier=Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(7.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "پاسخ به "+reply.author.displayName,
+                                        color=FqGold,
+                                        style=MaterialTheme.typography.labelMedium,
+                                        fontWeight=androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+                                    Text(
+                                        reply.body.ifBlank{"رسانه"},
+                                        color=FqMuted,
+                                        style=MaterialTheme.typography.bodySmall,
+                                        maxLines=1
+                                    )
+                                }
+                                FqIconButton(
+                                    icon=Icons.Default.Close,
+                                    contentDescription="لغو پاسخ",
+                                    onClick={
+                                        replyTo=null
+                                        draftReplyId=null
+                                    },
+                                    modifier=Modifier.size(40.dp)
+                                )
+                            }
                         }
                     }
-                }
 
-                if(typingUsers.isNotEmpty()) {
-                    val names=typingUsers.values.map { it.first }.distinct().take(2)
-                    Text(
-                        names.joinToString("، ")+" در حال نوشتن...",
-                        color=FqGold,
-                        fontSize=11.sp,
-                        modifier=Modifier.padding(horizontal=14.dp,vertical=3.dp)
-                    )
-                }
+                    if(typingUsers.isNotEmpty()) {
+                        val names=typingUsers.values
+                            .map { it.first }
+                            .distinct()
+                            .take(2)
+                        Text(
+                            names.joinToString("، ")+" در حال نوشتن...",
+                            color=FqGold,
+                            style=MaterialTheme.typography.labelSmall,
+                            modifier=Modifier.padding(
+                                horizontal=8.dp,
+                                vertical=3.dp
+                            )
+                        )
+                    }
 
-                Row(
-                    Modifier.fillMaxWidth().padding(8.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        enabled=!uploading,
-                        onClick={
-                            if(!loggedIn) onRequireAuth()
-                            else attachmentMenuOpen=true
-                        }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment=Alignment.Bottom
                     ) {
                         if(uploading) {
-                            CircularProgressIndicator(
-                                color=FqGold,
-                                strokeWidth=2.dp,
-                                modifier=Modifier.size(19.dp)
+                            Box(
+                                Modifier.size(48.dp),
+                                contentAlignment=Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color=FqGold,
+                                    strokeWidth=2.dp,
+                                    modifier=Modifier.size(20.dp)
+                                )
+                            }
+                        } else {
+                            FqIconButton(
+                                icon=Icons.Default.AttachFile,
+                                contentDescription="پیوست",
+                                onClick={
+                                    if(!loggedIn) onRequireAuth()
+                                    else attachmentMenuOpen=true
+                                }
+                            )
+                        }
+
+                        Spacer(Modifier.width(5.dp))
+
+                        Column(Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value=text,
+                                onValueChange={text=it.take(4000)},
+                                placeholder={
+                                    Text(
+                                        if(loggedIn)
+                                            "پیام بنویس..."
+                                        else
+                                            "برای پیام دادن وارد شو"
+                                    )
+                                },
+                                shape=RoundedCornerShape(20.dp),
+                                colors=OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor=FqGold.copy(alpha=.75f),
+                                    unfocusedBorderColor=FqBorder,
+                                    focusedContainerColor=FqSurface,
+                                    unfocusedContainerColor=FqSurface
+                                ),
+                                modifier=Modifier.fillMaxWidth(),
+                                maxLines=4
+                            )
+
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .padding(top=4.dp),
+                                verticalAlignment=Alignment.CenterVertically,
+                                horizontalArrangement=Arrangement.spacedBy(6.dp)
+                            ) {
+                                PremiumChip(
+                                    icon=Icons.Default.VisibilityOff,
+                                    label="Spoiler",
+                                    active=spoiler,
+                                    onClick={spoiler=!spoiler}
+                                )
+                                if(text.isNotBlank()) {
+                                    PremiumChip(
+                                        icon=Icons.Default.Schedule,
+                                        label="زمان‌بندی",
+                                        active=false,
+                                        onClick={
+                                            if(!loggedIn) onRequireAuth()
+                                            else scheduledOpen=true
+                                        }
+                                    )
+                                }
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    text.length.toString()+"/4000",
+                                    color=if(text.length>3800)
+                                        FqDanger
+                                    else
+                                        FqMuted,
+                                    style=MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.width(5.dp))
+
+                        if(text.isNotBlank()) {
+                            FqIconButton(
+                                icon=Icons.Default.Send,
+                                contentDescription="ارسال پیام",
+                                accent=true,
+                                onClick={
+                                    if(!loggedIn) {
+                                        onRequireAuth()
+                                    } else {
+                                        val sending=text.trim()
+                                        val replyId=replyTo?.id
+                                        val sendingSpoiler=spoiler
+                                        text=""
+                                        replyTo=null
+                                        draftReplyId=null
+                                        scope.launch {
+                                            runCatching {
+                                                social.sendMessage(
+                                                    roomId,
+                                                    sending,
+                                                    sendingSpoiler,
+                                                    replyId
+                                                )
+                                            }.onSuccess {
+                                                spoiler=false
+                                                runCatching {
+                                                    messaging.deleteRoomDraft(roomId)
+                                                }
+                                                refresh()
+                                            }.onFailure {
+                                                error=it.message
+                                                if(text.isBlank()) text=sending
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        } else if(!loggedIn) {
+                            FqIconButton(
+                                icon=Icons.Default.Mic,
+                                contentDescription="پیام صوتی",
+                                onClick=onRequireAuth
                             )
                         } else {
-                            Icon(Icons.Default.AttachFile,null,tint=FqGold)
-                        }
-                    }
-
-                    FilterChip(
-                        selected=spoiler,
-                        onClick={spoiler=!spoiler},
-                        label={Text("Spoiler",fontSize=11.sp)}
-                    )
-
-                    Spacer(Modifier.width(6.dp))
-
-                    OutlinedTextField(
-                        value=text,
-                        onValueChange={text=it.take(4000)},
-                        placeholder={Text("پیام...")},
-                        shape=RoundedCornerShape(20.dp),
-                        modifier=Modifier.weight(1f),
-                        maxLines=4
-                    )
-
-                    if(text.isNotBlank()) {
-                        IconButton(
-                            onClick={
-                                if(!loggedIn) onRequireAuth()
-                                else scheduledOpen=true
-                            }
-                        ) {
-                            Icon(Icons.Default.Schedule,null,tint=FqMuted)
-                        }
-
-                        IconButton(onClick={
-                            if(!loggedIn) {
-                                onRequireAuth()
-                            } else {
-                                val sending=text.trim()
-                                val replyId=replyTo?.id
-                                val sendingSpoiler=spoiler
-                                text=""
-                                replyTo=null
-                                draftReplyId=null
-                                scope.launch {
-                                    runCatching {
-                                        social.sendMessage(
-                                            roomId,
-                                            sending,
-                                            sendingSpoiler,
-                                            replyId
-                                        )
-                                    }.onSuccess {
-                                        spoiler=false
-                                        runCatching { messaging.deleteRoomDraft(roomId) }
-                                        refresh()
-                                    }.onFailure {
-                                        error=it.message
-                                        if(text.isBlank()) text=sending
+                            VoiceRecordButton(
+                                enabled=!uploading,
+                                onRecorded={file,durationMs,waveform->
+                                    uploading=true
+                                    val replyId=replyTo?.id
+                                    val sendingSpoiler=spoiler
+                                    replyTo=null
+                                    draftReplyId=null
+                                    scope.launch {
+                                        runCatching {
+                                            social.sendVoiceMessage(
+                                                roomId=roomId,
+                                                file=file,
+                                                durationMs=durationMs,
+                                                waveform=waveform,
+                                                spoiler=sendingSpoiler,
+                                                replyToMessageId=replyId
+                                            )
+                                        }.onSuccess {
+                                            spoiler=false
+                                            runCatching {
+                                                messaging.deleteRoomDraft(roomId)
+                                            }
+                                            refresh()
+                                        }.onFailure {
+                                            error=it.message
+                                        }
+                                        file.delete()
+                                        uploading=false
                                     }
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Default.Send,null,tint=FqGold)
+                                },
+                                onError={error=it}
+                            )
                         }
-                    } else if(!loggedIn) {
-                        IconButton(onClick=onRequireAuth) {
-                            Icon(Icons.Default.Mic,null,tint=FqMuted)
-                        }
-                    } else {
-                        VoiceRecordButton(
-                            enabled=!uploading,
-                            onRecorded={file,durationMs,waveform->
-                                uploading=true
-                                val replyId=replyTo?.id
-                                val sendingSpoiler=spoiler
-                                replyTo=null
-                                draftReplyId=null
-                                scope.launch {
-                                    runCatching {
-                                        social.sendVoiceMessage(
-                                            roomId=roomId,
-                                            file=file,
-                                            durationMs=durationMs,
-                                            waveform=waveform,
-                                            spoiler=sendingSpoiler,
-                                            replyToMessageId=replyId
-                                        )
-                                    }.onSuccess {
-                                        spoiler=false
-                                        runCatching { messaging.deleteRoomDraft(roomId) }
-                                        refresh()
-                                    }.onFailure {
-                                        error=it.message
-                                    }
-                                    file.delete()
-                                    uploading=false
-                                }
-                            },
-                            onError={error=it}
-                        )
                     }
                 }
             }
