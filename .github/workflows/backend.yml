@@ -55,7 +55,7 @@ jobs:
 
       - name: Start MinIO object storage
         run: |
-          docker run -d --name filmiqoo-minio             -p 9000:9000             -e MINIO_ROOT_USER=filmiqoo-ci             -e MINIO_ROOT_PASSWORD=filmiqoo-ci-secret-password             minio/minio:latest server /data
+          docker run -d --name filmiqoo-minio             -p 9000:9000             -e MINIO_ROOT_USER=filmiqoo-ci             -e MINIO_ROOT_PASSWORD=filmiqoo-ci-secret-password             quay.io/minio/minio:latest server /data
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null; then
               exit 0
