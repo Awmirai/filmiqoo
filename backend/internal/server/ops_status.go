@@ -77,7 +77,6 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 		SELECT COUNT(*)
 		  FROM ugc_uploads
 		 WHERE (status='presigned' AND created_at<now()-interval '2 hours')
-		    OR (status='uploaded' AND created_at<now()-interval '24 hours')
 		    OR (status='failed' AND created_at<now()-interval '1 hour')
 	`).Scan(&staleUploads)
 
