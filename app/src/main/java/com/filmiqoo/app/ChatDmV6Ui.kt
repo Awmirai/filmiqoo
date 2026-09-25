@@ -128,7 +128,7 @@ fun RichMessageAttachment(
                     Column(Modifier.weight(1f)) {
                         Text(
                             message.attachmentFileName ?: "فایل",
-                            fontSize=9.sp,
+                            fontSize=11.sp,
                             maxLines=2
                         )
                         Text(
@@ -138,7 +138,7 @@ fun RichMessageAttachment(
                                     .takeIf(String::isNotBlank)
                             ).joinToString(" • "),
                             color=FqMuted,
-                            fontSize=7.sp
+                            fontSize=11.sp
                         )
                     }
                     Icon(Icons.Default.OpenInNew,null,tint=FqMuted)
@@ -180,7 +180,7 @@ fun RichMessageAttachment(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 message.locationLabel ?: "موقعیت مکانی",
-                                fontSize=10.sp
+                                fontSize=12.sp
                             )
                             Text(
                                 String.format(
@@ -189,7 +189,7 @@ fun RichMessageAttachment(
                                     lat,lng
                                 ),
                                 color=FqMuted,
-                                fontSize=7.sp
+                                fontSize=11.sp
                             )
                         }
                         Icon(Icons.Default.OpenInNew,null,tint=FqMuted)
@@ -227,12 +227,12 @@ fun RichMessageAttachment(
                     }
                     Spacer(Modifier.width(9.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(message.contactName ?: "مخاطب",fontSize=10.sp)
+                        Text(message.contactName ?: "مخاطب",fontSize=12.sp)
                         if(phone.isNotBlank()) {
-                            Text(phone,color=FqMuted,fontSize=7.sp)
+                            Text(phone,color=FqMuted,fontSize=11.sp)
                         }
                         message.contactEmail?.takeIf(String::isNotBlank)?.let {
-                            Text(it,color=FqMuted,fontSize=7.sp)
+                            Text(it,color=FqMuted,fontSize=11.sp)
                         }
                     }
                     if(phone.isNotBlank()) {
@@ -307,8 +307,8 @@ private fun ChatAttachmentOption(
             }
             Spacer(Modifier.width(10.dp))
             Column {
-                Text(title,fontSize=10.sp)
-                Text(subtitle,color=FqMuted,fontSize=7.sp)
+                Text(title,fontSize=12.sp)
+                Text(subtitle,color=FqMuted,fontSize=11.sp)
             }
         }
     }
@@ -455,7 +455,7 @@ fun ScheduledMessagesSheet(
                 Spacer(Modifier.width(7.dp))
                 Column(Modifier.weight(1f)) {
                     Text("پیام زمان‌بندی‌شده",fontSize=19.sp)
-                    Text("ارسال خودکار در زمان انتخابی",color=FqMuted,fontSize=8.sp)
+                    Text("ارسال خودکار در زمان انتخابی",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick=onDismiss){Icon(Icons.Default.Close,null)}
             }
@@ -469,7 +469,7 @@ fun ScheduledMessagesSheet(
                     Text(
                         currentText.trim(),
                         maxLines=3,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(10.dp)
                     )
                 }
@@ -477,7 +477,7 @@ fun ScheduledMessagesSheet(
                 Text(
                     "ارسال در:",
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=10.dp,bottom=5.dp)
                 )
                 Row(
@@ -507,7 +507,7 @@ fun ScheduledMessagesSheet(
                                     busy=false
                                 }
                             },
-                            label={Text(preset.first,fontSize=7.sp)}
+                            label={Text(preset.first,fontSize=11.sp)}
                         )
                     }
                 }
@@ -515,7 +515,7 @@ fun ScheduledMessagesSheet(
                 Text(
                     "برای ساخت پیام زمان‌بندی‌شده اول متن پیام را بنویس.",
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(vertical=10.dp)
                 )
             }
@@ -531,7 +531,7 @@ fun ScheduledMessagesSheet(
                 Text(
                     "پیام زمان‌بندی‌شده‌ای نداری.",
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(vertical=12.dp)
                 )
             } else {
@@ -550,13 +550,13 @@ fun ScheduledMessagesSheet(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     item.body.ifBlank { "پیام زمان‌بندی‌شده" },
-                                    fontSize=9.sp,
+                                    fontSize=11.sp,
                                     maxLines=2
                                 )
                                 Text(
                                     formatScheduledTime(item.scheduledAt),
                                     color=FqMuted,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
                             IconButton(
@@ -599,7 +599,7 @@ fun UnreadMessagesDivider(count:Long) {
             Text(
                 if(count>0) count.toString()+" پیام خوانده‌نشده" else "پیام‌های جدید",
                 color=FqGold,
-                fontSize=7.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(horizontal=9.dp,vertical=4.dp)
             )
         }
@@ -630,7 +630,7 @@ fun BulkMessageSelectionBar(
             Text(
                 count.toString()+" انتخاب",
                 color=FqGold,
-                fontSize=10.sp,
+                fontSize=12.sp,
                 modifier=Modifier.weight(1f)
             )
             IconButton(onClick=onForward) {

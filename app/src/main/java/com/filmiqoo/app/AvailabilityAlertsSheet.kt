@@ -114,7 +114,7 @@ fun AvailabilityAlertsSheet(
                     Text(
                         state?.title ?: "Availability Alerts",
                         color=FqMuted,
-                        fontSize=8.sp
+                        fontSize=11.sp
                     )
                 }
                 IconButton(onClick=onDismiss){Icon(Icons.Default.Close,null)}
@@ -123,7 +123,7 @@ fun AvailabilityAlertsSheet(
             Text(
                 "فقط برای گزینه‌هایی که هنوز موجود نیستند Reminder فعال می‌شه. به محض آماده‌شدن، یک اعلان داخل Filmiqoo می‌گیری.",
                 color=FqMuted,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 lineHeight=14.sp,
                 modifier=Modifier.padding(top=12.dp,bottom=8.dp)
             )
@@ -139,7 +139,7 @@ fun AvailabilityAlertsSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(vertical=6.dp)
                 )
             }
@@ -207,7 +207,7 @@ fun AvailabilityAlertsSheet(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     option.title,
-                                    fontSize=10.sp,
+                                    fontSize=12.sp,
                                     fontWeight=FontWeight.Bold
                                 )
                                 Text(
@@ -221,7 +221,7 @@ fun AvailabilityAlertsSheet(
                                         subscribed -> FqGold
                                         else -> FqMuted
                                     },
-                                    fontSize=7.sp,
+                                    fontSize=11.sp,
                                     modifier=Modifier.padding(top=3.dp)
                                 )
                             }
@@ -259,7 +259,7 @@ fun AvailabilityAlertsSheet(
                     Text(
                         "تشخیص Availability از نسخه‌های واقعی Catalog انجام می‌شه؛ وضعیت ساختگی نمایش داده نمی‌شه.",
                         color=FqMuted,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         lineHeight=13.sp
                     )
                 }

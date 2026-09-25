@@ -92,7 +92,7 @@ fun SecurityScreen(
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
                 Text("امنیت و دستگاه‌ها",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text("Sessionهای فعال حساب Filmiqoo",color=FqMuted,fontSize=8.sp)
+                Text("Sessionهای فعال حساب Filmiqoo",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
@@ -105,7 +105,7 @@ fun SecurityScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.08f))
                     .padding(10.dp)
@@ -126,7 +126,7 @@ fun SecurityScreen(
                         Text(
                             "اگر دستگاه ناشناسی دیدی، Session اون دستگاه رو قطع کن.",
                             color=FqMuted,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             lineHeight=14.sp
                         )
                     }
@@ -159,7 +159,7 @@ fun SecurityScreen(
                         Text(
                             "دریافت نسخه داده‌ها یا حذف کامل دسترسی حساب.",
                             color=FqMuted,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             lineHeight=14.sp
                         )
                     }
@@ -414,7 +414,7 @@ private fun SecuritySessionCard(
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Text(
                         session.deviceName,
-                        fontSize=10.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis
@@ -439,7 +439,7 @@ private fun SecuritySessionCard(
                     Text(
                         "IP: "+session.ipAddress,
                         color=FqMuted,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=3.dp)
                     )
                 }
@@ -447,7 +447,7 @@ private fun SecuritySessionCard(
                 Text(
                     "آخرین فعالیت: "+formatSecurityTime(session.lastUsedAt),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=2.dp)
                 )
 

@@ -52,58 +52,26 @@ fun RemoteImage(
 
 @Composable
 fun BrandTopBar(
-    onSearch: (() -> Unit)? = null,
-    onNotifications: (() -> Unit)? = null
+    onSearch:(()->Unit)?=null,
+    onNotifications:(()->Unit)?=null
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal=18.dp, vertical=12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(31.dp).clip(RoundedCornerShape(9.dp)).background(FqGold),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.PlayArrow, null, tint=Color.Black, modifier=Modifier.size(24.dp))
-            }
-            Spacer(Modifier.width(9.dp))
-            Text("FILMIQOO", color=FqGold, fontSize=22.sp, fontWeight=FontWeight.Bold)
-        }
-        Spacer(Modifier.weight(1f))
-        if (onSearch != null) {
-            IconButton(onClick=onSearch) { Icon(Icons.Default.Search, null) }
-        }
-        if (onNotifications != null) {
-            IconButton(onClick=onNotifications) {
-                BadgedBox(badge = { Badge(containerColor=FqDanger) { Text("3") } }) {
-                    Icon(Icons.Default.NotificationsNone, null)
-                }
-            }
-        }
-    }
+    PremiumTopBar(
+        onSearch=onSearch,
+        onNotifications=onNotifications
+    )
 }
 
 @Composable
-fun SectionHeader(title: String, subtitle: String? = null, onMore: (() -> Unit)? = null) {
-    Row(
-        Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=24.dp,bottom=11.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize=20.sp, fontWeight=FontWeight.Bold)
-            if (!subtitle.isNullOrBlank()) {
-                Text(subtitle, color=FqMuted, fontSize=11.sp, modifier=Modifier.padding(top=2.dp))
-            }
-        }
-        if (onMore != null) {
-            Text(
-                "مشاهده همه",
-                color=FqGold,
-                fontSize=11.sp,
-                modifier=Modifier.clickable { onMore() }.padding(6.dp)
-            )
-        }
-    }
+fun SectionHeader(
+    title:String,
+    subtitle:String?=null,
+    onMore:(()->Unit)?=null
+) {
+    PremiumSectionHeader(
+        title=title,
+        subtitle=subtitle,
+        onMore=onMore
+    )
 }
 
 @Composable
@@ -180,8 +148,8 @@ fun StoryBubble(
             media.title,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
-            fontSize=9.sp,
-            modifier=Modifier.padding(top=5.dp)
+            fontSize=11.sp,
+            modifier=Modifier.padding(top=6.dp)
         )
     }
 }
@@ -192,35 +160,22 @@ fun MetricPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Stri
         Row(Modifier.padding(horizontal=10.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(14.dp))
             Spacer(Modifier.width(5.dp))
-            Text(text,fontSize=10.sp)
+            Text(text,style=MaterialTheme.typography.labelSmall)
         }
     }
 }
 
 @Composable
-fun LoadingPage(label: String = "در حال دریافت اطلاعات واقعی...") {
-    Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
-        Column(horizontalAlignment=Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color=FqGold,strokeWidth=3.dp,modifier=Modifier.size(36.dp))
-            Text(label,color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=12.dp))
-        }
-    }
+fun LoadingPage(label:String="در حال دریافت اطلاعات...") {
+    FqLoadingState(label)
 }
 
 @Composable
-fun ErrorPage(message: String, retry: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(26.dp),contentAlignment=Alignment.Center) {
-        Column(horizontalAlignment=Alignment.CenterHorizontally) {
-            Icon(Icons.Default.CloudOff,null,tint=FqMuted,modifier=Modifier.size(52.dp))
-            Text("ارتباط با TMDB برقرار نشد",fontSize=18.sp,modifier=Modifier.padding(top=14.dp))
-            Text(message,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
-            Button(
-                onClick=retry,
-                colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                modifier=Modifier.padding(top=18.dp)
-            ) { Text("تلاش دوباره") }
-        }
-    }
+fun ErrorPage(message:String,retry:()->Unit) {
+    FqErrorState(
+        message=message,
+        retry=retry
+    )
 }
 
 fun formatVote(value: Double): String = String.format(Locale.US, "%.1f", value)

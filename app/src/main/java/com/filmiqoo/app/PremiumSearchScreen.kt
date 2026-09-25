@@ -109,19 +109,12 @@ fun PremiumSearchScreen(
         Box(Modifier.weight(1f)) {
             when(val s=state) {
                 UniversalSearchLoad.Loading -> {
-                    Column(
-                        Modifier.fillMaxSize(),
-                        horizontalAlignment=Alignment.CenterHorizontally,
-                        verticalArrangement=Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(color=FqGold)
-                        Text(
-                            if(query.isBlank())"در حال آماده‌سازی Discover..." else "در حال جستجو...",
-                            color=FqMuted,
-                            fontSize=9.sp,
-                            modifier=Modifier.padding(top=9.dp)
-                        )
-                    }
+                    FqLoadingState(
+                        if(query.isBlank())
+                            "داریم Discover رو آماده می‌کنیم..."
+                        else
+                            "در حال جستجو..."
+                    )
                 }
 
                 is UniversalSearchLoad.Error -> {
@@ -162,75 +155,115 @@ fun PremiumSearchScreen(
 
 @Composable
 private fun SearchHeader(
-    query: String,
-    onQuery: (String) -> Unit,
-    onBack: () -> Unit
+    query:String,
+    onQuery:(String)->Unit,
+    onBack:()->Unit
 ) {
-    Box(
-        Modifier.fillMaxWidth().background(
-            Brush.verticalGradient(listOf(Color(0xFF111827),FqBg))
-        )
-    ) {
-        Column(Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,top=8.dp,bottom=12.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                IconButton(onClick=onBack) {
-                    Icon(Icons.Default.ArrowBack,null)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text("جستجو و Discover",fontSize=22.sp,fontWeight=FontWeight.Black)
-                    Text(
-                        "فیلم، سریال، کاربر، کانال و Reel",
-                        color=FqMuted,
-                        fontSize=8.sp
+    Column(
+        Modifier.fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF111620),
+                        FqBg
                     )
-                }
-            }
-
-            OutlinedTextField(
-                value=query,
-                onValueChange=onQuery,
-                placeholder={Text("مثلاً: Interstellar، @nima یا نقد فیلم...")},
-                leadingIcon={Icon(Icons.Default.Search,null,tint=FqGold)},
-                trailingIcon={
-                    if(query.isNotBlank()) {
-                        IconButton(onClick={onQuery("")}) {
-                            Icon(Icons.Default.Close,null)
-                        }
-                    } else {
-                        Icon(Icons.Default.Tune,null,tint=FqMuted)
-                    }
-                },
-                singleLine=true,
-                shape=RoundedCornerShape(18.dp),
-                modifier=Modifier.fillMaxWidth().padding(top=9.dp)
+                )
             )
+            .statusBarsPadding()
+            .padding(horizontal=FqDimens.Screen)
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .padding(top=8.dp,bottom=8.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            FqIconButton(
+                icon=Icons.Default.ArrowBack,
+                contentDescription="بازگشت",
+                onClick=onBack
+            )
+            Spacer(Modifier.width(4.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "جستجو و Discover",
+                    style=MaterialTheme.typography.headlineSmall,
+                    fontWeight=FontWeight.Black
+                )
+                Text(
+                    "فیلم، سریال، کاربر، کانال و Reel",
+                    color=FqMuted,
+                    style=MaterialTheme.typography.bodySmall,
+                    modifier=Modifier.padding(top=2.dp)
+                )
+            }
         }
+
+        OutlinedTextField(
+            value=query,
+            onValueChange=onQuery,
+            placeholder={
+                Text(
+                    "اسم فیلم، سریال یا @کاربر...",
+                    color=FqMuted
+                )
+            },
+            leadingIcon={
+                Icon(
+                    Icons.Default.Search,
+                    null,
+                    tint=FqGold
+                )
+            },
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={onQuery("")}) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription="پاک کردن جستجو"
+                        )
+                    }
+                }
+            },
+            singleLine=true,
+            shape=RoundedCornerShape(18.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold,
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(bottom=12.dp)
+        )
     }
 }
 
 @Composable
 private fun SearchTabs(
-    selected: SearchTab,
-    onSelected: (SearchTab) -> Unit
+    selected:SearchTab,
+    onSelected:(SearchTab)->Unit
 ) {
-    ScrollableTabRow(
-        selectedTabIndex=selected.ordinal,
-        containerColor=FqBg,
-        contentColor=FqGold,
-        edgePadding=10.dp,
-        divider={}
+    val items=listOf(
+        SearchTab.ALL to "همه",
+        SearchTab.MEDIA to "فیلم و سریال",
+        SearchTab.USERS to "کاربران",
+        SearchTab.CHANNELS to "کانال‌ها",
+        SearchTab.REELS to "Reels"
+    )
+    LazyRow(
+        contentPadding=PaddingValues(
+            horizontal=FqDimens.Screen,
+            vertical=8.dp
+        ),
+        horizontalArrangement=Arrangement.spacedBy(8.dp),
+        modifier=Modifier.fillMaxWidth()
+            .background(FqBg)
     ) {
-        listOf(
-            SearchTab.ALL to "همه",
-            SearchTab.MEDIA to "فیلم و سریال",
-            SearchTab.USERS to "کاربران",
-            SearchTab.CHANNELS to "کانال‌ها",
-            SearchTab.REELS to "Reels"
-        ).forEach { item ->
-            Tab(
-                selected=selected==item.first,
-                onClick={onSelected(item.first)},
-                text={Text(item.second,fontSize=9.sp)}
+        items(items,key={it.first.name}) { item ->
+            PremiumChip(
+                label=item.second,
+                active=selected==item.first,
+                onClick={onSelected(item.first)}
             )
         }
     }
@@ -250,7 +283,7 @@ private fun RecentSearches(
             Text("جستجوهای اخیر",fontSize=11.sp,fontWeight=FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             TextButton(onClick=onClear) {
-                Text("پاک کردن",fontSize=8.sp,color=FqMuted)
+                Text("پاک کردن",fontSize=11.sp,color=FqMuted)
             }
         }
         LazyRow(
@@ -260,7 +293,7 @@ private fun RecentSearches(
             items(history) { value ->
                 AssistChip(
                     onClick={onSelect(value)},
-                    label={Text(value,fontSize=8.sp)},
+                    label={Text(value,fontSize=11.sp)},
                     leadingIcon={
                         Icon(Icons.Default.History,null,modifier=Modifier.size(14.dp))
                     }
@@ -383,11 +416,11 @@ private fun SearchSectionTitle(
         Text(title,fontSize=16.sp,fontWeight=FontWeight.Bold)
         Spacer(Modifier.width(6.dp))
         Surface(color=FqSurface2,shape=CircleShape) {
-            Text(count.toString(),fontSize=7.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
+            Text(count.toString(),fontSize=11.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
         }
         Spacer(Modifier.weight(1f))
         TextButton(onClick=onMore) {
-            Text("همه",fontSize=8.sp)
+            Text("همه",fontSize=11.sp)
             Icon(Icons.Default.ChevronLeft,null,modifier=Modifier.size(15.dp))
         }
     }
@@ -428,7 +461,7 @@ private fun SearchPosterCard(
         }
         Text(
             media.title,
-            fontSize=9.sp,
+            fontSize=11.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
@@ -441,7 +474,7 @@ private fun SearchPosterCard(
                 if(media.vote>0)"★ "+formatVote(media.vote) else ""
             ).filter(String::isNotBlank).joinToString(" • "),
             color=FqMuted,
-            fontSize=7.sp,
+            fontSize=11.sp,
             maxLines=1
         )
     }
@@ -579,7 +612,7 @@ private fun UserBubble(
         }
         Text(
             user.displayName,
-            fontSize=8.sp,
+            fontSize=11.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
@@ -588,7 +621,7 @@ private fun UserBubble(
         Text(
             "@"+user.username,
             color=FqMuted,
-            fontSize=7.sp,
+            fontSize=11.sp,
             maxLines=1,
             overflow=TextOverflow.Ellipsis
         )
@@ -619,12 +652,12 @@ private fun UserRow(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                     }
                 }
-                Text("@"+user.username,color=FqMuted,fontSize=8.sp)
+                Text("@"+user.username,color=FqMuted,fontSize=11.sp)
                 if(user.bio.isNotBlank()) {
                     Text(
                         user.bio,
                         color=Color.White.copy(alpha=.72f),
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=3.dp)
@@ -632,7 +665,7 @@ private fun UserRow(
                 }
             }
             Column(horizontalAlignment=Alignment.End) {
-                Text(compactSearchCount(user.followers),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Text(compactSearchCount(user.followers),fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Text("دنبال‌کننده",color=FqMuted,fontSize=6.sp)
             }
         }
@@ -664,7 +697,7 @@ private fun ChannelRow(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                     }
                 }
-                Text("@"+channel.slug,color=FqMuted,fontSize=8.sp)
+                Text("@"+channel.slug,color=FqMuted,fontSize=11.sp)
                 Text(
                     listOf(
                         compactSearchCount(channel.followers)+" دنبال‌کننده",
@@ -672,7 +705,7 @@ private fun ChannelRow(
                         channel.reels.toString()+" Reel"
                     ).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=3.dp)
                 )
             }
@@ -721,7 +754,7 @@ private fun ReelSearchCard(
                 Text(
                     compactSearchCount(reel.views),
                     color=Color.White,
-                    fontSize=7.sp
+                    fontSize=11.sp
                 )
             }
         }
@@ -729,7 +762,7 @@ private fun ReelSearchCard(
         Column(Modifier.padding(9.dp)) {
             Text(
                 reel.caption.ifBlank { reel.mediaTitle ?: "Reel" },
-                fontSize=8.sp,
+                fontSize=11.sp,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis
             )
@@ -745,7 +778,7 @@ private fun ReelSearchCard(
                 Text(
                     "@"+reel.author.username,
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis
                 )

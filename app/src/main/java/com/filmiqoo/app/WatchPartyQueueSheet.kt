@@ -87,7 +87,7 @@ fun WatchPartyQueueSheet(
                     Text("بعدی‌ها",fontSize=21.sp,fontWeight=FontWeight.Black)
                     Text(
                         "پیشنهاد بده، رأی بده و با Host عنوان بعدی رو انتخاب کن.",
-                        color=FqMuted,fontSize=8.sp
+                        color=FqMuted,fontSize=11.sp
                     )
                 }
                 FilledTonalIconButton(onClick={showSearch=!showSearch}) {
@@ -158,7 +158,7 @@ fun WatchPartyQueueSheet(
                                     Column(Modifier.weight(1f)) {
                                         Text(
                                             media.title,
-                                            fontSize=9.sp,
+                                            fontSize=11.sp,
                                             fontWeight=FontWeight.Bold,
                                             maxLines=1,
                                             overflow=TextOverflow.Ellipsis
@@ -168,7 +168,7 @@ fun WatchPartyQueueSheet(
                                                 media.year,
                                                 if(media.type==MediaType.MOVIE)"فیلم" else "سریال"
                                             ).filter(String::isNotBlank).joinToString(" • "),
-                                            color=FqMuted,fontSize=7.sp
+                                            color=FqMuted,fontSize=11.sp
                                         )
                                     }
                                     Icon(Icons.Default.AddCircle,null,tint=FqGold)
@@ -244,7 +244,7 @@ fun WatchPartyQueueSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.fillMaxWidth().padding(top=9.dp)
                 )
             }
@@ -282,7 +282,7 @@ private fun WatchPartyQueueRow(
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Text(
                         item.media.title,
-                        fontSize=10.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
@@ -304,7 +304,7 @@ private fun WatchPartyQueueRow(
                 }
                 Text(
                     "پیشنهاد @"+item.suggestedBy.username,
-                    color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=3.dp)
+                    color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp)
                 )
                 Row(
                     Modifier.padding(top=7.dp),
@@ -322,7 +322,7 @@ private fun WatchPartyQueueRow(
                             modifier=Modifier.size(15.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(item.votes.toString(),fontSize=7.sp)
+                        Text(item.votes.toString(),fontSize=11.sp)
                     }
 
                     if(canHostControl && item.status=="queued") {
@@ -335,7 +335,7 @@ private fun WatchPartyQueueRow(
                         ) {
                             Icon(Icons.Default.PlayArrow,null,tint=Color.Black,modifier=Modifier.size(15.dp))
                             Spacer(Modifier.width(3.dp))
-                            Text("پخش بعدی",color=Color.Black,fontSize=7.sp)
+                            Text("پخش بعدی",color=Color.Black,fontSize=11.sp)
                         }
                     }
                 }

@@ -65,7 +65,7 @@ fun SeriesCalendarScreen(
                         Text("تقویم سریال‌های من",fontSize=22.sp,fontWeight=FontWeight.Black)
                         Text(
                             "قسمت‌های جدید و نسخه‌های آماده تماشا",
-                            color=FqMuted,fontSize=8.sp
+                            color=FqMuted,fontSize=11.sp
                         )
                     }
                     IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -79,7 +79,7 @@ fun SeriesCalendarScreen(
                         FilterChip(
                             selected=days==value,
                             onClick={days=value},
-                            label={Text(value.toString()+" روز",fontSize=8.sp)}
+                            label={Text(value.toString()+" روز",fontSize=11.sp)}
                         )
                     }
                 }
@@ -94,7 +94,7 @@ fun SeriesCalendarScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -129,7 +129,7 @@ fun SeriesCalendarScreen(
                             Text(
                                 episodes.size.toString()+" قسمت",
                                 color=FqMuted,
-                                fontSize=7.sp
+                                fontSize=11.sp
                             )
                         }
                     }
@@ -178,7 +178,7 @@ private fun SeriesCalendarCard(
                     Text(
                         item.episodeLabel,
                         color=FqGold,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         fontWeight=FontWeight.Bold,
                         modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
                     )
@@ -198,7 +198,7 @@ private fun SeriesCalendarCard(
                 Text(
                     item.episodeName.ifBlank{"قسمت "+item.episodeNumber},
                     color=Color.White.copy(alpha=.82f),
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=3.dp)
@@ -234,7 +234,7 @@ private fun SeriesCalendarCard(
                         Spacer(Modifier.width(6.dp))
                         Text(
                             item.runtimeMinutes.toString()+" دقیقه",
-                            color=FqMuted,fontSize=7.sp
+                            color=FqMuted,fontSize=11.sp
                         )
                     }
                 }

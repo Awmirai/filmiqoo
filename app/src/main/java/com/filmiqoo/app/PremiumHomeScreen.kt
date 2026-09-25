@@ -328,13 +328,13 @@ private fun PremiumHomeContent(
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Watch Party",fontSize=15.sp,fontWeight=FontWeight.Bold)
-                            Text("فیلم رو همزمان با بقیه ببین، چت کن و واکنش بده.",color=FqMuted,fontSize=9.sp,lineHeight=15.sp)
+                            Text("فیلم رو همزمان با بقیه ببین، چت کن و واکنش بده.",color=FqMuted,fontSize=11.sp,lineHeight=15.sp)
                         }
                         Button(
                             onClick={onWatchParty(hero.firstOrNull())},
                             colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                             contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)
-                        ) { Text("شروع",fontSize=9.sp) }
+                        ) { Text("شروع",fontSize=11.sp) }
                     }
                 }
             }
@@ -347,7 +347,7 @@ private fun PremiumHomeContent(
             ) {
                 Icon(Icons.Default.Refresh,null,modifier=Modifier.size(16.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("به‌روزرسانی پیشنهادها",fontSize=9.sp)
+                Text("به‌روزرسانی پیشنهادها",fontSize=11.sp)
             }
         }
     }
@@ -416,13 +416,13 @@ private fun PremiumHeroPager(
                         if(media.type==MediaType.MOVIE)"فیلم" else "سریال",
                         media.originalTitle.takeIf { it.isNotBlank() && it!=media.title }.orEmpty()
                     ).filter(String::isNotBlank).joinToString(" • ")
-                    Text(meta,color=Color.White.copy(alpha=.72f),fontSize=9.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
+                    Text(meta,color=Color.White.copy(alpha=.72f),fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
 
                     if(media.overview.isNotBlank()) {
                         Text(
                             media.overview,
                             color=Color.White.copy(alpha=.82f),
-                            fontSize=10.sp,
+                            fontSize=12.sp,
                             lineHeight=16.sp,
                             maxLines=3,
                             overflow=TextOverflow.Ellipsis,
@@ -490,7 +490,7 @@ private fun HeroBadge(icon: androidx.compose.ui.graphics.vector.ImageVector,text
         Row(Modifier.padding(horizontal=8.dp,vertical=5.dp),verticalAlignment=Alignment.CenterVertically) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(13.dp))
             Spacer(Modifier.width(4.dp))
-            Text(text,fontSize=9.sp,fontWeight=FontWeight.Bold)
+            Text(text,fontSize=11.sp,fontWeight=FontWeight.Bold)
         }
     }
 }
@@ -516,7 +516,7 @@ private fun PremiumStoryBubble(
                 RemoteImage(repository.poster(media.posterPath),Modifier.fillMaxSize().clip(CircleShape))
             }
         }
-        Text(media.title,fontSize=8.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
+        Text(media.title,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
     }
 }
 
@@ -557,7 +557,7 @@ private fun PremiumContinueRow(
                     Text(
                         item.episodeLabel,
                         color=Color.White,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.align(Alignment.BottomStart).padding(9.dp)
                     )
                 }
@@ -570,7 +570,7 @@ private fun PremiumContinueRow(
                 Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(item.media.title,fontSize=11.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        Text(((item.progress*100).toInt()).toString()+"٪ دیده شده",color=FqMuted,fontSize=8.sp,modifier=Modifier.padding(top=3.dp))
+                        Text(((item.progress*100).toInt()).toString()+"٪ دیده شده",color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
                     }
                     IconButton(onClick={onMedia(item.media)},modifier=Modifier.size(32.dp)) {
                         Icon(Icons.Default.MoreVert,null,modifier=Modifier.size(18.dp))
@@ -614,7 +614,7 @@ private fun PremiumTop10Row(
                     shape=RoundedCornerShape(8.dp),
                     modifier=Modifier.align(Alignment.BottomEnd).padding(bottom=4.dp)
                 ) {
-                    Text(media.title,fontSize=9.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.widthIn(max=122.dp).padding(7.dp))
+                    Text(media.title,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.widthIn(max=122.dp).padding(7.dp))
                 }
             }
         }
@@ -642,7 +642,7 @@ private fun PremiumPosterRow(
                             shape=RoundedCornerShape(8.dp),
                             modifier=Modifier.align(Alignment.TopStart).padding(7.dp)
                         ) {
-                            Text(media.quality.ifBlank{"PLAY"},fontSize=7.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp))
+                            Text(media.quality.ifBlank{"PLAY"},fontSize=11.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp))
                         }
                     }
                     if(media.vote>0) {
@@ -654,13 +654,13 @@ private fun PremiumPosterRow(
                             Row(Modifier.padding(horizontal=6.dp,vertical=3.dp),verticalAlignment=Alignment.CenterVertically) {
                                 Icon(Icons.Default.Star,null,tint=FqGold,modifier=Modifier.size(11.dp))
                                 Spacer(Modifier.width(3.dp))
-                                Text(formatVote(media.vote),fontSize=8.sp)
+                                Text(formatVote(media.vote),fontSize=11.sp)
                             }
                         }
                     }
                 }
-                Text(media.title,fontSize=10.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=7.dp))
-                Text(listOf(media.year,if(media.type==MediaType.MOVIE)"فیلم" else "سریال").filter(String::isNotBlank).joinToString(" • "),color=FqMuted,fontSize=8.sp,modifier=Modifier.padding(top=2.dp))
+                Text(media.title,fontSize=12.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=7.dp))
+                Text(listOf(media.year,if(media.type==MediaType.MOVIE)"فیلم" else "سریال").filter(String::isNotBlank).joinToString(" • "),color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=2.dp))
             }
         }
     }
@@ -689,7 +689,7 @@ private fun PremiumWideRow(
                 )
                 Column(Modifier.align(Alignment.BottomStart).padding(11.dp)) {
                     Text(media.title,fontSize=13.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    Text(listOf(media.year,if(media.vote>0)"★ "+formatVote(media.vote) else "").filter(String::isNotBlank).joinToString(" • "),color=FqMuted,fontSize=8.sp)
+                    Text(listOf(media.year,if(media.vote>0)"★ "+formatVote(media.vote) else "").filter(String::isNotBlank).joinToString(" • "),color=FqMuted,fontSize=11.sp)
                 }
             }
         }

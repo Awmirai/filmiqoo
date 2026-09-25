@@ -93,7 +93,7 @@ fun ReleaseCenterScreen(
                     IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                     Column(Modifier.weight(1f)) {
                         Text("Release Center",fontSize=21.sp,fontWeight=FontWeight.Black)
-                        Text("تقویم انتشار فیلم و سریال",color=Color.White.copy(alpha=.65f),fontSize=8.sp)
+                        Text("تقویم انتشار فیلم و سریال",color=Color.White.copy(alpha=.65f),fontSize=11.sp)
                     }
                     IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
                 }
@@ -110,7 +110,7 @@ fun ReleaseCenterScreen(
                         ) {
                             Text(
                                 releaseTimingLabel(item.daysAway),
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 fontWeight=FontWeight.Black,
                                 modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp)
                             )
@@ -130,7 +130,7 @@ fun ReleaseCenterScreen(
                                 if(item.media.vote>0)"★ "+formatVote(item.media.vote) else ""
                             ).filter(String::isNotBlank).joinToString(" • "),
                             color=FqMuted,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.padding(top=5.dp)
                         )
                         Row(
@@ -215,7 +215,7 @@ fun ReleaseCenterScreen(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.fillMaxWidth().padding(14.dp)
                 )
             }
@@ -371,7 +371,7 @@ private fun ReleaseRow(
                     Text(
                         item.media.originalTitle,
                         color=FqMuted,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=2.dp)
@@ -380,20 +380,20 @@ private fun ReleaseRow(
                 Text(
                     item.releaseDate.ifBlank{"تاریخ نامشخص"},
                     color=FqGold,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=6.dp)
                 )
                 Text(
                     releaseTimingLabel(item.daysAway),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=2.dp)
                 )
                 if(item.media.overview.isNotBlank()) {
                     Text(
                         item.media.overview,
                         color=Color.White.copy(alpha=.67f),
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         lineHeight=12.sp,
                         maxLines=2,
                         overflow=TextOverflow.Ellipsis,

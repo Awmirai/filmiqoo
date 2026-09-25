@@ -49,44 +49,63 @@ fun InboxScreen(
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
-        Box(
-            Modifier.fillMaxWidth().background(
-                Brush.linearGradient(listOf(Color(0xFF111827),Color(0xFF231B09),FqBg))
-            )
+        Surface(
+            color=FqGlass,
+            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+            shadowElevation=5.dp
         ) {
-            Column {
+            Column(
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=8.dp,vertical=6.dp)
+            ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(10.dp),
+                    Modifier.fillMaxWidth(),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+                    FqIconButton(
+                        icon=Icons.Default.ArrowBack,
+                        contentDescription="بازگشت",
+                        onClick=onBack
+                    )
                     Column(Modifier.weight(1f)) {
-                        Text("پیام‌ها",fontSize=23.sp,fontWeight=FontWeight.Black)
                         Text(
-                            if(archivedView)"گفتگوهای آرشیوشده" else "DM، گروه‌ها و Roomهای عضو‌شده",
+                            "پیام‌ها",
+                            style=MaterialTheme.typography.headlineSmall,
+                            fontWeight=FontWeight.Black
+                        )
+                        Text(
+                            if(archivedView)
+                                "گفتگوهای آرشیوشده"
+                            else
+                                "DM، گروه‌ها و Roomهای تو",
                             color=FqMuted,
-                            fontSize=8.sp
+                            style=MaterialTheme.typography.bodySmall
                         )
                     }
-                    IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
+                    FqIconButton(
+                        icon=Icons.Default.Refresh,
+                        contentDescription="همگام‌سازی",
+                        onClick={refresh++}
+                    )
                 }
 
                 Row(
                     Modifier.fillMaxWidth()
-                        .padding(start=14.dp,end=14.dp,bottom=10.dp),
-                    horizontalArrangement=Arrangement.spacedBy(7.dp)
+                        .padding(start=6.dp,end=6.dp,bottom=6.dp),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
-                        selected=!archivedView,
-                        onClick={archivedView=false},
-                        label={Text("Inbox",fontSize=8.sp)},
-                        leadingIcon={Icon(Icons.Default.Inbox,null,modifier=Modifier.size(15.dp))}
+                    PremiumChip(
+                        icon=Icons.Default.Inbox,
+                        label="Inbox",
+                        active=!archivedView,
+                        onClick={archivedView=false}
                     )
-                    FilterChip(
-                        selected=archivedView,
-                        onClick={archivedView=true},
-                        label={Text("آرشیو",fontSize=8.sp)},
-                        leadingIcon={Icon(Icons.Default.Archive,null,modifier=Modifier.size(15.dp))}
+                    PremiumChip(
+                        icon=Icons.Default.Archive,
+                        label="آرشیو",
+                        active=archivedView,
+                        onClick={archivedView=true}
                     )
                 }
             }
@@ -100,7 +119,7 @@ fun InboxScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=9.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.09f))
                     .padding(10.dp)
@@ -176,8 +195,12 @@ private fun InboxCard(
     var menuOpen by remember(item.id) { mutableStateOf(false) }
 
     Surface(
-        color=if(item.unread>0)FqGold.copy(alpha=.08f) else FqSurface,
+        color=if(item.unread>0)FqGold.copy(alpha=.07f) else FqSurface,
         shape=RoundedCornerShape(20.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if(item.unread>0) FqGold.copy(alpha=.22f) else FqBorder
+        ),
         modifier=Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -211,7 +234,7 @@ private fun InboxCard(
                     )
                     if(item.type=="dm" && item.otherUsername.isNotBlank()) {
                         Spacer(Modifier.width(5.dp))
-                        Text("@"+item.otherUsername,color=FqMuted,fontSize=7.sp)
+                        Text("@"+item.otherUsername,color=FqMuted,fontSize=11.sp)
                     }
                     if(item.notificationLevel=="off") {
                         Spacer(Modifier.width(5.dp))
@@ -235,7 +258,7 @@ private fun InboxCard(
                 Text(
                     item.lastMessage.ifBlank { item.topic.ifBlank { "مکالمه جدید" } },
                     color=if(item.unread>0)Color.White.copy(alpha=.85f) else FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=4.dp)
@@ -258,7 +281,7 @@ private fun InboxCard(
                     }
                     if(item.members>2) {
                         Spacer(Modifier.width(6.dp))
-                        Text(compactInboxCount(item.members)+" عضو",color=FqMuted,fontSize=7.sp)
+                        Text(compactInboxCount(item.members)+" عضو",color=FqMuted,fontSize=11.sp)
                     }
                 }
             }
@@ -267,7 +290,7 @@ private fun InboxCard(
                 Surface(color=FqGold,contentColor=Color.Black,shape=CircleShape) {
                     Text(
                         if(item.unread>99)"99+" else item.unread.toString(),
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         fontWeight=FontWeight.Black,
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
@@ -369,7 +392,7 @@ fun ConnectedNotificationsScreen(
                 Text(
                     if(unread>0)compactInboxCount(unread)+" خوانده‌نشده" else "همه‌چی دیده شده",
                     color=if(unread>0)FqGold else FqMuted,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
             }
             if(unread>0) {
@@ -378,14 +401,14 @@ fun ConnectedNotificationsScreen(
                         runCatching { repo.markAllNotificationsRead() }
                             .onSuccess { refresh++ }
                     }
-                }) { Text("خواندن همه",fontSize=8.sp) }
+                }) { Text("خواندن همه",fontSize=11.sp) }
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
 
         if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         error?.let {
-            Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(12.dp))
+            Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
         if(!loading && items.isEmpty()) {
@@ -478,13 +501,13 @@ private fun NotificationCard(
                     Text(
                         item.body,
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         maxLines=2,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=4.dp)
                     )
                 }
-                Text(notificationTypeLabel(item.type),color=FqGold,fontSize=7.sp,modifier=Modifier.padding(top=4.dp))
+                Text(notificationTypeLabel(item.type),color=FqGold,fontSize=11.sp,modifier=Modifier.padding(top=4.dp))
             }
             Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
         }

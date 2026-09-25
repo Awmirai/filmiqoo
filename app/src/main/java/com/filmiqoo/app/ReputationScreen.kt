@@ -50,7 +50,7 @@ fun ReputationScreen(
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
                 Text("Reputation و Badgeها",fontSize=21.sp,fontWeight=FontWeight.Black)
-                Text("بر اساس فعالیت واقعی و عمومی در Filmiqoo",color=FqMuted,fontSize=8.sp)
+                Text("بر اساس فعالیت واقعی و عمومی در Filmiqoo",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
@@ -63,7 +63,7 @@ fun ReputationScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -109,7 +109,7 @@ fun ReputationScreen(
                             Text(
                                 "هنوز Badge دریافت نشده؛ با Review، Collection و مشارکت عمومی قابل دریافت‌اند.",
                                 color=FqMuted,
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 lineHeight=14.sp,
                                 modifier=Modifier.padding(14.dp)
                             )
@@ -179,11 +179,11 @@ private fun ReputationHero(rep:UserReputation) {
                             )
                         }
                     }
-                    Text("@"+rep.username,color=FqMuted,fontSize=8.sp)
+                    Text("@"+rep.username,color=FqMuted,fontSize=11.sp)
                     Text(
                         "Level "+rep.level+" • "+compactReputation(rep.score)+" XP",
                         color=FqGold,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         fontWeight=FontWeight.Bold,
                         modifier=Modifier.padding(top=5.dp)
                     )
@@ -205,7 +205,7 @@ private fun ReputationHero(rep:UserReputation) {
                 Text(
                     (rep.nextLevelScore-rep.score).coerceAtLeast(0).toString()+" XP تا Level بعد",
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=5.dp)
                 )
             }
@@ -240,7 +240,7 @@ private fun ReputationStatsGrid(stats:ReputationStats) {
                     Icon(Icons.Default.LocalMovies,null,tint=FqGold)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("ژانر پرتکرار در Reviewها",fontSize=8.sp,color=FqMuted)
+                        Text("ژانر پرتکرار در Reviewها",fontSize=11.sp,color=FqMuted)
                         Text(
                             stats.topGenre,
                             fontSize=11.sp,
@@ -251,7 +251,7 @@ private fun ReputationStatsGrid(stats:ReputationStats) {
                     Text(
                         stats.topGenreReviews.toString()+" Review",
                         color=FqGold,
-                        fontSize=8.sp
+                        fontSize=11.sp
                     )
                 }
             }
@@ -318,7 +318,7 @@ private fun ReputationBadgeCard(badge:ReputationBadge) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Text(
                         badge.title,
-                        fontSize=10.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold
                     )
                     if(badge.earned) {
@@ -334,7 +334,7 @@ private fun ReputationBadgeCard(badge:ReputationBadge) {
                 Text(
                     badge.description,
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     lineHeight=13.sp,
                     modifier=Modifier.padding(top=3.dp)
                 )

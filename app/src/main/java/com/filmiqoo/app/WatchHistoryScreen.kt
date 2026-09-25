@@ -67,11 +67,11 @@ fun WatchHistoryScreen(
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
                 Text("تاریخچه تماشا",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text(items.size.toString()+" مورد اخیر",color=FqMuted,fontSize=8.sp)
+                Text(items.size.toString()+" مورد اخیر",color=FqMuted,fontSize=11.sp)
             }
             if(items.isNotEmpty()) {
                 TextButton(onClick={confirmClear=true}) {
-                    Text("پاک کردن همه",color=FqDanger,fontSize=8.sp)
+                    Text("پاک کردن همه",color=FqDanger,fontSize=11.sp)
                 }
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -88,7 +88,7 @@ fun WatchHistoryScreen(
 
         if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         error?.let {
-            Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(12.dp))
+            Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
         if(!loading && visible.isEmpty()) {
@@ -205,12 +205,12 @@ private fun HistoryCard(
                         overflow=TextOverflow.Ellipsis
                     )
                     if(item.episodeLabel.isNotBlank()) {
-                        Text(item.episodeLabel,color=FqGold,fontSize=8.sp,modifier=Modifier.padding(top=3.dp))
+                        Text(item.episodeLabel,color=FqGold,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
                     }
                     Text(
                         if(item.completed)"تماشا کامل شده" else ((item.progress*100).toInt()).toString()+"٪ دیده شده",
                         color=FqMuted,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=4.dp)
                     )
                     if(!item.completed) {

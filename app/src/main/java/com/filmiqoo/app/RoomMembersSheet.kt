@@ -95,7 +95,7 @@ fun RoomMembersSheet(
                     Text(
                         online.toString()+" آنلاین • "+total+" عضو",
                         color=FqMuted,
-                        fontSize=8.sp
+                        fontSize=11.sp
                     )
                 }
                 IconButton(onClick=onDismiss) {
@@ -132,7 +132,7 @@ fun RoomMembersSheet(
                                     Spacer(Modifier.width(8.dp))
                                     Column(Modifier.weight(1f)) {
                                         Row(verticalAlignment=Alignment.CenterVertically) {
-                                            Text(candidate.displayName,fontSize=9.sp)
+                                            Text(candidate.displayName,fontSize=11.sp)
                                             if(candidate.verified) {
                                                 Spacer(Modifier.width(3.dp))
                                                 Icon(
@@ -143,7 +143,7 @@ fun RoomMembersSheet(
                                                 )
                                             }
                                         }
-                                        Text("@"+candidate.username,color=FqMuted,fontSize=7.sp)
+                                        Text("@"+candidate.username,color=FqMuted,fontSize=11.sp)
                                     }
                                     IconButton(
                                         enabled=addingId==null,
@@ -191,7 +191,7 @@ fun RoomMembersSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=8.dp)
                 )
             }
@@ -238,7 +238,7 @@ fun RoomMembersSheet(
                             Spacer(Modifier.width(9.dp))
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                    Text(member.displayName,fontSize=10.sp)
+                                    Text(member.displayName,fontSize=12.sp)
                                     if(member.verified) {
                                         Spacer(Modifier.width(3.dp))
                                         Icon(
@@ -260,7 +260,7 @@ fun RoomMembersSheet(
                                         else -> relativeLastSeen(member.lastSeenAt)
                                     },
                                     color=if(member.presence=="offline")FqMuted else FqGreen,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
 
@@ -270,7 +270,7 @@ fun RoomMembersSheet(
                                     onClick={roleMenu=true},
                                     contentPadding=PaddingValues(horizontal=7.dp)
                                 ) {
-                                    Text(roleLabel(member.role),fontSize=7.sp)
+                                    Text(roleLabel(member.role),fontSize=11.sp)
                                     if(canChangeRole) {
                                         Icon(
                                             Icons.Default.KeyboardArrowDown,

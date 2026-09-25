@@ -217,7 +217,7 @@ fun ViewerProfilesScreen(
                 IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                 Column(Modifier.weight(1f)) {
                     Text("چه کسی تماشا می‌کند؟",fontSize=22.sp,fontWeight=FontWeight.Black)
-                    Text("History، Continue و Library برای هر پروفایل جداست.",color=FqMuted,fontSize=8.sp)
+                    Text("History، Continue و Library برای هر پروفایل جداست.",color=FqMuted,fontSize=11.sp)
                 }
                 if(profiles.size<5) {
                     IconButton(onClick={creating=true}) {
@@ -235,7 +235,7 @@ fun ViewerProfilesScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -475,7 +475,7 @@ private fun ViewerProfileCard(
                 Text(
                     if(active)"پروفایل فعال" else "انتخاب پروفایل",
                     color=if(active)FqGold else FqMuted,
-                    fontSize=7.sp
+                    fontSize=11.sp
                 )
             }
 
@@ -485,7 +485,7 @@ private fun ViewerProfileCard(
             ) {
                 Icon(Icons.Default.Edit,null,modifier=Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("ویرایش",fontSize=7.sp)
+                Text("ویرایش",fontSize=11.sp)
             }
         }
     }
@@ -514,7 +514,7 @@ private fun AddViewerProfileCard(onClick:()->Unit) {
                 fontWeight=FontWeight.Bold,
                 modifier=Modifier.padding(top=10.dp)
             )
-            Text("حداکثر ۵ پروفایل",color=FqMuted,fontSize=7.sp)
+            Text("حداکثر ۵ پروفایل",color=FqMuted,fontSize=11.sp)
         }
     }
 }
@@ -558,8 +558,8 @@ private fun ViewerProfileEditorDialog(
                     Icon(Icons.Default.ChildCare,null,tint=if(kids)Color(0xFF63D6FF) else FqMuted)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Kids Mode",fontSize=10.sp,fontWeight=FontWeight.Bold)
-                        Text("Social و Create در این حالت مخفی می‌شن.",color=FqMuted,fontSize=7.sp)
+                        Text("Kids Mode",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text("Social و Create در این حالت مخفی می‌شن.",color=FqMuted,fontSize=11.sp)
                     }
                     Switch(
                         checked=kids,
@@ -570,7 +570,7 @@ private fun ViewerProfileEditorDialog(
                     )
                 }
 
-                Text("سطح محتوا",fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=10.dp))
+                Text("سطح محتوا",fontSize=11.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=10.dp))
                 Row(horizontalArrangement=Arrangement.spacedBy(5.dp)) {
                     listOf(
                         "kids" to "کودک",
@@ -583,22 +583,22 @@ private fun ViewerProfileEditorDialog(
                                 maturity=item.first
                                 kids=item.first=="kids"
                             },
-                            label={Text(item.second,fontSize=7.sp)}
+                            label={Text(item.second,fontSize=11.sp)}
                         )
                     }
                 }
 
-                Text("زبان صدا",fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=8.dp))
+                Text("زبان صدا",fontSize=11.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=8.dp))
                 ViewerLanguageRow(selected=audio,onSelected={audio=it})
 
-                Text("زبان زیرنویس",fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=8.dp))
+                Text("زبان زیرنویس",fontSize=11.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=8.dp))
                 ViewerLanguageRow(selected=subtitle,onSelected={subtitle=it})
 
                 Row(
                     Modifier.fillMaxWidth().padding(top=8.dp),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    Text("Auto‑next",fontSize=9.sp,modifier=Modifier.weight(1f))
+                    Text("Auto‑next",fontSize=11.sp,modifier=Modifier.weight(1f))
                     Switch(checked=autoplay,onCheckedChange={autoplay=it})
                 }
 
@@ -615,7 +615,7 @@ private fun ViewerProfileEditorDialog(
                         Spacer(Modifier.width(5.dp))
                         Text(
                             if(existing.pinProtected)"تغییر / حذف PIN" else "تنظیم PIN پروفایل",
-                            fontSize=8.sp
+                            fontSize=11.sp
                         )
                     }
                 }
@@ -627,7 +627,7 @@ private fun ViewerProfileEditorDialog(
                     ) {
                         Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)
                         Spacer(Modifier.width(4.dp))
-                        Text("حذف پروفایل",color=FqDanger,fontSize=8.sp)
+                        Text("حذف پروفایل",color=FqDanger,fontSize=11.sp)
                     }
                 }
             }
@@ -690,7 +690,7 @@ private fun ViewerLanguageRow(
             FilterChip(
                 selected=selected==item.first,
                 onClick={onSelected(item.first)},
-                label={Text(item.second,fontSize=7.sp)}
+                label={Text(item.second,fontSize=11.sp)}
             )
         }
     }
@@ -714,7 +714,7 @@ private fun ViewerPinUnlockDialog(
                 Text(
                     "برای ورود به این پروفایل PIN چهاررقمی رو وارد کن.",
                     color=FqMuted,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
                 OutlinedTextField(
                     value=pin,
@@ -760,7 +760,7 @@ private fun ViewerPinSettingsDialog(
                     else
                         "با PIN، ورود به این پروفایل محافظت می‌شه.",
                     color=FqMuted,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
 
                 if(profile.pinProtected) {
@@ -804,7 +804,7 @@ private fun ViewerPinSettingsDialog(
                     ) {
                         Icon(Icons.Default.LockOpen,null,tint=FqDanger)
                         Spacer(Modifier.width(4.dp))
-                        Text("حذف PIN",color=FqDanger,fontSize=8.sp)
+                        Text("حذف PIN",color=FqDanger,fontSize=11.sp)
                     }
                 }
             }

@@ -73,7 +73,7 @@ fun PersonScreen(
                     Text(
                         error ?: "در حال دریافت "+initialName+"...",
                         color=FqMuted,
-                        fontSize=10.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(top=10.dp)
                     )
                     if(error!=null) {
@@ -111,7 +111,7 @@ fun PersonScreen(
                             }
                             Text(
                                 person.biography,
-                                fontSize=9.sp,
+                                fontSize=11.sp,
                                 lineHeight=16.sp,
                                 color=Color.White.copy(alpha=.83f),
                                 maxLines=if(bioExpanded)Int.MAX_VALUE else 7,
@@ -123,7 +123,7 @@ fun PersonScreen(
                                     onClick={bioExpanded=!bioExpanded},
                                     contentPadding=PaddingValues(0.dp)
                                 ) {
-                                    Text(if(bioExpanded)"کمتر" else "ادامه",fontSize=8.sp)
+                                    Text(if(bioExpanded)"کمتر" else "ادامه",fontSize=11.sp)
                                 }
                             }
                         }
@@ -271,7 +271,7 @@ private fun PersonHero(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         person.credits.distinctBy { it.media.key }.size.toString()+" اثر",
-                        fontSize=7.sp
+                        fontSize=11.sp
                     )
                 }
             }
@@ -300,7 +300,7 @@ private fun PersonHero(
                 Text(
                     departmentLabel(person.knownForDepartment),
                     color=FqGold,
-                    fontSize=10.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     modifier=Modifier.padding(top=3.dp)
                 )
@@ -309,7 +309,7 @@ private fun PersonHero(
                 Text(
                     person.alsoKnownAs.take(2).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=5.dp)
@@ -344,7 +344,7 @@ private fun PersonFacts(person:PersonDetail) {
                 ) {
                     Icon(fact.first,null,tint=FqGold,modifier=Modifier.size(15.dp))
                     Spacer(Modifier.width(5.dp))
-                    Text(fact.second,fontSize=7.sp)
+                    Text(fact.second,fontSize=11.sp)
                 }
             }
         }
@@ -370,7 +370,7 @@ private fun PersonTabBar(
             Tab(
                 selected=selected==item.first,
                 onClick={onSelected(item.first)},
-                text={Text(item.second,fontSize=9.sp)}
+                text={Text(item.second,fontSize=11.sp)}
             )
         }
     }
@@ -397,7 +397,7 @@ private fun PersonCreditsRow(
                 )
                 Text(
                     credit.media.title,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
@@ -439,7 +439,7 @@ private fun PersonCreditRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     credit.media.title,
-                    fontSize=10.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis
@@ -451,7 +451,7 @@ private fun PersonCreditRow(
                         credit.role
                     ).filter(String::isNotBlank).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     maxLines=2,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=3.dp)
@@ -460,7 +460,7 @@ private fun PersonCreditRow(
                     Text(
                         "★ "+String.format(java.util.Locale.US,"%.1f",credit.media.vote),
                         color=FqGold,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=4.dp)
                     )
                 }
@@ -484,7 +484,7 @@ private fun PersonSectionTitle(
         Spacer(Modifier.width(7.dp))
         Column {
             Text(title,fontSize=15.sp,fontWeight=FontWeight.Bold)
-            Text(subtitle,color=FqMuted,fontSize=7.sp)
+            Text(subtitle,color=FqMuted,fontSize=11.sp)
         }
     }
 }
@@ -505,7 +505,7 @@ private fun PersonEmpty(text:String) {
         shape=RoundedCornerShape(18.dp),
         modifier=Modifier.fillMaxWidth().padding(16.dp)
     ) {
-        Text(text,color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(16.dp))
+        Text(text,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(16.dp))
     }
 }
 

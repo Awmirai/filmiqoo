@@ -104,10 +104,10 @@ fun LiveHubScreen(
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Box(Modifier.size(9.dp).background(FqDanger,CircleShape))
                         Spacer(Modifier.width(6.dp))
-                        Text("LIVE",color=FqDanger,fontSize=10.sp,fontWeight=FontWeight.Black)
+                        Text("LIVE",color=FqDanger,fontSize=12.sp,fontWeight=FontWeight.Black)
                     }
                     Text("Live & Premiere",fontSize=24.sp,fontWeight=FontWeight.Black)
-                    Text("پخش زنده، پریمیر و Chat همزمان",color=FqMuted,fontSize=8.sp)
+                    Text("پخش زنده، پریمیر و Chat همزمان",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
             }
@@ -119,7 +119,7 @@ fun LiveHubScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text("رویدادها",fontSize=15.sp,fontWeight=FontWeight.Bold)
-                Text("Liveهای در حال پخش و Premiereهای آینده",color=FqMuted,fontSize=8.sp)
+                Text("Liveهای در حال پخش و Premiereهای آینده",color=FqMuted,fontSize=11.sp)
             }
             Button(
                 onClick={
@@ -130,7 +130,7 @@ fun LiveHubScreen(
             ) {
                 Icon(Icons.Default.Add,null,tint=Color.Black)
                 Spacer(Modifier.width(4.dp))
-                Text("ساخت",color=Color.Black,fontSize=8.sp)
+                Text("ساخت",color=Color.Black,fontSize=11.sp)
             }
         }
 
@@ -142,7 +142,7 @@ fun LiveHubScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.08f))
                     .padding(10.dp)
@@ -246,13 +246,13 @@ private fun LiveEventCard(
                         Text(
                             if(event.eventType=="premiere")"Premiere" else "Live Stream",
                             color=FqGold,
-                            fontSize=8.sp
+                            fontSize=11.sp
                         )
                     }
                     if(event.state=="live") {
                         Text(
                             compactLiveCount(event.viewers)+" بیننده",
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.background(
                                 Color.Black.copy(alpha=.55f),
                                 RoundedCornerShape(8.dp)
@@ -274,7 +274,7 @@ private fun LiveEventCard(
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        Text(event.host.displayName,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                        Text(event.host.displayName,fontSize=11.sp,fontWeight=FontWeight.Bold)
                         if(event.host.verified) {
                             Spacer(Modifier.width(3.dp))
                             Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(12.dp))
@@ -283,7 +283,7 @@ private fun LiveEventCard(
                     Text(
                         liveScheduleLabel(event),
                         color=FqMuted,
-                        fontSize=7.sp
+                        fontSize=11.sp
                     )
                 }
                 Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
@@ -315,7 +315,7 @@ private fun LiveStateBadge(event:LiveEvent,modifier:Modifier=Modifier) {
                     "ended" -> "ENDED"
                     else -> event.state.uppercase()
                 },
-                fontSize=7.sp,
+                fontSize=11.sp,
                 fontWeight=FontWeight.Black
             )
         }
@@ -439,7 +439,7 @@ private fun LiveEventDetailScreen(
                     Text(
                         localEvent.description,
                         color=Color.White.copy(alpha=.76f),
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         lineHeight=16.sp,
                         modifier=Modifier.padding(top=7.dp)
                     )
@@ -456,13 +456,13 @@ private fun LiveEventDetailScreen(
                     )
                     Spacer(Modifier.width(9.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(localEvent.host.displayName,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                        Text("@"+localEvent.host.username,color=FqMuted,fontSize=7.sp)
+                        Text(localEvent.host.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text("@"+localEvent.host.username,color=FqMuted,fontSize=11.sp)
                     }
                     if(localEvent.state=="live") {
                         Icon(Icons.Default.Visibility,null,tint=FqGold,modifier=Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(compactLiveCount(localEvent.viewers),fontSize=8.sp)
+                        Text(compactLiveCount(localEvent.viewers),fontSize=11.sp)
                     }
                 }
             }
@@ -485,8 +485,8 @@ private fun LiveEventDetailScreen(
                         )
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(media.title,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                            Text("متصل به Catalog Filmiqoo",color=FqMuted,fontSize=7.sp)
+                            Text(media.title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                            Text("متصل به Catalog Filmiqoo",color=FqMuted,fontSize=11.sp)
                         }
                         Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
                     }
@@ -714,11 +714,11 @@ private fun CreateLiveEventDialog(
                             Icon(Icons.Default.Movie,null,tint=FqGold)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(taggedMedia?.title ?: "انتخاب فیلم یا سریال",fontSize=9.sp)
+                                Text(taggedMedia?.title ?: "انتخاب فیلم یا سریال",fontSize=11.sp)
                                 Text(
                                     "Premiere از نسخه Stream-ready Catalog پخش می‌شه.",
                                     color=FqMuted,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
                             Icon(Icons.Default.ChevronLeft,null)
@@ -729,7 +729,7 @@ private fun CreateLiveEventDialog(
                         value=playbackUrl,
                         onValueChange={playbackUrl=it.take(2000)},
                         label={Text("HLS playback URL • اختیاری")},
-                        supportingText={Text("می‌تونی بعداً قبل از شروع Live هم واردش کنی.",fontSize=7.sp)},
+                        supportingText={Text("می‌تونی بعداً قبل از شروع Live هم واردش کنی.",fontSize=11.sp)},
                         modifier=Modifier.fillMaxWidth().padding(top=7.dp)
                     )
                 }
@@ -738,7 +738,7 @@ private fun CreateLiveEventDialog(
                     Modifier.fillMaxWidth().padding(top=8.dp),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    Text("Live Chat",fontSize=9.sp,modifier=Modifier.weight(1f))
+                    Text("Live Chat",fontSize=11.sp,modifier=Modifier.weight(1f))
                     Switch(checked=allowChat,onCheckedChange={allowChat=it})
                 }
 
@@ -750,7 +750,7 @@ private fun CreateLiveEventDialog(
                         FilterChip(
                             selected=visibility==it.first,
                             onClick={visibility=it.first},
-                            label={Text(it.second,fontSize=7.sp)}
+                            label={Text(it.second,fontSize=11.sp)}
                         )
                     }
                 }
@@ -831,7 +831,7 @@ private fun LiveSourceDialog(
                 Text(
                     "آدرس HLS خروجی Encoder/Live pipeline رو وارد کن. Premiere این مرحله رو لازم نداره.",
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     lineHeight=14.sp
                 )
                 OutlinedTextField(

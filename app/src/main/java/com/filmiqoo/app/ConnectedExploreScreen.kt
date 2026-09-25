@@ -448,7 +448,7 @@ private fun ReelVideoPage(
                     Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(52.dp))
                     Text("Spoiler Shield",color=FqDanger,fontSize=22.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=12.dp))
                     Text("این Reel دارای اسپویل است.",color=Color.White,fontSize=12.sp,modifier=Modifier.padding(top=7.dp))
-                    Text("برای نمایش لمس کن",color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=3.dp))
+                    Text("برای نمایش لمس کن",color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=3.dp))
                 }
             }
             return
@@ -474,7 +474,7 @@ private fun ReelVideoPage(
                             Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(15.dp))
                         }
                     }
-                    Text("@"+reel.author.username,color=Color.White.copy(alpha=.7f),fontSize=9.sp)
+                    Text("@"+reel.author.username,color=Color.White.copy(alpha=.7f),fontSize=11.sp)
                 }
                 Spacer(Modifier.width(10.dp))
                 OutlinedButton(
@@ -483,7 +483,7 @@ private fun ReelVideoPage(
                     modifier=Modifier.height(30.dp),
                     colors=ButtonDefaults.outlinedButtonColors(contentColor=if(followed)FqGold else Color.White)
                 ) {
-                    Text(if(followed)"دنبال می‌کنی" else "دنبال",fontSize=8.sp)
+                    Text(if(followed)"دنبال می‌کنی" else "دنبال",fontSize=11.sp)
                 }
             }
 
@@ -512,17 +512,17 @@ private fun ReelVideoPage(
                         )
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(media.title,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(media.title,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
                             Text(
                                 listOf(
                                     media.year,
                                     if(media.vote>0) "★ "+formatVote(media.vote) else ""
                                 ).filter(String::isNotBlank).joinToString(" • "),
-                                color=FqMuted,fontSize=8.sp
+                                color=FqMuted,fontSize=11.sp
                             )
                         }
                         Icon(Icons.Default.PlayArrow,null,tint=FqGold)
-                        Text("صفحه فیلم",color=FqGold,fontSize=8.sp)
+                        Text("صفحه فیلم",color=FqGold,fontSize=11.sp)
                     }
                 }
             }
@@ -595,7 +595,7 @@ private fun ReelCircleAction(
         ) {
             Icon(icon,null,tint=tint,modifier=Modifier.size(25.dp))
         }
-        Text(text,color=Color.White,fontSize=8.sp,modifier=Modifier.padding(top=3.dp))
+        Text(text,color=Color.White,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
     }
 }
 
@@ -629,7 +629,7 @@ private fun ReelCommentsSheet(
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Text("نظرها",fontSize=20.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                Text(compactCount(reel.comments),color=FqMuted,fontSize=9.sp)
+                Text(compactCount(reel.comments),color=FqMuted,fontSize=11.sp)
             }
 
             if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
@@ -645,15 +645,15 @@ private fun ReelCommentsSheet(
                         RemoteImage(c.author.avatarUrl.takeIf(String::isNotBlank),Modifier.size(34.dp).clip(CircleShape))
                         Spacer(Modifier.width(7.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(c.author.displayName,color=FqGold,fontSize=9.sp)
+                            Text(c.author.displayName,color=FqGold,fontSize=11.sp)
                             if(c.spoiler && !reveal) {
                                 Text(
                                     "⚠ Spoiler Shield • نمایش",
-                                    color=FqDanger,fontSize=9.sp,
+                                    color=FqDanger,fontSize=11.sp,
                                     modifier=Modifier.padding(top=4.dp).clickable { reveal=true }
                                 )
                             } else {
-                                Text(c.body,fontSize=10.sp,lineHeight=17.sp,modifier=Modifier.padding(top=3.dp))
+                                Text(c.body,fontSize=12.sp,lineHeight=17.sp,modifier=Modifier.padding(top=3.dp))
                             }
                         }
                     }
@@ -661,7 +661,7 @@ private fun ReelCommentsSheet(
             }
 
             Row(Modifier.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                FilterChip(selected=spoiler,onClick={spoiler=!spoiler},label={Text("Spoiler",fontSize=8.sp)})
+                FilterChip(selected=spoiler,onClick={spoiler=!spoiler},label={Text("Spoiler",fontSize=11.sp)})
                 Spacer(Modifier.width(6.dp))
                 OutlinedTextField(
                     value=text,onValueChange={text=it},

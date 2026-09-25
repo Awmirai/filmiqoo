@@ -54,7 +54,7 @@ fun FilmDnaScreen(
             IconButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,null) }
             Column(Modifier.weight(1f)) {
                 Text("Film DNA",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text("سلیقه سینمایی واقعی پروفایل فعال",color=FqMuted,fontSize=8.sp)
+                Text("سلیقه سینمایی واقعی پروفایل فعال",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}) { Icon(Icons.Default.Refresh,null) }
         }
@@ -67,7 +67,7 @@ fun FilmDnaScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=9.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.08f))
                     .padding(12.dp)
@@ -177,11 +177,11 @@ fun FilmDnaScreen(
                                 Icon(Icons.Default.AutoAwesome,null,tint=FqGold)
                                 Spacer(Modifier.width(9.dp))
                                 Column {
-                                    Text("DNA هنوز در حال شکل‌گیریه",fontSize=10.sp,fontWeight=FontWeight.Bold)
+                                    Text("DNA هنوز در حال شکل‌گیریه",fontSize=12.sp,fontWeight=FontWeight.Bold)
                                     Text(
                                         "هرچی بیشتر تماشا، Favorite و Watchlist داشته باشی، Badgeهای واقعی بیشتری باز می‌شن.",
                                         color=FqMuted,
-                                        fontSize=8.sp,
+                                        fontSize=11.sp,
                                         lineHeight=14.sp
                                     )
                                 }
@@ -214,7 +214,7 @@ fun FilmDnaScreen(
                             Text(
                                 "از مدت تماشای ثبت‌شده، عنوان‌های کامل‌شده، Favorites و Watchlist همین Viewer Profile استفاده می‌کنه. این تحلیل شخصیت یا روان‌شناسی نیست؛ فقط خلاصه‌ی الگوی مصرف فیلم و سریاله.",
                                 color=FqMuted,
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 lineHeight=15.sp,
                                 modifier=Modifier.padding(top=8.dp)
                             )
@@ -258,7 +258,7 @@ private fun DnaHero(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(dna.profileName,color=FqMuted,fontSize=9.sp)
+                    Text(dna.profileName,color=FqMuted,fontSize=11.sp)
                     Text(
                         dna.archetype,
                         fontSize=24.sp,
@@ -277,7 +277,7 @@ private fun DnaHero(
                 verticalAlignment=Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("دقت DNA",fontSize=8.sp,color=FqMuted)
+                    Text("دقت DNA",fontSize=11.sp,color=FqMuted)
                     LinearProgressIndicator(
                         progress={dna.confidence/100f},
                         color=FqGold,
@@ -300,7 +300,7 @@ private fun DnaHero(
                 else
                     "این نتیجه از رفتار واقعی پروفایل فعلی ساخته شده.",
                 color=Color.White.copy(alpha=.68f),
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(top=7.dp)
             )
         }
@@ -373,7 +373,7 @@ private fun DnaStat(
         ) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(18.dp))
             Text(value,fontSize=13.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(top=4.dp))
-            Text(label,color=FqMuted,fontSize=7.sp)
+            Text(label,color=FqMuted,fontSize=11.sp)
         }
     }
 }
@@ -411,7 +411,7 @@ private fun DnaAffinitySection(
                             Text(
                                 (index+1).toString(),
                                 color=if(index==0)FqGold else FqMuted,
-                                fontSize=8.sp,
+                                fontSize=11.sp,
                                 fontWeight=FontWeight.Bold
                             )
                         }
@@ -420,14 +420,14 @@ private fun DnaAffinitySection(
                             Row {
                                 Text(
                                     labelMapper(item.label),
-                                    fontSize=9.sp,
+                                    fontSize=11.sp,
                                     fontWeight=FontWeight.Bold,
                                     modifier=Modifier.weight(1f)
                                 )
                                 Text(
                                     String.format(java.util.Locale.US,"%.0f%%",item.strength*100),
                                     color=FqMuted,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
                             LinearProgressIndicator(
@@ -468,13 +468,13 @@ private fun DnaBadgeCard(badge:DnaBadge) {
             Text(
                 "Level "+badge.level,
                 color=FqGold,
-                fontSize=7.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(top=2.dp)
             )
             Text(
                 badge.description,
                 color=FqMuted,
-                fontSize=7.sp,
+                fontSize=11.sp,
                 lineHeight=13.sp,
                 maxLines=3,
                 overflow=TextOverflow.Ellipsis,

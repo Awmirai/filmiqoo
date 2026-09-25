@@ -69,7 +69,7 @@ fun CloseFriendsScreen(
                 Text(
                     people.count{it.closeFriend}.toString()+" نفر • فقط برای Storyهای خصوصی",
                     color=FqGold,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -86,7 +86,7 @@ fun CloseFriendsScreen(
                 Text(
                     "فقط افرادی که Follow می‌کنی می‌تونن وارد Close Friends بشن. خود لیست برای بقیه نمایش داده نمی‌شه.",
                     color=Color.White.copy(alpha=.78f),
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     lineHeight=14.sp
                 )
             }
@@ -110,7 +110,7 @@ fun CloseFriendsScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -154,7 +154,7 @@ fun CloseFriendsScreen(
                                 Row(verticalAlignment=Alignment.CenterVertically) {
                                     Text(
                                         person.displayName,
-                                        fontSize=10.sp,
+                                        fontSize=12.sp,
                                         fontWeight=FontWeight.Bold,
                                         maxLines=1,
                                         overflow=TextOverflow.Ellipsis
@@ -172,7 +172,7 @@ fun CloseFriendsScreen(
                                 Text(
                                     "@"+person.username,
                                     color=FqMuted,
-                                    fontSize=7.sp
+                                    fontSize=11.sp
                                 )
                             }
 
@@ -212,7 +212,7 @@ fun CloseFriendsScreen(
                                     Spacer(Modifier.width(4.dp))
                                     Text(
                                         if(person.closeFriend)"Close Friend" else "افزودن",
-                                        fontSize=7.sp
+                                        fontSize=11.sp
                                     )
                                 }
                             }

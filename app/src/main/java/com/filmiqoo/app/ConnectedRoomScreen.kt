@@ -355,56 +355,98 @@ fun ConnectedRoomScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().background(FqSurface).padding(horizontal=8.dp,vertical=7.dp),
-            verticalAlignment=Alignment.CenterVertically
+        Surface(
+            color=FqGlass,
+            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+            shadowElevation=6.dp
         ) {
-            IconButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,null) }
-            Box(Modifier.size(42.dp).background(FqGold,CircleShape),contentAlignment=Alignment.Center) {
-                Icon(Icons.Default.Forum,null,tint=Color.Black)
-            }
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) {
-                Text(roomTitle,fontSize=14.sp)
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(6.dp).background(
-                            if(realtimeConnected)FqGreen else if(error==null)FqGold else FqDanger,
-                            CircleShape
+            Row(
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=6.dp,vertical=6.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                FqIconButton(
+                    icon=Icons.Default.ArrowBack,
+                    contentDescription="بازگشت",
+                    onClick=onBack
+                )
+                Surface(
+                    color=FqGold.copy(alpha=.12f),
+                    contentColor=FqGold,
+                    shape=CircleShape,
+                    modifier=Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment=Alignment.Center) {
+                        Icon(
+                            if(memberState?.roomType=="dm")
+                                Icons.Default.PersonOutline
+                            else
+                                Icons.Default.Forum,
+                            contentDescription=null,
+                            modifier=Modifier.size(21.dp)
                         )
-                    )
-                    Spacer(Modifier.width(4.dp))
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        when {
-                            memberState?.roomType=="dm" -> {
-                                val other=memberState?.items?.firstOrNull { it.id!=meId }
-                                when(other?.presence) {
-                                    "watching" -> "آنلاین • در حال تماشا"
-                                    "online" -> "آنلاین"
-                                    else -> if(realtimeConnected)"آفلاین • Realtime" else "آفلاین"
+                        roomTitle,
+                        style=MaterialTheme.typography.titleMedium,
+                        fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                        maxLines=1
+                    )
+                    Row(
+                        verticalAlignment=Alignment.CenterVertically,
+                        modifier=Modifier.padding(top=2.dp)
+                    ) {
+                        Box(
+                            Modifier.size(7.dp).background(
+                                if(realtimeConnected) FqGreen
+                                else if(error==null) FqGold
+                                else FqDanger,
+                                CircleShape
+                            )
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            when {
+                                memberState?.roomType=="dm" -> {
+                                    val other=memberState?.items?.firstOrNull { it.id!=meId }
+                                    when(other?.presence) {
+                                        "watching" -> "آنلاین • در حال تماشا"
+                                        "online" -> "آنلاین"
+                                        else -> if(realtimeConnected) "Realtime متصل" else "آفلاین"
+                                    }
                                 }
-                            }
-                            loggedIn && memberState!=null ->
-                                (memberState?.online ?: 0L).toString()+" آنلاین • Realtime"
-                            realtimeConnected -> "Realtime • WebSocket"
-                            syncing -> "در حال همگام‌سازی..."
-                            loggedIn -> "اتصال Realtime در حال بازیابی"
-                            else -> "حالت فقط مشاهده"
-                        },
-                        color=FqMuted,fontSize=8.sp
+                                loggedIn && memberState!=null ->
+                                    (memberState?.online ?: 0L).toString()+" آنلاین"
+                                realtimeConnected -> "Realtime متصل"
+                                syncing -> "در حال همگام‌سازی..."
+                                loggedIn -> "در حال بازیابی اتصال..."
+                                else -> "فقط مشاهده"
+                            },
+                            color=FqMuted,
+                            style=MaterialTheme.typography.labelSmall,
+                            maxLines=1
+                        )
+                    }
+                }
+                if(loggedIn) {
+                    FqIconButton(
+                        icon=Icons.Default.Group,
+                        contentDescription="اعضای گفتگو",
+                        onClick={roomMembersOpen=true}
                     )
                 }
-            }
-            if(loggedIn) {
-                IconButton(onClick={roomMembersOpen=true}) {
-                    Icon(Icons.Default.Group,null)
-                }
-            }
-            IconButton(onClick={
-                if(!loggedIn) onRequireAuth() else searchOpen=true
-            }) {
-                Icon(Icons.Default.Search,null)
-            }
+                FqIconButton(
+                    icon=Icons.Default.Search,
+                    contentDescription="جستجوی پیام",
+                    onClick={
+                        if(!loggedIn) onRequireAuth()
+                        else searchOpen=true
+                    }
+                )
             Box {
                 IconButton(onClick={headerMenuOpen=true}) {
                     Icon(Icons.Default.MoreVert,null)
@@ -481,6 +523,7 @@ fun ConnectedRoomScreen(
                     )
                 }
             }
+            }
         }
 
         if(selectedMessageIds.isNotEmpty()) {
@@ -493,7 +536,7 @@ fun ConnectedRoomScreen(
         }
 
         error?.let {
-            Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.fillMaxWidth().background(FqDanger.copy(alpha=.08f)).padding(8.dp))
+            Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.fillMaxWidth().background(FqDanger.copy(alpha=.08f)).padding(8.dp))
         }
 
         LazyColumn(
@@ -569,7 +612,7 @@ fun ConnectedRoomScreen(
                                     Modifier.fillMaxWidth(),
                                     verticalAlignment=Alignment.CenterVertically
                                 ) {
-                                    Text(msg.author.displayName,color=FqGold,fontSize=9.sp)
+                                    Text(msg.author.displayName,color=FqGold,fontSize=11.sp)
                                     if(msg.author.verified) {
                                         Spacer(Modifier.width(3.dp))
                                         Icon(
@@ -707,7 +750,7 @@ fun ConnectedRoomScreen(
                                                 Text(
                                                     "فوروارد شده از "+forwarded.author,
                                                     color=FqGold,
-                                                    fontSize=7.sp
+                                                    fontSize=11.sp
                                                 )
                                                 Text(
                                                     forwarded.body.ifBlank {
@@ -722,7 +765,7 @@ fun ConnectedRoomScreen(
                                                         }
                                                     },
                                                     color=FqMuted,
-                                                    fontSize=7.sp,
+                                                    fontSize=11.sp,
                                                     maxLines=1
                                                 )
                                             }
@@ -737,11 +780,11 @@ fun ConnectedRoomScreen(
                                         modifier=Modifier.fillMaxWidth().padding(top=6.dp)
                                     ) {
                                         Column(Modifier.padding(8.dp)) {
-                                            Text(msg.replyAuthor ?: "Reply",color=FqGold,fontSize=7.sp)
+                                            Text(msg.replyAuthor ?: "Reply",color=FqGold,fontSize=11.sp)
                                             Text(
                                                 msg.replyPreview,
                                                 color=FqMuted,
-                                                fontSize=7.sp,
+                                                fontSize=11.sp,
                                                 maxLines=2
                                             )
                                         }
@@ -752,7 +795,7 @@ fun ConnectedRoomScreen(
                                     Text(
                                         "⚠ Spoiler Shield • نمایش پیام",
                                         color=FqDanger,
-                                        fontSize=9.sp,
+                                        fontSize=11.sp,
                                         modifier=Modifier.padding(top=5.dp).clickable { reveal=true }
                                     )
                                 } else {
@@ -809,7 +852,7 @@ fun ConnectedRoomScreen(
                                     ) {
                                         Text(
                                             msg.body,
-                                            fontSize=10.sp,
+                                            fontSize=12.sp,
                                             lineHeight=17.sp,
                                             modifier=Modifier.padding(top=5.dp)
                                         )
@@ -856,13 +899,13 @@ fun ConnectedRoomScreen(
                                         ) {
                                             Icon(Icons.Default.Reply,null,modifier=Modifier.size(14.dp))
                                             Spacer(Modifier.width(3.dp))
-                                            Text("پاسخ",fontSize=7.sp)
+                                            Text("پاسخ",fontSize=11.sp)
                                         }
                                         listOf("❤️","🔥","😂","👍").forEach { reaction ->
                                             val count=msg.reactions[reaction] ?: 0L
                                             Text(
                                                 reaction + if(count>0)" "+count else "",
-                                                fontSize=8.sp,
+                                                fontSize=11.sp,
                                                 modifier=Modifier.padding(horizontal=3.dp)
                                                     .clickable {
                                                         if(!loggedIn) {
@@ -904,12 +947,12 @@ fun ConnectedRoomScreen(
                             Text(
                                 "پاسخ به "+reply.author.displayName,
                                 color=FqGold,
-                                fontSize=7.sp
+                                fontSize=11.sp
                             )
                             Text(
                                 reply.body.ifBlank{"رسانه"},
                                 color=FqMuted,
-                                fontSize=7.sp,
+                                fontSize=11.sp,
                                 maxLines=1
                             )
                         }
@@ -930,7 +973,7 @@ fun ConnectedRoomScreen(
                     Text(
                         names.joinToString("، ")+" در حال نوشتن...",
                         color=FqGold,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=14.dp,vertical=3.dp)
                     )
                 }
@@ -960,7 +1003,7 @@ fun ConnectedRoomScreen(
                     FilterChip(
                         selected=spoiler,
                         onClick={spoiler=!spoiler},
-                        label={Text("Spoiler",fontSize=8.sp)}
+                        label={Text("Spoiler",fontSize=11.sp)}
                     )
 
                     Spacer(Modifier.width(6.dp))
@@ -1376,7 +1419,7 @@ private fun RoomMessageSearchSheet(
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("جستجوی پیام",fontSize=19.sp)
-                    Text("داخل همین Room",color=FqMuted,fontSize=8.sp)
+                    Text("داخل همین Room",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick=onDismiss){Icon(Icons.Default.Close,null)}
             }
@@ -1399,7 +1442,7 @@ private fun RoomMessageSearchSheet(
             }
 
             error?.let {
-                Text(it,color=FqDanger,fontSize=8.sp,modifier=Modifier.padding(top=7.dp))
+                Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(top=7.dp))
             }
 
             if(query.trim().length>=2 && !loading && results.isEmpty() && error==null) {
@@ -1456,7 +1499,7 @@ private fun RoomPinnedMessagesSheet(
                 Spacer(Modifier.width(7.dp))
                 Column(Modifier.weight(1f)) {
                     Text("پیام‌های Pin شده",fontSize=19.sp)
-                    Text("حداکثر ۵۰ پیام",color=FqMuted,fontSize=8.sp)
+                    Text("حداکثر ۵۰ پیام",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick=onDismiss){Icon(Icons.Default.Close,null)}
             }
@@ -1465,7 +1508,7 @@ private fun RoomPinnedMessagesSheet(
                 LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
             }
             error?.let {
-                Text(it,color=FqDanger,fontSize=8.sp,modifier=Modifier.padding(top=7.dp))
+                Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(top=7.dp))
             }
 
             if(!loading && pinnedItems.isEmpty() && error==null) {
@@ -1510,7 +1553,7 @@ private fun RoomSearchResultCard(
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text(msg.author.displayName,color=FqGold,fontSize=8.sp)
+                    Text(msg.author.displayName,color=FqGold,fontSize=11.sp)
                     if(msg.pinned) {
                         Spacer(Modifier.width(4.dp))
                         Icon(Icons.Default.PushPin,null,tint=FqGold,modifier=Modifier.size(11.dp))
@@ -1518,7 +1561,7 @@ private fun RoomSearchResultCard(
                 }
                 Text(
                     msg.body.ifBlank { if(msg.type=="text")"پیام" else "رسانه" },
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     maxLines=2,
                     color=Color.White.copy(alpha=.86f),
                     modifier=Modifier.padding(top=3.dp)

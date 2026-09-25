@@ -54,7 +54,7 @@ fun SafetyCenterScreen(
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
                 Text("مرکز ایمنی",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text("Block، Mute و کنترل تجربه اجتماعی",color=FqMuted,fontSize=8.sp)
+                Text("Block، Mute و کنترل تجربه اجتماعی",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
@@ -70,7 +70,7 @@ fun SafetyCenterScreen(
                 Text(
                     "Block ارتباط دوطرفه، Follow و DM را قطع می‌کند. Mute فقط محتوای کاربر را از تجربه تو کنار می‌گذارد.",
                     color=Color.White.copy(alpha=.78f),
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     lineHeight=14.sp
                 )
             }
@@ -84,12 +84,12 @@ fun SafetyCenterScreen(
             Tab(
                 selected=tab==0,
                 onClick={tab=0},
-                text={Text("Block شده ("+state.blocked.size+")",fontSize=8.sp)}
+                text={Text("Block شده ("+state.blocked.size+")",fontSize=11.sp)}
             )
             Tab(
                 selected=tab==1,
                 onClick={tab=1},
-                text={Text("Mute شده ("+state.muted.size+")",fontSize=8.sp)}
+                text={Text("Mute شده ("+state.muted.size+")",fontSize=11.sp)}
             )
         }
 
@@ -101,7 +101,7 @@ fun SafetyCenterScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -170,7 +170,7 @@ private fun SafetyUserRow(
                 Modifier.weight(1f).clickable { onUser() }
             ) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text(user.displayName,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    Text(user.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
                     if(user.verified) {
                         Spacer(Modifier.width(4.dp))
                         Icon(
@@ -181,7 +181,7 @@ private fun SafetyUserRow(
                         )
                     }
                 }
-                Text("@"+user.username,color=FqMuted,fontSize=7.sp)
+                Text("@"+user.username,color=FqMuted,fontSize=11.sp)
             }
             OutlinedButton(
                 onClick=onAction,
@@ -189,7 +189,7 @@ private fun SafetyUserRow(
             ) {
                 Icon(actionIcon,null,modifier=Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(actionLabel,fontSize=7.sp)
+                Text(actionLabel,fontSize=11.sp)
             }
         }
     }
@@ -229,7 +229,7 @@ fun SafetyActionSheet(
             Text(
                 targetLabel,
                 color=FqMuted,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(top=3.dp,bottom=12.dp)
             )
 
@@ -283,7 +283,7 @@ fun SafetyActionSheet(
                     }
                 }
             } else {
-                Text("دلیل گزارش",fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Text("دلیل گزارش",fontSize=12.sp,fontWeight=FontWeight.Bold)
                 LazyColumn(
                     modifier=Modifier.heightIn(max=310.dp).padding(top=6.dp)
                 ) {
@@ -312,7 +312,7 @@ fun SafetyActionSheet(
                                 onClick={reason=item.first}
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text(item.second,fontSize=9.sp)
+                            Text(item.second,fontSize=11.sp)
                         }
                     }
                 }
@@ -363,7 +363,7 @@ fun SafetyActionSheet(
                 Text(
                     it,
                     color=if(it.contains("شد") || it.contains("ارسال"))FqGreen else FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=10.dp)
                 )
             }
@@ -396,8 +396,8 @@ private fun SafetySheetAction(
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(title,fontSize=10.sp,fontWeight=FontWeight.Bold)
-            Text(subtitle,color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=2.dp))
+            Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+            Text(subtitle,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=2.dp))
         }
         Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
     }

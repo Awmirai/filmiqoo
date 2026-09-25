@@ -310,7 +310,7 @@ fun SocialStoryViewerScreen(
                         Text(
                             "@"+story.author.username+" • Story",
                             color=Color.White.copy(alpha=.65f),
-                            fontSize=7.sp
+                            fontSize=11.sp
                         )
                         if(story.closeFriendsOnly) {
                             Spacer(Modifier.width(5.dp))
@@ -382,7 +382,7 @@ fun SocialStoryViewerScreen(
                             Text(
                                 media.title,
                                 color=Color.White,
-                                fontSize=9.sp,
+                                fontSize=11.sp,
                                 fontWeight=FontWeight.Bold,
                                 maxLines=1,
                                 overflow=TextOverflow.Ellipsis
@@ -390,7 +390,7 @@ fun SocialStoryViewerScreen(
                             Text(
                                 "مشاهده صفحه فیلم / سریال",
                                 color=FqMuted,
-                                fontSize=7.sp
+                                fontSize=11.sp
                             )
                         }
                         Icon(Icons.Default.ChevronLeft,null,tint=FqGold)

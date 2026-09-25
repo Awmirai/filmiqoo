@@ -92,7 +92,7 @@ fun EditProfileScreen(
             }
             Column(Modifier.weight(1f)) {
                 Text("ویرایش پروفایل",fontSize=21.sp,fontWeight=FontWeight.Black)
-                Text("هویت عمومی تو در Filmiqoo",color=FqMuted,fontSize=8.sp)
+                Text("هویت عمومی تو در Filmiqoo",color=FqMuted,fontSize=11.sp)
             }
             TextButton(
                 enabled=!saving && username.trim().length>=3 && displayName.trim().length>=2,
@@ -186,7 +186,7 @@ fun EditProfileScreen(
                     ) {
                         Icon(Icons.Default.PhotoCamera,null,modifier=Modifier.size(17.dp))
                         Spacer(Modifier.width(5.dp))
-                        Text("Cover",fontSize=8.sp)
+                        Text("Cover",fontSize=11.sp)
                     }
 
                     Box(
@@ -260,7 +260,7 @@ fun EditProfileScreen(
                         minLines=3,
                         maxLines=5,
                         supportingText={
-                            Text(bio.length.toString()+"/300",fontSize=7.sp)
+                            Text(bio.length.toString()+"/300",fontSize=11.sp)
                         },
                         shape=RoundedCornerShape(15.dp),
                         modifier=Modifier.fillMaxWidth()
@@ -293,10 +293,10 @@ fun EditProfileScreen(
                         )
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("حساب خصوصی",fontSize=10.sp,fontWeight=FontWeight.Bold)
+                            Text("حساب خصوصی",fontSize=12.sp,fontWeight=FontWeight.Bold)
                             Text(
                                 "Followerهای جدید باید تأیید شوند.",
-                                color=FqMuted,fontSize=7.sp
+                                color=FqMuted,fontSize=11.sp
                             )
                         }
                         Switch(
@@ -341,7 +341,7 @@ fun EditProfileScreen(
                     Text(
                         it,
                         color=FqDanger,
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.fillMaxWidth().padding(16.dp)
                     )
                 }
@@ -364,7 +364,7 @@ fun EditProfileScreen(
                                 modifier=Modifier.size(22.dp)
                             )
                             Spacer(Modifier.width(9.dp))
-                            Text(stage.ifBlank{"در حال ذخیره..."},fontSize=9.sp)
+                            Text(stage.ifBlank{"در حال ذخیره..."},fontSize=11.sp)
                         }
                     }
                 }
@@ -376,7 +376,7 @@ fun EditProfileScreen(
 @Composable
 private fun ProfileInfoRow(label:String,value:String) {
     Row(Modifier.fillMaxWidth().padding(vertical=6.dp)) {
-        Text(label,color=FqMuted,fontSize=8.sp,modifier=Modifier.weight(1f))
-        Text(value,fontSize=8.sp)
+        Text(label,color=FqMuted,fontSize=11.sp,modifier=Modifier.weight(1f))
+        Text(value,fontSize=11.sp)
     }
 }

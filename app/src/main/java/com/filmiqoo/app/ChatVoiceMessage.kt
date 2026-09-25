@@ -144,7 +144,7 @@ fun VoiceRecordButton(
         ) {
             Box(Modifier.size(8.dp).background(FqDanger,CircleShape))
             Spacer(Modifier.width(6.dp))
-            Text(formatVoiceTime(elapsedMs),color=FqDanger,fontSize=8.sp)
+            Text(formatVoiceTime(elapsedMs),color=FqDanger,fontSize=11.sp)
 
             MiniWaveform(
                 waveform=compressVoiceWaveform(amplitudeSamples.toList(),24),
@@ -308,7 +308,7 @@ fun VoiceMessagePlayer(
                 Text(
                     shownTime,
                     color=Color.White.copy(alpha=.74f),
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier
                         .padding(horizontal=7.dp)
                         .clickable { showRemaining=!showRemaining }
@@ -356,7 +356,7 @@ fun VoiceMessagePlayer(
                             else -> "2×"
                         },
                         color=FqGold,
-                        fontSize=7.sp
+                        fontSize=11.sp
                     )
                 }
 
