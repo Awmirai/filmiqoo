@@ -150,7 +150,7 @@ fun SocialCollectionsScreen(
                 IconButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,null) }
                 Column(Modifier.weight(1f)) {
                     Text("Community Lists",fontSize=23.sp,fontWeight=FontWeight.Black)
-                    Text("Collectionهای عمومی فیلم‌بازها و Creatorها",color=FqMuted,fontSize=8.sp)
+                    Text("Collectionهای عمومی فیلم‌بازها و Creatorها",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={refresh++}) { Icon(Icons.Default.Refresh,null) }
             }
@@ -164,14 +164,14 @@ fun SocialCollectionsScreen(
             Tab(
                 selected=tab==0,
                 onClick={tab=0},
-                text={Text("کشف",fontSize=9.sp)}
+                text={Text("کشف",fontSize=11.sp)}
             )
             Tab(
                 selected=tab==1,
                 onClick={
                     if(!loggedIn) onRequireAuth() else tab=1
                 },
-                text={Text("دنبال‌شده‌ها",fontSize=9.sp)}
+                text={Text("دنبال‌شده‌ها",fontSize=11.sp)}
             )
         }
 
@@ -183,7 +183,7 @@ fun SocialCollectionsScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.08f))
                     .padding(10.dp)
@@ -280,7 +280,7 @@ private fun SocialCollectionCard(
                     Text(
                         collection.description,
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         maxLines=2,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=3.dp)
@@ -298,7 +298,7 @@ private fun SocialCollectionCard(
                     Spacer(Modifier.width(5.dp))
                     Text(
                         collection.owner.displayName,
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         color=Color.White.copy(alpha=.8f)
                     )
                     if(collection.owner.verified) {
@@ -316,7 +316,7 @@ private fun SocialCollectionCard(
                     collection.itemCount.toString()+" عنوان • "+
                         compactSocialCollectionCount(collection.followers)+" دنبال‌کننده",
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=5.dp)
                 )
             }
@@ -419,7 +419,7 @@ private fun SocialCollectionDetailScreen(
                     Text(
                         detail.summary.description,
                         color=Color.White.copy(alpha=.72f),
-                        fontSize=9.sp,
+                        fontSize=11.sp,
                         maxLines=2,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=5.dp)
@@ -441,7 +441,7 @@ private fun SocialCollectionDetailScreen(
                         Spacer(Modifier.width(7.dp))
                         Column {
                             Row(verticalAlignment=Alignment.CenterVertically) {
-                                Text(detail.summary.owner.displayName,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                                Text(detail.summary.owner.displayName,fontSize=11.sp,fontWeight=FontWeight.Bold)
                                 if(detail.summary.owner.verified) {
                                     Spacer(Modifier.width(3.dp))
                                     Icon(
@@ -452,7 +452,7 @@ private fun SocialCollectionDetailScreen(
                                     )
                                 }
                             }
-                            Text("@"+detail.summary.owner.username,color=FqMuted,fontSize=7.sp)
+                            Text("@"+detail.summary.owner.username,color=FqMuted,fontSize=11.sp)
                         }
                     }
 
@@ -478,7 +478,7 @@ private fun SocialCollectionDetailScreen(
                             )
                         }
                         Spacer(Modifier.width(5.dp))
-                        Text(if(detail.summary.following)"دنبال می‌کنی" else "دنبال کردن",fontSize=8.sp)
+                        Text(if(detail.summary.following)"دنبال می‌کنی" else "دنبال کردن",fontSize=11.sp)
                     }
                 }
 
@@ -486,7 +486,7 @@ private fun SocialCollectionDetailScreen(
                     detail.summary.itemCount.toString()+" عنوان • "+
                         compactSocialCollectionCount(detail.summary.followers)+" دنبال‌کننده",
                     color=FqGold,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=9.dp)
                 )
             }
@@ -522,7 +522,7 @@ private fun SocialCollectionDetailScreen(
                         }
                         Text(
                             media.title,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             fontWeight=FontWeight.Bold,
                             maxLines=1,
                             overflow=TextOverflow.Ellipsis,
