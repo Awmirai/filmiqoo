@@ -57,7 +57,7 @@ fun FriendActivityScreen(
                 Text("فعالیت دوستان",fontSize=22.sp,fontWeight=FontWeight.Black)
                 Text(
                     "تماشا، Post، Reel و Review افرادی که Follow کردی",
-                    color=FqMuted,fontSize=8.sp
+                    color=FqMuted,fontSize=11.sp
                 )
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -71,7 +71,7 @@ fun FriendActivityScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)
             )
         }
@@ -140,7 +140,7 @@ private fun FriendActivityCard(
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text(
                             item.actor.displayName,
-                            fontSize=10.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold,
                             modifier=Modifier.clickable { onCreator() }
                         )
@@ -157,7 +157,7 @@ private fun FriendActivityCard(
                     Text(
                         activitySentence(item),
                         color=activityColor(item.type),
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=2.dp)
                     )
                 }
@@ -186,14 +186,14 @@ private fun FriendActivityCard(
                         Spacer(Modifier.width(7.dp))
                         Text(
                             "Spoiler Shield • برای نمایش لمس کن",
-                            color=FqDanger,fontSize=8.sp
+                            color=FqDanger,fontSize=11.sp
                         )
                     }
                 }
             } else if(item.body.isNotBlank()) {
                 Text(
                     item.body,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     lineHeight=15.sp,
                     maxLines=4,
                     overflow=TextOverflow.Ellipsis,
@@ -221,7 +221,7 @@ private fun FriendActivityCard(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 media.title,
-                                fontSize=9.sp,
+                                fontSize=11.sp,
                                 fontWeight=FontWeight.Bold,
                                 maxLines=1,
                                 overflow=TextOverflow.Ellipsis
@@ -231,7 +231,7 @@ private fun FriendActivityCard(
                                     media.year,
                                     if(media.type==MediaType.MOVIE)"فیلم" else "سریال"
                                 ).filter(String::isNotBlank).joinToString(" • "),
-                                color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=3.dp)
+                                color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp)
                             )
                         }
                         Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
