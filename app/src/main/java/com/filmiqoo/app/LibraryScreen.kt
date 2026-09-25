@@ -141,7 +141,7 @@ fun LibraryScreen(
                 Tab(
                     selected=tab==item.first,
                     onClick={tab=item.first},
-                    text={Text(item.second,fontSize=9.sp)}
+                    text={Text(item.second,fontSize=11.sp)}
                 )
             }
         }
@@ -154,7 +154,7 @@ fun LibraryScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.08f))
                     .padding(9.dp)
@@ -188,7 +188,7 @@ fun LibraryScreen(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text("Collectionهای شخصی",fontSize=14.sp,fontWeight=FontWeight.Bold)
-                            Text("لیست‌های اختصاصی خودت رو بساز.",color=FqMuted,fontSize=8.sp)
+                            Text("لیست‌های اختصاصی خودت رو بساز.",color=FqMuted,fontSize=11.sp)
                         }
                         Button(
                             onClick={showCreate=true},
@@ -197,7 +197,7 @@ fun LibraryScreen(
                         ) {
                             Icon(Icons.Default.Add,null,tint=Color.Black)
                             Spacer(Modifier.width(4.dp))
-                            Text("جدید",color=Color.Black,fontSize=8.sp)
+                            Text("جدید",color=Color.Black,fontSize=11.sp)
                         }
                     }
 
@@ -303,7 +303,7 @@ private fun LibraryHeader(
                 Spacer(Modifier.width(9.dp))
                 Column {
                     Text("Library من",fontSize=27.sp,fontWeight=FontWeight.Black)
-                    Text("همه چیزهایی که برای خودت نگه داشتی",color=FqMuted,fontSize=9.sp)
+                    Text("همه چیزهایی که برای خودت نگه داشتی",color=FqMuted,fontSize=11.sp)
                 }
             }
             Row(
@@ -369,7 +369,7 @@ private fun LibraryMediaGrid(
                 }
                 Text(
                     media.title,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
@@ -423,7 +423,7 @@ private fun CollectionCard(
                     Text(
                         collection.description,
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=3.dp)
@@ -443,7 +443,7 @@ private fun CollectionCard(
                                 else -> "خصوصی"
                             },
                         color=FqMuted,
-                        fontSize=7.sp
+                        fontSize=11.sp
                     )
                 }
             }
@@ -496,7 +496,7 @@ private fun CollectionDetailScreen(
                         Text(
                             detail.summary.description,
                             color=FqMuted,
-                            fontSize=9.sp,
+                            fontSize=11.sp,
                             maxLines=2,
                             overflow=TextOverflow.Ellipsis
                         )
@@ -504,7 +504,7 @@ private fun CollectionDetailScreen(
                     Text(
                         detail.items.size.toString()+" عنوان",
                         color=FqGold,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=5.dp)
                     )
                 }
@@ -543,13 +543,13 @@ private fun CollectionDetailScreen(
                                 Text(
                                     listOf(media.year,if(media.type==MediaType.MOVIE)"فیلم" else "سریال")
                                         .filter(String::isNotBlank).joinToString(" • "),
-                                    color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=3.dp)
+                                    color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp)
                                 )
                                 if(media.overview.isNotBlank()) {
                                     Text(
                                         media.overview,
                                         color=Color.White.copy(alpha=.67f),
-                                        fontSize=7.sp,
+                                        fontSize=11.sp,
                                         maxLines=2,
                                         overflow=TextOverflow.Ellipsis,
                                         modifier=Modifier.padding(top=5.dp)
@@ -629,17 +629,17 @@ private fun CreateCollectionDialog(
                     FilterChip(
                         selected=visibility=="private",
                         onClick={visibility="private"},
-                        label={Text("خصوصی",fontSize=8.sp)}
+                        label={Text("خصوصی",fontSize=11.sp)}
                     )
                     FilterChip(
                         selected=visibility=="public",
                         onClick={visibility="public"},
-                        label={Text("عمومی",fontSize=8.sp)}
+                        label={Text("عمومی",fontSize=11.sp)}
                     )
                     FilterChip(
                         selected=visibility=="unlisted",
                         onClick={visibility="unlisted"},
-                        label={Text("Unlisted",fontSize=8.sp)}
+                        label={Text("Unlisted",fontSize=11.sp)}
                     )
                 }
             }
@@ -687,7 +687,7 @@ fun CollectionPickerSheet(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text("افزودن به Collection",fontSize=18.sp,fontWeight=FontWeight.Bold)
-                    Text(media.title,color=FqMuted,fontSize=8.sp)
+                    Text(media.title,color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={showCreate=true}) {
                     Icon(Icons.Default.CreateNewFolder,null,tint=FqGold)
@@ -739,10 +739,10 @@ fun CollectionPickerSheet(
                                 Text(collection.emoji,fontSize=25.sp)
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(collection.name,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                                    Text(collection.name,fontSize=12.sp,fontWeight=FontWeight.Bold)
                                     Text(
                                         collection.itemCount.toString()+" عنوان",
-                                        color=FqMuted,fontSize=7.sp
+                                        color=FqMuted,fontSize=11.sp
                                     )
                                 }
                                 Icon(Icons.Default.AddCircleOutline,null,tint=FqGold)
@@ -824,7 +824,7 @@ private fun SceneBookmarksLibrary(
                             Text(
                                 formatSceneTime(bookmark.positionMs),
                                 color=FqGold,
-                                fontSize=7.sp,
+                                fontSize=11.sp,
                                 fontWeight=FontWeight.Bold,
                                 modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
                             )
@@ -836,7 +836,7 @@ private fun SceneBookmarksLibrary(
                     Column(Modifier.weight(1f)) {
                         Text(
                             bookmark.title,
-                            fontSize=10.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold,
                             maxLines=1,
                             overflow=TextOverflow.Ellipsis
@@ -845,14 +845,14 @@ private fun SceneBookmarksLibrary(
                             Text(
                                 bookmark.subtitle,
                                 color=FqMuted,
-                                fontSize=7.sp,
+                                fontSize=11.sp,
                                 modifier=Modifier.padding(top=2.dp)
                             )
                         }
                         Text(
                             bookmark.note.ifBlank { "Scene Bookmark" },
                             color=Color.White.copy(alpha=.72f),
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             maxLines=2,
                             overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(top=6.dp)
@@ -861,7 +861,7 @@ private fun SceneBookmarksLibrary(
                             Text(
                                 "#"+bookmark.tag,
                                 color=FqGold,
-                                fontSize=7.sp,
+                                fontSize=11.sp,
                                 modifier=Modifier.padding(top=4.dp)
                             )
                         }
