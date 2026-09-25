@@ -44,7 +44,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 			 LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
-		   AND ($1='' OR mt.title ILIKE $2 ESCAPE '\\' OR mt.original_title ILIKE $2 ESCAPE '\\' OR mt.overview ILIKE $2 ESCAPE '\\')
+		   AND ($1='' OR mt.title ILIKE $2 ESCAPE E'\\' OR mt.original_title ILIKE $2 ESCAPE E'\\' OR mt.overview ILIKE $2 ESCAPE E'\\')
 		 ORDER BY
 		   CASE WHEN $1<>'' AND lower(mt.title)=lower($1) THEN 0 ELSE 1 END,
 		   mt.rating DESC NULLS LAST,
@@ -79,7 +79,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		       p.verified,p.follower_count,p.following_count,p.post_count,p.reel_count
 		  FROM profiles p
 		 WHERE p.private_account=false
-		   AND ($1='' OR p.username::text ILIKE $2 ESCAPE '\\' OR p.display_name ILIKE $2 ESCAPE '\\' OR p.bio ILIKE $2 ESCAPE '\\')
+		   AND ($1='' OR p.username::text ILIKE $2 ESCAPE E'\\' OR p.display_name ILIKE $2 ESCAPE E'\\' OR p.bio ILIKE $2 ESCAPE E'\\')
 		 ORDER BY
 		   CASE WHEN $1<>'' AND lower(p.username::text)=lower($1) THEN 0 ELSE 1 END,
 		   p.follower_count DESC,
@@ -110,7 +110,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		       follower_count,post_count,reel_count
 		  FROM channels
 		 WHERE visibility='public'
-		   AND ($1='' OR slug::text ILIKE $2 ESCAPE '\\' OR name ILIKE $2 ESCAPE '\\' OR bio ILIKE $2 ESCAPE '\\')
+		   AND ($1='' OR slug::text ILIKE $2 ESCAPE E'\\' OR name ILIKE $2 ESCAPE E'\\' OR bio ILIKE $2 ESCAPE E'\\')
 		 ORDER BY
 		   CASE WHEN $1<>'' AND lower(slug::text)=lower($1) THEN 0 ELSE 1 END,
 		   follower_count DESC,
@@ -143,7 +143,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles p ON p.user_id=r.creator_user_id
 		  LEFT JOIN media_titles mt ON mt.id=r.media_title_id
 		 WHERE r.status='published'
-		   AND ($1='' OR r.caption ILIKE $2 ESCAPE '\\' OR p.username::text ILIKE $2 ESCAPE '\\' OR p.display_name ILIKE $2 ESCAPE '\\' OR mt.title ILIKE $2 ESCAPE '\\')
+		   AND ($1='' OR r.caption ILIKE $2 ESCAPE E'\\' OR p.username::text ILIKE $2 ESCAPE E'\\' OR p.display_name ILIKE $2 ESCAPE E'\\' OR mt.title ILIKE $2 ESCAPE E'\\')
 		 ORDER BY r.view_count DESC,r.published_at DESC NULLS LAST
 		 LIMIT 20
 	`,query,pattern)
