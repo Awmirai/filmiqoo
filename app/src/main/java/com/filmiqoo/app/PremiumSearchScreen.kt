@@ -118,7 +118,7 @@ fun PremiumSearchScreen(
                         Text(
                             if(query.isBlank())"در حال آماده‌سازی Discover..." else "در حال جستجو...",
                             color=FqMuted,
-                            fontSize=9.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.padding(top=9.dp)
                         )
                     }
@@ -181,7 +181,7 @@ private fun SearchHeader(
                     Text(
                         "فیلم، سریال، کاربر، کانال و Reel",
                         color=FqMuted,
-                        fontSize=8.sp
+                        fontSize=11.sp
                     )
                 }
             }
@@ -230,7 +230,7 @@ private fun SearchTabs(
             Tab(
                 selected=selected==item.first,
                 onClick={onSelected(item.first)},
-                text={Text(item.second,fontSize=9.sp)}
+                text={Text(item.second,fontSize=11.sp)}
             )
         }
     }
@@ -250,7 +250,7 @@ private fun RecentSearches(
             Text("جستجوهای اخیر",fontSize=11.sp,fontWeight=FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             TextButton(onClick=onClear) {
-                Text("پاک کردن",fontSize=8.sp,color=FqMuted)
+                Text("پاک کردن",fontSize=11.sp,color=FqMuted)
             }
         }
         LazyRow(
@@ -260,7 +260,7 @@ private fun RecentSearches(
             items(history) { value ->
                 AssistChip(
                     onClick={onSelect(value)},
-                    label={Text(value,fontSize=8.sp)},
+                    label={Text(value,fontSize=11.sp)},
                     leadingIcon={
                         Icon(Icons.Default.History,null,modifier=Modifier.size(14.dp))
                     }
@@ -383,11 +383,11 @@ private fun SearchSectionTitle(
         Text(title,fontSize=16.sp,fontWeight=FontWeight.Bold)
         Spacer(Modifier.width(6.dp))
         Surface(color=FqSurface2,shape=CircleShape) {
-            Text(count.toString(),fontSize=7.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
+            Text(count.toString(),fontSize=11.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
         }
         Spacer(Modifier.weight(1f))
         TextButton(onClick=onMore) {
-            Text("همه",fontSize=8.sp)
+            Text("همه",fontSize=11.sp)
             Icon(Icons.Default.ChevronLeft,null,modifier=Modifier.size(15.dp))
         }
     }
@@ -428,7 +428,7 @@ private fun SearchPosterCard(
         }
         Text(
             media.title,
-            fontSize=9.sp,
+            fontSize=11.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
@@ -441,7 +441,7 @@ private fun SearchPosterCard(
                 if(media.vote>0)"★ "+formatVote(media.vote) else ""
             ).filter(String::isNotBlank).joinToString(" • "),
             color=FqMuted,
-            fontSize=7.sp,
+            fontSize=11.sp,
             maxLines=1
         )
     }
@@ -579,7 +579,7 @@ private fun UserBubble(
         }
         Text(
             user.displayName,
-            fontSize=8.sp,
+            fontSize=11.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
@@ -588,7 +588,7 @@ private fun UserBubble(
         Text(
             "@"+user.username,
             color=FqMuted,
-            fontSize=7.sp,
+            fontSize=11.sp,
             maxLines=1,
             overflow=TextOverflow.Ellipsis
         )
@@ -619,12 +619,12 @@ private fun UserRow(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                     }
                 }
-                Text("@"+user.username,color=FqMuted,fontSize=8.sp)
+                Text("@"+user.username,color=FqMuted,fontSize=11.sp)
                 if(user.bio.isNotBlank()) {
                     Text(
                         user.bio,
                         color=Color.White.copy(alpha=.72f),
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=3.dp)
@@ -632,7 +632,7 @@ private fun UserRow(
                 }
             }
             Column(horizontalAlignment=Alignment.End) {
-                Text(compactSearchCount(user.followers),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Text(compactSearchCount(user.followers),fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Text("دنبال‌کننده",color=FqMuted,fontSize=6.sp)
             }
         }
@@ -664,7 +664,7 @@ private fun ChannelRow(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                     }
                 }
-                Text("@"+channel.slug,color=FqMuted,fontSize=8.sp)
+                Text("@"+channel.slug,color=FqMuted,fontSize=11.sp)
                 Text(
                     listOf(
                         compactSearchCount(channel.followers)+" دنبال‌کننده",
@@ -672,7 +672,7 @@ private fun ChannelRow(
                         channel.reels.toString()+" Reel"
                     ).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=3.dp)
                 )
             }
@@ -721,7 +721,7 @@ private fun ReelSearchCard(
                 Text(
                     compactSearchCount(reel.views),
                     color=Color.White,
-                    fontSize=7.sp
+                    fontSize=11.sp
                 )
             }
         }
@@ -729,7 +729,7 @@ private fun ReelSearchCard(
         Column(Modifier.padding(9.dp)) {
             Text(
                 reel.caption.ifBlank { reel.mediaTitle ?: "Reel" },
-                fontSize=8.sp,
+                fontSize=11.sp,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis
             )
@@ -745,7 +745,7 @@ private fun ReelSearchCard(
                 Text(
                     "@"+reel.author.username,
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis
                 )
