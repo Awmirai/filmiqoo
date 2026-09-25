@@ -318,8 +318,11 @@ private fun ProfileHero(
 
         IconButton(
             onClick=onRefresh,
-            modifier=Modifier.align(Alignment.TopEnd).padding(10.dp)
-                .clip(CircleShape).background(Color.Black.copy(alpha=.45f))
+            modifier=Modifier.align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(10.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha=.45f))
         ) { Icon(Icons.Default.Refresh,null) }
 
         Column(
@@ -395,7 +398,12 @@ private fun StatTile(
     label: String,
     modifier: Modifier=Modifier
 ) {
-    Surface(color=FqSurface,shape=RoundedCornerShape(14.dp),modifier=modifier) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(16.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+        modifier=modifier
+    ) {
         Column(Modifier.padding(vertical=10.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(18.dp))
             Text(value,fontSize=12.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=4.dp))
@@ -453,26 +461,60 @@ private fun ContinueProfileCard(
 
 @Composable
 private fun ProfileActionRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    subtitle:String,
+    onClick:()->Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=4.dp)
-            .clip(RoundedCornerShape(16.dp)).background(FqSurface)
-            .clickable { onClick() }.padding(14.dp),
-        verticalAlignment=Alignment.CenterVertically
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+        modifier=Modifier.fillMaxWidth()
+            .padding(horizontal=FqDimens.Screen,vertical=4.dp)
+            .clickable { onClick() }
     ) {
-        Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(FqSurface2),contentAlignment=Alignment.Center) {
-            Icon(icon,null,tint=FqGold)
+        Row(
+            Modifier.padding(horizontal=14.dp,vertical=13.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Surface(
+                color=FqGold.copy(alpha=.10f),
+                contentColor=FqGold,
+                shape=RoundedCornerShape(13.dp),
+                modifier=Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription=null,
+                        modifier=Modifier.size(22.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style=MaterialTheme.typography.titleSmall,
+                    fontWeight=FontWeight.SemiBold
+                )
+                Text(
+                    subtitle,
+                    color=FqMuted,
+                    style=MaterialTheme.typography.bodySmall,
+                    maxLines=2,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=3.dp)
+                )
+            }
+            Icon(
+                Icons.Default.ChevronLeft,
+                contentDescription=null,
+                tint=FqMuted,
+                modifier=Modifier.size(20.dp)
+            )
         }
-        Spacer(Modifier.width(11.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title,fontSize=11.sp)
-            Text(subtitle,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
-        }
-        Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
     }
 }
 
