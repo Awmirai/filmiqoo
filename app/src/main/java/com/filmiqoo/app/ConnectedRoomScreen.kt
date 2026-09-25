@@ -1179,6 +1179,7 @@ fun ConnectedRoomScreen(
                 }
             }
         }
+    }
 
     if(attachmentMenuOpen) {
         ChatAttachmentMenuSheet(
