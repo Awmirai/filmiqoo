@@ -302,40 +302,66 @@ private fun RealReelsPager(
         }
 
         Row(
-            Modifier.align(Alignment.TopCenter).padding(top=10.dp)
-                .background(Color.Black.copy(alpha=.5f),RoundedCornerShape(22.dp))
-                .padding(horizontal=4.dp,vertical=2.dp),
+            Modifier.align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top=8.dp)
+                .background(
+                    Color.Black.copy(alpha=.54f),
+                    RoundedCornerShape(24.dp)
+                )
+                .padding(4.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
-            FilterChip(
-                selected=!followingTab,
-                onClick={followingTab=false},
-                label={Text("برای تو")},
-                colors=FilterChipDefaults.filterChipColors(
-                    selectedContainerColor=Color.White,
-                    selectedLabelColor=Color.Black,
-                    containerColor=Color.Transparent
+            Surface(
+                color=if(!followingTab) Color.White else Color.Transparent,
+                contentColor=if(!followingTab) Color.Black else Color.White,
+                shape=RoundedCornerShape(18.dp),
+                modifier=Modifier.clickable { followingTab=false }
+            ) {
+                Text(
+                    "برای تو",
+                    style=MaterialTheme.typography.labelMedium,
+                    fontWeight=FontWeight.Bold,
+                    modifier=Modifier.padding(horizontal=14.dp,vertical=9.dp)
                 )
-            )
+            }
             Spacer(Modifier.width(4.dp))
-            FilterChip(
-                selected=followingTab,
-                onClick={followingTab=true},
-                label={Text("دنبال‌شده‌ها")},
-                colors=FilterChipDefaults.filterChipColors(
-                    selectedContainerColor=Color.White,
-                    selectedLabelColor=Color.Black,
-                    containerColor=Color.Transparent
+            Surface(
+                color=if(followingTab) Color.White else Color.Transparent,
+                contentColor=if(followingTab) Color.Black else Color.White,
+                shape=RoundedCornerShape(18.dp),
+                modifier=Modifier.clickable { followingTab=true }
+            ) {
+                Text(
+                    "دنبال‌شده‌ها",
+                    style=MaterialTheme.typography.labelMedium,
+                    fontWeight=FontWeight.Bold,
+                    modifier=Modifier.padding(horizontal=14.dp,vertical=9.dp)
                 )
-            )
+            }
         }
 
-        IconButton(
-            onClick=onRefresh,
-            modifier=Modifier.align(Alignment.TopEnd).padding(top=12.dp,end=8.dp)
-                .clip(CircleShape).background(Color.Black.copy(alpha=.45f))
+        Surface(
+            color=Color.Black.copy(alpha=.48f),
+            contentColor=Color.White,
+            shape=CircleShape,
+            border=androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Color.White.copy(alpha=.10f)
+            ),
+            modifier=Modifier.align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top=8.dp,end=10.dp)
+                .size(44.dp)
+                .clickable { onRefresh() }
         ) {
-            Icon(Icons.Default.Refresh,null,tint=Color.White)
+            Box(contentAlignment=Alignment.Center) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription="به‌روزرسانی Reels",
+                    modifier=Modifier.size(21.dp)
+                )
+            }
         }
     }
 
