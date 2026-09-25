@@ -286,9 +286,9 @@ fun PremiumEmptyState(
     icon:ImageVector,
     title:String,
     body:String,
+    modifier:Modifier=Modifier,
     action:String?=null,
-    onAction:(()->Unit)?=null,
-    modifier:Modifier=Modifier
+    onAction:(()->Unit)?=null
 ) {
     Column(
         modifier.fillMaxWidth()
