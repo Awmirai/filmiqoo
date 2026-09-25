@@ -90,7 +90,7 @@ fun ChannelManageScreen(
                     overview?.let{"@"+it.slug+" • "+roleLabel(it.myRole)}
                         ?: "مدیریت کانال",
                     color=FqMuted,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
             }
             if(saving) {
@@ -114,7 +114,7 @@ fun ChannelManageScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.08f))
                     .padding(10.dp)
@@ -143,7 +143,7 @@ fun ChannelManageScreen(
                 Tab(
                     selected=tab==item.first,
                     onClick={tab=item.first},
-                    text={Text(item.second,fontSize=9.sp)}
+                    text={Text(item.second,fontSize=11.sp)}
                 )
             }
         }
@@ -175,11 +175,11 @@ fun ChannelManageScreen(
                                                 fontSize=14.sp,
                                                 fontWeight=FontWeight.Black
                                             )
-                                            Text("@"+data.slug,color=FqMuted,fontSize=8.sp)
+                                            Text("@"+data.slug,color=FqMuted,fontSize=11.sp)
                                             Text(
                                                 roleLabel(data.myRole),
                                                 color=FqGold,
-                                                fontSize=7.sp,
+                                                fontSize=11.sp,
                                                 modifier=Modifier.padding(top=3.dp)
                                             )
                                         }
@@ -236,7 +236,7 @@ fun ChannelManageScreen(
                                 minLines=4,
                                 maxLines=7,
                                 supportingText={
-                                    Text(bio.length.toString()+"/500",fontSize=7.sp)
+                                    Text(bio.length.toString()+"/500",fontSize=11.sp)
                                 },
                                 shape=RoundedCornerShape(15.dp),
                                 modifier=Modifier.fillMaxWidth(),
@@ -245,7 +245,7 @@ fun ChannelManageScreen(
                         }
 
                         item {
-                            Text("دسترسی کانال",fontSize=10.sp,fontWeight=FontWeight.Bold)
+                            Text("دسترسی کانال",fontSize=12.sp,fontWeight=FontWeight.Bold)
                             Row(
                                 Modifier.fillMaxWidth().padding(top=7.dp),
                                 horizontalArrangement=Arrangement.spacedBy(7.dp)
@@ -259,7 +259,7 @@ fun ChannelManageScreen(
                                         selected=visibility==item.first,
                                         onClick={visibility=item.first},
                                         enabled=data.myRole=="owner" || data.myRole=="admin",
-                                        label={Text(item.second,fontSize=8.sp)}
+                                        label={Text(item.second,fontSize=11.sp)}
                                     )
                                 }
                             }
@@ -314,7 +314,7 @@ fun ChannelManageScreen(
                                     Text(
                                         "Moderator می‌تونه Roomها و Community را مدیریت کند؛ Admin علاوه بر آن تنظیمات کانال را تغییر می‌دهد؛ Owner کنترل نقش‌ها را دارد.",
                                         color=FqMuted,
-                                        fontSize=8.sp,
+                                        fontSize=11.sp,
                                         lineHeight=14.sp
                                     )
                                 }
@@ -381,7 +381,7 @@ fun ChannelManageScreen(
                             Text(
                                 "Slow Mode و Privacy هر Room جداست.",
                                 color=FqMuted,
-                                fontSize=8.sp
+                                fontSize=11.sp
                             )
                         }
                         Button(
@@ -390,7 +390,7 @@ fun ChannelManageScreen(
                             shape=RoundedCornerShape(12.dp)
                         ) {
                             Icon(Icons.Default.Add,null,tint=Color.Black)
-                            Text("Room",color=Color.Black,fontSize=8.sp)
+                            Text("Room",color=Color.Black,fontSize=11.sp)
                         }
                     }
 
@@ -517,7 +517,7 @@ private fun TeamMemberManageCard(
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text(member.displayName,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    Text(member.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
                     if(member.verified) {
                         Spacer(Modifier.width(3.dp))
                         Icon(
@@ -528,14 +528,14 @@ private fun TeamMemberManageCard(
                         )
                     }
                 }
-                Text("@"+member.username,color=FqMuted,fontSize=7.sp)
+                Text("@"+member.username,color=FqMuted,fontSize=11.sp)
             }
 
             Box {
                 AssistChip(
                     onClick={if(canEdit) roleMenu=true},
                     enabled=canEdit,
-                    label={Text(roleLabel(member.role),fontSize=7.sp)}
+                    label={Text(roleLabel(member.role),fontSize=11.sp)}
                 )
                 DropdownMenu(
                     expanded=roleMenu,
@@ -590,11 +590,11 @@ private fun ManagedRoomCard(
             Column(
                 Modifier.weight(1f).clickable { onOpen() }
             ) {
-                Text(room.name,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Text(room.name,fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Text(
                     room.topic.ifBlank{"بدون Topic"},
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis
                 )
@@ -612,7 +612,7 @@ private fun ManagedRoomCard(
                             "Slow Mode خاموش"
                     ).joinToString(" • "),
                     color=FqGold,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=4.dp)
                 )
             }
@@ -666,7 +666,7 @@ private fun RoomSettingsDialog(
 
                 Text(
                     "Privacy",
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     fontWeight=FontWeight.Bold,
                     modifier=Modifier.padding(top=10.dp)
                 )
@@ -679,14 +679,14 @@ private fun RoomSettingsDialog(
                         FilterChip(
                             selected=visibility==item.first,
                             onClick={visibility=item.first},
-                            label={Text(item.second,fontSize=7.sp)}
+                            label={Text(item.second,fontSize=11.sp)}
                         )
                     }
                 }
 
                 Text(
                     "Slow Mode",
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     fontWeight=FontWeight.Bold,
                     modifier=Modifier.padding(top=10.dp)
                 )
