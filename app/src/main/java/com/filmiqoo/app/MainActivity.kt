@@ -849,11 +849,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
 @Composable
 private fun FilmiqooBottomBar(
-    selected: Int,
-    kidsMode: Boolean = false,
-    onSelected: (Int) -> Unit
+    selected:Int,
+    kidsMode:Boolean=false,
+    onSelected:(Int)->Unit
 ) {
-    val entries = if(kidsMode) {
+    val entries=if(kidsMode) {
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
             Triple(Icons.Default.PersonOutline,"پروفایل",4)
@@ -862,46 +862,91 @@ private fun FilmiqooBottomBar(
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
             Triple(Icons.Default.Explore,"اکسپلور",1),
-            Triple(Icons.Default.Add,"",2),
+            Triple(Icons.Default.Add,"ساخت",2),
             Triple(Icons.Default.Groups,"اجتماعی",3),
             Triple(Icons.Default.PersonOutline,"پروفایل",4)
         )
     }
 
-    NavigationBar(
-        containerColor=Color(0xFF0B0D11),
-        tonalElevation=10.dp
+    Surface(
+        color=FqGlass,
+        tonalElevation=0.dp,
+        shadowElevation=12.dp,
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            FqBorder
+        )
     ) {
-        entries.forEach { item ->
-            if(item.third==2) {
-                NavigationBarItem(
-                    selected=false,
-                    onClick={onSelected(2)},
-                    icon={
-                        Box(
-                            Modifier.size(48.dp).clip(CircleShape).background(FqGold),
-                            contentAlignment=Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Add,null,tint=Color.Black,modifier=Modifier.size(28.dp))
+        Row(
+            Modifier.fillMaxWidth()
+                .navigationBarsPadding()
+                .height(70.dp)
+                .padding(horizontal=6.dp),
+            verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.SpaceEvenly
+        ) {
+            entries.forEach { item ->
+                val active=selected==item.third
+                if(item.third==2) {
+                    Surface(
+                        color=FqGold,
+                        contentColor=Color(0xFF171000),
+                        shape=CircleShape,
+                        shadowElevation=7.dp,
+                        modifier=Modifier.size(54.dp)
+                            .clickable { onSelected(2) }
+                    ) {
+                        Box(contentAlignment=Alignment.Center) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription="ساخت محتوا",
+                                modifier=Modifier.size(27.dp)
+                            )
                         }
-                    },
-                    label=null,
-                    alwaysShowLabel=false
-                )
-            } else {
-                NavigationBarItem(
-                    selected=selected==item.third,
-                    onClick={onSelected(item.third)},
-                    icon={Icon(item.first,null)},
-                    label={Text(item.second,fontSize=9.sp)},
-                    colors=NavigationBarItemDefaults.colors(
-                        selectedIconColor=FqGold,
-                        selectedTextColor=FqGold,
-                        indicatorColor=FqSurface2,
-                        unselectedIconColor=FqMuted,
-                        unselectedTextColor=FqMuted
-                    )
-                )
+                    }
+                } else {
+                    val itemColor=if(active) FqGold else FqMuted
+                    Surface(
+                        color=Color.Transparent,
+                        contentColor=itemColor,
+                        shape=RoundedCornerShape(18.dp),
+                        modifier=Modifier.weight(1f)
+                            .heightIn(min=56.dp)
+                            .clickable { onSelected(item.third) }
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize()
+                                .padding(horizontal=4.dp,vertical=7.dp),
+                            horizontalAlignment=Alignment.CenterHorizontally,
+                            verticalArrangement=Arrangement.Center
+                        ) {
+                            Box(
+                                Modifier.height(28.dp)
+                                    .widthIn(min=42.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if(active) FqGold.copy(alpha=.12f)
+                                        else Color.Transparent
+                                    ),
+                                contentAlignment=Alignment.Center
+                            ) {
+                                Icon(
+                                    item.first,
+                                    contentDescription=item.second,
+                                    tint=itemColor,
+                                    modifier=Modifier.size(22.dp)
+                                )
+                            }
+                            Text(
+                                item.second,
+                                color=itemColor,
+                                style=MaterialTheme.typography.labelSmall,
+                                maxLines=1,
+                                modifier=Modifier.padding(top=2.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
