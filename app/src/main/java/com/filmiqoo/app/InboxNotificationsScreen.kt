@@ -65,7 +65,7 @@ fun InboxScreen(
                         Text(
                             if(archivedView)"گفتگوهای آرشیوشده" else "DM، گروه‌ها و Roomهای عضو‌شده",
                             color=FqMuted,
-                            fontSize=8.sp
+                            fontSize=11.sp
                         )
                     }
                     IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -79,13 +79,13 @@ fun InboxScreen(
                     FilterChip(
                         selected=!archivedView,
                         onClick={archivedView=false},
-                        label={Text("Inbox",fontSize=8.sp)},
+                        label={Text("Inbox",fontSize=11.sp)},
                         leadingIcon={Icon(Icons.Default.Inbox,null,modifier=Modifier.size(15.dp))}
                     )
                     FilterChip(
                         selected=archivedView,
                         onClick={archivedView=true},
-                        label={Text("آرشیو",fontSize=8.sp)},
+                        label={Text("آرشیو",fontSize=11.sp)},
                         leadingIcon={Icon(Icons.Default.Archive,null,modifier=Modifier.size(15.dp))}
                     )
                 }
@@ -100,7 +100,7 @@ fun InboxScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=9.sp,
+                fontSize=11.sp,
                 modifier=Modifier.fillMaxWidth()
                     .background(FqDanger.copy(alpha=.09f))
                     .padding(10.dp)
@@ -211,7 +211,7 @@ private fun InboxCard(
                     )
                     if(item.type=="dm" && item.otherUsername.isNotBlank()) {
                         Spacer(Modifier.width(5.dp))
-                        Text("@"+item.otherUsername,color=FqMuted,fontSize=7.sp)
+                        Text("@"+item.otherUsername,color=FqMuted,fontSize=11.sp)
                     }
                     if(item.notificationLevel=="off") {
                         Spacer(Modifier.width(5.dp))
@@ -235,7 +235,7 @@ private fun InboxCard(
                 Text(
                     item.lastMessage.ifBlank { item.topic.ifBlank { "مکالمه جدید" } },
                     color=if(item.unread>0)Color.White.copy(alpha=.85f) else FqMuted,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=4.dp)
@@ -258,7 +258,7 @@ private fun InboxCard(
                     }
                     if(item.members>2) {
                         Spacer(Modifier.width(6.dp))
-                        Text(compactInboxCount(item.members)+" عضو",color=FqMuted,fontSize=7.sp)
+                        Text(compactInboxCount(item.members)+" عضو",color=FqMuted,fontSize=11.sp)
                     }
                 }
             }
@@ -267,7 +267,7 @@ private fun InboxCard(
                 Surface(color=FqGold,contentColor=Color.Black,shape=CircleShape) {
                     Text(
                         if(item.unread>99)"99+" else item.unread.toString(),
-                        fontSize=7.sp,
+                        fontSize=11.sp,
                         fontWeight=FontWeight.Black,
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
@@ -369,7 +369,7 @@ fun ConnectedNotificationsScreen(
                 Text(
                     if(unread>0)compactInboxCount(unread)+" خوانده‌نشده" else "همه‌چی دیده شده",
                     color=if(unread>0)FqGold else FqMuted,
-                    fontSize=8.sp
+                    fontSize=11.sp
                 )
             }
             if(unread>0) {
@@ -378,14 +378,14 @@ fun ConnectedNotificationsScreen(
                         runCatching { repo.markAllNotificationsRead() }
                             .onSuccess { refresh++ }
                     }
-                }) { Text("خواندن همه",fontSize=8.sp) }
+                }) { Text("خواندن همه",fontSize=11.sp) }
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
 
         if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         error?.let {
-            Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(12.dp))
+            Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
         if(!loading && items.isEmpty()) {
@@ -478,13 +478,13 @@ private fun NotificationCard(
                     Text(
                         item.body,
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         maxLines=2,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=4.dp)
                     )
                 }
-                Text(notificationTypeLabel(item.type),color=FqGold,fontSize=7.sp,modifier=Modifier.padding(top=4.dp))
+                Text(notificationTypeLabel(item.type),color=FqGold,fontSize=11.sp,modifier=Modifier.padding(top=4.dp))
             }
             Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
         }
