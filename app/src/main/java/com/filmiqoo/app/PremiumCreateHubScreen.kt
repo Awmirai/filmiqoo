@@ -226,7 +226,7 @@ fun PremiumCreateHubScreen(
                     }
                     Column(Modifier.weight(1f)) {
                         Text("Filmiqoo Studio",fontSize=23.sp,fontWeight=FontWeight.Black)
-                        Text("ساخت و انتشار محتوا",color=FqMuted,fontSize=8.sp)
+                        Text("ساخت و انتشار محتوا",color=FqMuted,fontSize=11.sp)
                     }
                     TextButton(
                         onClick={
@@ -236,7 +236,7 @@ fun PremiumCreateHubScreen(
                     ) {
                         Icon(Icons.Default.Drafts,null,modifier=Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Draft",fontSize=8.sp)
+                        Text("Draft",fontSize=11.sp)
                     }
                 }
             }
@@ -270,7 +270,7 @@ fun PremiumCreateHubScreen(
                                 )
                             }
                         },
-                        label={Text(item.label,fontSize=8.sp)},
+                        label={Text(item.label,fontSize=11.sp)},
                         leadingIcon={
                             Icon(
                                 when(item) {
@@ -313,7 +313,7 @@ fun PremiumCreateHubScreen(
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(kind.label,fontSize=15.sp,fontWeight=FontWeight.Bold)
-                            Text(kind.subtitle,color=FqMuted,fontSize=8.sp)
+                            Text(kind.subtitle,color=FqMuted,fontSize=11.sp)
                         }
                     }
 
@@ -393,7 +393,7 @@ fun PremiumCreateHubScreen(
                         if(kind==CreateKind.POLL) {
                             Text(
                                 "گزینه‌ها",
-                                fontSize=10.sp,
+                                fontSize=12.sp,
                                 fontWeight=FontWeight.Bold,
                                 modifier=Modifier.padding(top=12.dp,bottom=5.dp)
                             )
@@ -416,7 +416,7 @@ fun PremiumCreateHubScreen(
                             if(pollOptions.size<6) {
                                 TextButton(onClick={pollOptions.add("")}) {
                                     Icon(Icons.Default.Add,null)
-                                    Text("گزینه بیشتر",fontSize=8.sp)
+                                    Text("گزینه بیشتر",fontSize=11.sp)
                                 }
                             }
                         }
@@ -428,7 +428,7 @@ fun PremiumCreateHubScreen(
                             FilterChip(
                                 selected=spoiler,
                                 onClick={spoiler=!spoiler},
-                                label={Text("Spoiler",fontSize=8.sp)},
+                                label={Text("Spoiler",fontSize=11.sp)},
                                 leadingIcon={Icon(Icons.Default.VisibilityOff,null,modifier=Modifier.size(15.dp))}
                             )
                             if(kind==CreateKind.STORY) {
@@ -438,7 +438,7 @@ fun PremiumCreateHubScreen(
                                     label={
                                         Text(
                                             if(closeFriendsOnly)"Close Friends" else "عمومی",
-                                            fontSize=8.sp
+                                            fontSize=11.sp
                                         )
                                     },
                                     leadingIcon={
@@ -454,7 +454,7 @@ fun PremiumCreateHubScreen(
                                 FilterChip(
                                     selected=allowComments,
                                     onClick={allowComments=!allowComments},
-                                    label={Text(if(allowComments)"Comment روشن" else "Comment خاموش",fontSize=8.sp)},
+                                    label={Text(if(allowComments)"Comment روشن" else "Comment خاموش",fontSize=11.sp)},
                                     leadingIcon={Icon(Icons.Default.ChatBubbleOutline,null,modifier=Modifier.size(15.dp))}
                                 )
                             }
@@ -475,7 +475,7 @@ fun PremiumCreateHubScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         taggedMedia?.title ?: "تگ فیلم یا سریال",
-                                        fontSize=9.sp,
+                                        fontSize=11.sp,
                                         fontWeight=FontWeight.Bold
                                     )
                                     Text(
@@ -484,7 +484,7 @@ fun PremiumCreateHubScreen(
                                         else
                                             "متصل به Catalog Filmiqoo",
                                         color=FqMuted,
-                                        fontSize=7.sp
+                                        fontSize=11.sp
                                     )
                                 }
                                 if(taggedMedia!=null) {
@@ -551,14 +551,14 @@ fun PremiumCreateHubScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(
                                             if(scheduledAtMillis==null)"زمان‌بندی انتشار" else "انتشار زمان‌بندی‌شده",
-                                            fontSize=9.sp,
+                                            fontSize=11.sp,
                                             fontWeight=FontWeight.Bold
                                         )
                                         Text(
                                             scheduledAtMillis?.let(::formatCreatorSchedule)
                                                 ?: "اختیاری • تاریخ و ساعت دقیق انتخاب کن",
                                             color=if(scheduledAtMillis!=null)FqGold else FqMuted,
-                                            fontSize=7.sp,
+                                            fontSize=11.sp,
                                             modifier=Modifier.padding(top=2.dp)
                                         )
                                     }
@@ -582,7 +582,7 @@ fun PremiumCreateHubScreen(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=5.dp)
                 )
             }
@@ -603,8 +603,8 @@ fun PremiumCreateHubScreen(
                         )
                         Spacer(Modifier.width(9.dp))
                         Column {
-                            Text("در حال انتشار",fontSize=10.sp,fontWeight=FontWeight.Bold)
-                            Text(publishStage,color=FqMuted,fontSize=8.sp)
+                            Text("در حال انتشار",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                            Text(publishStage,color=FqMuted,fontSize=11.sp)
                         }
                     }
                 }
@@ -759,7 +759,7 @@ fun PremiumCreateHubScreen(
             Text(
                 "UGC روی Object Storage/CDN Filmiqoo ذخیره می‌شود؛ Telegram فقط برای فایل اصلی فیلم و سریال باقی می‌ماند.",
                 color=FqMuted,
-                fontSize=7.sp,
+                fontSize=11.sp,
                 lineHeight=13.sp,
                 modifier=Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=5.dp)
             )
@@ -849,7 +849,7 @@ private fun ChannelComposer(
             FilterChip(
                 selected=visibility==item.first,
                 onClick={onVisibility(item.first)},
-                label={Text(item.second,fontSize=8.sp)}
+                label={Text(item.second,fontSize=11.sp)}
             )
         }
     }
@@ -900,7 +900,7 @@ fun MediaTagPickerDialog(
                     LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth().padding(top=6.dp))
                 }
                 error?.let {
-                    Text(it,color=FqDanger,fontSize=8.sp,modifier=Modifier.padding(top=6.dp))
+                    Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(top=6.dp))
                 }
                 LazyColumn(
                     verticalArrangement=Arrangement.spacedBy(6.dp),
@@ -923,11 +923,11 @@ fun MediaTagPickerDialog(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(media.title,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                                    Text(media.title,fontSize=11.sp,fontWeight=FontWeight.Bold)
                                     Text(
                                         listOf(media.year,if(media.type==MediaType.MOVIE)"فیلم" else "سریال")
                                             .filter(String::isNotBlank).joinToString(" • "),
-                                        color=FqMuted,fontSize=7.sp
+                                        color=FqMuted,fontSize=11.sp
                                     )
                                 }
                                 Icon(Icons.Default.AddCircle,null,tint=FqGold)
