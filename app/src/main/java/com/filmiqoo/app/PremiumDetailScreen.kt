@@ -315,18 +315,18 @@ fun PremiumDetailScreen(
                     }
 
                     item {
-                        ScrollableTabRow(
-                            selectedTabIndex=tab,
-                            containerColor=FqBg,
-                            contentColor=FqGold,
-                            edgePadding=12.dp,
-                            divider={}
+                        LazyRow(
+                            contentPadding=PaddingValues(
+                                horizontal=FqDimens.Screen,
+                                vertical=12.dp
+                            ),
+                            horizontalArrangement=Arrangement.spacedBy(8.dp)
                         ) {
-                            tabs.forEachIndexed { index,label ->
-                                Tab(
-                                    selected=tab==index,
-                                    onClick={tab=index},
-                                    text={Text(label,fontSize=12.sp)}
+                            itemsIndexed(tabs) { index,label ->
+                                PremiumChip(
+                                    label=label,
+                                    active=tab==index,
+                                    onClick={tab=index}
                                 )
                             }
                         }
@@ -875,8 +875,14 @@ private fun ActionTile(
 ) {
     Surface(
         color=if(active)FqGold.copy(alpha=.13f) else FqSurface,
-        shape=RoundedCornerShape(16.dp),
-        modifier=Modifier.width(112.dp).clickable(enabled=enabled && !loading) { onClick() }
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if(active) FqGold.copy(alpha=.28f) else FqBorder
+        ),
+        modifier=Modifier.width(116.dp)
+            .heightIn(min=68.dp)
+            .clickable(enabled=enabled && !loading) { onClick() }
     ) {
         Column(
             Modifier.padding(horizontal=10.dp,vertical=11.dp),
@@ -899,7 +905,8 @@ private fun ActionTile(
             Text(
                 label,
                 color=if(enabled)Color.White else FqMuted,
-                fontSize=11.sp,
+                style=MaterialTheme.typography.labelSmall,
+                fontWeight=FontWeight.SemiBold,
                 maxLines=1,
                 modifier=Modifier.padding(top=5.dp)
             )
