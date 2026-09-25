@@ -71,7 +71,7 @@ fun SettingsScreen(
                 IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                 Column(Modifier.weight(1f)) {
                     Text("تنظیمات",fontSize=23.sp,fontWeight=FontWeight.Black)
-                    Text("پخش، دانلود، حریم خصوصی و اعلان‌ها",color=FqMuted,fontSize=8.sp)
+                    Text("پخش، دانلود، حریم خصوصی و اعلان‌ها",color=FqMuted,fontSize=11.sp)
                 }
                 if(saving) CircularProgressIndicator(color=FqGold,strokeWidth=2.dp,modifier=Modifier.size(22.dp))
             }
@@ -80,7 +80,7 @@ fun SettingsScreen(
         if(loading) item { LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth()) }
         error?.let { e ->
             item {
-                Text(e,color=FqDanger,fontSize=9.sp,modifier=Modifier.fillMaxWidth().padding(12.dp))
+                Text(e,color=FqDanger,fontSize=11.sp,modifier=Modifier.fillMaxWidth().padding(12.dp))
             }
         }
 
@@ -240,7 +240,7 @@ fun SettingsScreen(
                                 "تنظیمات بین دستگاه‌های حساب Filmiqoo همگام می‌شوند."
                             else
                                 "در Preview تنظیمات فقط روی همین دستگاه ذخیره می‌شوند.",
-                            color=FqMuted,fontSize=8.sp,lineHeight=14.sp
+                            color=FqMuted,fontSize=11.sp,lineHeight=14.sp
                         )
                     }
                 }
@@ -267,8 +267,8 @@ private fun SettingsSwitchRow(
         verticalAlignment=Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title,fontSize=10.sp,fontWeight=FontWeight.Bold)
-            Text(subtitle,color=FqMuted,fontSize=7.sp,lineHeight=13.sp,modifier=Modifier.padding(top=3.dp))
+            Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+            Text(subtitle,color=FqMuted,fontSize=11.sp,lineHeight=13.sp,modifier=Modifier.padding(top=3.dp))
         }
         Switch(checked=checked,onCheckedChange=onChange)
     }
@@ -291,10 +291,10 @@ private fun SettingsChoiceRow(
             verticalAlignment=Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(title,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                Text(subtitle,color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=3.dp))
+                Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                Text(subtitle,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
             }
-            Text(value,color=FqGold,fontSize=9.sp,fontWeight=FontWeight.Bold)
+            Text(value,color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
             Icon(Icons.Default.ExpandMore,null,tint=FqMuted)
         }
         DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
