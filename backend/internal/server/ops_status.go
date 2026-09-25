@@ -36,6 +36,17 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 	redisErr:=s.redis.Ping(ctx).Err()
 	redisLatency:=time.Since(redisStarted)
 
+	objectStarted:=time.Now()
+	var objectErr error
+	if s.objects==nil {
+		objectErr=context.Canceled
+	} else {
+		objectCtx,objectCancel:=context.WithTimeout(ctx,1200*time.Millisecond)
+		objectErr=s.objects.Health(objectCtx)
+		objectCancel()
+	}
+	objectLatency:=time.Since(objectStarted)
+
 	push:=s.statusCounts(ctx,`
 		SELECT status,COUNT(*)
 		  FROM push_outbox
@@ -95,7 +106,8 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 
 	status:="ok"
 	code:=http.StatusOK
-	if dbErr!=nil || redisErr!=nil || (s.cfg.FirebasePushEnabled && s.fcm==nil) {
+	if dbErr!=nil || redisErr!=nil || objectErr!=nil ||
+		(s.cfg.FirebasePushEnabled && s.fcm==nil) {
 		status="degraded"
 		code=http.StatusServiceUnavailable
 	}
@@ -130,6 +142,10 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 				"acquiredConns":dbPool.AcquiredConns(),
 				"idleConns":dbPool.IdleConns(),
 				"constructingConns":dbPool.ConstructingConns(),
+			},
+			"objectStorage":map[string]any{
+				"ok":objectErr==nil,
+				"latencyMs":objectLatency.Milliseconds(),
 			},
 			"firebasePush":map[string]any{
 				"enabled":s.cfg.FirebasePushEnabled,
