@@ -93,7 +93,7 @@ fun MessagesScreen(
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Watch Party زنده",fontSize=14.sp)
-                    Text("همین حالا وارد اتاق تماشا شو",color=FqMuted,fontSize=9.sp)
+                    Text("همین حالا وارد اتاق تماشا شو",color=FqMuted,fontSize=11.sp)
                 }
                 Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
             }
@@ -117,13 +117,13 @@ fun MessagesScreen(
                     Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
                         Text(row.first,fontSize=13.sp)
-                        Text(row.second,color=FqMuted,fontSize=9.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp))
+                        Text(row.second,color=FqMuted,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp))
                     }
-                    if(row.third.isNotBlank()) Text(row.third,color=FqMuted,fontSize=8.sp)
+                    if(row.third.isNotBlank()) Text(row.third,color=FqMuted,fontSize=11.sp)
                     if(tab==0) {
                         Spacer(Modifier.width(7.dp))
                         Surface(color=FqGold,shape=CircleShape) {
-                            Text("1",color=Color.Black,fontSize=8.sp,modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp))
+                            Text("1",color=Color.Black,fontSize=11.sp,modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp))
                         }
                     }
                 }
@@ -163,7 +163,7 @@ fun ChatRoomScreen(
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 Text(title,fontSize=15.sp)
-                Text("846 آنلاین • 12.8K عضو",color=FqMuted,fontSize=8.sp)
+                Text("846 آنلاین • 12.8K عضو",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={}) { Icon(Icons.Default.Search,null) }
             IconButton(onClick={}) { Icon(Icons.Default.MoreVert,null) }
@@ -178,7 +178,7 @@ fun ChatRoomScreen(
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
                     Text(media.title,fontSize=11.sp)
-                    Text("روم رسمی این عنوان",color=FqMuted,fontSize=8.sp)
+                    Text("روم رسمی این عنوان",color=FqMuted,fontSize=11.sp)
                 }
                 Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
             }
@@ -199,7 +199,7 @@ fun ChatRoomScreen(
                         modifier=Modifier.widthIn(max=300.dp)
                     ) {
                         Column(Modifier.padding(11.dp)) {
-                            if(!msg.mine) Text(msg.author,color=FqGold,fontSize=9.sp)
+                            if(!msg.mine) Text(msg.author,color=FqGold,fontSize=11.sp)
                             if(msg.spoiler && !revealSpoiler) {
                                 Surface(
                                     color=FqDanger.copy(alpha=.13f),
@@ -209,16 +209,16 @@ fun ChatRoomScreen(
                                     Row(Modifier.padding(9.dp),verticalAlignment=Alignment.CenterVertically) {
                                         Icon(Icons.Default.Warning,null,tint=FqDanger,modifier=Modifier.size(15.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("اسپویلر • برای نمایش لمس کنید",fontSize=9.sp)
+                                        Text("اسپویلر • برای نمایش لمس کنید",fontSize=11.sp)
                                     }
                                 }
                             } else {
                                 Text(msg.text,fontSize=11.sp,lineHeight=18.sp,modifier=Modifier.padding(top=3.dp))
                             }
                             Row(Modifier.padding(top=6.dp),verticalAlignment=Alignment.CenterVertically) {
-                                Text(msg.time,color=FqMuted,fontSize=7.sp)
+                                Text(msg.time,color=FqMuted,fontSize=11.sp)
                                 Spacer(Modifier.width(7.dp))
-                                Text("❤️  "+((msg.id*3)%17+1),fontSize=8.sp,color=FqMuted)
+                                Text("❤️  "+((msg.id*3)%17+1),fontSize=11.sp,color=FqMuted)
                             }
                         }
                     }
@@ -293,7 +293,7 @@ fun CreatorProfileScreen(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(18.dp))
                     }
                 }
-                Text(creator.handle,color=FqMuted,fontSize=10.sp)
+                Text(creator.handle,color=FqMuted,fontSize=12.sp)
                 Text(creator.bio,fontSize=11.sp,modifier=Modifier.padding(top=9.dp))
                 Row(
                     Modifier.fillMaxWidth().padding(top=16.dp),
@@ -363,7 +363,7 @@ fun CreatorProfileScreen(
 private fun CreatorMetric(value:String,label:String) {
     Column(horizontalAlignment=Alignment.CenterHorizontally) {
         Text(value,fontSize=17.sp)
-        Text(label,color=FqMuted,fontSize=9.sp)
+        Text(label,color=FqMuted,fontSize=11.sp)
     }
 }
 
@@ -394,7 +394,7 @@ fun ProfileScreen(
                     Icon(Icons.Default.Person,null,tint=Color.Black,modifier=Modifier.size(54.dp))
                 }
                 Text("Armin",fontSize=23.sp,modifier=Modifier.padding(top=10.dp))
-                Text("@armin93",color=FqMuted,fontSize=10.sp)
+                Text("@armin93",color=FqMuted,fontSize=12.sp)
                 Text("عاشق سینما، سریال و داستان‌های خوب 🍿",fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
                 Row(
                     Modifier.fillMaxWidth().padding(top=16.dp),
@@ -489,7 +489,7 @@ private fun ProfileQuick(icon:androidx.compose.ui.graphics.vector.ImageVector,la
         horizontalAlignment=Alignment.CenterHorizontally
     ) {
         Icon(icon,null,tint=FqGold,modifier=Modifier.size(28.dp))
-        Text(label,fontSize=9.sp,modifier=Modifier.padding(top=8.dp))
+        Text(label,fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
     }
 }
 
@@ -529,7 +529,7 @@ fun WatchPartyScreen(
                 shape=RoundedCornerShape(12.dp),
                 modifier=Modifier.align(Alignment.BottomCenter).padding(12.dp)
             ) {
-                Text(if(playing)"همگام‌سازی فعال • در حال پخش" else "برای همه متوقف شده",fontSize=10.sp,modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp))
+                Text(if(playing)"همگام‌سازی فعال • در حال پخش" else "برای همه متوقف شده",fontSize=12.sp,modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp))
             }
         }
         Row(
@@ -538,7 +538,7 @@ fun WatchPartyScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text("Watch Party",fontSize=20.sp)
-                Text((media?.title ?: "The Last of Us")+" • 137 نفر حاضر",color=FqMuted,fontSize=9.sp)
+                Text((media?.title ?: "The Last of Us")+" • 137 نفر حاضر",color=FqMuted,fontSize=11.sp)
             }
             Button(
                 onClick={playing=!playing},
@@ -563,8 +563,8 @@ fun WatchPartyScreen(
                     }
                     Spacer(Modifier.width(8.dp))
                     Column {
-                        Text(msg.author,color=FqGold,fontSize=9.sp)
-                        Text(msg.text,fontSize=10.sp,modifier=Modifier.padding(top=2.dp))
+                        Text(msg.author,color=FqGold,fontSize=11.sp)
+                        Text(msg.text,fontSize=12.sp,modifier=Modifier.padding(top=2.dp))
                     }
                 }
             }
@@ -663,7 +663,7 @@ fun CreateHubScreen(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(option.second,fontSize=13.sp)
-                    Text(option.third,color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(top=3.dp))
+                    Text(option.third,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
                 }
                 Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
             }
@@ -739,13 +739,13 @@ fun CreateHubScreen(
                         ) {
                             Text(
                                 "فایل انتخاب شده مستقیم با URL امضاشده به Media Storage فرستاده می‌شود و بعد از ثبت روی Filmiqoo منتشر می‌شود.",
-                                color=FqGoldSoft,fontSize=9.sp,lineHeight=16.sp,modifier=Modifier.padding(10.dp)
+                                color=FqGoldSoft,fontSize=11.sp,lineHeight=16.sp,modifier=Modifier.padding(10.dp)
                             )
                         }
                     }
 
                     error?.let {
-                        Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(top=8.dp))
+                        Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
                     }
 
                     Button(
