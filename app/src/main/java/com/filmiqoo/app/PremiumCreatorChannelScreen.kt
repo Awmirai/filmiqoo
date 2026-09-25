@@ -398,11 +398,11 @@ private fun CreatorEntityScaffold(
                                 Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(18.dp))
                             }
                         }
-                        Text(handle,color=FqMuted,fontSize=9.sp)
+                        Text(handle,color=FqMuted,fontSize=11.sp)
                         if(bio.isNotBlank()) {
                             Text(
                                 bio,
-                                fontSize=9.sp,
+                                fontSize=11.sp,
                                 lineHeight=15.sp,
                                 maxLines=2,
                                 overflow=TextOverflow.Ellipsis,
@@ -495,7 +495,7 @@ private fun CreatorEntityScaffold(
                 Tab(
                     selected=tab==i,
                     onClick={onTab(i)},
-                    text={Text(label,fontSize=9.sp)}
+                    text={Text(label,fontSize=11.sp)}
                 )
             }
         }
@@ -509,7 +509,7 @@ private fun CreatorCountCard(value:String,label:String,modifier:Modifier=Modifie
     Surface(color=Color.Black.copy(alpha=.36f),shape=RoundedCornerShape(14.dp),modifier=modifier) {
         Column(Modifier.padding(vertical=9.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(value,fontSize=13.sp,fontWeight=FontWeight.Black)
-            Text(label,color=FqMuted,fontSize=7.sp)
+            Text(label,color=FqMuted,fontSize=11.sp)
         }
     }
 }
@@ -546,7 +546,7 @@ private fun CreatorReelsGrid(
                     verticalAlignment=Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.PlayArrow,null,tint=Color.White,modifier=Modifier.size(14.dp))
-                    Text(compactCreatorCount(reel.views),color=Color.White,fontSize=7.sp)
+                    Text(compactCreatorCount(reel.views),color=Color.White,fontSize=11.sp)
                 }
                 reel.media?.asMediaItem()?.let { media ->
                     IconButton(
@@ -584,10 +584,10 @@ private fun CreatorPostsList(posts: List<SocialPost>) {
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
                             Text(post.author.displayName,fontSize=11.sp,fontWeight=FontWeight.Bold)
-                            Text("@"+post.author.username,color=FqMuted,fontSize=7.sp)
+                            Text("@"+post.author.username,color=FqMuted,fontSize=11.sp)
                         }
                         Surface(color=FqSurface2,shape=RoundedCornerShape(8.dp)) {
-                            Text(post.type,fontSize=7.sp,color=FqGold,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp))
+                            Text(post.type,fontSize=11.sp,color=FqGold,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp))
                         }
                     }
 
@@ -600,7 +600,7 @@ private fun CreatorPostsList(posts: List<SocialPost>) {
                             Row(Modifier.padding(13.dp),verticalAlignment=Alignment.CenterVertically) {
                                 Icon(Icons.Default.VisibilityOff,null,tint=FqDanger)
                                 Spacer(Modifier.width(7.dp))
-                                Text("Spoiler Shield • برای نمایش لمس کن",fontSize=9.sp)
+                                Text("Spoiler Shield • برای نمایش لمس کن",fontSize=11.sp)
                             }
                         }
                     } else {
@@ -608,11 +608,11 @@ private fun CreatorPostsList(posts: List<SocialPost>) {
                     }
 
                     Row(Modifier.fillMaxWidth().padding(top=10.dp)) {
-                        Text("♥ "+compactCreatorCount(post.likes),color=FqMuted,fontSize=8.sp)
+                        Text("♥ "+compactCreatorCount(post.likes),color=FqMuted,fontSize=11.sp)
                         Spacer(Modifier.width(12.dp))
-                        Text("💬 "+compactCreatorCount(post.comments),color=FqMuted,fontSize=8.sp)
+                        Text("💬 "+compactCreatorCount(post.comments),color=FqMuted,fontSize=11.sp)
                         Spacer(Modifier.width(12.dp))
-                        Text("🔖 "+compactCreatorCount(post.saves),color=FqMuted,fontSize=8.sp)
+                        Text("🔖 "+compactCreatorCount(post.saves),color=FqMuted,fontSize=11.sp)
                     }
                 }
             }
@@ -646,11 +646,11 @@ private fun ChannelStoriesGrid(
                     )
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(story.caption.ifBlank{"Story"},fontSize=10.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        Text(story.caption.ifBlank{"Story"},fontSize=12.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(
                             compactCreatorCount(story.views)+" بازدید",
                             color=FqMuted,
-                            fontSize=7.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.padding(top=4.dp)
                         )
                     }
@@ -683,7 +683,7 @@ private fun ChannelMembersList(members: List<ChannelMember>) {
                                 Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(13.dp))
                             }
                         }
-                        Text("@"+member.username,color=FqMuted,fontSize=7.sp)
+                        Text("@"+member.username,color=FqMuted,fontSize=11.sp)
                     }
                     Surface(
                         color=if(member.role=="owner")FqGold.copy(alpha=.15f) else FqSurface2,
@@ -697,7 +697,7 @@ private fun ChannelMembersList(members: List<ChannelMember>) {
                                 else -> "Member"
                             },
                             color=if(member.role=="owner")FqGold else Color.White,
-                            fontSize=7.sp,
+                            fontSize=11.sp,
                             modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp)
                         )
                     }
@@ -735,8 +735,8 @@ private fun ChannelRoomsList(
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(room.name,fontSize=11.sp,fontWeight=FontWeight.Bold)
-                        Text(room.topic,color=FqMuted,fontSize=8.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        Text(compactCreatorCount(room.members)+" عضو",color=FqGold,fontSize=7.sp,modifier=Modifier.padding(top=3.dp))
+                        Text(room.topic,color=FqMuted,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(compactCreatorCount(room.members)+" عضو",color=FqGold,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
                     }
                     Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
                 }
@@ -759,7 +759,7 @@ private fun CreatorAbout(
             Surface(color=FqSurface,shape=RoundedCornerShape(20.dp),modifier=Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(15.dp)) {
                     Text("درباره",fontSize=15.sp,fontWeight=FontWeight.Bold)
-                    Text(bio.ifBlank{"Bio ثبت نشده."},color=Color.White.copy(alpha=.78f),fontSize=9.sp,lineHeight=16.sp,modifier=Modifier.padding(top=7.dp))
+                    Text(bio.ifBlank{"Bio ثبت نشده."},color=Color.White.copy(alpha=.78f),fontSize=11.sp,lineHeight=16.sp,modifier=Modifier.padding(top=7.dp))
                     HorizontalDivider(color=FqSurface3,modifier=Modifier.padding(vertical=12.dp))
                     Row {
                         MetricPill(Icons.Default.Verified,if(verified)"تأییدشده" else "عادی")
@@ -851,7 +851,7 @@ fun CreatorStudioScreen(
                         Column {
                             Text("Creator Studio",color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
                             Text(d.displayName,fontSize=22.sp,fontWeight=FontWeight.Black)
-                            Text("@"+d.username,color=FqMuted,fontSize=8.sp)
+                            Text("@"+d.username,color=FqMuted,fontSize=11.sp)
                         }
                     }
                 }
@@ -883,7 +883,7 @@ fun CreatorStudioScreen(
                         Text(
                             "ساخت، زمان‌بندی و مدیریت پخش زنده و Premiere",
                             color=FqMuted,
-                            fontSize=8.sp
+                            fontSize=11.sp
                         )
                     }
                     Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
@@ -916,7 +916,7 @@ fun CreatorStudioScreen(
                         Text(
                             "Post، Review، Poll و Reel رو برای زمان دقیق برنامه‌ریزی کن.",
                             color=FqMuted,
-                            fontSize=8.sp,
+                            fontSize=11.sp,
                             lineHeight=14.sp
                         )
                     }
@@ -961,7 +961,7 @@ fun CreatorStudioScreen(
                     FilterChip(
                         selected=analyticsDays==days,
                         onClick={analyticsDays=days},
-                        label={Text(days.toString()+" روز",fontSize=8.sp)}
+                        label={Text(days.toString()+" روز",fontSize=11.sp)}
                     )
                 }
             }
@@ -1077,7 +1077,7 @@ fun CreatorStudioScreen(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.fillMaxWidth().padding(14.dp)
                 )
             }
@@ -1146,11 +1146,11 @@ private fun CreatorRetentionMetrics(summary:CreatorAnalyticsSummary) {
                 Icon(Icons.Default.TrendingUp,null,tint=FqGold)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Followerهای جدید",fontSize=9.sp,fontWeight=FontWeight.Bold)
+                    Text("Followerهای جدید",fontSize=11.sp,fontWeight=FontWeight.Bold)
                     Text(
                         "در بازه انتخاب‌شده",
                         color=FqMuted,
-                        fontSize=7.sp
+                        fontSize=11.sp
                     )
                 }
                 Text(
@@ -1175,7 +1175,7 @@ private fun CreatorDailyChart(items:List<CreatorDailyMetric>) {
             Text(
                 "هنوز داده Playback برای نمودار ثبت نشده.",
                 color=FqMuted,
-                fontSize=8.sp,
+                fontSize=11.sp,
                 modifier=Modifier.padding(14.dp)
             )
         }
@@ -1261,7 +1261,7 @@ private fun CreatorTopReelCard(item:CreatorTopReelMetric) {
             Column(Modifier.weight(1f)) {
                 Text(
                     item.caption.ifBlank{"Reel"},
-                    fontSize=9.sp,
+                    fontSize=11.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=2,
                     overflow=TextOverflow.Ellipsis
@@ -1270,7 +1270,7 @@ private fun CreatorTopReelCard(item:CreatorTopReelMetric) {
                     compactCreatorCount(item.uniqueViewers)+" Viewer • "+
                         formatCreatorWatchTime(item.watchMs),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=5.dp)
                 )
                 LinearProgressIndicator(
@@ -1346,13 +1346,13 @@ private fun ScheduledCreatorCard(
                             "reel" -> "Reel"
                             else -> "Post"
                         },
-                        fontSize=10.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold
                     )
                     Text(
                         item.scheduledAt.replace("T"," ").take(16),
                         color=FqGold,
-                        fontSize=8.sp,
+                        fontSize=11.sp,
                         modifier=Modifier.padding(top=2.dp)
                     )
                 }
@@ -1374,7 +1374,7 @@ private fun ScheduledCreatorCard(
             if(item.preview.isNotBlank()) {
                 Text(
                     item.preview,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     maxLines=3,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=9.dp)
@@ -1386,7 +1386,7 @@ private fun ScheduledCreatorCard(
                 Text(
                     meta.joinToString(" • "),
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=5.dp)
                 )
             }
@@ -1403,7 +1403,7 @@ private fun ScheduledCreatorCard(
                 ) {
                     Icon(Icons.Default.Publish,null,tint=Color.Black,modifier=Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Publish Now",color=Color.Black,fontSize=7.sp)
+                    Text("Publish Now",color=Color.Black,fontSize=11.sp)
                 }
                 OutlinedButton(
                     onClick=onUnschedule,
@@ -1412,7 +1412,7 @@ private fun ScheduledCreatorCard(
                 ) {
                     Icon(Icons.Default.EditCalendar,null,modifier=Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("برگردان به Draft",fontSize=7.sp)
+                    Text("برگردان به Draft",fontSize=11.sp)
                 }
             }
         }
@@ -1430,7 +1430,7 @@ private fun StudioMetric(
         Column(Modifier.padding(14.dp)) {
             Icon(icon,null,tint=FqGold)
             Text(value,fontSize=22.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(top=8.dp))
-            Text(label,color=FqMuted,fontSize=8.sp)
+            Text(label,color=FqMuted,fontSize=11.sp)
         }
     }
 }
@@ -1444,7 +1444,7 @@ private fun StudioStatRow(
     Row(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
         Icon(icon,null,tint=FqGold,modifier=Modifier.size(19.dp))
         Spacer(Modifier.width(9.dp))
-        Text(label,fontSize=10.sp,modifier=Modifier.weight(1f))
+        Text(label,fontSize=12.sp,modifier=Modifier.weight(1f))
         Text(compactCreatorCount(value),fontSize=12.sp,fontWeight=FontWeight.Bold)
     }
 }
