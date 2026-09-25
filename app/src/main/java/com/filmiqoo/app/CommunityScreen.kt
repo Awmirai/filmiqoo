@@ -73,7 +73,7 @@ fun CommunityScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text("Community",fontSize=24.sp,fontWeight=FontWeight.Bold)
-                Text("آدم‌ها، داستان‌ها و بحث‌های سینمایی",color=FqMuted,fontSize=10.sp)
+                Text("آدم‌ها، داستان‌ها و بحث‌های سینمایی",color=FqMuted,fontSize=12.sp)
             }
             IconButton(onClick=onFriendActivity) { Icon(Icons.Default.Diversity3,null) }
             IconButton(onClick=onInbox) { Icon(Icons.Default.MarkChatUnread,null) }
@@ -101,7 +101,7 @@ fun CommunityScreen(
                 modifier=Modifier.fillMaxWidth().padding(12.dp),
                 shape=RoundedCornerShape(12.dp)
             ) {
-                Text(it,color=FqDanger,fontSize=10.sp,modifier=Modifier.padding(10.dp))
+                Text(it,color=FqDanger,fontSize=12.sp,modifier=Modifier.padding(10.dp))
             }
         }
 
@@ -220,7 +220,7 @@ fun CommunityScreen(
                                         }
                                         Text(
                                             story.author.displayName,
-                                            fontSize=9.sp,maxLines=1,overflow=TextOverflow.Ellipsis,
+                                            fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis,
                                             modifier=Modifier.padding(top=5.dp)
                                         )
                                     }
@@ -243,7 +243,7 @@ fun CommunityScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(story.author.displayName,fontSize=13.sp)
                                         Text(story.caption.ifBlank { "Story" },fontSize=11.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))
-                                        Text(story.views.toString()+" بازدید",color=FqMuted,fontSize=8.sp,modifier=Modifier.padding(top=5.dp))
+                                        Text(story.views.toString()+" بازدید",color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=5.dp))
                                     }
                                     if(story.spoiler) Icon(Icons.Default.Warning,null,tint=FqDanger)
                                 }
@@ -295,8 +295,8 @@ fun CommunityScreen(
                                                 Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(15.dp))
                                             }
                                         }
-                                        Text("@"+channel.slug,color=FqMuted,fontSize=9.sp)
-                                        Text(channel.bio,color=Color.White.copy(alpha=.78f),fontSize=9.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp))
+                                        Text("@"+channel.slug,color=FqMuted,fontSize=11.sp)
+                                        Text(channel.bio,color=Color.White.copy(alpha=.78f),fontSize=11.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp))
                                     }
                                     FilledTonalButton(
                                         onClick={
@@ -308,7 +308,7 @@ fun CommunityScreen(
                                         },
                                         contentPadding=PaddingValues(horizontal=10.dp,vertical=4.dp)
                                     ) {
-                                        Text(if(following)"دنبال‌شده" else "دنبال",fontSize=9.sp)
+                                        Text(if(following)"دنبال‌شده" else "دنبال",fontSize=11.sp)
                                     }
                                 }
                             }
@@ -335,11 +335,11 @@ fun CommunityScreen(
                                     Spacer(Modifier.width(11.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(room.name,fontSize=13.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
-                                        Text(room.topic,color=FqMuted,fontSize=9.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp))
+                                        Text(room.topic,color=FqMuted,fontSize=11.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp))
                                         Row(Modifier.padding(top=5.dp),verticalAlignment=Alignment.CenterVertically) {
                                             Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(12.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text(room.members.toString()+" عضو",fontSize=8.sp,color=FqMuted)
+                                            Text(room.members.toString()+" عضو",fontSize=11.sp,color=FqMuted)
                                         }
                                     }
                                     Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
@@ -406,12 +406,12 @@ private fun SocialPostCard(
                             Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                         }
                     }
-                    Text("@"+post.author.username,color=FqMuted,fontSize=8.sp)
+                    Text("@"+post.author.username,color=FqMuted,fontSize=11.sp)
                 }
                 Surface(color=FqSurface2,shape=RoundedCornerShape(9.dp)) {
                     Text(
                         when(post.type){"review"->"Review";"poll"->"Poll";"announcement"->"خبر";else->"Post"},
-                        color=FqGold,fontSize=8.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                        color=FqGold,fontSize=11.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
                 }
                 IconButton(onClick=onSafety) {
@@ -428,7 +428,7 @@ private fun SocialPostCard(
                     Column(Modifier.padding(15.dp),horizontalAlignment=Alignment.CenterHorizontally) {
                         Icon(Icons.Default.VisibilityOff,null,tint=FqDanger)
                         Text("Spoiler Shield",color=FqDanger,fontSize=12.sp,modifier=Modifier.padding(top=5.dp))
-                        Text("برای نمایش محتوا لمس کن",color=FqMuted,fontSize=9.sp)
+                        Text("برای نمایش محتوا لمس کن",color=FqMuted,fontSize=11.sp)
                     }
                 }
             } else {
@@ -450,8 +450,8 @@ private fun SocialPostCard(
                         RemoteImage(media.posterUrl,Modifier.size(42.dp,58.dp).clip(RoundedCornerShape(8.dp)))
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(media.title.orEmpty(),fontSize=10.sp)
-                            Text("متصل به Catalog Filmiqoo",color=FqMuted,fontSize=8.sp)
+                            Text(media.title.orEmpty(),fontSize=12.sp)
+                            Text("متصل به Catalog Filmiqoo",color=FqMuted,fontSize=11.sp)
                         }
                         Icon(Icons.Default.Movie,null,tint=FqGold)
                     }
@@ -467,12 +467,12 @@ private fun SocialPostCard(
                         modifier=Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(post.likes.toString(),fontSize=9.sp)
+                    Text(post.likes.toString(),fontSize=11.sp)
                 }
                 TextButton(onClick=onComments,contentPadding=PaddingValues(horizontal=8.dp)) {
                     Icon(Icons.Default.ChatBubbleOutline,null,modifier=Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(post.comments.toString(),fontSize=9.sp)
+                    Text(post.comments.toString(),fontSize=11.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick=onSave,contentPadding=PaddingValues(horizontal=6.dp)) {
@@ -484,14 +484,14 @@ private fun SocialPostCard(
                     )
                     if(post.saves>0) {
                         Spacer(Modifier.width(3.dp))
-                        Text(post.saves.toString(),fontSize=8.sp)
+                        Text(post.saves.toString(),fontSize=11.sp)
                     }
                 }
                 TextButton(onClick=onShare,contentPadding=PaddingValues(horizontal=6.dp)) {
                     Icon(Icons.Default.Share,null,modifier=Modifier.size(18.dp))
                     if(post.shares>0) {
                         Spacer(Modifier.width(3.dp))
-                        Text(post.shares.toString(),fontSize=8.sp)
+                        Text(post.shares.toString(),fontSize=11.sp)
                     }
                 }
             }
@@ -573,7 +573,7 @@ private fun PollWidget(
                             ) {
                                 Text(
                                     option.label,
-                                    fontSize=9.sp,
+                                    fontSize=11.sp,
                                     fontWeight=if(selected==option.id)FontWeight.Bold else FontWeight.Normal,
                                     modifier=Modifier.weight(1f)
                                 )
@@ -583,7 +583,7 @@ private fun PollWidget(
                                     else
                                         "0٪",
                                     color=FqMuted,
-                                    fontSize=8.sp
+                                    fontSize=11.sp
                                 )
                             }
                         }
@@ -592,13 +592,13 @@ private fun PollWidget(
                 Text(
                     compactPollVotes(poll.totalVotes)+" رأی",
                     color=FqMuted,
-                    fontSize=7.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.padding(top=5.dp)
                 )
             }
 
             error?.let {
-                Text(it,color=FqDanger,fontSize=7.sp,modifier=Modifier.padding(top=5.dp))
+                Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(top=5.dp))
             }
         }
     }
@@ -638,7 +638,7 @@ private fun PostCommentsSheet(
     ModalBottomSheet(onDismissRequest=onDismiss,containerColor=FqSurface) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(.78f).padding(horizontal=14.dp)) {
             Text("نظرها",fontSize=20.sp,fontWeight=FontWeight.Bold)
-            Text(post.author.displayName+" • "+post.body.take(70),color=FqMuted,fontSize=9.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(post.author.displayName+" • "+post.body.take(70),color=FqMuted,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
 
             if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
 
@@ -650,15 +650,15 @@ private fun PostCommentsSheet(
                     var reveal by remember(c.id) { mutableStateOf(!c.spoiler) }
                     Surface(color=FqSurface2,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(10.dp)) {
-                            Text(c.author.displayName,color=FqGold,fontSize=9.sp)
+                            Text(c.author.displayName,color=FqGold,fontSize=11.sp)
                             if(c.spoiler && !reveal) {
                                 Text(
                                     "⚠ اسپویلر • برای نمایش لمس کن",
-                                    color=FqDanger,fontSize=9.sp,
+                                    color=FqDanger,fontSize=11.sp,
                                     modifier=Modifier.padding(top=5.dp).clickable { reveal=true }
                                 )
                             } else {
-                                Text(c.body,fontSize=10.sp,modifier=Modifier.padding(top=4.dp))
+                                Text(c.body,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))
                             }
                         }
                     }
@@ -666,7 +666,7 @@ private fun PostCommentsSheet(
             }
 
             Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(vertical=8.dp)) {
-                FilterChip(selected=spoiler,onClick={spoiler=!spoiler},label={Text("اسپویلر",fontSize=8.sp)})
+                FilterChip(selected=spoiler,onClick={spoiler=!spoiler},label={Text("اسپویلر",fontSize=11.sp)})
                 Spacer(Modifier.width(7.dp))
                 OutlinedTextField(
                     value=text,onValueChange={text=it},
@@ -702,7 +702,7 @@ private fun EmptyCommunityState(
         Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(28.dp)) {
             Icon(icon,null,tint=FqMuted,modifier=Modifier.size(54.dp))
             Text(title,fontSize=17.sp,modifier=Modifier.padding(top=12.dp))
-            Text(body,color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=6.dp))
+            Text(body,color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=6.dp))
         }
     }
 }
