@@ -355,56 +355,98 @@ fun ConnectedRoomScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().background(FqSurface).padding(horizontal=8.dp,vertical=7.dp),
-            verticalAlignment=Alignment.CenterVertically
+        Surface(
+            color=FqGlass,
+            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+            shadowElevation=6.dp
         ) {
-            IconButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,null) }
-            Box(Modifier.size(42.dp).background(FqGold,CircleShape),contentAlignment=Alignment.Center) {
-                Icon(Icons.Default.Forum,null,tint=Color.Black)
-            }
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) {
-                Text(roomTitle,fontSize=14.sp)
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(6.dp).background(
-                            if(realtimeConnected)FqGreen else if(error==null)FqGold else FqDanger,
-                            CircleShape
+            Row(
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=6.dp,vertical=6.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                FqIconButton(
+                    icon=Icons.Default.ArrowBack,
+                    contentDescription="بازگشت",
+                    onClick=onBack
+                )
+                Surface(
+                    color=FqGold.copy(alpha=.12f),
+                    contentColor=FqGold,
+                    shape=CircleShape,
+                    modifier=Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment=Alignment.Center) {
+                        Icon(
+                            if(memberState?.roomType=="dm")
+                                Icons.Default.PersonOutline
+                            else
+                                Icons.Default.Forum,
+                            contentDescription=null,
+                            modifier=Modifier.size(21.dp)
                         )
-                    )
-                    Spacer(Modifier.width(4.dp))
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        when {
-                            memberState?.roomType=="dm" -> {
-                                val other=memberState?.items?.firstOrNull { it.id!=meId }
-                                when(other?.presence) {
-                                    "watching" -> "آنلاین • در حال تماشا"
-                                    "online" -> "آنلاین"
-                                    else -> if(realtimeConnected)"آفلاین • Realtime" else "آفلاین"
+                        roomTitle,
+                        style=MaterialTheme.typography.titleMedium,
+                        fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                        maxLines=1
+                    )
+                    Row(
+                        verticalAlignment=Alignment.CenterVertically,
+                        modifier=Modifier.padding(top=2.dp)
+                    ) {
+                        Box(
+                            Modifier.size(7.dp).background(
+                                if(realtimeConnected) FqGreen
+                                else if(error==null) FqGold
+                                else FqDanger,
+                                CircleShape
+                            )
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            when {
+                                memberState?.roomType=="dm" -> {
+                                    val other=memberState?.items?.firstOrNull { it.id!=meId }
+                                    when(other?.presence) {
+                                        "watching" -> "آنلاین • در حال تماشا"
+                                        "online" -> "آنلاین"
+                                        else -> if(realtimeConnected) "Realtime متصل" else "آفلاین"
+                                    }
                                 }
-                            }
-                            loggedIn && memberState!=null ->
-                                (memberState?.online ?: 0L).toString()+" آنلاین • Realtime"
-                            realtimeConnected -> "Realtime • WebSocket"
-                            syncing -> "در حال همگام‌سازی..."
-                            loggedIn -> "اتصال Realtime در حال بازیابی"
-                            else -> "حالت فقط مشاهده"
-                        },
-                        color=FqMuted,fontSize=11.sp
+                                loggedIn && memberState!=null ->
+                                    (memberState?.online ?: 0L).toString()+" آنلاین"
+                                realtimeConnected -> "Realtime متصل"
+                                syncing -> "در حال همگام‌سازی..."
+                                loggedIn -> "در حال بازیابی اتصال..."
+                                else -> "فقط مشاهده"
+                            },
+                            color=FqMuted,
+                            style=MaterialTheme.typography.labelSmall,
+                            maxLines=1
+                        )
+                    }
+                }
+                if(loggedIn) {
+                    FqIconButton(
+                        icon=Icons.Default.Group,
+                        contentDescription="اعضای گفتگو",
+                        onClick={roomMembersOpen=true}
                     )
                 }
-            }
-            if(loggedIn) {
-                IconButton(onClick={roomMembersOpen=true}) {
-                    Icon(Icons.Default.Group,null)
-                }
-            }
-            IconButton(onClick={
-                if(!loggedIn) onRequireAuth() else searchOpen=true
-            }) {
-                Icon(Icons.Default.Search,null)
-            }
+                FqIconButton(
+                    icon=Icons.Default.Search,
+                    contentDescription="جستجوی پیام",
+                    onClick={
+                        if(!loggedIn) onRequireAuth()
+                        else searchOpen=true
+                    }
+                )
             Box {
                 IconButton(onClick={headerMenuOpen=true}) {
                     Icon(Icons.Default.MoreVert,null)
@@ -480,6 +522,8 @@ fun ConnectedRoomScreen(
                         }
                     )
                 }
+            }
+        }
             }
         }
 
