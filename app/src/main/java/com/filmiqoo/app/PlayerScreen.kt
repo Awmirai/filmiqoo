@@ -1705,32 +1705,40 @@ private fun PlayerErrorOverlay(
 
 @Composable
 private fun PlayerTopControls(
-    target: PlaybackTarget,
-    currentVariant: PlaybackVariant?,
-    downloadQueued: Boolean,
-    onBack: () -> Unit,
-    onDownload: () -> Unit,
-    onMoments: () -> Unit,
-    onBookmarks: () -> Unit,
-    onDialogueSearch: () -> Unit,
-    onQueue: () -> Unit,
-    onHandoff: () -> Unit,
-    onShare: () -> Unit,
-    onPip: () -> Unit,
-    onSettings: () -> Unit,
-    onLock: () -> Unit
+    target:PlaybackTarget,
+    currentVariant:PlaybackVariant?,
+    downloadQueued:Boolean,
+    onBack:()->Unit,
+    onDownload:()->Unit,
+    onMoments:()->Unit,
+    onBookmarks:()->Unit,
+    onDialogueSearch:()->Unit,
+    onQueue:()->Unit,
+    onHandoff:()->Unit,
+    onShare:()->Unit,
+    onPip:()->Unit,
+    onSettings:()->Unit,
+    onLock:()->Unit
 ) {
+    var moreOpen by remember { mutableStateOf(false) }
+
     Row(
-        Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,top=10.dp),
+        Modifier.fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start=12.dp,end=12.dp,top=8.dp),
         verticalAlignment=Alignment.CenterVertically
     ) {
-        PlayerGlassIcon(Icons.Default.ArrowBack,onBack)
+        PlayerGlassIcon(
+            icon=Icons.Default.ArrowBack,
+            onClick=onBack,
+            contentDescription="بازگشت"
+        )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 target.title,
                 color=Color.White,
-                fontSize=13.sp,
+                style=MaterialTheme.typography.titleSmall,
                 fontWeight=FontWeight.Bold,
                 maxLines=1,
                 overflow=TextOverflow.Ellipsis
@@ -1739,39 +1747,94 @@ private fun PlayerTopControls(
                 listOf(
                     target.subtitle,
                     currentVariant?.label.orEmpty()
-                ).filter(String::isNotBlank).distinct().joinToString(" • "),
-                color=Color.White.copy(alpha=.62f),
-                fontSize=11.sp,
+                ).filter(String::isNotBlank)
+                    .distinct()
+                    .joinToString(" • "),
+                color=Color.White.copy(alpha=.68f),
+                style=MaterialTheme.typography.labelSmall,
                 maxLines=1,
                 overflow=TextOverflow.Ellipsis
             )
         }
-        PlayerGlassIcon(Icons.Default.Forum,onMoments)
-        Spacer(Modifier.width(5.dp))
-        PlayerGlassIcon(Icons.Default.BookmarkAdd,onBookmarks)
-        Spacer(Modifier.width(5.dp))
-        PlayerGlassIcon(Icons.Default.ManageSearch,onDialogueSearch)
-        Spacer(Modifier.width(5.dp))
-        if(target.previousMediaVersionId!=null || target.upNext.isNotEmpty()) {
-            PlayerGlassIcon(Icons.Default.QueuePlayNext,onQueue)
-            Spacer(Modifier.width(5.dp))
-        }
-        PlayerGlassIcon(Icons.Default.DevicesOther,onHandoff)
-        Spacer(Modifier.width(5.dp))
-        PlayerGlassIcon(Icons.Default.Share,onShare)
-        Spacer(Modifier.width(5.dp))
+
         PlayerCastRouteButton()
-        Spacer(Modifier.width(5.dp))
+        Spacer(Modifier.width(6.dp))
+
         PlayerGlassIcon(
-            if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
-            onDownload
+            icon=if(downloadQueued)
+                Icons.Default.DownloadDone
+            else
+                Icons.Default.Download,
+            onClick=onDownload,
+            contentDescription="دانلود"
         )
-        Spacer(Modifier.width(5.dp))
-        PlayerGlassIcon(Icons.Default.PictureInPictureAlt,onPip)
-        Spacer(Modifier.width(5.dp))
-        PlayerGlassIcon(Icons.Default.Settings,onSettings)
-        Spacer(Modifier.width(5.dp))
-        PlayerGlassIcon(Icons.Default.LockOpen,onLock)
+        Spacer(Modifier.width(6.dp))
+
+        PlayerGlassIcon(
+            icon=Icons.Default.Settings,
+            onClick=onSettings,
+            contentDescription="تنظیمات پخش"
+        )
+        Spacer(Modifier.width(6.dp))
+
+        Box {
+            PlayerGlassIcon(
+                icon=Icons.Default.MoreVert,
+                onClick={moreOpen=true},
+                contentDescription="گزینه‌های بیشتر"
+            )
+            DropdownMenu(
+                expanded=moreOpen,
+                onDismissRequest={moreOpen=false},
+                containerColor=FqSurface
+            ) {
+                DropdownMenuItem(
+                    text={Text("Moments و گفتگو")},
+                    leadingIcon={Icon(Icons.Default.Forum,null)},
+                    onClick={moreOpen=false;onMoments()}
+                )
+                DropdownMenuItem(
+                    text={Text("Bookmark صحنه")},
+                    leadingIcon={Icon(Icons.Default.BookmarkAdd,null)},
+                    onClick={moreOpen=false;onBookmarks()}
+                )
+                DropdownMenuItem(
+                    text={Text("جستجوی دیالوگ")},
+                    leadingIcon={Icon(Icons.Default.ManageSearch,null)},
+                    onClick={moreOpen=false;onDialogueSearch()}
+                )
+                if(
+                    target.previousMediaVersionId!=null ||
+                    target.upNext.isNotEmpty()
+                ) {
+                    DropdownMenuItem(
+                        text={Text("صف قسمت‌ها")},
+                        leadingIcon={Icon(Icons.Default.QueuePlayNext,null)},
+                        onClick={moreOpen=false;onQueue()}
+                    )
+                }
+                DropdownMenuItem(
+                    text={Text("ادامه روی دستگاه دیگر")},
+                    leadingIcon={Icon(Icons.Default.DevicesOther,null)},
+                    onClick={moreOpen=false;onHandoff()}
+                )
+                DropdownMenuItem(
+                    text={Text("اشتراک‌گذاری")},
+                    leadingIcon={Icon(Icons.Default.Share,null)},
+                    onClick={moreOpen=false;onShare()}
+                )
+                DropdownMenuItem(
+                    text={Text("Picture in Picture")},
+                    leadingIcon={Icon(Icons.Default.PictureInPictureAlt,null)},
+                    onClick={moreOpen=false;onPip()}
+                )
+                DropdownMenuItem(
+                    text={Text("قفل کنترل‌ها")},
+                    leadingIcon={Icon(Icons.Default.LockOpen,null)},
+                    onClick={moreOpen=false;onLock()}
+                )
+            }
+        }
     }
 }
 
@@ -1791,16 +1854,28 @@ private fun PlayerCastRouteButton() {
 
 @Composable
 private fun PlayerGlassIcon(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    onClick:()->Unit,
+    contentDescription:String?=null
 ) {
-    Box(
-        Modifier.size(40.dp).clip(CircleShape)
-            .background(Color.Black.copy(alpha=.5f))
-            .clickable { onClick() },
-        contentAlignment=Alignment.Center
+    Surface(
+        color=Color.Black.copy(alpha=.48f),
+        contentColor=Color.White,
+        shape=CircleShape,
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha=.10f)
+        ),
+        modifier=Modifier.size(44.dp)
+            .clickable { onClick() }
     ) {
-        Icon(icon,null,tint=Color.White,modifier=Modifier.size(20.dp))
+        Box(contentAlignment=Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription=contentDescription,
+                modifier=Modifier.size(21.dp)
+            )
+        }
     }
 }
 
@@ -1819,7 +1894,9 @@ private fun PlayerCenterControls(
     ) {
         Column(
             horizontalAlignment=Alignment.CenterHorizontally,
-            modifier=Modifier.clickable { onBack10() }
+            modifier=Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp)
+                .clickable { onBack10() }
+                .padding(6.dp)
         ) {
             Icon(Icons.Default.Replay10,null,tint=Color.White,modifier=Modifier.size(34.dp))
             Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
@@ -1840,7 +1917,9 @@ private fun PlayerCenterControls(
 
         Column(
             horizontalAlignment=Alignment.CenterHorizontally,
-            modifier=Modifier.clickable { onForward10() }
+            modifier=Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp)
+                .clickable { onForward10() }
+                .padding(6.dp)
         ) {
             Icon(Icons.Default.Forward10,null,tint=Color.White,modifier=Modifier.size(34.dp))
             Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
