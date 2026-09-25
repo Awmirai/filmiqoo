@@ -1,0 +1,50 @@
+name: Staging Load Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      concurrency:
+        description: "Concurrent workers"
+        required: false
+        default: "20"
+        type: string
+      duration_seconds:
+        description: "Test duration"
+        required: false
+        default: "30"
+        type: string
+      p95_limit_ms:
+        description: "Maximum allowed p95 latency"
+        required: false
+        default: "1500"
+        type: string
+      max_error_percent:
+        description: "Maximum allowed request error percentage"
+        required: false
+        default: "1.0"
+        type: string
+
+jobs:
+  load-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: false
+
+      - name: Run staging load smoke
+        env:
+          FILMIQOO_LOAD_BASE_URL: ${{ vars.FILMIQOO_STAGING_BASE_URL }}
+          FILMIQOO_LOAD_CONCURRENCY: ${{ inputs.concurrency }}
+          FILMIQOO_LOAD_DURATION_SECONDS: ${{ inputs.duration_seconds }}
+          FILMIQOO_LOAD_P95_LIMIT_MS: ${{ inputs.p95_limit_ms }}
+          FILMIQOO_LOAD_MAX_ERROR_PERCENT: ${{ inputs.max_error_percent }}
+        run: |
+          test -n "$FILMIQOO_LOAD_BASE_URL"
+          go run ./cmd/loadsmoke

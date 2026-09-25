@@ -28,19 +28,24 @@ type Server struct {
 	upstreamClient *http.Client
 	tmdb *tmdb.Client
 	objects *objectstore.Store
+	objectStoreInitError string
 	fcm *fcmClient
 	fcmInitError string
 	workersCancel context.CancelFunc
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
-	objects, _ := objectstore.New(
-		cfg.ObjectStorageEndpoint,
-		cfg.ObjectStoragePublicEndpoint,
-		cfg.ObjectStorageKey,
-		cfg.ObjectStorageSecret,
-		cfg.ObjectStorageBucket,
-	)
+	var objects *objectstore.Store
+	var objectErr error
+	if strings.TrimSpace(cfg.ObjectStorageEndpoint)!="" {
+		objects,objectErr=objectstore.New(
+			cfg.ObjectStorageEndpoint,
+			cfg.ObjectStoragePublicEndpoint,
+			cfg.ObjectStorageKey,
+			cfg.ObjectStorageSecret,
+			cfg.ObjectStorageBucket,
+		)
+	}
 	s := &Server{
 		cfg: cfg,
 		db: db,
@@ -57,6 +62,10 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			},
 		},
 	}
+	if objectErr!=nil {
+		s.objectStoreInitError=objectErr.Error()
+		log.Printf("object storage unavailable: %v",objectErr)
+	}
 	if err:=s.configureFCM(); err!=nil {
 		s.fcmInitError=err.Error()
 		log.Printf("firebase push disabled: %v",err)
@@ -68,6 +77,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	r.Use(middleware.Recoverer)
 	r.Use(s.securityHeaders)
 	r.Use(s.limitJSONBody)
+	r.Use(s.requestDeadline)
 	r.Use(s.cors)
 
 	r.Get("/healthz", s.health)
@@ -75,6 +85,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 	r.Route("/internal", func(r chi.Router) {
 		r.Get("/ops/status",s.opsStatus)
+		r.Get("/ops/moderation",s.opsModerationQueue)
+		r.Post("/ops/moderation/{id}/status",s.opsResolveModeration)
 		r.Post("/telegram/ingest", s.telegramIngest)
 		r.Get("/telegram/pending", s.pendingTelegramIngest)
 		r.Post("/telegram/{id}/resolve", s.resolveTelegramIngestNow)
@@ -114,7 +126,13 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/releases", s.releaseCenter)
 		r.Get("/catalog/{id}", s.catalogDetail)
 		r.Get("/catalog/{id}/reviews", s.mediaReviews)
-		r.Get("/search", s.universalSearch)
+		r.With(
+			s.authRateLimit(
+				"public-search",
+				s.cfg.PublicSearchRateLimit,
+				time.Minute,
+			),
+		).Get("/search",s.universalSearch)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/reels/{id}", s.reelDetail)
 		r.Get("/social/feed", s.socialFeed)
@@ -362,6 +380,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	go s.runPushDeliveryWorker(workerCtx)
 	go s.runTelegramIngestWorker(workerCtx)
 	go s.runTelemetryMaintenanceWorker(workerCtx)
+	go s.runUploadCleanupWorker(workerCtx)
 	return s
 }
 
@@ -398,6 +417,24 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"redis unavailable"})
 		return
 	}
+	if strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!="" {
+		if s.objects==nil {
+			writeJSON(w,http.StatusServiceUnavailable,map[string]string{
+				"status":"object storage unavailable",
+				"detail":s.objectStoreInitError,
+			})
+			return
+		}
+		objectCtx,objectCancel:=context.WithTimeout(ctx,1500*time.Millisecond)
+		objectErr:=s.objects.Health(objectCtx)
+		objectCancel()
+		if objectErr!=nil {
+			writeJSON(w,http.StatusServiceUnavailable,map[string]string{
+				"status":"object storage unavailable",
+			})
+			return
+		}
+	}
 	if s.cfg.FirebasePushEnabled && s.fcm==nil {
 		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
 			"status":"firebase push unavailable",
@@ -408,6 +445,10 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w,http.StatusOK,map[string]string{
 		"status":"ready",
 		"push":map[bool]string{true:"enabled",false:"disabled"}[s.fcm!=nil],
+		"objectStorage":map[bool]string{
+			true:"ready",
+			false:"disabled",
+		}[strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!=""],
 	})
 }
 
@@ -664,6 +705,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeError(w http.ResponseWriter,status int,err error) {
 	if err==nil {
 		err=errors.New(http.StatusText(status))
+	}
+	if errors.Is(err,context.DeadlineExceeded) {
+		writeJSON(w,http.StatusGatewayTimeout,map[string]string{"error":"request timed out"})
+		return
 	}
 	if status>=http.StatusInternalServerError {
 		log.Printf("internal server error: %v",err)

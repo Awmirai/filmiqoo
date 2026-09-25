@@ -21,7 +21,7 @@ func main() {
 	)
 	defer cancel()
 
-	db,err:=storage.OpenPostgres(ctx,cfg.DatabaseURL)
+	db,err:=storage.OpenPostgres(ctx,cfg.DatabaseURL,cfg.PostgresMaxConns,cfg.PostgresMinConns)
 	if err!=nil { log.Fatalf("postgres: %v",err) }
 	defer db.Close()
 

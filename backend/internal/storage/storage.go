@@ -8,11 +8,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func OpenPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+func OpenPostgres(
+	ctx context.Context,
+	dsn string,
+	maxConns int,
+	minConns int,
+) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil { return nil, err }
-	cfg.MaxConns = 20
-	cfg.MinConns = 2
+	if maxConns<=0 { maxConns=40 }
+	if minConns<0 { minConns=0 }
+	if minConns>maxConns { minConns=maxConns }
+	cfg.MaxConns = int32(maxConns)
+	cfg.MinConns = int32(minConns)
 	cfg.MaxConnLifetime = 30 * time.Minute
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil { return nil, err }
@@ -22,6 +30,15 @@ func OpenPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func OpenRedis(addr, password string) *redis.Client {
-	return redis.NewClient(&redis.Options{Addr: addr, Password: password, DB: 0, PoolSize: 30, MinIdleConns: 3})
+func OpenRedis(addr,password string,poolSize int) *redis.Client {
+	if poolSize<=0 { poolSize=60 }
+	minIdle:=poolSize/10
+	if minIdle<3 { minIdle=3 }
+	return redis.NewClient(&redis.Options{
+		Addr:addr,
+		Password:password,
+		DB:0,
+		PoolSize:poolSize,
+		MinIdleConns:minIdle,
+	})
 }

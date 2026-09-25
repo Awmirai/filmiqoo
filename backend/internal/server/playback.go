@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -23,6 +24,8 @@ type playbackTokenRequest struct {
 }
 
 func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control","no-store")
+	w.Header().Set("Pragma","no-cache")
 	var body playbackTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -83,6 +86,8 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control","private, no-store")
+	w.Header().Set("Referrer-Policy","no-referrer")
 	versionID := chi.URLParam(r, "versionID")
 	exp, err := strconv.ParseInt(r.URL.Query().Get("exp"), 10, 64)
 	if err != nil || exp <= time.Now().Unix() {
@@ -118,20 +123,48 @@ func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
 		"?hash=" + url.QueryEscape(streamHash)
 	if download { upstream += "&d=true" }
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	if v := r.Header.Get("Range"); v != "" { req.Header.Set("Range", v) }
-	if v := r.Header.Get("User-Agent"); v != "" { req.Header.Set("User-Agent", v) }
+	var resp *http.Response
+	var lastErr error
+	for attempt:=0; attempt<2; attempt++ {
+		req,reqErr:=http.NewRequestWithContext(r.Context(),http.MethodGet,upstream,nil)
+		if reqErr!=nil {
+			writeError(w,http.StatusInternalServerError,reqErr)
+			return
+		}
+		if v:=r.Header.Get("Range"); v!="" { req.Header.Set("Range",v) }
+		if v:=r.Header.Get("User-Agent"); v!="" { req.Header.Set("User-Agent",v) }
 
-	resp, err := s.upstreamClient.Do(req)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
+		resp,lastErr=s.upstreamClient.Do(req)
+		if lastErr==nil &&
+			resp.StatusCode!=http.StatusBadGateway &&
+			resp.StatusCode!=http.StatusServiceUnavailable &&
+			resp.StatusCode!=http.StatusGatewayTimeout {
+			break
+		}
+		if resp!=nil {
+			resp.Body.Close()
+			resp=nil
+		}
+		if attempt==0 {
+			select {
+			case <-r.Context().Done():
+				writeError(w,http.StatusBadGateway,r.Context().Err())
+				return
+			case <-time.After(150*time.Millisecond):
+			}
+		}
+	}
+	if lastErr!=nil || resp==nil {
+		s.recordPlaybackOriginResult(r.Context(),false)
+		writeError(w,http.StatusBadGateway,lastErr)
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode>=500 {
+		s.recordPlaybackOriginResult(r.Context(),false)
+	} else {
+		s.recordPlaybackOriginResult(r.Context(),true)
+	}
 
 	for _, key := range []string{
 		"Content-Type","Content-Length","Content-Range","Accept-Ranges",
@@ -396,4 +429,16 @@ func (s *Server) signPlayback(versionID string, exp int64, download bool) string
 	mac := hmac.New(sha256.New, []byte(s.cfg.PlaybackSigningSecret))
 	_, _ = mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+
+func (s *Server) recordPlaybackOriginResult(ctx context.Context,success bool) {
+	if s.redis==nil { return }
+	status:="success"
+	if !success { status="error" }
+	key:="metrics:playback-origin:"+status+":"+time.Now().UTC().Format("2006010215")
+	pipe:=s.redis.Pipeline()
+	pipe.Incr(ctx,key)
+	pipe.Expire(ctx,key,48*time.Hour)
+	_,_=pipe.Exec(ctx)
 }

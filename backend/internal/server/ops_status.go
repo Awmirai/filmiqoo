@@ -36,6 +36,20 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 	redisErr:=s.redis.Ping(ctx).Err()
 	redisLatency:=time.Since(redisStarted)
 
+	objectConfigured:=strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!=""
+	objectStarted:=time.Now()
+	var objectErr error
+	if objectConfigured {
+		if s.objects==nil {
+			objectErr=context.Canceled
+		} else {
+			objectCtx,objectCancel:=context.WithTimeout(ctx,1200*time.Millisecond)
+			objectErr=s.objects.Health(objectCtx)
+			objectCancel()
+		}
+	}
+	objectLatency:=time.Since(objectStarted)
+
 	push:=s.statusCounts(ctx,`
 		SELECT status,COUNT(*)
 		  FROM push_outbox
@@ -66,9 +80,38 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 	_ = s.db.QueryRow(ctx,"SELECT COUNT(*) FROM media_versions WHERE stream_ready=true").Scan(&readyMedia)
 	_ = s.db.QueryRow(ctx,"SELECT COUNT(*) FROM push_devices WHERE enabled=true").Scan(&enabledPushDevices)
 
+	var openReports,criticalReports,staleUploads int64
+	_ = s.db.QueryRow(ctx,`
+		SELECT COUNT(*),
+		       COUNT(*) FILTER (WHERE priority>=90)
+		  FROM reports
+		 WHERE status IN ('open','reviewing')
+	`).Scan(&openReports,&criticalReports)
+	_ = s.db.QueryRow(ctx,`
+		SELECT COUNT(*)
+		  FROM ugc_uploads
+		 WHERE (status='presigned' AND created_at<now()-interval '2 hours')
+		    OR (status='failed' AND created_at<now()-interval '1 hour')
+	`).Scan(&staleUploads)
+
+	dbPool:=s.db.Stat()
+	redisPool:=s.redis.PoolStats()
+
+	hourKey:=time.Now().UTC().Format("2006010215")
+	playbackSuccess,_:=s.redis.Get(
+		ctx,
+		"metrics:playback-origin:success:"+hourKey,
+	).Int64()
+	playbackErrors,_:=s.redis.Get(
+		ctx,
+		"metrics:playback-origin:error:"+hourKey,
+	).Int64()
+
 	status:="ok"
 	code:=http.StatusOK
-	if dbErr!=nil || redisErr!=nil || (s.cfg.FirebasePushEnabled && s.fcm==nil) {
+	if dbErr!=nil || redisErr!=nil ||
+		(objectConfigured && objectErr!=nil) ||
+		(s.cfg.FirebasePushEnabled && s.fcm==nil) {
 		status="degraded"
 		code=http.StatusServiceUnavailable
 	}
@@ -88,6 +131,26 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 			"redis":map[string]any{
 				"ok":redisErr==nil,
 				"latencyMs":redisLatency.Milliseconds(),
+				"pool":map[string]any{
+					"hits":redisPool.Hits,
+					"misses":redisPool.Misses,
+					"timeouts":redisPool.Timeouts,
+					"totalConns":redisPool.TotalConns,
+					"idleConns":redisPool.IdleConns,
+					"staleConns":redisPool.StaleConns,
+				},
+			},
+			"postgresPool":map[string]any{
+				"maxConns":dbPool.MaxConns(),
+				"totalConns":dbPool.TotalConns(),
+				"acquiredConns":dbPool.AcquiredConns(),
+				"idleConns":dbPool.IdleConns(),
+				"constructingConns":dbPool.ConstructingConns(),
+			},
+			"objectStorage":map[string]any{
+				"configured":objectConfigured,
+				"ok":!objectConfigured || objectErr==nil,
+				"latencyMs":objectLatency.Milliseconds(),
 			},
 			"firebasePush":map[string]any{
 				"enabled":s.cfg.FirebasePushEnabled,
@@ -107,6 +170,13 @@ func (s *Server) opsStatus(w http.ResponseWriter,r *http.Request) {
 			"activeSessions":activeSessions,
 			"enabledPushDevices":enabledPushDevices,
 			"streamReadyMediaVersions":readyMedia,
+			"openModerationReports":openReports,
+			"criticalModerationReports":criticalReports,
+			"staleUploads":staleUploads,
+		},
+		"playbackOriginCurrentHour":map[string]any{
+			"success":playbackSuccess,
+			"errors":playbackErrors,
 		},
 	})
 }

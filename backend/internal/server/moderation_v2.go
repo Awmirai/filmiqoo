@@ -19,7 +19,8 @@ func (s *Server) submitReport(w http.ResponseWriter,r *http.Request) {
 		Detail string `json:"detail"`
 	}
 	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-		writeError(w,http.StatusBadRequest,err); return
+		writeError(w,http.StatusBadRequest,err)
+		return
 	}
 
 	body.TargetType=strings.ToLower(strings.TrimSpace(body.TargetType))
@@ -30,33 +31,102 @@ func (s *Server) submitReport(w http.ResponseWriter,r *http.Request) {
 	switch body.TargetType {
 	case "user","post","reel","story","message","channel","review","moment":
 	default:
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported report target"}); return
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported report target"})
+		return
 	}
 	switch body.Reason {
 	case "spam","harassment","hate","sexual","violence","spoiler","copyright","impersonation","misinformation","other":
 	default:
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid report reason"}); return
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid report reason"})
+		return
 	}
 	if body.TargetID=="" {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"targetId is required"}); return
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"targetId is required"})
+		return
 	}
 	if len([]rune(body.Detail))>1200 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"report detail is too long"}); return
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"report detail is too long"})
+		return
 	}
 
-	var id string
+	priority:=reportBasePriority(body.Reason)
+	var id,status string
 	err:=s.db.QueryRow(r.Context(),`
-		INSERT INTO reports (reporter_user_id,target_type,target_id,reason,detail,status)
-		VALUES ($1,$2,$3,$4,$5,'open')
-		RETURNING id::text
-	`,userID,body.TargetType,body.TargetID,body.Reason,body.Detail).Scan(&id)
+		INSERT INTO reports (
+			reporter_user_id,target_type,target_id,reason,detail,status,priority,updated_at
+		)
+		VALUES ($1,$2,$3,$4,$5,'open',$6,now())
+		ON CONFLICT (reporter_user_id,target_type,target_id,reason)
+		WHERE status IN ('open','reviewing')
+		DO UPDATE SET
+		  detail=CASE
+		    WHEN EXCLUDED.detail<>'' THEN EXCLUDED.detail
+		    ELSE reports.detail
+		  END,
+		  priority=GREATEST(reports.priority,EXCLUDED.priority),
+		  updated_at=now()
+		RETURNING id::text,status,priority
+	`,userID,body.TargetType,body.TargetID,body.Reason,body.Detail,priority).
+		Scan(&id,&status,&priority)
 	if err!=nil {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid report target"}); return
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid report target"})
+		return
+	}
+
+	var independentReporters int
+	_ = s.db.QueryRow(r.Context(),`
+		SELECT COUNT(DISTINCT reporter_user_id)
+		  FROM reports
+		 WHERE target_type=$1
+		   AND target_id=$2
+		   AND status IN ('open','reviewing')
+		   AND created_at>=now()-interval '24 hours'
+	`,body.TargetType,body.TargetID).Scan(&independentReporters)
+
+	escalated:=priority
+	switch {
+	case independentReporters>=7:
+		escalated=100
+	case independentReporters>=4 && escalated<90:
+		escalated=90
+	case independentReporters>=2 && escalated<70:
+		escalated=70
+	}
+	if escalated>priority {
+		_,_=s.db.Exec(r.Context(),`
+			UPDATE reports
+			   SET priority=GREATEST(priority,$3),
+			       updated_at=now()
+			 WHERE target_type=$1
+			   AND target_id=$2
+			   AND status IN ('open','reviewing')
+		`,body.TargetType,body.TargetID,escalated)
+		priority=escalated
 	}
 
 	writeJSON(w,http.StatusCreated,map[string]any{
-		"id":id,"status":"open",
+		"id":id,
+		"status":status,
+		"priority":priority,
+		"independentReporters24h":independentReporters,
 	})
+}
+
+func reportBasePriority(reason string) int {
+	switch reason {
+	case "violence","sexual","hate":
+		return 80
+	case "harassment","impersonation":
+		return 65
+	case "copyright":
+		return 55
+	case "spam","misinformation":
+		return 45
+	case "spoiler":
+		return 25
+	default:
+		return 40
+	}
 }
 
 func (s *Server) toggleUserBlock(w http.ResponseWriter,r *http.Request) {

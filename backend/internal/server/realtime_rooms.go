@@ -50,12 +50,37 @@ func (s *Server) roomRealtime(w http.ResponseWriter,r *http.Request) {
 
 	_ = s.touchOnlinePresence(r.Context(),userID)
 
-	conn,err:=websocket.Accept(w,r,&websocket.AcceptOptions{OriginPatterns:[]string{"*"}})
+	slot,ok,slotErr:=s.acquireRealtimeSlot(r.Context(),userID)
+	if slotErr!=nil {
+		writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"realtime capacity check unavailable"})
+		return
+	}
+	if !ok {
+		writeJSON(w,http.StatusTooManyRequests,map[string]string{"error":s.realtimeLimitMessage()})
+		return
+	}
+	defer s.releaseRealtimeSlot(context.Background(),userID,slot)
+
+	conn,err:=websocket.Accept(w,r,nil)
 	if err!=nil { return }
+	conn.SetReadLimit(16*1024)
 	defer conn.CloseNow()
 
 	ctx,cancel:=context.WithCancel(r.Context())
 	defer cancel()
+
+	refreshTicker:=time.NewTicker(60*time.Second)
+	defer refreshTicker.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-refreshTicker.C:
+				s.refreshRealtimeSlot(context.Background(),userID,slot)
+			}
+		}
+	}()
 
 	pubsub:=s.redis.Subscribe(ctx,"room:"+roomID)
 	defer pubsub.Close()

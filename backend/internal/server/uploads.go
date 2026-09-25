@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -22,6 +23,27 @@ func (s *Server) presignUpload(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 	userID:=userIDFromContext(r.Context())
+
+	var dailyCount int
+	var dailyBytes int64
+	if err:=s.db.QueryRow(r.Context(),`
+		SELECT COUNT(*),COALESCE(SUM(size_bytes),0)
+		  FROM ugc_uploads
+		 WHERE user_id=$1
+		   AND created_at>=now()-interval '24 hours'
+		   AND status<>'deleted'
+	`,userID).Scan(&dailyCount,&dailyBytes); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
+	if dailyCount>=s.cfg.UploadDailyCountLimit {
+		w.Header().Set("Retry-After","3600")
+		writeJSON(w,http.StatusTooManyRequests,map[string]string{
+			"error":"daily upload count limit reached",
+		})
+		return
+	}
+
 	var body struct {
 		Kind string `json:"kind"`
 		MimeType string `json:"mimeType"`
@@ -39,6 +61,13 @@ func (s *Server) presignUpload(w http.ResponseWriter,r *http.Request) {
 	if body.Kind=="document" { max=100*1024*1024 }
 	if body.SizeBytes<=0 || body.SizeBytes>max {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"file size is outside allowed range"}); return
+	}
+	if dailyBytes+body.SizeBytes>s.cfg.UploadDailyBytesLimit {
+		w.Header().Set("Retry-After","3600")
+		writeJSON(w,http.StatusTooManyRequests,map[string]string{
+			"error":"daily upload byte limit reached",
+		})
+		return
 	}
 	allowedDocument:=map[string]bool{
 		"application/pdf":true,
@@ -89,15 +118,83 @@ func (s *Server) presignUpload(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) completeUpload(w http.ResponseWriter,r *http.Request) {
+	if s.objects==nil {
+		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
+			"error":"object storage is not configured",
+		})
+		return
+	}
+
 	userID:=userIDFromContext(r.Context())
 	id:=chi.URLParam(r,"id")
+
+	var key,mime,status string
+	var expectedSize int64
+	err:=s.db.QueryRow(r.Context(),`
+		SELECT object_key,mime_type,size_bytes,status
+		  FROM ugc_uploads
+		 WHERE id=$1 AND user_id=$2
+	`,id,userID).Scan(&key,&mime,&expectedSize,&status)
+	if err!=nil || status!="presigned" {
+		writeJSON(w,http.StatusNotFound,map[string]string{
+			"error":"upload not found or already completed",
+		})
+		return
+	}
+
+	verifyCtx,cancel:=context.WithTimeout(r.Context(),10*time.Second)
+	defer cancel()
+	info,err:=s.objects.Stat(verifyCtx,key)
+	if err!=nil {
+		writeJSON(w,http.StatusConflict,map[string]string{
+			"error":"uploaded object is not available yet",
+		})
+		return
+	}
+	if info.Size!=expectedSize {
+		_,_=s.db.Exec(r.Context(),`
+			UPDATE ugc_uploads SET status='failed'
+			 WHERE id=$1 AND user_id=$2
+		`,id,userID)
+		_ = s.objects.Delete(verifyCtx,key)
+		writeJSON(w,http.StatusUnprocessableEntity,map[string]any{
+			"error":"uploaded object size does not match presigned request",
+			"expectedBytes":expectedSize,
+			"actualBytes":info.Size,
+		})
+		return
+	}
+
+	actualType:=strings.ToLower(strings.TrimSpace(info.ContentType))
+	if actualType!="" &&
+		actualType!="application/octet-stream" &&
+		mime!="" &&
+		actualType!=mime {
+		_,_=s.db.Exec(r.Context(),`
+			UPDATE ugc_uploads SET status='failed'
+			 WHERE id=$1 AND user_id=$2
+		`,id,userID)
+		_ = s.objects.Delete(verifyCtx,key)
+		writeJSON(w,http.StatusUnprocessableEntity,map[string]any{
+			"error":"uploaded object content type does not match presigned request",
+		})
+		return
+	}
+
 	tag,err:=s.db.Exec(r.Context(),`
-		UPDATE ugc_uploads SET status='uploaded',uploaded_at=now()
+		UPDATE ugc_uploads
+		   SET status='uploaded',uploaded_at=now()
 		 WHERE id=$1 AND user_id=$2 AND status='presigned'
 	`,id,userID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
 	if tag.RowsAffected()!=1 {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"upload not found or already completed"}); return
+		writeJSON(w,http.StatusConflict,map[string]string{
+			"error":"upload state changed while completing",
+		})
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

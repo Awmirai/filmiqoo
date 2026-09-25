@@ -50,6 +50,14 @@ type Config struct {
 	TelemetryRetentionDays int
 	OpsSecret string
 	AllowInternalPlaintextDatabase bool
+	PublicSearchRateLimit int
+	RealtimeConnectionsPerUser int
+	UploadDailyCountLimit int
+	UploadDailyBytesLimit int64
+	PostgresMaxConns int
+	PostgresMinConns int
+	RedisPoolSize int
+	APIRequestTimeoutSeconds int
 }
 
 func Load() Config {
@@ -92,6 +100,14 @@ func Load() Config {
 		TelemetryRetentionDays: envInt("TELEMETRY_RETENTION_DAYS", 30),
 		OpsSecret: env("OPS_SECRET", "dev-ops-change-me"),
 		AllowInternalPlaintextDatabase: envBool("ALLOW_INTERNAL_PLAINTEXT_DATABASE", false),
+		PublicSearchRateLimit: envInt("PUBLIC_SEARCH_RATE_LIMIT_PER_MINUTE", 60),
+		RealtimeConnectionsPerUser: envInt("REALTIME_CONNECTIONS_PER_USER", 8),
+		UploadDailyCountLimit: envInt("UPLOAD_DAILY_COUNT_LIMIT", 100),
+		UploadDailyBytesLimit: envInt64("UPLOAD_DAILY_BYTES_LIMIT", 10*1024*1024*1024),
+		PostgresMaxConns: envInt("POSTGRES_MAX_CONNS", 40),
+		PostgresMinConns: envInt("POSTGRES_MIN_CONNS", 4),
+		RedisPoolSize: envInt("REDIS_POOL_SIZE", 60),
+		APIRequestTimeoutSeconds: envInt("API_REQUEST_TIMEOUT_SECONDS", 20),
 	}
 }
 
@@ -151,6 +167,24 @@ func (c Config) Validate() error {
 				return errors.New("production DATABASE_URL may disable TLS only for explicitly allowed internal/private database hosts")
 			}
 		}
+		for name,value:=range map[string]string{
+			"PUBLIC_API_BASE_URL":c.PublicAPIBaseURL,
+			"OBJECT_STORAGE_PUBLIC_ENDPOINT":c.ObjectStoragePublicEndpoint,
+		} {
+			v:=strings.TrimSpace(value)
+			if v=="" || !strings.HasPrefix(strings.ToLower(v),"https://") {
+				return fmt.Errorf("%s must use HTTPS in production",name)
+			}
+		}
+		for name,value:=range map[string]string{
+			"OBJECT_STORAGE_ENDPOINT":c.ObjectStorageEndpoint,
+			"OBJECT_STORAGE_BUCKET":c.ObjectStorageBucket,
+			"OBJECT_STORAGE_KEY":c.ObjectStorageKey,
+		} {
+			if strings.TrimSpace(value)=="" {
+				return fmt.Errorf("%s is required in production",name)
+			}
+		}
 	}
 
 	if c.AuthLoginRateLimit<=0 || c.AuthRegisterRateLimit<=0 || c.AuthRefreshRateLimit<=0 {
@@ -158,6 +192,19 @@ func (c Config) Validate() error {
 	}
 	if c.AuthenticatedWriteRateLimit<=0 {
 		return errors.New("authenticated write rate limit must be greater than zero")
+	}
+	if c.PublicSearchRateLimit<=0 || c.RealtimeConnectionsPerUser<=0 {
+		return errors.New("public search and realtime limits must be greater than zero")
+	}
+	if c.UploadDailyCountLimit<=0 || c.UploadDailyBytesLimit<=0 {
+		return errors.New("upload daily limits must be greater than zero")
+	}
+	if c.PostgresMaxConns<=0 || c.PostgresMinConns<0 ||
+		c.PostgresMinConns>c.PostgresMaxConns || c.RedisPoolSize<=0 {
+		return errors.New("database and redis pool settings are invalid")
+	}
+	if c.APIRequestTimeoutSeconds<5 || c.APIRequestTimeoutSeconds>120 {
+		return errors.New("API_REQUEST_TIMEOUT_SECONDS must be between 5 and 120")
 	}
 	if c.PushMaxAttempts<=0 || c.TelegramIngestMaxAttempts<=0 ||
 		c.TelegramIngestRetryBaseSeconds<=0 || c.TelemetryRetentionDays<=0 {
