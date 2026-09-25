@@ -92,7 +92,7 @@ fun InboxScreen(
 
                 Row(
                     Modifier.fillMaxWidth()
-                        .padding(horizontal=6.dp,bottom=6.dp),
+                        .padding(start=6.dp,end=6.dp,bottom=6.dp),
                     horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
                     PremiumChip(
