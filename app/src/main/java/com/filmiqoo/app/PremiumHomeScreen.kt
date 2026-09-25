@@ -444,9 +444,17 @@ private fun PremiumHeroPager(
                                     )
                                 } else onMedia(media)
                             },
-                            colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                            shape=RoundedCornerShape(14.dp),
+                            colors=ButtonDefaults.buttonColors(
+                                containerColor=FqGold,
+                                contentColor=Color(0xFF171000)
+                            ),
+                            shape=RoundedCornerShape(16.dp),
+                            contentPadding=PaddingValues(
+                                horizontal=16.dp,
+                                vertical=13.dp
+                            ),
                             modifier=Modifier.weight(1f)
+                                .heightIn(min=50.dp)
                         ) {
                             Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
                             Spacer(Modifier.width(5.dp))
@@ -455,12 +463,20 @@ private fun PremiumHeroPager(
                         Spacer(Modifier.width(8.dp))
                         FilledTonalIconButton(
                             onClick={onMedia(media)},
-                            colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=Color.White.copy(alpha=.14f))
+                            colors=IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor=Color.Black.copy(alpha=.46f),
+                                contentColor=Color.White
+                            ),
+                            modifier=Modifier.size(48.dp)
                         ) { Icon(Icons.Default.Info,null) }
                         Spacer(Modifier.width(6.dp))
                         FilledTonalIconButton(
                             onClick={onWatchParty(media)},
-                            colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=Color.White.copy(alpha=.14f))
+                            colors=IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor=Color.Black.copy(alpha=.46f),
+                                contentColor=Color.White
+                            ),
+                            modifier=Modifier.size(48.dp)
                         ) { Icon(Icons.Default.Groups,null) }
                     }
                 }
@@ -533,7 +549,9 @@ private fun PremiumContinueRow(
     ) {
         items(items,key={it.target.mediaVersionId}) { item ->
             Column(
-                Modifier.width(232.dp).clip(RoundedCornerShape(20.dp)).background(FqSurface)
+                Modifier.width(236.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(FqSurface)
                     .clickable { onPlay(item.target) }
             ) {
                 Box(Modifier.fillMaxWidth().height(130.dp)) {
@@ -572,7 +590,10 @@ private fun PremiumContinueRow(
                         Text(item.media.title,fontSize=11.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
                         Text(((item.progress*100).toInt()).toString()+"٪ دیده شده",color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
                     }
-                    IconButton(onClick={onMedia(item.media)},modifier=Modifier.size(32.dp)) {
+                    IconButton(
+                        onClick={onMedia(item.media)},
+                        modifier=Modifier.size(44.dp)
+                    ) {
                         Icon(Icons.Default.MoreVert,null,modifier=Modifier.size(18.dp))
                     }
                 }
