@@ -66,7 +66,7 @@ fun WatchPartyFriendsInviteSheet(
                     Text("دعوت دوست‌ها",fontSize=21.sp,fontWeight=FontWeight.Black)
                     Text(
                         "از Following مستقیم Invite بفرست؛ لازم نیست لینک رو جدا بفرستی.",
-                        color=FqMuted,fontSize=8.sp
+                        color=FqMuted,fontSize=11.sp
                     )
                 }
                 IconButton(
@@ -129,7 +129,7 @@ fun WatchPartyFriendsInviteSheet(
                                     Row(verticalAlignment=Alignment.CenterVertically) {
                                         Text(
                                             user.displayName,
-                                            fontSize=10.sp,
+                                            fontSize=12.sp,
                                             fontWeight=FontWeight.Bold,
                                             maxLines=1,
                                             overflow=TextOverflow.Ellipsis
@@ -144,7 +144,7 @@ fun WatchPartyFriendsInviteSheet(
                                             )
                                         }
                                     }
-                                    Text("@"+user.username,color=FqMuted,fontSize=7.sp)
+                                    Text("@"+user.username,color=FqMuted,fontSize=11.sp)
                                     if(user.watchingNow) {
                                         Text(
                                             "الان آنلاین و در حال تماشا",
@@ -159,7 +159,7 @@ fun WatchPartyFriendsInviteSheet(
                                     "accepted" -> {
                                         AssistChip(
                                             onClick={},
-                                            label={Text("عضو شده",fontSize=7.sp)},
+                                            label={Text("عضو شده",fontSize=11.sp)},
                                             leadingIcon={
                                                 Icon(
                                                     Icons.Default.Check,
@@ -173,7 +173,7 @@ fun WatchPartyFriendsInviteSheet(
                                     "pending" -> {
                                         AssistChip(
                                             onClick={},
-                                            label={Text("دعوت شد",fontSize=7.sp)},
+                                            label={Text("دعوت شد",fontSize=11.sp)},
                                             leadingIcon={
                                                 Icon(
                                                     Icons.Default.HourglassTop,
@@ -218,7 +218,7 @@ fun WatchPartyFriendsInviteSheet(
                                                 )
                                             }
                                             Spacer(Modifier.width(4.dp))
-                                            Text("دعوت",color=Color.Black,fontSize=7.sp)
+                                            Text("دعوت",color=Color.Black,fontSize=11.sp)
                                         }
                                     }
                                 }
@@ -232,7 +232,7 @@ fun WatchPartyFriendsInviteSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=8.sp,
+                    fontSize=11.sp,
                     modifier=Modifier.fillMaxWidth().padding(top=9.dp)
                 )
             }
