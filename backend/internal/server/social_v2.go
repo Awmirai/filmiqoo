@@ -171,6 +171,31 @@ func (s *Server) togglePostLike(w http.ResponseWriter,r *http.Request) {
 		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE posts SET like_count=like_count+1 WHERE id=$1",postID) }
 	}
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+	if !exists {
+		var authorID string
+		if scanErr:=tx.QueryRow(
+			r.Context(),
+			"SELECT author_user_id::text FROM posts WHERE id=$1",
+			postID,
+		).Scan(&authorID); scanErr==nil && authorID!=userID {
+			_,_=tx.Exec(r.Context(),`
+				INSERT INTO notifications (
+					user_id,actor_user_id,notification_type,entity_type,entity_id,title
+				)
+				SELECT $1,$2,'post_like','post',$3,'پسند جدید روی پست'
+				WHERE NOT EXISTS (
+					SELECT 1 FROM notifications
+					 WHERE user_id=$1
+					   AND actor_user_id=$2
+					   AND notification_type='post_like'
+					   AND entity_id=$3
+					   AND created_at>now()-interval '12 hours'
+				)
+			`,authorID,userID,postID)
+		}
+	}
+
 	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	writeJSON(w,http.StatusOK,map[string]any{"liked":!exists})
 }
@@ -200,6 +225,29 @@ func (s *Server) addPostComment(w http.ResponseWriter,r *http.Request) {
 	`,postID,body.ParentCommentID,userID,body.Body,body.Spoiler).Scan(&id)
 	if err==nil { _,err=tx.Exec(r.Context(),"UPDATE posts SET comment_count=comment_count+1 WHERE id=$1",postID) }
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+	var recipientID string
+	if scanErr:=tx.QueryRow(r.Context(),`
+		SELECT COALESCE(
+			(
+				SELECT author_user_id::text
+				  FROM comments
+				 WHERE id=$1
+			),
+			p.author_user_id::text
+		)
+		  FROM posts p
+		 WHERE p.id=$2
+	`,body.ParentCommentID,postID).Scan(&recipientID); scanErr==nil && recipientID!=userID {
+		preview:=normalizeMessagePreview(body.Body)
+		if body.Spoiler { preview="کامنت اسپویلردار" }
+		_,_=tx.Exec(r.Context(),`
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
+			) VALUES ($1,$2,'post_comment','post',$3,'کامنت جدید روی پست',$4)
+		`,recipientID,userID,postID,preview)
+	}
+
 	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	writeJSON(w,http.StatusCreated,map[string]any{"id":id})
