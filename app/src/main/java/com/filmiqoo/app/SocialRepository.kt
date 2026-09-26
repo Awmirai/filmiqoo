@@ -609,6 +609,12 @@ class SocialRepository(
             authorized=true
         ).optString("selectedOptionId")
 
+    suspend fun pollSelection(postId:String):String? =
+        backend.getJson(
+            "/v1/social/posts/"+postId+"/poll/selection",
+            authorized=true
+        ).optString("selectedOptionId").takeIf(String::isNotBlank)
+
     suspend fun togglePostLike(id: String): Boolean =
         backend.postJson("/v1/social/posts/"+id+"/like",JSONObject(),authorized=true)
             .optBoolean("liked")
