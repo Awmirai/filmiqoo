@@ -100,3 +100,27 @@ func (s *Server) votePoll(w http.ResponseWriter,r *http.Request) {
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"selectedOptionId":body.OptionID,"changed":true})
 }
+
+
+func (s *Server) postPollSelection(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	postID:=chi.URLParam(r,"id")
+
+	var selected *string
+	err:=s.db.QueryRow(r.Context(),`
+		SELECT (
+			SELECT option_id::text
+			  FROM poll_votes
+			 WHERE post_id=$1 AND user_id=$2
+			 LIMIT 1
+		)
+	`,postID,userID).Scan(&selected)
+	if err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"selectedOptionId":selected,
+	})
+}
