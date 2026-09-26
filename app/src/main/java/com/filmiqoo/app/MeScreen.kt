@@ -937,7 +937,7 @@ private fun MeMoreSheet(
         MeSheetRow(Icons.Default.Star,"Close Friends",onCloseFriends)
         MeSheetRow(Icons.Default.MilitaryTech,"Reputation و Badgeها",onReputation)
         MeSheetRow(Icons.Default.EventAvailable,"تقویم سریال‌ها",onSeriesCalendar)
-        MeSheetRow(Icons.Default.CollectionsBookmark,"Community Lists",onSocialCollections)
+        MeSheetRow(Icons.Default.CollectionsBookmark,"Club Lists",onSocialCollections)
         MeSheetRow(Icons.Default.Shield,"مرکز ایمنی",onSafety)
         MeSheetRow(Icons.Default.Security,"امنیت و دستگاه‌ها",onSecurity)
         MeSheetRow(Icons.Default.Settings,"همه تنظیمات",onSettings)
