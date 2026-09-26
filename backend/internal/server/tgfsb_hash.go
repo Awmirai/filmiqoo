@@ -1,19 +1,25 @@
 package server
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
-	"strconv"
+	"strings"
 )
 
-func computeTGFSBHash(fileName string,fileSize int64,mimeType string,fileID int64,length int) string {
-	h:=md5.New()
-	_,_=h.Write([]byte(fileName))
-	_,_=h.Write([]byte(strconv.FormatInt(fileSize,10)))
-	_,_=h.Write([]byte(mimeType))
-	_,_=h.Write([]byte(strconv.FormatInt(fileID,10)))
-	full:=hex.EncodeToString(h.Sum(nil))
-	if length<5 { length=6 }
-	if length>len(full) { length=len(full) }
+func computeTGFSBHash(fileUniqueID string, length int) string {
+	uniqueID := strings.TrimSpace(fileUniqueID)
+	if uniqueID == "" {
+		return ""
+	}
+
+	sum := sha256.Sum256([]byte(uniqueID))
+	full := hex.EncodeToString(sum[:])
+
+	if length < 6 {
+		length = 6
+	}
+	if length > 63 {
+		length = 63
+	}
 	return full[:length]
 }
