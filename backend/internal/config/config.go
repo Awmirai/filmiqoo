@@ -26,9 +26,6 @@ type Config struct {
 	PublicMediaBaseURL string
 	Environment string
 	TelegramIngestSecret string
-	TelegramIngestBotToken string
-	TelegramLogChannel string
-	TelegramBotPollTimeoutSeconds int
 	TelegramStreamBaseURL string
 	PlaybackSigningSecret string
 	PublicAPIBaseURL string
@@ -79,9 +76,6 @@ func Load() Config {
 		PublicMediaBaseURL: env("PUBLIC_MEDIA_BASE_URL", "http://localhost:9000/filmiqoo-media"),
 		Environment: env("APP_ENV", "development"),
 		TelegramIngestSecret: env("TELEGRAM_INGEST_SECRET", "dev-ingest-change-me"),
-		TelegramIngestBotToken: strings.TrimSpace(os.Getenv("TELEGRAM_INGEST_BOT_TOKEN")),
-		TelegramLogChannel: strings.TrimSpace(os.Getenv("TELEGRAM_LOG_CHANNEL")),
-		TelegramBotPollTimeoutSeconds: envInt("TELEGRAM_BOT_POLL_TIMEOUT_SECONDS", 20),
 		TelegramStreamBaseURL: env("TELEGRAM_STREAM_BASE_URL", "http://localhost:8081"),
 		PlaybackSigningSecret: env("PLAYBACK_SIGNING_SECRET", "dev-playback-change-me"),
 		PublicAPIBaseURL: env("PUBLIC_API_BASE_URL", "http://localhost:8080"),
@@ -211,9 +205,6 @@ func (c Config) Validate() error {
 	}
 	if c.APIRequestTimeoutSeconds<5 || c.APIRequestTimeoutSeconds>120 {
 		return errors.New("API_REQUEST_TIMEOUT_SECONDS must be between 5 and 120")
-	}
-	if c.TelegramBotPollTimeoutSeconds<5 || c.TelegramBotPollTimeoutSeconds>50 {
-		return errors.New("TELEGRAM_BOT_POLL_TIMEOUT_SECONDS must be between 5 and 50")
 	}
 	if c.PushMaxAttempts<=0 || c.TelegramIngestMaxAttempts<=0 ||
 		c.TelegramIngestRetryBaseSeconds<=0 || c.TelemetryRetentionDays<=0 {
