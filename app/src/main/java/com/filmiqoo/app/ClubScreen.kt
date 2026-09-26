@@ -566,19 +566,24 @@ private fun ClubForYou(
                                 runCatching { social.sharePost(post.id,"system") }
                             }
                         }
-                        shareText(
+                        val destination=post.media?.id
+                            ?.takeIf(String::isNotBlank)
+                            ?.let(FilmiqooDeepLinks::title)
+                            ?: FilmiqooDeepLinks.creator(post.author.id)
+                        FilmiqooDeepLinks.share(
                             context,
                             buildString {
                                 append(post.author.displayName)
                                 if(post.body.isNotBlank()) {
                                     append("\n")
-                                    append(post.body.take(700))
+                                    append(post.body.take(500))
                                 }
                                 post.media?.title?.takeIf(String::isNotBlank)?.let {
                                     append("\n🎬 ")
                                     append(it)
                                 }
-                            }
+                            },
+                            destination
                         )
                     }
                 )
