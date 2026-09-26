@@ -123,6 +123,13 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		})
 
 		r.Get("/catalog/home", s.catalogHome)
+		r.With(
+			s.authRateLimit(
+				"tmdb-metadata",
+				s.cfg.PublicSearchRateLimit,
+				time.Minute,
+			),
+		).Get("/tmdb", s.tmdbProxy)
 		r.Get("/releases", s.releaseCenter)
 		r.Get("/catalog/{id}", s.catalogDetail)
 		r.Get("/catalog/{id}/reviews", s.mediaReviews)
