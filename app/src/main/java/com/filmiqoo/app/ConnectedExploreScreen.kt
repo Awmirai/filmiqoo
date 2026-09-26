@@ -261,7 +261,7 @@ private fun RealReelsPager(
                             name=reel.author.displayName,
                             handle="@"+reel.author.username,
                             followers="",
-                            bio="Creator در Filmiqoo",
+                            bio="سازنده در Filmiqoo",
                             verified=reel.author.verified,
                             id=reel.author.id,
                             entityType="user",
@@ -289,7 +289,7 @@ private fun RealReelsPager(
                 onShare={
                     shareText(
                         context,
-                         "Filmiqoo Clip • "+(reel.media?.title ?: reel.caption.ifBlank{"Reel"})
+                         "Filmiqoo Clip • "+(reel.media?.title ?: reel.caption.ifBlank{"Clip"})
                     )
                 },
                 onToggleMute={muted=!muted},
@@ -464,7 +464,7 @@ private fun ReelVideoPage(
                 Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.padding(30.dp)) {
                     Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(52.dp))
                     Text("Spoiler Shield",color=FqDanger,fontSize=22.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=12.dp))
-                    Text("این Reel دارای اسپویل است.",color=Color.White,fontSize=12.sp,modifier=Modifier.padding(top=7.dp))
+                    Text("این Clip دارای اسپویل است.",color=Color.White,fontSize=12.sp,modifier=Modifier.padding(top=7.dp))
                     Text("برای نمایش لمس کن",color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=3.dp))
                 }
             }
