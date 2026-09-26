@@ -997,3 +997,97 @@ private fun compactMeCount(value:Long):String = when {
     value>=1_000 -> String.format(Locale.US,"%.1fK",value/1_000.0)
     else -> value.toString()
 }
+
+
+@Composable
+fun MeSignedOutScreen(
+    onLogin:()->Unit,
+    onClub:()->Unit,
+    onClips:()->Unit
+) {
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(
+                listOf(
+                    Color(0xFF111722),
+                    FqBg,
+                    FqBg
+                )
+            )
+        )
+    ) {
+        Column(
+            Modifier.align(Alignment.Center)
+                .fillMaxWidth()
+                .padding(horizontal=28.dp),
+            horizontalAlignment=Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier.size(92.dp)
+                    .background(Color.White,CircleShape),
+                contentAlignment=Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Person,
+                    null,
+                    tint=Color.Black,
+                    modifier=Modifier.size(46.dp)
+                )
+            }
+
+            Text(
+                "پروفایل Filmiqoo تو",
+                fontSize=25.sp,
+                fontWeight=FontWeight.Black,
+                modifier=Modifier.padding(top=20.dp)
+            )
+            Text(
+                "فیلم‌هایی که می‌بینی، Reviewها، Clips، Listها و آدم‌هایی که دنبال می‌کنی همه در یک هویت سینمایی جمع می‌شن.",
+                color=FqMuted,
+                fontSize=12.sp,
+                lineHeight=19.sp,
+                modifier=Modifier.padding(top=9.dp)
+            )
+
+            Button(
+                onClick=onLogin,
+                colors=ButtonDefaults.buttonColors(
+                    containerColor=Color.White,
+                    contentColor=Color.Black
+                ),
+                shape=RoundedCornerShape(17.dp),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(top=22.dp)
+                    .height(52.dp)
+            ) {
+                Text("ورود یا ساخت حساب",fontWeight=FontWeight.Black)
+            }
+
+            Row(
+                Modifier.fillMaxWidth().padding(top=10.dp),
+                horizontalArrangement=Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick=onClub,
+                    shape=RoundedCornerShape(16.dp),
+                    border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+                    modifier=Modifier.weight(1f).height(48.dp)
+                ) {
+                    Icon(Icons.Default.Groups,null,modifier=Modifier.size(17.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Club")
+                }
+                OutlinedButton(
+                    onClick=onClips,
+                    shape=RoundedCornerShape(16.dp),
+                    border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+                    modifier=Modifier.weight(1f).height(48.dp)
+                ) {
+                    Icon(Icons.Default.SmartDisplay,null,modifier=Modifier.size(17.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Clips")
+                }
+            }
+        }
+    }
+}
