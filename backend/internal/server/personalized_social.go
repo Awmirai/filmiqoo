@@ -120,6 +120,16 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		       rl.like_count,rl.comment_count,rl.save_count,rl.share_count,rl.view_count,rl.spoiler,
 		       EXISTS(SELECT 1 FROM reel_likes rlx WHERE rlx.reel_id=rl.id AND rlx.user_id=$1),
 		       EXISTS(SELECT 1 FROM reel_saves rsx WHERE rsx.reel_id=rl.id AND rsx.user_id=$1),
+		       EXISTS(
+		         SELECT 1 FROM user_follows uf
+		          WHERE uf.follower_user_id=$1 AND uf.followed_user_id=rl.creator_user_id
+		       ),
+		       EXISTS(
+		         SELECT 1 FROM follow_requests fr
+		          WHERE fr.requester_user_id=$1
+		            AND fr.target_user_id=rl.creator_user_id
+		            AND fr.status='pending'
+		       ),
 		       p.user_id::text,p.display_name,p.username::text,p.avatar_url,p.verified,
 		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,mt.backdrop_url,
 		       mt.year,mt.rating
@@ -200,7 +210,7 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		var id,caption,playbackURL,coverURL,authorID,displayName,username,avatar string
 		var duration int
 		var likes,comments,saves,shares,views int64
-		var spoiler,likedByMe,savedByMe,verified bool
+		var spoiler,likedByMe,savedByMe,followingAuthor,followPending,verified bool
 		var mediaID,kind,title,originalTitle,poster,backdrop *string
 		var tmdbID *int64
 		var year *int
@@ -208,6 +218,7 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		if err:=rows.Scan(
 			&id,&caption,&playbackURL,&coverURL,&duration,
 			&likes,&comments,&saves,&shares,&views,&spoiler,&likedByMe,&savedByMe,
+			&followingAuthor,&followPending,
 			&authorID,&displayName,&username,&avatar,&verified,
 			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
 		); err!=nil { continue }
@@ -217,6 +228,7 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 			"durationMs":duration,"likes":likes,"comments":comments,"saves":saves,
 			"shares":shares,"views":views,"spoiler":spoiler,
 			"likedByMe":likedByMe,"savedByMe":savedByMe,
+			"followingAuthor":followingAuthor,"followPending":followPending,
 			"author":map[string]any{
 				"id":authorID,"displayName":displayName,"username":username,
 				"avatarUrl":avatar,"verified":verified,
