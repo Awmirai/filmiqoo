@@ -600,8 +600,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onMedia={overlay=OverlayRoute.Detail(it)},
                     onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                     onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
-                    onOpenReels={
+                    onOpenClip={ clipId ->
                         overlay=null
+                        deepLinkReelId=clipId
                         tab=1
                     },
                     onStartDm={userId,title->
