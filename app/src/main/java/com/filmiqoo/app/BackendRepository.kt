@@ -61,8 +61,8 @@ data class PlaybackQueueItem(
 
 data class PlaybackTarget(
     val mediaVersionId: String,
-    val mediaTitleId: String? = null,
     val title: String,
+    val mediaTitleId: String? = null,
     val subtitle: String = "",
     val posterUrl: String? = null,
     val startPositionMs: Long = 0L,
