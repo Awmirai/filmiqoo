@@ -179,7 +179,7 @@ fun InboxScreen(
                 body=if(archivedView)
                     "گفتگوهایی که آرشیو می‌کنی اینجا می‌مونن."
                 else
-                    "از پروفایل یک Creator روی «پیام» بزن یا وارد Roomهای Community شو."
+                    "از پروفایل یک نفر روی «پیام» بزن یا وارد Roomهای Club شو."
             )
         } else {
             LazyColumn(
