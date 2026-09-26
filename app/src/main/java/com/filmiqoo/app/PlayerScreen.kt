@@ -99,6 +99,9 @@ fun FilmiqooPlayerScreen(
     var currentTarget by remember(target.mediaVersionId) { mutableStateOf(target) }
     var currentVersionId by remember(target.mediaVersionId) { mutableStateOf(target.mediaVersionId) }
     var selectedVariantId by remember(target.mediaVersionId) { mutableStateOf(target.mediaVersionId) }
+    val pulseRepository=remember { PulseRepository(backend) }
+    var pulseState by remember { mutableStateOf<PulseState?>(null) }
+    var pulseBusy by remember { mutableStateOf(false) }
 
     var playUrl by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -182,6 +185,15 @@ fun FilmiqooPlayerScreen(
                     )
                     .build()
             }
+    }
+
+    LaunchedEffect(currentTarget.mediaTitleId) {
+        val mediaId=currentTarget.mediaTitleId
+        pulseState=if(mediaId.isNullOrBlank() || currentTarget.localUri!=null) {
+            null
+        } else {
+            runCatching { pulseRepository.load(mediaId) }.getOrNull()
+        }
     }
 
     fun activePositionMs():Long =
@@ -1219,6 +1231,38 @@ fun FilmiqooPlayerScreen(
                 },
                 modifier=Modifier.align(Alignment.Center)
             )
+
+            currentTarget.mediaTitleId
+                ?.takeIf { it.isNotBlank() && currentTarget.localUri==null }
+                ?.let { mediaId ->
+                    PlayerPulseBar(
+                        state=pulseState,
+                        busy=pulseBusy,
+                        onReact={ emoji ->
+                            if(!pulseBusy) {
+                                pulseBusy=true
+                                scope.launch {
+                                    runCatching {
+                                        pulseRepository.react(
+                                            mediaId=mediaId,
+                                            emoji=emoji,
+                                            positionMs=activePositionMs()
+                                        )
+                                    }.onSuccess {
+                                        pulseState=it
+                                        playerSettingsMessage=emoji+" واکنش ثبت شد"
+                                    }.onFailure {
+                                        playerSettingsMessage=it.message ?: "ارسال واکنش ناموفق بود"
+                                    }
+                                    pulseBusy=false
+                                    bumpControls()
+                                }
+                            }
+                        },
+                        modifier=Modifier.align(Alignment.BottomStart)
+                            .padding(start=18.dp,bottom=108.dp)
+                    )
+                }
 
             PlayerBottomControls(
                 positionMs=positionMs,
@@ -3455,4 +3499,60 @@ private fun chooseDataSaverVariant(
 
     val under720=numbered.filter { it.first<=720 }
     return (under720.maxByOrNull { it.first } ?: numbered.minByOrNull { it.first })?.second
+}
+
+
+@Composable
+private fun PlayerPulseBar(
+    state:PulseState?,
+    busy:Boolean,
+    onReact:(String)->Unit,
+    modifier:Modifier=Modifier
+) {
+    val reactions=listOf("🔥","😱","😂","❤️","👀")
+    Surface(
+        color=Color.Black.copy(alpha=.58f),
+        shape=RoundedCornerShape(20.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha=.10f)
+        ),
+        modifier=modifier
+    ) {
+        Row(
+            Modifier.padding(horizontal=8.dp,vertical=7.dp),
+            verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(4.dp)
+        ) {
+            if(state?.watchingNow ?: 0L > 0L) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(7.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF5D6C))
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        (state?.watchingNow ?: 0L).toString(),
+                        color=Color.White.copy(alpha=.80f),
+                        fontSize=10.sp,
+                        fontWeight=FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+            }
+            reactions.forEach { emoji ->
+                Surface(
+                    color=Color.White.copy(alpha=.07f),
+                    shape=CircleShape,
+                    modifier=Modifier.size(36.dp)
+                        .clickable(enabled=!busy) { onReact(emoji) }
+                ) {
+                    Box(contentAlignment=Alignment.Center) {
+                        Text(emoji,fontSize=16.sp)
+                    }
+                }
+            }
+        }
+    }
 }
