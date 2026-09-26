@@ -154,6 +154,7 @@ fun ClubScreen(
                             items=following,
                             onMedia=onMedia,
                             onCreator=onCreator,
+                            onOpenClip=onOpenClip,
                             onRefresh={refresh++}
                         )
                     }
@@ -355,8 +356,8 @@ private fun ClubForYou(
         if(rooms.isNotEmpty()) {
             item {
                 ClubSectionTitle(
-                    title="الان در Club",
-                    subtitle="بحث‌هایی که همین حالا جریان دارن"
+                    title="Roomهای Club",
+                    subtitle="گفت‌وگوهای مرتبط با فیلم‌ها و سریال‌ها"
                 )
             }
             item {
@@ -679,12 +680,18 @@ private fun ClubLiveRoomsRow(
                             ContentScale.Crop
                         )
                         Surface(
-                            color=Color(0xFFFF4D67),
-                            shape=CircleShape,
-                            modifier=Modifier.size(9.dp)
-                                .align(Alignment.TopEnd)
-                                .offset(x=2.dp,y=(-2).dp)
-                        ) {}
+                            color=Color.Black.copy(alpha=.72f),
+                            shape=RoundedCornerShape(7.dp),
+                            modifier=Modifier.align(Alignment.BottomStart)
+                                .padding(4.dp)
+                        ) {
+                            Text(
+                                roomTypeLabel(room.type),
+                                color=Color.White.copy(alpha=.82f),
+                                fontSize=7.sp,
+                                modifier=Modifier.padding(horizontal=5.dp,vertical=2.dp)
+                            )
+                        }
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
@@ -1095,6 +1102,7 @@ private fun ClubFollowingFeed(
     items:List<FriendActivityItem>,
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
+    onOpenClip:(String)->Unit,
     onRefresh:()->Unit
 ) {
     if(items.isEmpty()) {
@@ -1148,21 +1156,100 @@ private fun ClubFollowingFeed(
                                 fontSize=12.sp,
                                 fontWeight=FontWeight.Bold
                             )
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                Text(
+                                    followingActionLabel(item.type),
+                                    color=FqMuted,
+                                    fontSize=9.sp
+                                )
+                                val relative=clubRelativeTime(item.createdAt)
+                                if(relative.isNotBlank()) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "• "+relative,
+                                        color=FqMuted,
+                                        fontSize=9.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    var activityRevealed by remember(
+                        item.type,
+                        item.entityId,
+                        item.createdAt
+                    ) {
+                        mutableStateOf(!item.spoiler)
+                    }
+
+                    if(item.body.isNotBlank()) {
+                        if(item.spoiler && !activityRevealed) {
+                            Surface(
+                                color=FqDanger.copy(alpha=.08f),
+                                shape=RoundedCornerShape(14.dp),
+                                border=androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    FqDanger.copy(alpha=.16f)
+                                ),
+                                modifier=Modifier.fillMaxWidth()
+                                    .padding(top=12.dp)
+                                    .clickable { activityRevealed=true }
+                            ) {
+                                Row(
+                                    Modifier.padding(12.dp),
+                                    verticalAlignment=Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.VisibilityOff,
+                                        null,
+                                        tint=FqDanger,
+                                        modifier=Modifier.size(17.dp)
+                                    )
+                                    Spacer(Modifier.width(7.dp))
+                                    Text(
+                                        "Spoiler مخفی شده • برای نمایش لمس کن",
+                                        color=FqDanger,
+                                        fontSize=10.sp,
+                                        fontWeight=FontWeight.Bold
+                                    )
+                                }
+                            }
+                        } else {
                             Text(
-                                followingActionLabel(item.type),
-                                color=FqMuted,
-                                fontSize=9.sp
+                                item.body,
+                                fontSize=12.sp,
+                                lineHeight=19.sp,
+                                modifier=Modifier.padding(top=12.dp)
                             )
                         }
                     }
 
-                    if(item.body.isNotBlank()) {
-                        Text(
-                            item.body,
-                            fontSize=12.sp,
-                            lineHeight=19.sp,
+                    if(item.type.lowercase() in listOf("reel","clip")) {
+                        Surface(
+                            color=Color.White,
+                            contentColor=Color.Black,
+                            shape=RoundedCornerShape(14.dp),
                             modifier=Modifier.padding(top=12.dp)
-                        )
+                                .clickable { onOpenClip(item.entityId) }
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal=12.dp,vertical=9.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.SmartDisplay,
+                                    null,
+                                    modifier=Modifier.size(17.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "دیدن Clip",
+                                    fontSize=10.sp,
+                                    fontWeight=FontWeight.Bold
+                                )
+                            }
+                        }
                     }
 
                     item.media?.let { media ->
@@ -1222,7 +1309,7 @@ private fun ClubRooms(
     ) {
         item {
             Text(
-                "بحث‌های زنده",
+                "Roomها",
                 fontSize=22.sp,
                 fontWeight=FontWeight.Black,
                 modifier=Modifier.padding(start=4.dp,end=4.dp,bottom=4.dp)
@@ -1251,16 +1338,16 @@ private fun ClubRooms(
                             ContentScale.Crop
                         )
                         Surface(
-                            color=Color.Black.copy(alpha=.68f),
+                            color=Color.Black.copy(alpha=.72f),
                             shape=RoundedCornerShape(8.dp),
                             modifier=Modifier.align(Alignment.BottomStart)
                                 .padding(6.dp)
                         ) {
                             Text(
-                                "LIVE",
-                                color=Color(0xFFFF7185),
+                                roomTypeLabel(room.type),
+                                color=Color.White.copy(alpha=.86f),
                                 fontSize=8.sp,
-                                fontWeight=FontWeight.Black,
+                                fontWeight=FontWeight.Bold,
                                 modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
                             )
                         }
@@ -1593,6 +1680,14 @@ private fun ClubInlineError(
             Text("دوباره",fontSize=10.sp,color=Color.White)
         }
     }
+}
+
+private fun roomTypeLabel(type:String):String = when(type.lowercase()) {
+    "episode" -> "EPISODE"
+    "community" -> "TITLE"
+    "group" -> "GROUP"
+    "dm" -> "DM"
+    else -> "ROOM"
 }
 
 private fun followingActionLabel(type:String):String = when(type.lowercase()) {
