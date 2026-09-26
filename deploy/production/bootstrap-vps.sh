@@ -141,8 +141,14 @@ cd "$DEPLOY_DIR"
 echo "Validating production compose..."
 docker compose --env-file .env.production -f docker-compose.yml config >/dev/null
 
+echo "Pulling public runtime images..."
+docker compose --env-file .env.production -f docker-compose.yml pull postgres redis caddy
+
+echo "Building pinned MinIO Community image locally..."
+docker compose --env-file .env.production -f docker-compose.yml build minio
+
 echo "Starting Filmiqoo production services..."
-docker compose --env-file .env.production -f docker-compose.yml up -d
+docker compose --env-file .env.production -f docker-compose.yml up -d --no-build
 
 echo "Waiting for HTTPS readiness..."
 ready=0
