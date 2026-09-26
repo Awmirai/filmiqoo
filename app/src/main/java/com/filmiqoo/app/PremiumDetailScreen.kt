@@ -143,6 +143,7 @@ fun PremiumDetailScreen(
                                     PlaybackTarget(
                                         mediaVersionId=id,
                                         title=d.media.title,
+                                        mediaTitleId=d.media.backendId,
                                         subtitle=buildString {
                                             append(d.media.year)
                                             val quality=selectedVersion?.quality ?: d.media.quality
@@ -290,6 +291,7 @@ fun PremiumDetailScreen(
                                             PlaybackTarget(
                                                 mediaVersionId=id,
                                                 title=d.media.title,
+                                                mediaTitleId=d.media.backendId,
                                                 subtitle=selectedVersion?.quality.orEmpty(),
                                                 posterUrl=repository.poster(d.media.posterPath)
                                             )
@@ -457,6 +459,7 @@ fun PremiumDetailScreen(
                                                         val fallback=PlaybackTarget(
                                                             mediaVersionId=id,
                                                             title=ep.name.ifBlank { d.media.title+" • قسمت "+ep.number },
+                                                            mediaTitleId=d.media.backendId,
                                                             subtitle=ep.quality.orEmpty()
                                                         )
                                                         val target=runCatching {
@@ -492,6 +495,7 @@ fun PremiumDetailScreen(
                                                                     title=ep.name.ifBlank {
                                                                         d.media.title+" • قسمت "+ep.number
                                                                     },
+                                                                    mediaTitleId=d.media.backendId,
                                                                     subtitle="S"+
                                                                         selectedSeason.number.toString().padStart(2,'0')+
                                                                         "E"+ep.number.toString().padStart(2,'0')+
@@ -1605,6 +1609,7 @@ private fun EpisodeCard(
                                     PlaybackTarget(
                                         mediaVersionId=episode.mediaVersionId,
                                         title=episode.name.ifBlank { title+" • قسمت "+episode.number },
+                                        mediaTitleId=mediaTitleId,
                                         subtitle="S"+seasonNumber.toString().padStart(2,'0')+
                                             "E"+episode.number.toString().padStart(2,'0')+
                                             if(episode.quality.isNullOrBlank())"" else " • "+episode.quality,
