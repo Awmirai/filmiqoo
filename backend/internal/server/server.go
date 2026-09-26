@@ -131,6 +131,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		).Get("/tmdb", s.tmdbProxy)
 		r.Get("/releases", s.releaseCenter)
 		r.Get("/catalog/{id}", s.catalogDetail)
+		r.Get("/catalog/{id}/pulse", s.mediaPulse)
 		r.Get("/catalog/{id}/reviews", s.mediaReviews)
 		r.With(
 			s.authRateLimit(
@@ -179,6 +180,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 					time.Minute,
 				),
 			)
+			r.Post("/catalog/{id}/pulse/react", s.reactMediaPulse)
 			r.Post("/social/reels", s.createReel)
 			r.Post("/social/reels/{id}/like", s.toggleReelLike)
 			r.Post("/social/reels/{id}/save", s.toggleReelSave)
