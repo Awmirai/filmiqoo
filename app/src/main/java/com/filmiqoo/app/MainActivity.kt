@@ -788,16 +788,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
-                        2 -> FilmiqooClubScreen(
+                        2 -> ClubScreen(
                             social=social,
+                            backend=backend,
                             loggedIn=backend.session.isLoggedIn,
-                            onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
-                            onCreator={overlay=OverlayRoute.CreatorPage(it)},
-                            onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onMedia={overlay=OverlayRoute.Detail(it)},
-                            onOpenClips={tab=1},
-                            onCreate={overlay=OverlayRoute.Create},
+                            onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                            onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
+                            onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onInbox={overlay=OverlayRoute.Inbox},
+                            onCreate={overlay=OverlayRoute.Create},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         3 -> LibraryScreen(
