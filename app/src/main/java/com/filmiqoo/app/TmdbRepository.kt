@@ -40,10 +40,18 @@ class TmdbRepository(private val context: Context) {
     val imageOriginal = "https://image.tmdb.org/t/p/original"
 
     private suspend fun get(path: String, params: Map<String, String> = emptyMap()): JSONObject = withContext(Dispatchers.IO) {
-        val token = credential()
+        val serverResult = runCatching { backend.tmdbMetadata(path, params) }
+        serverResult.getOrNull()?.let { return@withContext it }
+
+        val localToken = prefs.getString("credential", "").orEmpty().trim()
+        if (localToken.isBlank()) {
+            throw (serverResult.exceptionOrNull()
+                ?: IllegalStateException("Filmiqoo metadata service is unavailable"))
+        }
+
         val builder = (base + path).toHttpUrl().newBuilder()
-        if (!token.startsWith("eyJ")) {
-            builder.addQueryParameter("api_key", token)
+        if (!localToken.startsWith("eyJ")) {
+            builder.addQueryParameter("api_key", localToken)
         }
         params.forEach { (k, v) -> builder.addQueryParameter(k, v) }
 
@@ -51,8 +59,8 @@ class TmdbRepository(private val context: Context) {
             .url(builder.build())
             .header("accept", "application/json")
 
-        if (token.startsWith("eyJ")) {
-            requestBuilder.header("Authorization", "Bearer " + token)
+        if (localToken.startsWith("eyJ")) {
+            requestBuilder.header("Authorization", "Bearer " + localToken)
         }
 
         client.newCall(requestBuilder.build()).execute().use { response ->
@@ -201,9 +209,8 @@ class TmdbRepository(private val context: Context) {
     }
 
     suspend fun trending(): List<MediaItem> {
-        if (!hasApiKey()) {
-            return runCatching { backend.catalogHome() }.getOrDefault(emptyList())
-        }
+        val platform = runCatching { backend.catalogHome() }.getOrDefault(emptyList())
+        if (platform.isNotEmpty()) return platform
         return parseList(
             get("trending/all/week", mapOf("language" to "fa-IR")),
             MediaType.MOVIE
@@ -212,16 +219,14 @@ class TmdbRepository(private val context: Context) {
 
     suspend fun search(query: String): List<MediaItem> {
         if (query.isBlank()) return emptyList()
-        if (!hasApiKey()) {
-            return runCatching { backend.catalogHome() }
-                .getOrDefault(emptyList())
-                .filter {
-                    it.title.contains(query, ignoreCase = true) ||
-                        it.originalTitle.contains(query, ignoreCase = true) ||
-                        it.overview.contains(query, ignoreCase = true)
-                }
-        }
-        return parseList(
+        val platform = runCatching { backend.catalogHome() }
+            .getOrDefault(emptyList())
+            .filter {
+                it.title.contains(query, ignoreCase = true) ||
+                    it.originalTitle.contains(query, ignoreCase = true) ||
+                    it.overview.contains(query, ignoreCase = true)
+            }
+        val metadata = parseList(
             get("search/multi", mapOf(
                 "language" to "fa-IR",
                 "query" to query,
@@ -230,10 +235,13 @@ class TmdbRepository(private val context: Context) {
             )),
             MediaType.MOVIE
         ).filter { it.type == MediaType.MOVIE || it.type == MediaType.TV }
+        return (platform + metadata)
+            .distinctBy { it.type to it.id }
+            .take(60)
     }
 
     suspend fun detail(media: MediaItem): MediaDetail {
-        if (!hasApiKey() && !media.backendId.isNullOrBlank()) {
+        if (!media.backendId.isNullOrBlank()) {
             val platform = backend.detail(media.backendId)
             return MediaDetail(
                 media = media.copy(overview = platform.overview.ifBlank { media.overview }),
