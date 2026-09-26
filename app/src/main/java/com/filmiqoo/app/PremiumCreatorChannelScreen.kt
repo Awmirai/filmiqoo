@@ -373,10 +373,6 @@ private fun CreatorEntityScaffold(
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                 ) { Icon(Icons.Default.Share,null) }
                 IconButton(
-                    onClick=onRefresh,
-                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
-                ) { Icon(Icons.Default.Refresh,null) }
-                IconButton(
                     onClick=onMore,
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                 ) { Icon(Icons.Default.MoreVert,null) }
@@ -427,7 +423,7 @@ private fun CreatorEntityScaffold(
                         CreatorCountCard(compactCreatorCount(following),"دنبال‌شده",Modifier.weight(1f))
                     }
                     CreatorCountCard(compactCreatorCount(postsCount),"پست",Modifier.weight(1f))
-                    CreatorCountCard(compactCreatorCount(reelsCount),"Reel",Modifier.weight(1f))
+                    CreatorCountCard(compactCreatorCount(reelsCount),"Clip",Modifier.weight(1f))
                 }
 
                 Row(
