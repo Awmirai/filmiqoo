@@ -9,6 +9,13 @@ data class PulseState(
     val live: Boolean
 )
 
+data class PulseTrendItem(
+    val media:MediaItem,
+    val watchingNow:Long,
+    val reactions:Long,
+    val live:Boolean
+)
+
 class PulseRepository(
     private val backend: BackendRepository
 ) {
@@ -19,6 +26,37 @@ class PulseRepository(
                 authorized=false
             )
         )
+
+    suspend fun trending():List<PulseTrendItem> {
+        val root=backend.getJson("/v1/pulse/trending",authorized=false)
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val id=x.optString("id")
+                val title=x.optString("title")
+                if(id.isBlank() || title.isBlank()) continue
+                add(
+                    PulseTrendItem(
+                        media=MediaItem(
+                            id=if(x.isNull("tmdbId"))0 else x.optInt("tmdbId"),
+                            type=if(x.optString("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+                            title=title,
+                            originalTitle=x.optString("originalTitle"),
+                            posterPath=x.optString("posterUrl").takeIf(String::isNotBlank),
+                            backdropPath=x.optString("backdropUrl").takeIf(String::isNotBlank),
+                            vote=if(x.isNull("rating"))0.0 else x.optDouble("rating"),
+                            date=x.optInt("year").takeIf { it>0 }?.toString().orEmpty(),
+                            backendId=id
+                        ),
+                        watchingNow=x.optLong("watchingNow"),
+                        reactions=x.optLong("reactions"),
+                        live=x.optBoolean("live")
+                    )
+                )
+            }
+        }
+    }
 
     suspend fun react(
         mediaId:String,
