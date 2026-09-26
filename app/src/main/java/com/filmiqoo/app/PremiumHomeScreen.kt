@@ -139,7 +139,7 @@ private fun PremiumHomeContent(
                 subtitle=when {
                     kidsMode -> "فضای امن Kids • فقط محتوای متناسب با پروفایل"
                     loggedIn -> "پیشنهادهای امروز بر اساس تماشای تو"
-                    else -> "فیلم، سریال و Community در یک جا"
+                    else -> "فیلم، سریال و Club در یک جا"
                 },
                 onSearch=onSearch,
                 onNotifications=onNotifications
@@ -255,8 +255,8 @@ private fun PremiumHomeContent(
         if(!kidsMode) personalized?.communityHot?.takeIf { it.isNotEmpty() }?.let { items ->
             item {
                 PremiumSectionHeader(
-                    title="داغ در Community",
-                    subtitle="بر اساس Post، Reel، Like، Save و Share",
+                    title="داغ در Club",
+                    subtitle="بر اساس Post، Clip، Like، Save و Share",
                     icon=Icons.Default.LocalFireDepartment
                 )
             }
