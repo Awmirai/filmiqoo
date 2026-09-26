@@ -810,12 +810,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         )
                         else -> {
                             if(backend.session.isLoggedIn) {
-                                ConnectedProfileScreen(
+                                MeScreen(
                                     backend=backend,
                                     repository=repository,
                                     kidsMode=activeViewer?.kidsMode==true,
                                     onMedia={overlay=OverlayRoute.Detail(it)},
                                     onPlay={overlay=OverlayRoute.Player(it)},
+                                    onClips={tab=1},
                                     onCommunity={tab=2},
                                     onDownloads={overlay=OverlayRoute.Downloads},
                                     onLibrary={overlay=OverlayRoute.Library},
@@ -848,17 +849,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     }
                                 )
                             } else {
-                                ProfileScreen(
-                                    repository=repository,
-                                    store=store,
-                                    onCreator={
-                                        overlay=OverlayRoute.CreatorPage(
-                                            Creator("Preview","@preview","","حالت نمایشی Filmiqoo")
-                                        )
-                                    },
-                                    onWatchParty={overlay=OverlayRoute.WatchParty(null)},
-                                    onMessages={tab=3},
-                                    onMedia={overlay=OverlayRoute.Detail(it)}
+                                MeSignedOutScreen(
+                                    onLogin={overlay=OverlayRoute.Auth},
+                                    onClub={tab=2},
+                                    onClips={tab=1}
                                 )
                             }
                         }
