@@ -28,10 +28,6 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 	)
 	if err!=nil { return err }
 
-	if streamHash=="" && fileNumericID!=0 {
-		streamHash=computeTGFSBHash(fileName,fileSize,mimeType,fileNumericID,s.cfg.TelegramStreamHashLength)
-		_,_ = s.db.Exec(ctx,"UPDATE telegram_ingest_items SET stream_hash=$2,updated_at=now() WHERE id=$1",ingestID,streamHash)
-	}
 
 	_,_ = s.db.Exec(ctx,"UPDATE telegram_ingest_items SET status='resolving',error_text='',updated_at=now() WHERE id=$1",ingestID)
 
