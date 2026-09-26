@@ -49,70 +49,79 @@ fun InboxScreen(
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
-        Surface(
-            color=FqGlass,
-            border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
-            shadowElevation=5.dp
-        ) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal=8.dp,vertical=6.dp)
-            ) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    FqIconButton(
-                        icon=Icons.Default.ArrowBack,
-                        contentDescription="بازگشت",
-                        onClick=onBack
+        Column(
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF111722),FqBg)
                     )
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "پیام‌ها",
-                            style=MaterialTheme.typography.headlineSmall,
-                            fontWeight=FontWeight.Black
-                        )
-                        Text(
-                            if(archivedView)
-                                "گفتگوهای آرشیوشده"
-                            else
-                                "DM، گروه‌ها و Roomهای تو",
-                            color=FqMuted,
-                            style=MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    FqIconButton(
-                        icon=Icons.Default.Refresh,
-                        contentDescription="همگام‌سازی",
-                        onClick={refresh++}
+                )
+                .statusBarsPadding()
+                .padding(start=12.dp,end=12.dp,top=8.dp,bottom=10.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                FqIconButton(
+                    icon=Icons.Default.ArrowBack,
+                    contentDescription="بازگشت",
+                    onClick=onBack
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "پیام‌ها",
+                        fontSize=26.sp,
+                        fontWeight=FontWeight.Black
+                    )
+                    Text(
+                        if(archivedView)"آرشیو گفتگوها" else "گفتگوهای تو",
+                        color=FqMuted,
+                        fontSize=11.sp
                     )
                 }
+                FqIconButton(
+                    icon=Icons.Default.Refresh,
+                    contentDescription="همگام‌سازی",
+                    onClick={refresh++}
+                )
+            }
 
-                Row(
-                    Modifier.fillMaxWidth()
-                        .padding(start=6.dp,end=6.dp,bottom=6.dp),
-                    horizontalArrangement=Arrangement.spacedBy(8.dp)
-                ) {
-                    PremiumChip(
-                        icon=Icons.Default.Inbox,
-                        label="Inbox",
-                        active=!archivedView,
-                        onClick={archivedView=false}
-                    )
-                    PremiumChip(
-                        icon=Icons.Default.Archive,
-                        label="آرشیو",
-                        active=archivedView,
-                        onClick={archivedView=true}
-                    )
+            Row(
+                Modifier.fillMaxWidth()
+                    .padding(top=10.dp)
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(FqSurface)
+                    .padding(4.dp),
+                horizontalArrangement=Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    false to "اصلی",
+                    true to "آرشیو"
+                ).forEach { (archived,label) ->
+                    val active=archivedView==archived
+                    Surface(
+                        color=if(active) Color.White else Color.Transparent,
+                        contentColor=if(active) Color.Black else FqMuted,
+                        shape=RoundedCornerShape(13.dp),
+                        modifier=Modifier.weight(1f)
+                            .height(38.dp)
+                            .clickable { archivedView=archived }
+                    ) {
+                        Box(contentAlignment=Alignment.Center) {
+                            Text(
+                                label,
+                                fontSize=11.sp,
+                                fontWeight=if(active)FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }
 
         if(loading) {
-            LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
+            LinearProgressIndicator(color=Color.White,modifier=Modifier.fillMaxWidth())
         }
 
         error?.let {
@@ -195,11 +204,11 @@ private fun InboxCard(
     var menuOpen by remember(item.id) { mutableStateOf(false) }
 
     Surface(
-        color=if(item.unread>0)FqGold.copy(alpha=.07f) else FqSurface,
+        color=if(item.unread>0)FqSurface2 else FqSurface,
         shape=RoundedCornerShape(20.dp),
         border=androidx.compose.foundation.BorderStroke(
             1.dp,
-            if(item.unread>0) FqGold.copy(alpha=.22f) else FqBorder
+            if(item.unread>0) Color.White.copy(alpha=.12f) else FqBorder
         ),
         modifier=Modifier.fillMaxWidth().clickable { onClick() }
     ) {
@@ -215,7 +224,7 @@ private fun InboxCard(
                         Icon(
                             if(item.type=="dm")Icons.Default.Person else Icons.Default.Groups,
                             null,
-                            tint=FqGold
+                            tint=Color.White
                         )
                     }
                 }
@@ -274,7 +283,7 @@ private fun InboxCard(
                                 "episode" -> "Episode Room"
                                 else -> "Room"
                             },
-                            color=FqGold,
+                            color=FqMuted,
                             fontSize=6.sp,
                             modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
                         )
@@ -287,7 +296,7 @@ private fun InboxCard(
             }
 
             if(item.unread>0) {
-                Surface(color=FqGold,contentColor=Color.Black,shape=CircleShape) {
+                Surface(color=Color.White,contentColor=Color.Black,shape=CircleShape) {
                     Text(
                         if(item.unread>99)"99+" else item.unread.toString(),
                         fontSize=11.sp,
