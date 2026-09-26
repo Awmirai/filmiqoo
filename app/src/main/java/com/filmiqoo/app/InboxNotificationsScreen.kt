@@ -36,6 +36,18 @@ fun InboxScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<InboxConversation>>(emptyList()) }
+    var query by remember { mutableStateOf("") }
+
+    val filteredItems=remember(items,query) {
+        val q=query.trim()
+        if(q.isBlank()) items
+        else items.filter {
+            it.title.contains(q,ignoreCase=true) ||
+                it.otherUsername.contains(q,ignoreCase=true) ||
+                it.lastMessage.contains(q,ignoreCase=true) ||
+                it.topic.contains(q,ignoreCase=true)
+        }
+    }
 
     BackHandler { onBack() }
 
@@ -118,6 +130,31 @@ fun InboxScreen(
                     }
                 }
             }
+
+            OutlinedTextField(
+                value=query,
+                onValueChange={query=it},
+                singleLine=true,
+                placeholder={Text("جستجو در گفتگوها...")},
+                leadingIcon={
+                    Icon(Icons.Default.Search,null,modifier=Modifier.size(20.dp))
+                },
+                trailingIcon={
+                    if(query.isNotBlank()) {
+                        IconButton(onClick={query=""}) {
+                            Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                        }
+                    }
+                },
+                shape=RoundedCornerShape(16.dp),
+                colors=OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor=Color.White.copy(alpha=.18f),
+                    unfocusedBorderColor=FqBorder,
+                    focusedContainerColor=FqSurface,
+                    unfocusedContainerColor=FqSurface
+                ),
+                modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+            )
         }
 
         if(loading) {
@@ -135,7 +172,7 @@ fun InboxScreen(
             )
         }
 
-        if(!loading && items.isEmpty()) {
+        if(!loading && filteredItems.isEmpty()) {
             PremiumEmptyState(
                 icon=if(archivedView)Icons.Default.Archive else Icons.Default.MarkChatUnread,
                 title=if(archivedView)"آرشیو خالیه" else "هنوز مکالمه‌ای نداری",
@@ -149,7 +186,7 @@ fun InboxScreen(
                 contentPadding=PaddingValues(start=12.dp,end=12.dp,top=10.dp,bottom=24.dp),
                 verticalArrangement=Arrangement.spacedBy(8.dp)
             ) {
-                items(items,key={it.id}) { conversation ->
+                items(filteredItems,key={it.id}) { conversation ->
                     InboxCard(
                         item=conversation,
                         onClick={
