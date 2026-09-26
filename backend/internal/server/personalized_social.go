@@ -116,6 +116,21 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
 	userID:=userIDFromContext(r.Context())
 	rows,err:=s.db.Query(r.Context(),`
+		WITH playback_quality AS (
+		  SELECT reel_id,
+		         COUNT(*) AS samples,
+		         COUNT(*) FILTER (WHERE completed) AS completions,
+		         COUNT(*) FILTER (WHERE rewatched) AS rewatches,
+		         AVG(
+		           CASE
+		             WHEN duration_ms>0 THEN LEAST(watch_ms::numeric/duration_ms::numeric,1.5)
+		             ELSE 0
+		           END
+		         ) AS watch_ratio
+		    FROM reel_playback_events
+		   WHERE created_at>now()-interval '14 days'
+		   GROUP BY reel_id
+		)
 		SELECT rl.id::text,rl.caption,rl.playback_url,rl.cover_url,rl.duration_ms,
 		       rl.like_count,rl.comment_count,rl.save_count,rl.share_count,rl.view_count,rl.spoiler,
 		       EXISTS(SELECT 1 FROM reel_likes rlx WHERE rlx.reel_id=rl.id AND rlx.user_id=$1),
@@ -136,6 +151,7 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		  FROM reels rl
 		  JOIN profiles p ON p.user_id=rl.creator_user_id
 		  LEFT JOIN media_titles mt ON mt.id=rl.media_title_id
+		  LEFT JOIN playback_quality pq ON pq.reel_id=rl.id
 		 WHERE rl.status='published'
 		   AND NOT EXISTS (
 		     SELECT 1 FROM blocks b
@@ -187,12 +203,29 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		          AND previous.creator_user_id=rl.creator_user_id
 		          AND previous.id<>rl.id
 		     ) THEN 50 ELSE 0 END
+		     + CASE WHEN EXISTS(
+		       SELECT 1
+		         FROM reel_playback_events own_watch
+		         JOIN reels watched ON watched.id=own_watch.reel_id
+		        WHERE own_watch.user_id=$1
+		          AND watched.creator_user_id=rl.creator_user_id
+		          AND watched.id<>rl.id
+		          AND (own_watch.completed OR own_watch.rewatched)
+		     ) THEN 60 ELSE 0 END
 		     + CASE
 		         WHEN COALESCE(rl.published_at,rl.created_at)>now()-interval '12 hours' THEN 110
 		         WHEN COALESCE(rl.published_at,rl.created_at)>now()-interval '2 days' THEN 65
 		         WHEN COALESCE(rl.published_at,rl.created_at)>now()-interval '7 days' THEN 25
 		         ELSE 0
 		       END
+		     + LEAST(
+		       (
+		         COALESCE(pq.watch_ratio,0)*180 +
+		         LEAST(COALESCE(pq.completions,0),40)*3 +
+		         LEAST(COALESCE(pq.rewatches,0),20)*5
+		       ),
+		       260
+		     )
 		     + LEAST(
 		       rl.like_count*2 + rl.comment_count*4 + rl.save_count*5 +
 		       rl.share_count*6 + rl.view_count/25,
