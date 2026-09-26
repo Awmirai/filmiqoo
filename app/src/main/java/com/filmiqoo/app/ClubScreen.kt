@@ -1606,8 +1606,4 @@ private fun ClubPulseCard(
     }
 }
 
-private fun compactClubCount(value:Long):String = when {
-    value>=1_000_000 -> String.format(java.util.Locale.US,"%.1fM",value/1_000_000.0)
-    value>=1_000 -> String.format(java.util.Locale.US,"%.1fK",value/1_000.0)
-    else -> value.toString()
-}
+
