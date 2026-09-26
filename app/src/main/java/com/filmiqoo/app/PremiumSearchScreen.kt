@@ -44,7 +44,7 @@ fun PremiumSearchScreen(
     onBack: () -> Unit,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
-    onOpenReels: () -> Unit
+    onOpenClip: (String) -> Unit
 ) {
     val context=LocalContext.current
     val searchRepo=remember { UniversalSearchRepository(context.applicationContext,backend) }
@@ -126,7 +126,7 @@ fun PremiumSearchScreen(
                         repository=repository,
                         onMedia=onMedia,
                         onCreator=onCreator,
-                        onOpenReels=onOpenReels
+                        onOpenClip=onOpenClip
                     )
                 }
             }
@@ -291,7 +291,7 @@ private fun SearchAllContent(
     repository: TmdbRepository,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
-    onOpenReels: () -> Unit
+    onOpenClip: (String) -> Unit
 ) {
     val empty=result.media.isEmpty() && result.users.isEmpty() &&
         result.channels.isEmpty() && result.reels.isEmpty()
@@ -366,7 +366,7 @@ private fun SearchAllContent(
                     horizontalArrangement=Arrangement.spacedBy(9.dp)
                 ) {
                     items(result.reels.take(8),key={it.id}) { reel ->
-                        ReelSearchCard(reel,onOpenReels) {
+                        ReelSearchCard(reel,{onOpenClip(reel.id)}) {
                             onCreator(reel.author.asCreator())
                         }
                     }
@@ -533,11 +533,11 @@ private fun ChannelSearchList(
 @Composable
 private fun ReelSearchGrid(
     reels: List<SearchReel>,
-    onOpenReels: () -> Unit,
+    onOpenClip: (String) -> Unit,
     onCreator: (Creator) -> Unit
 ) {
     if(reels.isEmpty()) {
-        PremiumEmptyState(Icons.Default.VideoLibrary,"Reel پیدا نشد","Caption، Creator یا اسم فیلم رو جستجو کن.")
+        PremiumEmptyState(Icons.Default.VideoLibrary,"Clip پیدا نشد","Caption، سازنده یا اسم فیلم رو جستجو کن.")
         return
     }
 
@@ -548,7 +548,7 @@ private fun ReelSearchGrid(
         verticalArrangement=Arrangement.spacedBy(9.dp)
     ) {
         items(reels,key={it.id}) { reel ->
-            ReelSearchCard(reel,onOpenReels){onCreator(reel.author.asCreator())}
+            ReelSearchCard(reel,{onOpenClip(reel.id)}){onCreator(reel.author.asCreator())}
         }
     }
 }
@@ -729,7 +729,7 @@ private fun ReelSearchCard(
 
         Column(Modifier.padding(9.dp)) {
             Text(
-                reel.caption.ifBlank { reel.mediaTitle ?: "Reel" },
+                reel.caption.ifBlank { reel.mediaTitle ?: "Clip" },
                 fontSize=11.sp,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis
