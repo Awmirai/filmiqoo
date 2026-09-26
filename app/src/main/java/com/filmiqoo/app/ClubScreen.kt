@@ -177,6 +177,11 @@ fun ClubScreen(
             social=social,
             loggedIn=loggedIn,
             onRequireAuth=onRequireAuth,
+            onCommentAdded={
+                feed=feed.map {
+                    if(it.id==post.id) it.copy(comments=it.comments+1) else it
+                }
+            },
             onDismiss={commentsFor=null}
         )
     }
@@ -1298,6 +1303,7 @@ private fun ClubCommentsSheet(
     social:SocialRepository,
     loggedIn:Boolean,
     onRequireAuth:()->Unit,
+    onCommentAdded:()->Unit,
     onDismiss:()->Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -1411,6 +1417,7 @@ private fun ClubCommentsSheet(
                                         social.addComment(post.id,clean)
                                     }.onSuccess {
                                         text=""
+                                        onCommentAdded()
                                         reload()
                                     }
                                     sending=false
