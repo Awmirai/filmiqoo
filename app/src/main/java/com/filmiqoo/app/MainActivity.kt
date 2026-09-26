@@ -812,6 +812,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             loggedIn=backend.session.isLoggedIn,
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                            onOpenClip={ clipId ->
+                                deepLinkReelId=clipId
+                                tab=1
+                            },
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onInbox={overlay=OverlayRoute.Inbox},
