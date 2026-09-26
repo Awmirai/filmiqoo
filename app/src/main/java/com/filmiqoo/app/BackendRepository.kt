@@ -7,6 +7,8 @@ import android.provider.OpenableColumns
 import android.os.Environment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -227,6 +229,7 @@ class BackendRepository(context: Context) {
         .readTimeout(35, TimeUnit.SECONDS)
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
+    private val refreshMutex = Mutex()
 
     suspend fun health(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
@@ -856,11 +859,12 @@ class BackendRepository(context: Context) {
     private suspend fun executeJson(builder: Request.Builder, authorized: Boolean): JSONObject =
         withContext(Dispatchers.IO) {
             var requestBuilder = builder
+            var accessUsed: String? = null
             if (authorized) {
                 ensureAccessToken()
-                val access = session.accessToken
-                if (!access.isNullOrBlank()) {
-                    requestBuilder = requestBuilder.header("Authorization", "Bearer " + access)
+                accessUsed = session.accessToken
+                if (!accessUsed.isNullOrBlank()) {
+                    requestBuilder = requestBuilder.header("Authorization", "Bearer " + accessUsed)
                 }
                 viewerProfiles.activeId()?.let {
                     requestBuilder = requestBuilder.header("X-Filmiqoo-Viewer-Profile", it)
@@ -869,7 +873,7 @@ class BackendRepository(context: Context) {
 
             var request = requestBuilder.build()
             var response = client.newCall(request).execute()
-            if (authorized && response.code == 401 && refreshSession()) {
+            if (authorized && response.code == 401 && refreshSession(accessUsed)) {
                 response.close()
                 request = request.newBuilder()
                     .header("Authorization", "Bearer " + session.accessToken.orEmpty())
@@ -888,26 +892,37 @@ class BackendRepository(context: Context) {
         if (!session.isLoggedIn) throw IllegalStateException("برای ادامه باید وارد حساب Filmiqoo شوی.")
     }
 
-    private suspend fun refreshSession(): Boolean = withContext(Dispatchers.IO) {
-        val refresh = session.refreshToken ?: return@withContext false
-        runCatching {
-            val body = JSONObject().put("refreshToken", refresh)
-            val req = Request.Builder()
-                .url(session.baseUrl + "/v1/auth/refresh")
-                .post(body.toString().toRequestBody(jsonType))
-                .build()
-            client.newCall(req).execute().use { res ->
-                if (!res.isSuccessful) {
-                    session.clear()
-                    return@use false
-                }
-                val o = JSONObject(res.body?.string().orEmpty())
-                session.accessToken = o.getString("accessToken")
-                session.refreshToken = o.getString("refreshToken")
-                true
+    private suspend fun refreshSession(staleAccessToken: String?): Boolean =
+        refreshMutex.withLock {
+            val currentAccess = session.accessToken
+            if (
+                !currentAccess.isNullOrBlank() &&
+                currentAccess != staleAccessToken
+            ) {
+                return@withLock true
             }
-        }.getOrDefault(false)
-    }
+
+            val refresh = session.refreshToken ?: return@withLock false
+            runCatching {
+                val body = JSONObject().put("refreshToken", refresh)
+                val req = Request.Builder()
+                    .url(session.baseUrl + "/v1/auth/refresh")
+                    .post(body.toString().toRequestBody(jsonType))
+                    .build()
+                client.newCall(req).execute().use { res ->
+                    if (!res.isSuccessful) {
+                        if (session.refreshToken == refresh) {
+                            session.clear()
+                        }
+                        return@use false
+                    }
+                    val o = JSONObject(res.body?.string().orEmpty())
+                    session.accessToken = o.getString("accessToken")
+                    session.refreshToken = o.getString("refreshToken")
+                    true
+                }
+            }.getOrDefault(false)
+        }
 
     private fun apiError(raw: String, code: Int): String {
         return runCatching { JSONObject(raw).optString("error") }
