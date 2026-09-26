@@ -158,6 +158,31 @@ func (s *Server) toggleReviewLike(w http.ResponseWriter,r *http.Request) {
         }
     }
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+    if !exists {
+        var authorID string
+        if scanErr:=tx.QueryRow(
+            r.Context(),
+            "SELECT user_id::text FROM media_reviews WHERE id=$1",
+            reviewID,
+        ).Scan(&authorID); scanErr==nil && authorID!=userID {
+            _,_=tx.Exec(r.Context(),`
+                INSERT INTO notifications (
+                    user_id,actor_user_id,notification_type,entity_type,entity_id,title
+                )
+                SELECT $1,$2,'review_like','review',$3,'پسند جدید روی Review'
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM notifications
+                     WHERE user_id=$1
+                       AND actor_user_id=$2
+                       AND notification_type='review_like'
+                       AND entity_id=$3
+                       AND created_at>now()-interval '12 hours'
+                )
+            `,authorID,userID,reviewID)
+        }
+    }
+
     if err:=tx.Commit(r.Context()); err!=nil {
         writeError(w,http.StatusInternalServerError,err); return
     }
