@@ -39,3 +39,7 @@ jobs:
 
       - name: Build production backend container
         run: docker build -t filmiqoo-api:contract ./backend
+
+      - name: Build pinned MinIO community container
+        working-directory: deploy/production
+        run: docker compose --env-file .env.production.example -f docker-compose.yml build minio
