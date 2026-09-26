@@ -51,6 +51,7 @@ fun PremiumTopBar(
     subtitle:String?=null,
     onSearch:(()->Unit)?=null,
     onNotifications:(()->Unit)?=null,
+    notificationCount:Long=0L,
     onProfile:(()->Unit)?=null
 ) {
     Row(
@@ -88,14 +89,25 @@ fun PremiumTopBar(
             )
         }
         if(onNotifications!=null) {
-            BadgedBox(
-                badge={
-                    Badge(
-                        containerColor=FqDanger,
-                        modifier=Modifier.size(8.dp)
+            if(notificationCount>0L) {
+                BadgedBox(
+                    badge={
+                        Badge(containerColor=FqDanger) {
+                            Text(
+                                if(notificationCount>99L) "99+"
+                                else notificationCount.toString(),
+                                fontWeight=FontWeight.Black
+                            )
+                        }
+                    }
+                ) {
+                    FqIconButton(
+                        icon=Icons.Default.NotificationsNone,
+                        contentDescription="اعلان‌ها",
+                        onClick=onNotifications
                     )
                 }
-            ) {
+            } else {
                 FqIconButton(
                     icon=Icons.Default.NotificationsNone,
                     contentDescription="اعلان‌ها",
