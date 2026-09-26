@@ -52,8 +52,10 @@ fun PremiumHomeScreen(
     var continueItems by remember { mutableStateOf<List<ContinueWatchingItem>>(emptyList()) }
     var personalized by remember { mutableStateOf<PersonalizedHomeBundle?>(null) }
     var friendsWatching by remember { mutableStateOf<List<FriendWatchingNow>>(emptyList()) }
+    var unreadNotifications by remember { mutableLongStateOf(0L) }
     val personalizationRepo=remember { HomePersonalizationRepository(backend) }
     val friendActivityRepo=remember { FriendActivityRepository(backend) }
+    val messagingRepo=remember { MessagingRepository(backend) }
     val activeViewer=if(loggedIn) backend.viewerProfiles.active() else null
     val kidsMode=activeViewer?.kidsMode==true
 
@@ -64,10 +66,14 @@ fun PremiumHomeScreen(
             friendsWatching=if(!kidsMode) {
                 runCatching { friendActivityRepo.followingWatching() }.getOrDefault(emptyList())
             } else emptyList()
+            unreadNotifications=if(!kidsMode) {
+                runCatching { messagingRepo.notifications().second }.getOrDefault(0L)
+            } else 0L
         } else {
             continueItems=emptyList()
             personalized=null
             friendsWatching=emptyList()
+            unreadNotifications=0L
         }
         state=PremiumHomeLoad.Loading
         state=if(kidsMode) {
@@ -86,6 +92,7 @@ fun PremiumHomeScreen(
             continueItems=continueItems,
             personalized=personalized,
             friendsWatching=friendsWatching,
+            unreadNotifications=unreadNotifications,
             repository=repository,
             loggedIn=loggedIn,
             kidsMode=kidsMode,
@@ -109,6 +116,7 @@ private fun PremiumHomeContent(
     continueItems: List<ContinueWatchingItem>,
     personalized: PersonalizedHomeBundle?,
     friendsWatching: List<FriendWatchingNow>,
+    unreadNotifications: Long,
     repository: TmdbRepository,
     loggedIn: Boolean,
     kidsMode: Boolean,
@@ -148,7 +156,8 @@ private fun PremiumHomeContent(
                     else -> "فیلم، سریال و Club در یک جا"
                 },
                 onSearch=onSearch,
-                onNotifications=onNotifications
+                onNotifications=onNotifications,
+                notificationCount=unreadNotifications
             )
         }
 
