@@ -436,6 +436,7 @@ fun ConnectedNotificationsScreen(
     onBack: () -> Unit,
     onOpenRoom: (String,String) -> Unit,
     onOpenCreator: (Creator) -> Unit,
+    onOpenClip: (String) -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
     onOpenCollection: (String) -> Unit,
     onOpenWatchParty: (String) -> Unit,
@@ -494,7 +495,11 @@ fun ConnectedNotificationsScreen(
         }
 
         if(!loading && items.isEmpty()) {
-            PremiumEmptyState(Icons.Default.NotificationsNone,"اعلانی نداری","Follow، Story reaction، Reply و پیام‌های جدید اینجا نمایش داده می‌شن.")
+            PremiumEmptyState(
+                Icons.Default.NotificationsNone,
+                "اعلانی نداری",
+                "Like، Comment، Follow، Story و پیام‌های جدید اینجا نمایش داده می‌شن."
+            )
         } else {
             LazyColumn(
                 contentPadding=PaddingValues(12.dp),
@@ -514,9 +519,12 @@ fun ConnectedNotificationsScreen(
                                         onOpenWatchParty(item.entityId)
                                     item.entityType=="room" && !item.entityId.isNullOrBlank() ->
                                         onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
+                                    item.entityType=="reel" && !item.entityId.isNullOrBlank() ->
+                                        onOpenClip(item.entityId)
                                     item.media!=null ->
                                         onOpenMedia(item.media)
-                                    item.entityType=="user" && item.actor!=null ->
+                                    item.entityType in setOf("user","post","review","story") &&
+                                        item.actor!=null ->
                                         onOpenCreator(
                                             Creator(
                                                 name=item.actor.displayName,
@@ -602,6 +610,11 @@ private fun notificationIcon(type:String)=when(type) {
     "follow_accepted" -> Icons.Default.HowToReg
     "story_reaction" -> Icons.Default.Favorite
     "story_reply" -> Icons.Default.Reply
+    "post_like" -> Icons.Default.Favorite
+    "post_comment" -> Icons.Default.ChatBubble
+    "reel_like" -> Icons.Default.Favorite
+    "reel_comment" -> Icons.Default.ChatBubble
+    "review_like" -> Icons.Default.Star
     "dm_message" -> Icons.Default.MarkChatUnread
     "room_message" -> Icons.Default.Forum
     "release_ready" -> Icons.Default.NewReleases
@@ -623,6 +636,11 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "follow_accepted" -> "Follow پذیرفته شد"
     "story_reaction" -> "Story Reaction"
     "story_reply" -> "Story Reply"
+    "post_like" -> "Post Like"
+    "post_comment" -> "Post Comment"
+    "reel_like" -> "Clip Like"
+    "reel_comment" -> "Clip Comment"
+    "review_like" -> "Review Like"
     "dm_message" -> "پیام خصوصی"
     "room_message" -> "پیام گروه"
     "release_ready" -> "انتشار"
