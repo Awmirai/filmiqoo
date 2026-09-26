@@ -762,6 +762,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
                     onOpenCreator={overlay=OverlayRoute.CreatorPage(it)},
+                    onOpenClip={ clipId ->
+                        overlay=null
+                        deepLinkReelId=clipId
+                        tab=1
+                    },
                     onOpenMedia={overlay=OverlayRoute.Detail(it)},
                     onOpenCollection={overlay=OverlayRoute.SocialCollections(it)},
                     onOpenWatchParty={overlay=OverlayRoute.WatchParty(partyId=it)},
