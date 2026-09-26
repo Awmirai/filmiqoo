@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.Duration
 
 private enum class ClubTab { FOR_YOU, FOLLOWING, ROOMS }
 
@@ -421,6 +423,22 @@ private fun ClubForYou(
                         if(!loggedIn) {
                             onRequireAuth()
                         } else {
+                            val previousLiked=post.likedByMe
+                            val previousLikes=post.likes
+                            val optimisticLiked=!previousLiked
+                            onFeedChange(
+                                feed.map {
+                                    if(it.id==post.id) {
+                                        it.copy(
+                                            likedByMe=optimisticLiked,
+                                            likes=(
+                                                previousLikes+
+                                                    if(optimisticLiked)1 else -1
+                                            ).coerceAtLeast(0)
+                                        )
+                                    } else it
+                                }
+                            )
                             scope.launch {
                                 runCatching { social.togglePostLike(post.id) }
                                     .onSuccess { liked->
@@ -430,9 +448,21 @@ private fun ClubForYou(
                                                     it.copy(
                                                         likedByMe=liked,
                                                         likes=(
-                                                            it.likes+
+                                                            previousLikes+
                                                                 if(liked)1 else -1
                                                         ).coerceAtLeast(0)
+                                                    )
+                                                } else it
+                                            }
+                                        )
+                                    }
+                                    .onFailure {
+                                        onFeedChange(
+                                            feed.map {
+                                                if(it.id==post.id) {
+                                                    it.copy(
+                                                        likedByMe=previousLiked,
+                                                        likes=previousLikes
                                                     )
                                                 } else it
                                             }
@@ -445,6 +475,22 @@ private fun ClubForYou(
                         if(!loggedIn) {
                             onRequireAuth()
                         } else {
+                            val previousSaved=post.savedByMe
+                            val previousSaves=post.saves
+                            val optimisticSaved=!previousSaved
+                            onFeedChange(
+                                feed.map {
+                                    if(it.id==post.id) {
+                                        it.copy(
+                                            savedByMe=optimisticSaved,
+                                            saves=(
+                                                previousSaves+
+                                                    if(optimisticSaved)1 else -1
+                                            ).coerceAtLeast(0)
+                                        )
+                                    } else it
+                                }
+                            )
                             scope.launch {
                                 runCatching { social.togglePostSave(post.id) }
                                     .onSuccess { result->
@@ -454,6 +500,18 @@ private fun ClubForYou(
                                                     it.copy(
                                                         savedByMe=result.first,
                                                         saves=result.second
+                                                    )
+                                                } else it
+                                            }
+                                        )
+                                    }
+                                    .onFailure {
+                                        onFeedChange(
+                                            feed.map {
+                                                if(it.id==post.id) {
+                                                    it.copy(
+                                                        savedByMe=previousSaved,
+                                                        saves=previousSaves
                                                     )
                                                 } else it
                                             }
@@ -866,6 +924,13 @@ private fun ClubPostCard(
                         fontSize=8.sp,
                         fontWeight=FontWeight.Bold
                     )
+                    post.publishedAt?.let { published ->
+                        val relative=clubRelativeTime(published)
+                        if(relative.isNotBlank()) {
+                            Spacer(Modifier.width(6.dp))
+                            Text("• "+relative,color=FqMuted,fontSize=8.sp)
+                        }
+                    }
                 }
             }
         }
@@ -1492,6 +1557,18 @@ private fun followingActionLabel(type:String):String = when(type.lowercase()) {
     "reel","clip" -> "یک Clip منتشر کرده"
     "watching" -> "الان در حال تماشاست"
     else -> "در Club فعال بوده"
+}
+
+private fun clubRelativeTime(value:String):String {
+    val published=runCatching { Instant.parse(value) }.getOrNull() ?: return ""
+    val minutes=Duration.between(published,Instant.now()).toMinutes().coerceAtLeast(0)
+    return when {
+        minutes<1 -> "الان"
+        minutes<60 -> minutes.toString()+"د"
+        minutes<1_440 -> (minutes/60).toString()+"س"
+        minutes<10_080 -> (minutes/1_440).toString()+"روز"
+        else -> (minutes/10_080).toString()+"هفته"
+    }
 }
 
 private fun compactClubCount(value:Long):String = when {
