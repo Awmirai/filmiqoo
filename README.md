@@ -28,7 +28,7 @@ Current API foundation includes:
     GET  /v1/catalog/home
     GET  /v1/social/reels
     GET  /v1/social/channels
-    GET  /v1/realtime
+    GET  /v1/realtime/rooms/{id}  (authenticated WebSocket)
     POST /v1/social/reels/{id}/like
     POST /v1/social/channels/{id}/follow
     POST /v1/watch/progress
