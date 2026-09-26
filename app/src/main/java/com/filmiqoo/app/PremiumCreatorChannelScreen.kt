@@ -58,7 +58,7 @@ fun PremiumCreatorChannelScreen(
     onMedia: (MediaItem) -> Unit,
     onOpenRoom: (SocialRoom) -> Unit,
     onStory: (List<SocialStory>, Int) -> Unit,
-    onOpenReels: () -> Unit,
+    onOpenClip: (String) -> Unit,
     onStartDm: (String, String) -> Unit,
     onManageChannel: (String, String) -> Unit,
     onReputation: (String) -> Unit,
@@ -195,7 +195,7 @@ fun PremiumCreatorChannelScreen(
                 }
             ) {
                 when(tab) {
-                    0 -> CreatorReelsGrid(s.reels,onOpenReels,onMedia)
+                    0 -> CreatorReelsGrid(s.reels,onOpenClip,onMedia)
                     1 -> CreatorPostsList(s.posts)
                     else -> CreatorAbout(
                         bio=p.bio,
@@ -262,7 +262,7 @@ fun PremiumCreatorChannelScreen(
                 }
             ) {
                 when(tab) {
-                    0 -> CreatorReelsGrid(s.reels,onOpenReels,onMedia)
+                    0 -> CreatorReelsGrid(s.reels,onOpenClip,onMedia)
                     1 -> CreatorPostsList(s.posts)
                     2 -> ChannelRoomsList(s.rooms,onOpenRoom)
                     else -> CreatorAbout(
@@ -519,7 +519,7 @@ private fun CreatorCountCard(value:String,label:String,modifier:Modifier=Modifie
 @Composable
 private fun CreatorReelsGrid(
     reels: List<ReelFeedItem>,
-    onOpenReels: () -> Unit,
+    onOpenClip: (String) -> Unit,
     onMedia: (MediaItem) -> Unit
 ) {
     if(reels.isEmpty()) {
@@ -535,7 +535,7 @@ private fun CreatorReelsGrid(
     ) {
         items(reels,key={it.id}) { reel ->
             Box(
-                Modifier.aspectRatio(.68f).clickable { onOpenReels() }
+                Modifier.aspectRatio(.68f).clickable { onOpenClip(reel.id) }
             ) {
                 RemoteImage(reel.coverUrl.takeIf(String::isNotBlank),Modifier.fillMaxSize(),ContentScale.Crop)
                 Box(
