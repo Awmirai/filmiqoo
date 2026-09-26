@@ -22,6 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.Duration
 
 @Composable
 fun InboxScreen(
@@ -190,6 +192,9 @@ fun InboxScreen(
                     InboxCard(
                         item=conversation,
                         onClick={
+                            items=items.map {
+                                if(it.id==conversation.id) it.copy(unread=0L) else it
+                            }
                             scope.launch {
                                 runCatching { repo.markRoomRead(conversation.id) }
                                 onOpenRoom(conversation)
@@ -332,14 +337,33 @@ private fun InboxCard(
                 }
             }
 
-            if(item.unread>0) {
-                Surface(color=Color.White,contentColor=Color.Black,shape=CircleShape) {
-                    Text(
-                        if(item.unread>99)"99+" else item.unread.toString(),
-                        fontSize=11.sp,
-                        fontWeight=FontWeight.Black,
-                        modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
-                    )
+            Column(
+                horizontalAlignment=Alignment.End,
+                verticalArrangement=Arrangement.spacedBy(6.dp)
+            ) {
+                item.lastMessageAt?.let { value ->
+                    val relative=inboxRelativeTime(value)
+                    if(relative.isNotBlank()) {
+                        Text(
+                            relative,
+                            color=FqMuted,
+                            fontSize=8.sp
+                        )
+                    }
+                }
+                if(item.unread>0) {
+                    Surface(
+                        color=Color.White,
+                        contentColor=Color.Black,
+                        shape=CircleShape
+                    ) {
+                        Text(
+                            if(item.unread>99)"99+" else item.unread.toString(),
+                            fontSize=11.sp,
+                            fontWeight=FontWeight.Black,
+                            modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                        )
+                    }
                 }
             }
 
@@ -391,6 +415,18 @@ private fun InboxCard(
                 }
             }
         }
+    }
+}
+
+private fun inboxRelativeTime(value:String):String {
+    val instant=runCatching { Instant.parse(value) }.getOrNull() ?: return ""
+    val minutes=Duration.between(instant,Instant.now()).toMinutes().coerceAtLeast(0)
+    return when {
+        minutes<1 -> "الان"
+        minutes<60 -> minutes.toString()+"د"
+        minutes<1_440 -> (minutes/60).toString()+"س"
+        minutes<10_080 -> (minutes/1_440).toString()+"روز"
+        else -> (minutes/10_080).toString()+"هفته"
     }
 }
 
