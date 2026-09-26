@@ -58,6 +58,7 @@ class HistoryRepository(
                         target=PlaybackTarget(
                             mediaVersionId=versionId,
                             title=media.title,
+                            mediaTitleId=media.backendId,
                             subtitle=label,
                             posterUrl=media.posterPath,
                             startPositionMs=x.optLong("positionMs")
