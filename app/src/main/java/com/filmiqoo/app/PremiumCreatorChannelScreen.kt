@@ -151,6 +151,7 @@ fun PremiumCreatorChannelScreen(
                 postsCount=p.posts,
                 reelsCount=p.reels,
                 isChannel=false,
+                selfProfile=s.relationship?.self == true,
                 followed=followed,
                 followPending=followPending,
                 followBusy=followBusy,
@@ -176,7 +177,8 @@ fun PremiumCreatorChannelScreen(
                         safetyLabel=p.displayName
                     }
                 },
-                onMessage={onStartDm(p.id,p.displayName)},
+                onMessage=if(s.relationship?.self==true) null
+                    else { { onStartDm(p.id,p.displayName) } },
                 onReputation={onReputation(p.id)},
                 onFollow={
                     if(!backend.session.isLoggedIn) {
@@ -228,6 +230,7 @@ fun PremiumCreatorChannelScreen(
                 postsCount=p.posts,
                 reelsCount=p.reels,
                 isChannel=true,
+                selfProfile=false,
                 followed=followed,
                 followPending=false,
                 followBusy=followBusy,
@@ -322,6 +325,7 @@ private fun CreatorEntityScaffold(
     postsCount: Long,
     reelsCount: Long,
     isChannel: Boolean,
+    selfProfile: Boolean,
     followed: Boolean,
     followPending: Boolean,
     followBusy: Boolean,
@@ -384,10 +388,12 @@ private fun CreatorEntityScaffold(
                     onClick=onShare,
                     modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
                 ) { Icon(Icons.Default.Share,null) }
-                IconButton(
-                    onClick=onMore,
-                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
-                ) { Icon(Icons.Default.MoreVert,null) }
+                if(!selfProfile) {
+                    IconButton(
+                        onClick=onMore,
+                        modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.4f))
+                    ) { Icon(Icons.Default.MoreVert,null) }
+                }
             }
 
             Column(
@@ -438,12 +444,13 @@ private fun CreatorEntityScaffold(
                     CreatorCountCard(compactCreatorCount(reelsCount),"Clip",Modifier.weight(1f))
                 }
 
-                Row(
-                    Modifier.fillMaxWidth().padding(top=11.dp),
-                    horizontalArrangement=Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick=onFollow,
+                if(!selfProfile) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top=11.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick=onFollow,
                         enabled=!followBusy,
                         colors=ButtonDefaults.buttonColors(
                             containerColor=when {
@@ -483,15 +490,16 @@ private fun CreatorEntityScaffold(
                         )
                     }
 
-                    if(onMessage!=null) {
-                        OutlinedButton(
-                            onClick=onMessage,
-                            shape=RoundedCornerShape(14.dp),
-                            modifier=Modifier.weight(.72f)
-                        ) {
-                            Icon(Icons.Default.ChatBubbleOutline,null,modifier=Modifier.size(17.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("پیام")
+                        if(onMessage!=null) {
+                            OutlinedButton(
+                                onClick=onMessage,
+                                shape=RoundedCornerShape(14.dp),
+                                modifier=Modifier.weight(.72f)
+                            ) {
+                                Icon(Icons.Default.ChatBubbleOutline,null,modifier=Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("پیام")
+                            }
                         }
                     }
                 }
