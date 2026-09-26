@@ -354,6 +354,53 @@ class SocialRepository(
         )
     }
 
+    suspend fun mediaClips(mediaTitleId:String): List<ReelFeedItem> {
+        val root=backend.getJson(
+            "/v1/catalog/"+mediaTitleId+"/clips",
+            authorized=false
+        )
+        val arr=root.optJSONArray("items") ?: return emptyList()
+        return buildList {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val mediaObj=x.optJSONObject("media")
+                val kind=mediaObj?.optString("kind").orEmpty()
+                val media=mediaObj?.let {
+                    val backendId=it.optString("id").takeIf(String::isNotBlank)
+                    if(backendId==null) null else ReelMediaRef(
+                        backendId=backendId,
+                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
+                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
+                        title=it.optString("title"),
+                        originalTitle=it.optString("originalTitle"),
+                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
+                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
+                        year=if(it.isNull("year")) null else it.optInt("year"),
+                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
+                    )
+                }
+                add(
+                    ReelFeedItem(
+                        id=x.optString("id"),
+                        caption=x.optString("caption"),
+                        playbackUrl=x.optString("playbackUrl"),
+                        coverUrl=x.optString("coverUrl"),
+                        durationMs=x.optLong("durationMs"),
+                        likes=x.optLong("likes"),
+                        comments=x.optLong("comments"),
+                        saves=x.optLong("saves"),
+                        shares=x.optLong("shares"),
+                        views=x.optLong("views"),
+                        spoiler=x.optBoolean("spoiler"),
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+                        media=media
+                    )
+                )
+            }
+        }
+    }
+
+
     suspend fun feed(): List<SocialPost> {
         val loggedIn=backend.session.isLoggedIn
         val root=backend.getJson(
