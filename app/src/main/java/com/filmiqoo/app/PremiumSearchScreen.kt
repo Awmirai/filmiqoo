@@ -50,10 +50,8 @@ fun PremiumSearchScreen(
     val searchRepo=remember { UniversalSearchRepository(context.applicationContext,backend) }
 
     var query by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf(SearchTab.ALL) }
     var state by remember { mutableStateOf<UniversalSearchLoad>(UniversalSearchLoad.Loading) }
     var history by remember { mutableStateOf(searchRepo.history()) }
-    var mediaFilter by remember { mutableStateOf<MediaType?>(null) }
 
     BackHandler { onBack() }
 
@@ -90,10 +88,6 @@ fun PremiumSearchScreen(
             onBack=onBack
         )
 
-        SearchTabs(
-            selected=tab,
-            onSelected={tab=it}
-        )
 
         if(query.isBlank() && history.isNotEmpty()) {
             RecentSearches(
@@ -126,27 +120,14 @@ fun PremiumSearchScreen(
                 }
 
                 is UniversalSearchLoad.Ready -> {
-                    when(tab) {
-                        SearchTab.ALL -> SearchAllContent(
-                            result=s.result,
-                            query=query,
-                            repository=repository,
-                            onMedia=onMedia,
-                            onCreator=onCreator,
-                            onOpenReels=onOpenReels,
-                            onTab={tab=it}
-                        )
-                        SearchTab.MEDIA -> MediaSearchGrid(
-                            media=s.result.media,
-                            repository=repository,
-                            filter=mediaFilter,
-                            onFilter={mediaFilter=it},
-                            onMedia=onMedia
-                        )
-                        SearchTab.USERS -> UserSearchList(s.result.users,onCreator)
-                        SearchTab.CHANNELS -> ChannelSearchList(s.result.channels,onCreator)
-                        SearchTab.REELS -> ReelSearchGrid(s.result.reels,onOpenReels,onCreator)
-                    }
+                    SearchAllContent(
+                        result=s.result,
+                        query=query,
+                        repository=repository,
+                        onMedia=onMedia,
+                        onCreator=onCreator,
+                        onOpenReels=onOpenReels
+                    )
                 }
             }
         }
@@ -185,12 +166,12 @@ private fun SearchHeader(
             Spacer(Modifier.width(4.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "جستجو و Discover",
+                    "جستجو",
                     style=MaterialTheme.typography.headlineSmall,
                     fontWeight=FontWeight.Black
                 )
                 Text(
-                    "فیلم، سریال، کاربر، کانال و Reel",
+                    "فیلم، سریال، آدم‌ها و Clips",
                     color=FqMuted,
                     style=MaterialTheme.typography.bodySmall,
                     modifier=Modifier.padding(top=2.dp)
@@ -203,7 +184,7 @@ private fun SearchHeader(
             onValueChange=onQuery,
             placeholder={
                 Text(
-                    "اسم فیلم، سریال یا @کاربر...",
+                    "فیلم، سریال، آدم یا موضوع...",
                     color=FqMuted
                 )
             },
@@ -310,8 +291,7 @@ private fun SearchAllContent(
     repository: TmdbRepository,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
-    onOpenReels: () -> Unit,
-    onTab: (SearchTab) -> Unit
+    onOpenReels: () -> Unit
 ) {
     val empty=result.media.isEmpty() && result.users.isEmpty() &&
         result.channels.isEmpty() && result.reels.isEmpty()
@@ -336,8 +316,7 @@ private fun SearchAllContent(
             item {
                 SearchSectionTitle(
                     title=if(query.isBlank())"ترند فیلم و سریال" else "فیلم و سریال",
-                    count=result.media.size,
-                    onMore={onTab(SearchTab.MEDIA)}
+                    count=result.media.size
                 )
             }
             item {
@@ -354,9 +333,7 @@ private fun SearchAllContent(
 
         if(result.users.isNotEmpty()) {
             item {
-                SearchSectionTitle("Creatorها و کاربران",result.users.size) {
-                    onTab(SearchTab.USERS)
-                }
+                SearchSectionTitle("آدم‌ها",result.users.size)
             }
             item {
                 LazyRow(
@@ -372,9 +349,7 @@ private fun SearchAllContent(
 
         if(result.channels.isNotEmpty()) {
             item {
-                SearchSectionTitle("کانال‌ها",result.channels.size) {
-                    onTab(SearchTab.CHANNELS)
-                }
+                SearchSectionTitle("کانال‌ها",result.channels.size)
             }
             items(result.channels.take(4),key={it.id}) { channel ->
                 ChannelRow(channel) { onCreator(channel.asCreator()) }
@@ -383,9 +358,7 @@ private fun SearchAllContent(
 
         if(result.reels.isNotEmpty()) {
             item {
-                SearchSectionTitle("Reels",result.reels.size) {
-                    onTab(SearchTab.REELS)
-                }
+                SearchSectionTitle("Clips",result.reels.size)
             }
             item {
                 LazyRow(
@@ -406,8 +379,7 @@ private fun SearchAllContent(
 @Composable
 private fun SearchSectionTitle(
     title: String,
-    count: Int,
-    onMore: () -> Unit
+    count: Int
 ) {
     Row(
         Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=20.dp,bottom=9.dp),
@@ -419,10 +391,6 @@ private fun SearchSectionTitle(
             Text(count.toString(),fontSize=11.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
         }
         Spacer(Modifier.weight(1f))
-        TextButton(onClick=onMore) {
-            Text("همه",fontSize=11.sp)
-            Icon(Icons.Default.ChevronLeft,null,modifier=Modifier.size(15.dp))
-        }
     }
 }
 
