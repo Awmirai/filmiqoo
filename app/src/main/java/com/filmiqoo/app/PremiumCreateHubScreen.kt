@@ -45,10 +45,10 @@ private enum class CreateKind(
 ) {
     STORY("Story","عکس، ویدیو یا متن ۲۴ ساعته"),
     REEL("Clip","ویدیوی کوتاه برای Club"),
-    POST("Post","پست Community"),
+    POST("Post","پست Club"),
     REVIEW("Review","نقد فیلم یا سریال"),
     POLL("Poll","نظرسنجی واقعی"),
-    CHANNEL("Channel","ساخت فضای Creator یا Community")
+    CHANNEL("Channel","ساخت فضای عمومی در Club")
 }
 
 private data class CreateDraft(
@@ -736,9 +736,9 @@ fun PremiumCreateHubScreen(
                                         "Story برای ۲۴ ساعت منتشر شد."
                                 }
                                 CreateKind.REEL -> {
-                                    publishStage="در حال آپلود Reel..."
+                                    publishStage="در حال آپلود Clip..."
                                     val ticket=social.uploadMedia(context,selectedUri!!,"reel")
-                                    publishStage="در حال انتشار Reel..."
+                                    publishStage="در حال انتشار Clip..."
                                     social.createReel(
                                         uploadId=ticket.uploadId,
                                         caption=caption.trim(),
@@ -747,7 +747,7 @@ fun PremiumCreateHubScreen(
                                         mediaTitleId=mediaId,
                                         scheduledAt=scheduledIso
                                     )
-                                    if(isScheduled)"Reel زمان‌بندی شد." else "Reel روی Explore منتشر شد."
+                                    if(isScheduled)"Clip زمان‌بندی شد." else "Clip منتشر شد."
                                 }
                                 CreateKind.CHANNEL -> {
                                     publishStage="در حال ساخت Channel..."
@@ -788,7 +788,7 @@ fun PremiumCreateHubScreen(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     when(kind) {
-                        CreateKind.REEL -> if(scheduledAtMillis!=null)"آپلود و زمان‌بندی Reel" else "آپلود و انتشار Reel"
+                        CreateKind.REEL -> if(scheduledAtMillis!=null)"آپلود و زمان‌بندی Clip" else "آپلود و انتشار Clip"
                         CreateKind.STORY -> "انتشار Story"
                         CreateKind.POLL -> if(scheduledAtMillis!=null)"زمان‌بندی Poll" else "انتشار Poll"
                         CreateKind.CHANNEL -> "ساخت Channel"
