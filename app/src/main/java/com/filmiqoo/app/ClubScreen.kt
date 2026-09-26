@@ -1310,6 +1310,7 @@ private fun ClubCommentsSheet(
     var comments by remember(post.id) { mutableStateOf<List<SocialComment>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var text by remember { mutableStateOf("") }
+    var spoiler by remember { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
 
     fun reload() {
@@ -1340,7 +1341,9 @@ private fun ClubCommentsSheet(
                 fontWeight=FontWeight.Black
             )
             Text(
-                post.author.displayName+" • "+compactClubCount(post.comments)+" نظر",
+                post.author.displayName+" • "+
+                    compactClubCount(if(loading)post.comments else comments.size.toLong())+
+                    " نظر",
                 color=FqMuted,
                 fontSize=10.sp,
                 modifier=Modifier.padding(top=3.dp,bottom=12.dp)
@@ -1378,60 +1381,95 @@ private fun ClubCommentsSheet(
                                     fontSize=10.sp,
                                     fontWeight=FontWeight.Bold
                                 )
-                                Text(
-                                    comment.body,
-                                    fontSize=11.sp,
-                                    lineHeight=18.sp,
-                                    modifier=Modifier.padding(top=2.dp)
-                                )
+                                var reveal by remember(comment.id) {
+                                    mutableStateOf(!comment.spoiler)
+                                }
+                                if(comment.spoiler && !reveal) {
+                                    Text(
+                                        "⚠ Spoiler Shield • نمایش",
+                                        color=FqDanger,
+                                        fontSize=10.sp,
+                                        fontWeight=FontWeight.Bold,
+                                        modifier=Modifier.padding(top=4.dp)
+                                            .clickable { reveal=true }
+                                    )
+                                } else {
+                                    Text(
+                                        comment.body,
+                                        fontSize=11.sp,
+                                        lineHeight=18.sp,
+                                        modifier=Modifier.padding(top=2.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Row(
-                Modifier.fillMaxWidth().padding(top=14.dp,bottom=10.dp),
-                verticalAlignment=Alignment.CenterVertically
+            Column(
+                Modifier.fillMaxWidth().padding(top=14.dp,bottom=10.dp)
             ) {
-                OutlinedTextField(
-                    value=text,
-                    onValueChange={text=it},
-                    placeholder={Text("نظرت رو بنویس...")},
-                    singleLine=false,
-                    maxLines=4,
-                    shape=RoundedCornerShape(18.dp),
-                    modifier=Modifier.weight(1f)
+                FilterChip(
+                    selected=spoiler,
+                    onClick={spoiler=!spoiler},
+                    label={Text("Spoiler",fontSize=10.sp)},
+                    leadingIcon={
+                        Icon(
+                            Icons.Default.VisibilityOff,
+                            null,
+                            modifier=Modifier.size(14.dp)
+                        )
+                    }
                 )
-                Spacer(Modifier.width(8.dp))
-                FilledIconButton(
-                    onClick={
-                        if(!loggedIn) {
-                            onRequireAuth()
-                        } else {
-                            val clean=text.trim()
-                            if(clean.isNotBlank() && !sending) {
-                                sending=true
-                                scope.launch {
-                                    runCatching {
-                                        social.addComment(post.id,clean)
-                                    }.onSuccess {
-                                        text=""
-                                        onCommentAdded()
-                                        reload()
+                Row(
+                    Modifier.fillMaxWidth().padding(top=6.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value=text,
+                        onValueChange={text=it},
+                        placeholder={Text("نظرت رو بنویس...")},
+                        singleLine=false,
+                        maxLines=4,
+                        shape=RoundedCornerShape(18.dp),
+                        modifier=Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilledIconButton(
+                        onClick={
+                            if(!loggedIn) {
+                                onRequireAuth()
+                            } else {
+                                val clean=text.trim()
+                                if(clean.isNotBlank() && !sending) {
+                                    sending=true
+                                    scope.launch {
+                                        runCatching {
+                                            social.addComment(
+                                                postId=post.id,
+                                                body=clean,
+                                                spoiler=spoiler
+                                            )
+                                        }.onSuccess {
+                                            text=""
+                                            spoiler=false
+                                            onCommentAdded()
+                                            reload()
+                                        }
+                                        sending=false
                                     }
-                                    sending=false
                                 }
                             }
-                        }
-                    },
-                    enabled=!sending,
-                    colors=IconButtonDefaults.filledIconButtonColors(
-                        containerColor=Color.White,
-                        contentColor=Color.Black
-                    )
-                ) {
-                    Icon(Icons.Default.ArrowUpward,null)
+                        },
+                        enabled=!sending,
+                        colors=IconButtonDefaults.filledIconButtonColors(
+                            containerColor=Color.White,
+                            contentColor=Color.Black
+                        )
+                    ) {
+                        Icon(Icons.Default.ArrowUpward,null)
+                    }
                 }
             }
         }
