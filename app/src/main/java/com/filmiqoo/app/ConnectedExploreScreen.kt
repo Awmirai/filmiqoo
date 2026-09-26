@@ -115,7 +115,7 @@ fun ConnectedExploreScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun RealReelsPager(
     reels: List<ReelFeedItem>,
@@ -139,6 +139,7 @@ private fun RealReelsPager(
     val followBusy=remember { mutableStateMapOf<String,Boolean>() }
     val revealed=remember { mutableStateMapOf<String,Boolean>() }
     var commentsFor by remember { mutableStateOf<ReelFeedItem?>(null) }
+    var moreFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var safetyFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var muted by remember { mutableStateOf(false) }
@@ -298,31 +299,13 @@ private fun RealReelsPager(
                         )
                     )
                 },
-                onNotInterested={
-                    if(!loggedIn) {
-                        onRequireAuth()
-                    } else {
-                        scope.launch {
-                            runCatching {
-                                social.feedback("reel",reel.id,"not_interested")
-                            }.onSuccess {
-                                feedbackMessage="این نوع Clip کمتر نمایش داده می‌شه."
-                                onRefresh()
-                            }
-                        }
-                    }
-                },
-                onSafety={
-                    if(!loggedIn) onRequireAuth() else safetyFor=reel
-                },
                 onShare={
                     shareText(
                         context,
-                         "Filmiqoo Clip • "+(reel.media?.title ?: reel.caption.ifBlank{"Clip"})
+                        "Filmiqoo Clip • "+(reel.media?.title ?: reel.caption.ifBlank{"Clip"})
                     )
                 },
-                onToggleMute={muted=!muted},
-                muted=muted
+                onMore={moreFor=reel}
             )
         }
 
@@ -373,12 +356,12 @@ private fun RealReelsPager(
                 .statusBarsPadding()
                 .padding(top=8.dp,end=10.dp)
                 .size(44.dp)
-                .clickable { onRefresh() }
+                .clickable { muted=!muted }
         ) {
             Box(contentAlignment=Alignment.Center) {
                 Icon(
-                    Icons.Default.Refresh,
-                    contentDescription="به‌روزرسانی Clips",
+                    if(muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                    contentDescription=if(muted)"فعال کردن صدا" else "بی‌صدا کردن",
                     modifier=Modifier.size(21.dp)
                 )
             }
@@ -393,6 +376,54 @@ private fun RealReelsPager(
             onRequireAuth=onRequireAuth,
             onDismiss={commentsFor=null}
         )
+    }
+
+    moreFor?.let { reel ->
+        ModalBottomSheet(
+            onDismissRequest={moreFor=null},
+            containerColor=FqSurface,
+            dragHandle={BottomSheetDefaults.DragHandle(color=FqMuted)}
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .padding(horizontal=16.dp)
+                    .padding(bottom=24.dp)
+            ) {
+                Text(
+                    "گزینه‌های Clip",
+                    fontSize=18.sp,
+                    fontWeight=FontWeight.Black,
+                    modifier=Modifier.padding(bottom=8.dp)
+                )
+                ReelMoreAction(
+                    icon=Icons.Default.DoNotDisturbOn,
+                    title="علاقه ندارم",
+                    subtitle="Clipهای مشابه کمتر نمایش داده می‌شن."
+                ) {
+                    moreFor=null
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else {
+                        scope.launch {
+                            runCatching {
+                                social.feedback("reel",reel.id,"not_interested")
+                            }.onSuccess {
+                                feedbackMessage="این نوع Clip کمتر نمایش داده می‌شه."
+                                onRefresh()
+                            }
+                        }
+                    }
+                }
+                ReelMoreAction(
+                    icon=Icons.Default.Shield,
+                    title="ایمنی و گزارش",
+                    subtitle="گزارش، Block یا Mute کردن این حساب"
+                ) {
+                    moreFor=null
+                    if(!loggedIn) onRequireAuth() else safetyFor=reel
+                }
+            }
+        }
     }
 
     safetyFor?.let { reel ->
@@ -435,11 +466,8 @@ private fun ReelVideoPage(
     onComment: () -> Unit,
     onMedia: () -> Unit,
     onCreator: () -> Unit,
-    onNotInterested: () -> Unit,
-    onSafety: () -> Unit,
     onShare: () -> Unit,
-    onToggleMute: () -> Unit,
-    muted: Boolean
+    onMore: () -> Unit
 ) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         val background=reel.coverUrl.ifBlank {
@@ -629,30 +657,56 @@ private fun ReelVideoPage(
                 onClick=onSave
             )
             ReelCircleAction(
-                icon=if(muted)Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                tint=Color.White,
-                text=if(muted)"بی‌صدا" else "صدا",
-                onClick=onToggleMute
-            )
-            ReelCircleAction(
-                icon=Icons.Default.DoNotDisturbOn,
-                tint=Color.White,
-                text="علاقه ندارم",
-                onClick=onNotInterested
-            )
-            ReelCircleAction(
-                icon=Icons.Default.MoreVert,
-                tint=Color.White,
-                text="بیشتر",
-                onClick=onSafety
-            )
-            ReelCircleAction(
                 icon=Icons.Default.Share,
                 tint=Color.White,
                 text=compactCount(reel.shares),
                 onClick=onShare
             )
+            ReelCircleAction(
+                icon=Icons.Default.MoreHoriz,
+                tint=Color.White,
+                text="بیشتر",
+                onClick=onMore
+            )
         }
+    }
+}
+
+@Composable
+private fun ReelMoreAction(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    subtitle:String,
+    onClick:()->Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+            .padding(horizontal=12.dp,vertical=13.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ) {
+        Surface(
+            color=FqSurface2,
+            contentColor=Color.White,
+            shape=CircleShape,
+            modifier=Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment=Alignment.Center) {
+                Icon(icon,null,modifier=Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+            Text(
+                subtitle,
+                color=FqMuted,
+                fontSize=10.sp,
+                modifier=Modifier.padding(top=2.dp)
+            )
+        }
+        Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
     }
 }
 
