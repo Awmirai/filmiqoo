@@ -255,6 +255,8 @@ data class ReelFeedItem(
     val spoiler: Boolean,
     val likedByMe: Boolean = false,
     val savedByMe: Boolean = false,
+    val followingAuthor: Boolean = false,
+    val followPending: Boolean = false,
     val author: SocialAuthor,
     val media: ReelMediaRef?
 )
