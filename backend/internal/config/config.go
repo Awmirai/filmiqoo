@@ -26,6 +26,8 @@ type Config struct {
 	PublicMediaBaseURL string
 	Environment string
 	TelegramIngestSecret string
+	TelegramWebhookSecret string
+	TelegramLogChannel string
 	TelegramStreamBaseURL string
 	PlaybackSigningSecret string
 	PublicAPIBaseURL string
@@ -76,6 +78,8 @@ func Load() Config {
 		PublicMediaBaseURL: env("PUBLIC_MEDIA_BASE_URL", "http://localhost:9000/filmiqoo-media"),
 		Environment: env("APP_ENV", "development"),
 		TelegramIngestSecret: env("TELEGRAM_INGEST_SECRET", "dev-ingest-change-me"),
+		TelegramWebhookSecret: strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_SECRET")),
+		TelegramLogChannel: strings.TrimSpace(os.Getenv("TELEGRAM_LOG_CHANNEL")),
 		TelegramStreamBaseURL: env("TELEGRAM_STREAM_BASE_URL", "http://localhost:8081"),
 		PlaybackSigningSecret: env("PLAYBACK_SIGNING_SECRET", "dev-playback-change-me"),
 		PublicAPIBaseURL: env("PUBLIC_API_BASE_URL", "http://localhost:8080"),
