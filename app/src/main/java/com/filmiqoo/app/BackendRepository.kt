@@ -61,6 +61,7 @@ data class PlaybackQueueItem(
 
 data class PlaybackTarget(
     val mediaVersionId: String,
+    val mediaTitleId: String? = null,
     val title: String,
     val subtitle: String = "",
     val posterUrl: String? = null,
@@ -620,6 +621,7 @@ class BackendRepository(context: Context) {
                     ContinueWatchingItem(
                         target=PlaybackTarget(
                             mediaVersionId=versionId,
+                            mediaTitleId=media.backendId,
                             title=media.title,
                             subtitle=label,
                             posterUrl=media.posterPath,
@@ -719,6 +721,7 @@ class BackendRepository(context: Context) {
             }
             PlaybackTarget(
                 mediaVersionId=o.optString("mediaVersionId").ifBlank{mediaVersionId},
+                mediaTitleId=o.optString("mediaTitleId").takeIf(String::isNotBlank),
                 title=o.optString("title"),
                 subtitle=o.optString("subtitle"),
                 posterUrl=o.optString("posterUrl").takeIf(String::isNotBlank),
