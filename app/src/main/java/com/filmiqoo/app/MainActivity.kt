@@ -883,7 +883,7 @@ private fun FilmiqooBottomBar(
     } else {
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.Explore,"کشف",1),
+            Triple(Icons.Default.SmartDisplay,"کلیپ",1),
             Triple(Icons.Default.Groups,"کلاب",2),
             Triple(Icons.Default.VideoLibrary,"کتابخانه",3),
             Triple(Icons.Default.PersonOutline,"من",4)
