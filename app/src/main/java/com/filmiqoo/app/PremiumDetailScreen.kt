@@ -315,24 +315,23 @@ fun PremiumDetailScreen(
                                 loggedIn=backend.session.isLoggedIn,
                                 onRequireAuth=onRequireAuth,
                                 onReact={ emoji ->
-                                    if(pulseBusy) return@FilmiqooPulseCard
                                     if(!backend.session.isLoggedIn) {
                                         onRequireAuth()
-                                        return@FilmiqooPulseCard
-                                    }
-                                    pulseBusy=true
-                                    scope.launch {
-                                        runCatching {
-                                            pulseRepository.react(
-                                                mediaId=pulseMediaId,
-                                                emoji=emoji
-                                            )
-                                        }.onSuccess {
-                                            pulse=it
-                                        }.onFailure {
-                                            message=it.message
+                                    } else if(!pulseBusy) {
+                                        pulseBusy=true
+                                        scope.launch {
+                                            runCatching {
+                                                pulseRepository.react(
+                                                    mediaId=pulseMediaId,
+                                                    emoji=emoji
+                                                )
+                                            }.onSuccess {
+                                                pulse=it
+                                            }.onFailure {
+                                                message=it.message
+                                            }
+                                            pulseBusy=false
                                         }
-                                        pulseBusy=false
                                     }
                                 }
                             )
