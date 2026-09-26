@@ -850,12 +850,6 @@ private fun ClubPostCard(
                     fontSize=9.sp
                 )
             }
-            Icon(
-                Icons.Default.MoreHoriz,
-                null,
-                tint=FqMuted,
-                modifier=Modifier.size(20.dp)
-            )
         }
 
         if(post.spoiler && !revealed) {
