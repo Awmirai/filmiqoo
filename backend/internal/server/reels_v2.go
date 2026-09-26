@@ -26,6 +26,31 @@ func (s *Server) toggleReelLike(w http.ResponseWriter,r *http.Request) {
 		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE reels SET like_count=like_count+1 WHERE id=$1",reelID) }
 	}
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+	if !exists {
+		var creatorID string
+		if scanErr:=tx.QueryRow(
+			r.Context(),
+			"SELECT creator_user_id::text FROM reels WHERE id=$1",
+			reelID,
+		).Scan(&creatorID); scanErr==nil && creatorID!=userID {
+			_,_=tx.Exec(r.Context(),`
+				INSERT INTO notifications (
+					user_id,actor_user_id,notification_type,entity_type,entity_id,title
+				)
+				SELECT $1,$2,'reel_like','reel',$3,'پسند جدید روی Clip'
+				WHERE NOT EXISTS (
+					SELECT 1 FROM notifications
+					 WHERE user_id=$1
+					   AND actor_user_id=$2
+					   AND notification_type='reel_like'
+					   AND entity_id=$3
+					   AND created_at>now()-interval '12 hours'
+				)
+			`,creatorID,userID,reelID)
+		}
+	}
+
 	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	writeJSON(w,http.StatusOK,map[string]any{"liked":!exists})
 }
@@ -87,6 +112,29 @@ func (s *Server) addReelComment(w http.ResponseWriter,r *http.Request) {
 	`,reelID,body.ParentCommentID,userID,body.Body,body.Spoiler).Scan(&id)
 	if err==nil { _,err=tx.Exec(r.Context(),"UPDATE reels SET comment_count=comment_count+1 WHERE id=$1",reelID) }
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+	var recipientID string
+	if scanErr:=tx.QueryRow(r.Context(),`
+		SELECT COALESCE(
+			(
+				SELECT author_user_id::text
+				  FROM comments
+				 WHERE id=$1
+			),
+			rl.creator_user_id::text
+		)
+		  FROM reels rl
+		 WHERE rl.id=$2
+	`,body.ParentCommentID,reelID).Scan(&recipientID); scanErr==nil && recipientID!=userID {
+		preview:=normalizeMessagePreview(body.Body)
+		if body.Spoiler { preview="کامنت اسپویلردار" }
+		_,_=tx.Exec(r.Context(),`
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
+			) VALUES ($1,$2,'reel_comment','reel',$3,'کامنت جدید روی Clip',$4)
+		`,recipientID,userID,reelID,preview)
+	}
+
 	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	writeJSON(w,http.StatusCreated,map[string]any{"id":id})
 }
