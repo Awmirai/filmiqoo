@@ -34,6 +34,7 @@ func (s *Server) userRelationship(w http.ResponseWriter,r *http.Request) {
 		"pending":pending,
 		"private":privateAccount,
 		"blocked":blocked,
+		"self":userID==targetID,
 	})
 }
 
