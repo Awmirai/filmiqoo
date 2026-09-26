@@ -55,6 +55,7 @@ fun PremiumDetailScreen(
     val scope=rememberCoroutineScope()
     val library=remember { LibraryRepository(backend) }
     val seriesAlerts=remember { SeriesAlertsRepository(backend) }
+    val pulseRepository=remember { PulseRepository(backend) }
 
     var reload by remember(media.key) { mutableIntStateOf(0) }
     var state by remember(media.key) { mutableStateOf<PremiumDetailLoad>(PremiumDetailLoad.Loading) }
@@ -67,6 +68,8 @@ fun PremiumDetailScreen(
     var showCollections by remember { mutableStateOf(false) }
     var showAvailabilityAlerts by remember { mutableStateOf(false) }
     var downloadBusy by remember { mutableStateOf(false) }
+    var pulse by remember(media.key) { mutableStateOf<PulseState?>(null) }
+    var pulseBusy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(media.key,reload) {
@@ -88,6 +91,12 @@ fun PremiumDetailScreen(
             }
             PremiumDetailLoad.Ready(tmdb,platform)
         }.getOrElse { PremiumDetailLoad.Error(it.message ?: "خطا در دریافت اطلاعات") }
+    }
+
+    LaunchedEffect(media.backendId,reload) {
+        val id=media.backendId
+        pulse=if(id.isNullOrBlank()) null else
+            runCatching { pulseRepository.load(id) }.getOrNull()
     }
 
     BackHandler { onBack() }
@@ -296,6 +305,38 @@ fun PremiumDetailScreen(
                             onWatchParty={onWatchParty(d.media)},
                             onChat={onChat(d.media)}
                         )
+                    }
+
+                    d.media.backendId?.takeIf(String::isNotBlank)?.let { pulseMediaId ->
+                        item {
+                            FilmiqooPulseCard(
+                                state=pulse,
+                                busy=pulseBusy,
+                                loggedIn=backend.session.isLoggedIn,
+                                onRequireAuth=onRequireAuth,
+                                onReact={ emoji ->
+                                    if(pulseBusy) return@FilmiqooPulseCard
+                                    if(!backend.session.isLoggedIn) {
+                                        onRequireAuth()
+                                        return@FilmiqooPulseCard
+                                    }
+                                    pulseBusy=true
+                                    scope.launch {
+                                        runCatching {
+                                            pulseRepository.react(
+                                                mediaId=pulseMediaId,
+                                                emoji=emoji
+                                            )
+                                        }.onSuccess {
+                                            pulse=it
+                                        }.onFailure {
+                                            message=it.message
+                                        }
+                                        pulseBusy=false
+                                    }
+                                }
+                            )
+                        }
                     }
 
                     if(versions.size>1) {
@@ -2145,4 +2186,115 @@ private fun formatBytes(bytes: Long): String {
     } else {
         String.format(Locale.US,"%.0f MB",bytes/1024.0/1024.0)
     }
+}
+
+
+@Composable
+private fun FilmiqooPulseCard(
+    state:PulseState?,
+    busy:Boolean,
+    loggedIn:Boolean,
+    onRequireAuth:()->Unit,
+    onReact:(String)->Unit
+) {
+    val reactions=listOf("🔥","😱","😂","❤️","👀")
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(22.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if(state?.live==true) FqGold.copy(alpha=.45f) else FqBorder
+        ),
+        modifier=Modifier.fillMaxWidth()
+            .padding(horizontal=FqDimens.Screen,vertical=10.dp)
+    ) {
+        Column(Modifier.padding(15.dp)) {
+            Row(
+                verticalAlignment=Alignment.CenterVertically,
+                modifier=Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    Modifier.size(10.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if(state?.live==true) Color(0xFFFF4D67) else FqMuted
+                        )
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Pulse",
+                        fontWeight=FontWeight.Black,
+                        fontSize=15.sp
+                    )
+                    Text(
+                        when {
+                            state==null -> "واکنش زنده بین فیلم‌بازها"
+                            state.watchingNow>0 ->
+                                state.watchingNow.toString()+" نفر الان دارن می‌بینن"
+                            state.recent>0 ->
+                                state.recent.toString()+" واکنش در چند ساعت اخیر"
+                            else -> "اولین واکنش این عنوان رو تو بفرست"
+                        },
+                        color=FqMuted,
+                        fontSize=11.sp,
+                        modifier=Modifier.padding(top=2.dp)
+                    )
+                }
+                if(state?.live==true) {
+                    Surface(
+                        color=Color(0xFFFF4D67).copy(alpha=.14f),
+                        shape=CircleShape
+                    ) {
+                        Text(
+                            "LIVE",
+                            color=Color(0xFFFF6A7D),
+                            fontSize=10.sp,
+                            fontWeight=FontWeight.Bold,
+                            modifier=Modifier.padding(horizontal=9.dp,vertical=4.dp)
+                        )
+                    }
+                }
+            }
+
+            LazyRow(
+                horizontalArrangement=Arrangement.spacedBy(8.dp),
+                modifier=Modifier.padding(top=13.dp)
+            ) {
+                items(reactions) { emoji ->
+                    val count=state?.reactions?.get(emoji) ?: 0L
+                    Surface(
+                        color=FqSurface2,
+                        shape=RoundedCornerShape(16.dp),
+                        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+                        modifier=Modifier.clickable(enabled=!busy) {
+                            if(loggedIn) onReact(emoji) else onRequireAuth()
+                        }
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=12.dp,vertical=9.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Text(emoji,fontSize=18.sp)
+                            if(count>0) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    compactPulseCount(count),
+                                    color=FqMuted,
+                                    fontSize=11.sp,
+                                    fontWeight=FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun compactPulseCount(value:Long):String = when {
+    value>=1_000_000 -> String.format(Locale.US,"%.1fM",value/1_000_000.0)
+    value>=1_000 -> String.format(Locale.US,"%.1fK",value/1_000.0)
+    else -> value.toString()
 }
