@@ -486,8 +486,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 onBack={showSearch=false},
                 onMedia={ overlay=OverlayRoute.Detail(it); showSearch=false },
                 onCreator={ overlay=OverlayRoute.CreatorPage(it); showSearch=false },
-                onOpenReels={
+                onOpenClip={ clipId ->
                     showSearch=false
+                    deepLinkReelId=clipId
                     tab=1
                 }
             )
