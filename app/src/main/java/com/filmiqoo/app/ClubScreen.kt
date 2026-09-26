@@ -1131,7 +1131,7 @@ private fun ClubRooms(
                 "بحث‌های زنده",
                 fontSize=22.sp,
                 fontWeight=FontWeight.Black,
-                modifier=Modifier.padding(horizontal=4.dp,bottom=4.dp)
+                modifier=Modifier.padding(start=4.dp,end=4.dp,bottom=4.dp)
             )
         }
         items(rooms,key={it.id}) { room ->
@@ -1403,7 +1403,7 @@ private fun ClubSignedOutState(
     ) {
         Column(horizontalAlignment=Alignment.CenterHorizontally) {
             Icon(
-                Icons.Default.LockOutline,
+                Icons.Default.Lock,
                 null,
                 tint=FqMuted,
                 modifier=Modifier.size(38.dp)
