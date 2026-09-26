@@ -118,6 +118,8 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT rl.id::text,rl.caption,rl.playback_url,rl.cover_url,rl.duration_ms,
 		       rl.like_count,rl.comment_count,rl.save_count,rl.share_count,rl.view_count,rl.spoiler,
+		       EXISTS(SELECT 1 FROM reel_likes rlx WHERE rlx.reel_id=rl.id AND rlx.user_id=$1),
+		       EXISTS(SELECT 1 FROM reel_saves rsx WHERE rsx.reel_id=rl.id AND rsx.user_id=$1),
 		       p.user_id::text,p.display_name,p.username::text,p.avatar_url,p.verified,
 		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,mt.backdrop_url,
 		       mt.year,mt.rating
@@ -198,14 +200,14 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		var id,caption,playbackURL,coverURL,authorID,displayName,username,avatar string
 		var duration int
 		var likes,comments,saves,shares,views int64
-		var spoiler,verified bool
+		var spoiler,likedByMe,savedByMe,verified bool
 		var mediaID,kind,title,originalTitle,poster,backdrop *string
 		var tmdbID *int64
 		var year *int
 		var rating *float64
 		if err:=rows.Scan(
 			&id,&caption,&playbackURL,&coverURL,&duration,
-			&likes,&comments,&saves,&shares,&views,&spoiler,
+			&likes,&comments,&saves,&shares,&views,&spoiler,&likedByMe,&savedByMe,
 			&authorID,&displayName,&username,&avatar,&verified,
 			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
 		); err!=nil { continue }
@@ -214,6 +216,7 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 			"id":id,"caption":caption,"playbackUrl":playbackURL,"coverUrl":coverURL,
 			"durationMs":duration,"likes":likes,"comments":comments,"saves":saves,
 			"shares":shares,"views":views,"spoiler":spoiler,
+			"likedByMe":likedByMe,"savedByMe":savedByMe,
 			"author":map[string]any{
 				"id":authorID,"displayName":displayName,"username":username,
 				"avatarUrl":avatar,"verified":verified,
