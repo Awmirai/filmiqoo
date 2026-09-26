@@ -777,6 +777,11 @@ class SocialRepository(
         }
     }
 
+    suspend fun roomForMedia(mediaTitleId:String):SocialRoom? =
+        rooms().firstOrNull { room ->
+            room.media?.id==mediaTitleId && room.type=="community"
+        }
+
     suspend fun roomMessages(roomId: String): List<RoomMessageItem> {
         val root=backend.getJson("/v1/rooms/"+roomId+"/messages",authorized=false)
         val arr=root.optJSONArray("items") ?: return emptyList()
