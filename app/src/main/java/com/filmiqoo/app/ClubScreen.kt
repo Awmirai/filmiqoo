@@ -48,6 +48,7 @@ fun ClubScreen(
     val context=LocalContext.current
     val friendRepo=remember { FriendActivityRepository(backend) }
     val pulseRepo=remember { PulseRepository(backend) }
+    val messagingRepo=remember { MessagingRepository(backend) }
 
     var tab by remember { mutableStateOf(ClubTab.FOR_YOU) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -62,6 +63,15 @@ fun ClubScreen(
     var following by remember { mutableStateOf<List<FriendActivityItem>>(emptyList()) }
     var pulse by remember { mutableStateOf<List<PulseTrendItem>>(emptyList()) }
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
+    var unreadMessages by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(loggedIn,refresh) {
+        unreadMessages=if(loggedIn) {
+            runCatching {
+                messagingRepo.inbox().sumOf { it.unread }
+            }.getOrDefault(0L)
+        } else 0L
+    }
 
     LaunchedEffect(tab,refresh,loggedIn) {
         loading=true
@@ -100,6 +110,7 @@ fun ClubScreen(
         Column(Modifier.fillMaxSize()) {
             ClubHeader(
                 selected=tab,
+                unreadMessages=unreadMessages,
                 onSelected={tab=it},
                 onInbox=onInbox,
                 onCreate={
@@ -191,6 +202,7 @@ fun ClubScreen(
 @Composable
 private fun ClubHeader(
     selected:ClubTab,
+    unreadMessages:Long,
     onSelected:(ClubTab)->Unit,
     onInbox:()->Unit,
     onCreate:()->Unit
@@ -227,11 +239,29 @@ private fun ClubHeader(
                 )
             }
 
-            FqIconButton(
-                icon=Icons.Default.MarkChatUnread,
-                contentDescription="پیام‌ها",
-                onClick=onInbox
-            )
+            Box {
+                FqIconButton(
+                    icon=Icons.Default.MarkChatUnread,
+                    contentDescription="پیام‌ها",
+                    onClick=onInbox
+                )
+                if(unreadMessages>0) {
+                    Surface(
+                        color=Color.White,
+                        contentColor=Color.Black,
+                        shape=CircleShape,
+                        modifier=Modifier.align(Alignment.TopEnd)
+                            .offset(x=2.dp,y=(-2).dp)
+                    ) {
+                        Text(
+                            if(unreadMessages>99)"99+" else unreadMessages.toString(),
+                            fontSize=7.sp,
+                            fontWeight=FontWeight.Black,
+                            modifier=Modifier.padding(horizontal=5.dp,vertical=2.dp)
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.width(5.dp))
             Surface(
                 color=Color.White,
