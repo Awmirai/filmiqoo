@@ -95,7 +95,8 @@ data class UserRelationship(
     val following:Boolean,
     val pending:Boolean,
     val privateAccount:Boolean,
-    val blocked:Boolean
+    val blocked:Boolean,
+    val self:Boolean=false
 )
 
 data class FollowRequestItem(
@@ -783,7 +784,8 @@ class SocialRepository(
             following=o.optBoolean("following"),
             pending=o.optBoolean("pending"),
             privateAccount=o.optBoolean("private"),
-            blocked=o.optBoolean("blocked")
+            blocked=o.optBoolean("blocked"),
+            self=o.optBoolean("self")
         )
     }
 
