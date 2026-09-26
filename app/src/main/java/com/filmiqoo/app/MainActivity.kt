@@ -901,64 +901,78 @@ private fun FilmiqooBottomBar(
         )
     }
 
-    Surface(
-        color=FqGlass,
-        tonalElevation=0.dp,
-        shadowElevation=12.dp,
-        border=androidx.compose.foundation.BorderStroke(
-            1.dp,
-            FqBorder
-        )
+    Box(
+        Modifier.fillMaxWidth()
+            .background(Color.Transparent)
+            .navigationBarsPadding()
+            .padding(horizontal=10.dp,bottom=8.dp,top=3.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth()
-                .navigationBarsPadding()
-                .height(70.dp)
-                .padding(horizontal=6.dp),
-            verticalAlignment=Alignment.CenterVertically,
-            horizontalArrangement=Arrangement.SpaceEvenly
+        Surface(
+            color=Color(0xF20A0D12),
+            shape=RoundedCornerShape(24.dp),
+            tonalElevation=0.dp,
+            shadowElevation=18.dp,
+            border=androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Color.White.copy(alpha=.08f)
+            ),
+            modifier=Modifier.fillMaxWidth()
         ) {
-            entries.forEach { item ->
-                val active=selected==item.third
-                val itemColor=if(active) FqGold else FqMuted
-                Surface(
-                    color=Color.Transparent,
-                    contentColor=itemColor,
-                    shape=RoundedCornerShape(18.dp),
-                    modifier=Modifier.weight(1f)
-                        .heightIn(min=56.dp)
-                        .clickable { onSelected(item.third) }
-                ) {
-                    Column(
-                        Modifier.fillMaxSize()
-                            .padding(horizontal=4.dp,vertical=7.dp),
-                        horizontalAlignment=Alignment.CenterHorizontally,
-                        verticalArrangement=Arrangement.Center
+            Row(
+                Modifier.fillMaxWidth()
+                    .height(64.dp)
+                    .padding(horizontal=5.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.SpaceEvenly
+            ) {
+                entries.forEach { item ->
+                    val active=selected==item.third
+                    Surface(
+                        color=Color.Transparent,
+                        contentColor=if(active) Color.White else FqMuted,
+                        shape=RoundedCornerShape(18.dp),
+                        modifier=Modifier.weight(1f)
+                            .fillMaxHeight()
+                            .clickable { onSelected(item.third) }
                     ) {
-                        Box(
-                            Modifier.height(28.dp)
-                                .widthIn(min=42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    if(active) FqGold.copy(alpha=.12f)
-                                    else Color.Transparent
-                                ),
-                            contentAlignment=Alignment.Center
+                        Column(
+                            Modifier.fillMaxSize().padding(vertical=6.dp),
+                            horizontalAlignment=Alignment.CenterHorizontally,
+                            verticalArrangement=Arrangement.Center
                         ) {
-                            Icon(
-                                item.first,
-                                contentDescription=item.second,
-                                tint=itemColor,
-                                modifier=Modifier.size(22.dp)
+                            Box(
+                                Modifier.width(38.dp)
+                                    .height(27.dp)
+                                    .clip(RoundedCornerShape(13.dp))
+                                    .background(
+                                        if(active) Color.White.copy(alpha=.09f)
+                                        else Color.Transparent
+                                    ),
+                                contentAlignment=Alignment.Center
+                            ) {
+                                Icon(
+                                    item.first,
+                                    contentDescription=item.second,
+                                    tint=if(active) Color.White else FqMuted,
+                                    modifier=Modifier.size(21.dp)
+                                )
+                            }
+                            Text(
+                                item.second,
+                                color=if(active) Color.White else FqMuted,
+                                style=MaterialTheme.typography.labelSmall,
+                                fontWeight=if(active) FontWeight.Bold else FontWeight.Medium,
+                                maxLines=1,
+                                modifier=Modifier.padding(top=2.dp)
+                            )
+                            Box(
+                                Modifier.padding(top=3.dp)
+                                    .width(if(active) 16.dp else 0.dp)
+                                    .height(2.dp)
+                                    .clip(CircleShape)
+                                    .background(if(active) FqGold else Color.Transparent)
                             )
                         }
-                        Text(
-                            item.second,
-                            color=itemColor,
-                            style=MaterialTheme.typography.labelSmall,
-                            maxLines=1,
-                            modifier=Modifier.padding(top=2.dp)
-                        )
                     }
                 }
             }
