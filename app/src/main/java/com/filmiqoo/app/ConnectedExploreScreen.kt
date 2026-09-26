@@ -78,7 +78,7 @@ fun ConnectedExploreScreen(
             }
             if(target!=null) onInitialReelConsumed()
             ReelLoad.Ready(ordered)
-        }.getOrElse { ReelLoad.Error(it.message ?: "خطا در دریافت Reels") }
+        }.getOrElse { ReelLoad.Error(it.message ?: "خطا در دریافت Clips") }
     }
 
     when(val s=state) {
@@ -138,7 +138,6 @@ private fun RealReelsPager(
     var safetyFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var muted by remember { mutableStateOf(false) }
-    var followingTab by remember { mutableStateOf(false) }
 
     val player=remember {
         ExoPlayer.Builder(context).build().apply {
@@ -278,7 +277,7 @@ private fun RealReelsPager(
                             runCatching {
                                 social.feedback("reel",reel.id,"not_interested")
                             }.onSuccess {
-                                feedbackMessage="این نوع Reel کمتر نمایش داده می‌شه."
+                                feedbackMessage="این نوع Clip کمتر نمایش داده می‌شه."
                                 onRefresh()
                             }
                         }
@@ -290,7 +289,7 @@ private fun RealReelsPager(
                 onShare={
                     shareText(
                         context,
-                        "Filmiqoo Reel • "+(reel.media?.title ?: reel.caption.ifBlank{"Reel"})
+                         "Filmiqoo Clip • "+(reel.media?.title ?: reel.caption.ifBlank{"Reel"})
                     )
                 },
                 onToggleMute={muted=!muted},
@@ -298,42 +297,37 @@ private fun RealReelsPager(
             )
         }
 
-        Row(
-            Modifier.align(Alignment.TopCenter)
+        Surface(
+            color=Color.Black.copy(alpha=.56f),
+            contentColor=Color.White,
+            shape=RoundedCornerShape(22.dp),
+            border=androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Color.White.copy(alpha=.10f)
+            ),
+            modifier=Modifier.align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .padding(top=8.dp)
-                .background(
-                    Color.Black.copy(alpha=.54f),
-                    RoundedCornerShape(24.dp)
-                )
-                .padding(4.dp),
-            verticalAlignment=Alignment.CenterVertically
         ) {
-            Surface(
-                color=if(!followingTab) Color.White else Color.Transparent,
-                contentColor=if(!followingTab) Color.Black else Color.White,
-                shape=RoundedCornerShape(18.dp),
-                modifier=Modifier.clickable { followingTab=false }
+            Row(
+                Modifier.padding(horizontal=14.dp,vertical=9.dp),
+                verticalAlignment=Alignment.CenterVertically
             ) {
-                Text(
-                    "برای تو",
-                    style=MaterialTheme.typography.labelMedium,
-                    fontWeight=FontWeight.Bold,
-                    modifier=Modifier.padding(horizontal=14.dp,vertical=9.dp)
+                Icon(
+                    Icons.Default.SmartDisplay,
+                    null,
+                    modifier=Modifier.size(16.dp)
                 )
-            }
-            Spacer(Modifier.width(4.dp))
-            Surface(
-                color=if(followingTab) Color.White else Color.Transparent,
-                contentColor=if(followingTab) Color.Black else Color.White,
-                shape=RoundedCornerShape(18.dp),
-                modifier=Modifier.clickable { followingTab=true }
-            ) {
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    "دنبال‌شده‌ها",
-                    style=MaterialTheme.typography.labelMedium,
-                    fontWeight=FontWeight.Bold,
-                    modifier=Modifier.padding(horizontal=14.dp,vertical=9.dp)
+                    "Clips",
+                    fontWeight=FontWeight.Black,
+                    fontSize=12.sp
+                )
+                Text(
+                    "  •  برای تو",
+                    color=Color.White.copy(alpha=.65f),
+                    fontSize=10.sp
                 )
             }
         }
@@ -355,7 +349,7 @@ private fun RealReelsPager(
             Box(contentAlignment=Alignment.Center) {
                 Icon(
                     Icons.Default.Refresh,
-                    contentDescription="به‌روزرسانی Reels",
+                    contentDescription="به‌روزرسانی Clips",
                     modifier=Modifier.size(21.dp)
                 )
             }
@@ -377,7 +371,7 @@ private fun RealReelsPager(
             backend=backend,
             targetType="reel",
             targetId=reel.id,
-            targetLabel="Reel از "+reel.author.displayName,
+            targetLabel="Clip از "+reel.author.displayName,
             userTargetId=reel.author.id,
             onDismiss={safetyFor=null},
             onChanged={
