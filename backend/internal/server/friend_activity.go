@@ -58,16 +58,26 @@ func (s *Server) followingActivityFeed(w http.ResponseWriter,r *http.Request) {
 			    ON uf.followed_user_id=mr.user_id
 			   AND uf.follower_user_id=$1
 			 WHERE mr.updated_at>now()-interval '30 days'
+		),
+		ranked AS (
+			SELECT
+				a.*,
+				ROW_NUMBER() OVER (
+					PARTITION BY a.actor_user_id
+					ORDER BY a.activity_at DESC
+				) AS actor_rank
+			  FROM activity a
 		)
 		SELECT
 			a.activity_type,a.entity_id::text,a.body,a.spoiler,a.activity_at,
 			p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
 			mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,
 			mt.poster_url,mt.backdrop_url,mt.year,mt.rating
-		  FROM activity a
+		  FROM ranked a
 		  JOIN profiles p ON p.user_id=a.actor_user_id
 		  LEFT JOIN media_titles mt ON mt.id=a.media_title_id
-		 WHERE NOT EXISTS (
+		 WHERE a.actor_rank<=8
+		   AND NOT EXISTS (
 		     SELECT 1 FROM blocks b
 		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=a.actor_user_id)
 		         OR (b.blocker_user_id=a.actor_user_id AND b.blocked_user_id=$1)
@@ -77,7 +87,7 @@ func (s *Server) followingActivityFeed(w http.ResponseWriter,r *http.Request) {
 		      WHERE m.muter_user_id=$1 AND m.muted_user_id=a.actor_user_id
 		   )
 		 ORDER BY a.activity_at DESC
-		 LIMIT 120
+		 LIMIT 80
 	`,userID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
