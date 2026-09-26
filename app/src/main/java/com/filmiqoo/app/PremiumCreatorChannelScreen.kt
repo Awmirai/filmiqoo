@@ -523,7 +523,7 @@ private fun CreatorReelsGrid(
     onMedia: (MediaItem) -> Unit
 ) {
     if(reels.isEmpty()) {
-        PremiumEmptyState(Icons.Default.VideoLibrary,"هنوز Reels نداره","Reelهای منتشرشده اینجا نمایش داده می‌شن.")
+        PremiumEmptyState(Icons.Default.VideoLibrary,"هنوز Clip نداره","Clipهای منتشرشده اینجا نمایش داده می‌شن.")
         return
     }
 
@@ -927,7 +927,7 @@ fun CreatorStudioScreen(
                         Icon(Icons.Default.EventAvailable,null,tint=FqMuted)
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            "Post، Review، Poll و Reel رو برای زمان دقیق برنامه‌ریزی کن.",
+                            "Post، Review، Poll و Clip رو برای زمان دقیق برنامه‌ریزی کن.",
                             color=FqMuted,
                             fontSize=11.sp,
                             lineHeight=14.sp
@@ -988,7 +988,7 @@ fun CreatorStudioScreen(
             item {
                 PremiumSectionHeader(
                     "Watch Time روزانه",
-                    "Sessionهای واقعی Reel در "+a3.days+" روز اخیر",
+                    "Sessionهای واقعی Clip در "+a3.days+" روز اخیر",
                     Icons.Default.ShowChart
                 )
             }
@@ -1000,7 +1000,7 @@ fun CreatorStudioScreen(
             if(a3.topReels.isNotEmpty()) {
                 item {
                     PremiumSectionHeader(
-                        "بهترین Reelها",
+                        "بهترین Clipها",
                         "بر اساس Session، Watch Time و Completion",
                         Icons.Default.Leaderboard
                     )
@@ -1019,7 +1019,7 @@ fun CreatorStudioScreen(
             Column(Modifier.padding(horizontal=14.dp)) {
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     StudioMetric(
-                        "بازدید Reels",
+                        "بازدید Clipها",
                         compactCreatorCount(d.reelViews),
                         Icons.Default.Visibility,
                         Modifier.weight(1f)
@@ -1052,7 +1052,7 @@ fun CreatorStudioScreen(
         }
 
         item {
-            PremiumSectionHeader("Engagement","تعامل روی Reels",Icons.Default.Bolt)
+            PremiumSectionHeader("Engagement","تعامل روی Clipها",Icons.Default.Bolt)
         }
 
         item {
