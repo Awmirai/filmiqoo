@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -905,7 +906,7 @@ private fun FilmiqooBottomBar(
         Modifier.fillMaxWidth()
             .background(Color.Transparent)
             .navigationBarsPadding()
-            .padding(horizontal=10.dp,bottom=8.dp,top=3.dp)
+            .padding(start=10.dp,end=10.dp,bottom=8.dp,top=3.dp)
     ) {
         Surface(
             color=Color(0xF20A0D12),
