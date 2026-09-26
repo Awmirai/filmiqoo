@@ -88,9 +88,10 @@ func (s *Server) mediaClips(w http.ResponseWriter,r *http.Request) {
         var duration int64
         var likes,comments,saves,shares,views int64
         var spoiler,verified bool
-        var catalogID,kind,title,originalTitle,poster,backdrop string
+        var catalogID,kind,title string
+        var originalTitle,poster,backdrop *string
         var tmdbID *int64
-        var year int
+        var year *int
         var rating *float64
 
         if err:=rows.Scan(
