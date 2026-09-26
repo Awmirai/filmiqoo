@@ -1442,6 +1442,17 @@ private fun ClubRooms(
         return
     }
 
+    var roomQuery by remember { mutableStateOf("") }
+    val filteredRooms=remember(rooms,roomQuery) {
+        val q=roomQuery.trim()
+        if(q.isBlank()) rooms
+        else rooms.filter { room ->
+            room.name.contains(q,ignoreCase=true) ||
+                room.topic.contains(q,ignoreCase=true) ||
+                room.media?.title.orEmpty().contains(q,ignoreCase=true)
+        }
+    }
+
     LazyColumn(
         contentPadding=PaddingValues(horizontal=12.dp,vertical=12.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)
@@ -1453,8 +1464,47 @@ private fun ClubRooms(
                 fontWeight=FontWeight.Black,
                 modifier=Modifier.padding(start=4.dp,end=4.dp,bottom=4.dp)
             )
+            Text(
+                "بحث فیلم‌ها، سریال‌ها و قسمت‌ها",
+                color=FqMuted,
+                fontSize=10.sp,
+                modifier=Modifier.padding(start=4.dp,end=4.dp,bottom=9.dp)
+            )
+            OutlinedTextField(
+                value=roomQuery,
+                onValueChange={roomQuery=it},
+                singleLine=true,
+                placeholder={Text("جستجو در Roomها...")},
+                leadingIcon={
+                    Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))
+                },
+                trailingIcon={
+                    if(roomQuery.isNotBlank()) {
+                        IconButton(onClick={roomQuery=""}) {
+                            Icon(Icons.Default.Close,null,modifier=Modifier.size(17.dp))
+                        }
+                    }
+                },
+                shape=RoundedCornerShape(16.dp),
+                colors=OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor=Color.White.copy(alpha=.18f),
+                    unfocusedBorderColor=FqBorder,
+                    focusedContainerColor=FqSurface,
+                    unfocusedContainerColor=FqSurface
+                ),
+                modifier=Modifier.fillMaxWidth()
+            )
         }
-        items(rooms,key={it.id}) { room ->
+        if(filteredRooms.isEmpty()) {
+            item {
+                PremiumEmptyState(
+                    icon=Icons.Default.SearchOff,
+                    title="Room پیدا نشد",
+                    body="اسم فیلم، سریال یا موضوع گفتگو رو با عبارت دیگه‌ای جستجو کن."
+                )
+            }
+        }
+        items(filteredRooms,key={it.id}) { room ->
             Surface(
                 color=FqSurface,
                 shape=RoundedCornerShape(22.dp),
@@ -1473,7 +1523,11 @@ private fun ClubRooms(
                     ) {
                         RemoteImage(
                             room.media?.posterUrl?.takeIf(String::isNotBlank),
-                            Modifier.fillMaxSize(),
+                            Modifier.fillMaxSize()
+                                .clickable {
+                                    room.media?.asMediaItem()?.let(onMedia)
+                                        ?: onOpenRoom(room)
+                                },
                             ContentScale.Crop
                         )
                         Surface(
