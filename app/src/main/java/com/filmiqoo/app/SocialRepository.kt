@@ -54,6 +54,8 @@ data class SocialPost(
     val publishedAt: String?,
     val likedByMe: Boolean = false,
     val savedByMe: Boolean = false,
+    val followingAuthor: Boolean = false,
+    val followPending: Boolean = false,
     val author: SocialAuthor,
     val media: SocialMediaRef?
 )
@@ -301,6 +303,8 @@ class SocialRepository(
                         spoiler=x.optBoolean("spoiler"),
                         likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=x.optBoolean("savedByMe"),
+                        followingAuthor=x.optBoolean("followingAuthor"),
+                        followPending=x.optBoolean("followPending"),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
                         media=media
                     )
@@ -341,6 +345,8 @@ class SocialRepository(
             spoiler=x.optBoolean("spoiler"),
             likedByMe=x.optBoolean("likedByMe"),
             savedByMe=x.optBoolean("savedByMe"),
+            followingAuthor=x.optBoolean("followingAuthor"),
+            followPending=x.optBoolean("followPending"),
             author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
             media=media
         )
@@ -443,6 +449,8 @@ class SocialRepository(
                         spoiler=x.optBoolean("spoiler"),
                         likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=true,
+                        followingAuthor=x.optBoolean("followingAuthor"),
+                        followPending=x.optBoolean("followPending"),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
                         media=media
                     )
