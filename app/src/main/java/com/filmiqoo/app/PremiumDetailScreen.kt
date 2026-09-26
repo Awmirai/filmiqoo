@@ -47,6 +47,7 @@ fun PremiumDetailScreen(
     onMedia: (MediaItem) -> Unit,
     onChat: (MediaItem) -> Unit,
     onWatchParty: (MediaItem) -> Unit,
+    onClip: (String) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onPerson: (CastMember) -> Unit,
     onRequireAuth: () -> Unit
@@ -56,6 +57,7 @@ fun PremiumDetailScreen(
     val library=remember { LibraryRepository(backend) }
     val seriesAlerts=remember { SeriesAlertsRepository(backend) }
     val pulseRepository=remember { PulseRepository(backend) }
+    val socialRepository=remember { SocialRepository(backend) }
 
     var reload by remember(media.key) { mutableIntStateOf(0) }
     var state by remember(media.key) { mutableStateOf<PremiumDetailLoad>(PremiumDetailLoad.Loading) }
@@ -69,6 +71,7 @@ fun PremiumDetailScreen(
     var showAvailabilityAlerts by remember { mutableStateOf(false) }
     var downloadBusy by remember { mutableStateOf(false) }
     var pulse by remember(media.key) { mutableStateOf<PulseState?>(null) }
+    var relatedClips by remember(media.key) { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
     var pulseBusy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
@@ -95,8 +98,14 @@ fun PremiumDetailScreen(
 
     LaunchedEffect(media.backendId,reload) {
         val id=media.backendId
-        pulse=if(id.isNullOrBlank()) null else
-            runCatching { pulseRepository.load(id) }.getOrNull()
+        if(id.isNullOrBlank()) {
+            pulse=null
+            relatedClips=emptyList()
+        } else {
+            pulse=runCatching { pulseRepository.load(id) }.getOrNull()
+            relatedClips=runCatching { socialRepository.mediaClips(id) }
+                .getOrDefault(emptyList())
+        }
     }
 
     BackHandler { onBack() }
@@ -581,9 +590,11 @@ fun PremiumDetailScreen(
                                     media=d.media,
                                     backend=backend,
                                     loggedIn=backend.session.isLoggedIn,
+                                    relatedClips=relatedClips,
                                     onRequireAuth=onRequireAuth,
                                     onChat=onChat,
-                                    onWatchParty=onWatchParty
+                                    onWatchParty=onWatchParty,
+                                    onClip=onClip
                                 )
                             }
                         }
@@ -1737,9 +1748,11 @@ private fun PremiumCommunityPanel(
     media: MediaItem,
     backend: BackendRepository,
     loggedIn: Boolean,
+    relatedClips: List<ReelFeedItem>,
     onRequireAuth: () -> Unit,
     onChat: (MediaItem) -> Unit,
-    onWatchParty: (MediaItem) -> Unit
+    onWatchParty: (MediaItem) -> Unit,
+    onClip: (String) -> Unit
 ) {
     val scope=rememberCoroutineScope()
     val reviews=remember { ReviewsRepository(backend) }
@@ -1811,6 +1824,36 @@ private fun PremiumCommunityPanel(
                         Spacer(Modifier.width(5.dp))
                         Text("Watch Party")
                     }
+                }
+            }
+        }
+
+        if(relatedClips.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().padding(top=18.dp,bottom=8.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Text(
+                    "Clipهای این عنوان",
+                    fontSize=15.sp,
+                    fontWeight=FontWeight.Black
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    relatedClips.size.toString()+" Clip",
+                    color=FqMuted,
+                    fontSize=10.sp
+                )
+            }
+            LazyRow(
+                horizontalArrangement=Arrangement.spacedBy(10.dp),
+                contentPadding=PaddingValues(end=4.dp)
+            ) {
+                items(relatedClips,key={it.id}) { clip ->
+                    RelatedTitleClipCard(
+                        clip=clip,
+                        onClick={onClip(clip.id)}
+                    )
                 }
             }
         }
@@ -1969,6 +2012,67 @@ private fun PremiumCommunityPanel(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun RelatedTitleClipCard(
+    clip:ReelFeedItem,
+    onClick:()->Unit
+) {
+    Box(
+        Modifier.width(142.dp)
+            .height(220.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(FqSurface2)
+            .clickable { onClick() }
+    ) {
+        RemoteImage(
+            clip.coverUrl.takeIf(String::isNotBlank)
+                ?: clip.media?.backdropUrl
+                ?: clip.media?.posterUrl,
+            Modifier.fillMaxSize(),
+            ContentScale.Crop
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha=.10f),
+                        Color.Black.copy(alpha=.90f)
+                    )
+                )
+            )
+        )
+        Surface(
+            color=Color.Black.copy(alpha=.52f),
+            shape=CircleShape,
+            modifier=Modifier.align(Alignment.Center)
+        ) {
+            Icon(
+                Icons.Default.PlayArrow,
+                null,
+                modifier=Modifier.padding(8.dp).size(20.dp)
+            )
+        }
+        Column(
+            Modifier.align(Alignment.BottomStart).padding(10.dp)
+        ) {
+            Text(
+                clip.caption.ifBlank { clip.author.displayName },
+                fontSize=10.sp,
+                fontWeight=FontWeight.Bold,
+                maxLines=2,
+                overflow=TextOverflow.Ellipsis
+            )
+            Text(
+                compactPulseCount(clip.views)+" بازدید",
+                color=Color.White.copy(alpha=.66f),
+                fontSize=8.sp,
+                modifier=Modifier.padding(top=4.dp)
+            )
+        }
     }
 }
 
