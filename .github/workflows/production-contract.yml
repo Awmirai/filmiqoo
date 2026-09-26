@@ -28,6 +28,7 @@ jobs:
           bash -n restore.sh
           bash -n rollback.sh
           bash -n bootstrap-vps.sh
+          bash -n update-api.sh
 
       - name: Validate production compose
         working-directory: deploy/production

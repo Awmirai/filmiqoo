@@ -51,6 +51,13 @@ func New(token string) *Client {
 
 func (c *Client) Enabled() bool { return c != nil && c.token != "" }
 
+func (c *Client) RawJSON(ctx context.Context, path string, params url.Values) (json.RawMessage, error) {
+	if !c.Enabled() { return nil, errors.New("TMDB token is not configured") }
+	var raw json.RawMessage
+	if err := c.get(ctx, path, params, &raw); err != nil { return nil, err }
+	return raw, nil
+}
+
 func (c *Client) Search(ctx context.Context, kind, title string, year *int) (TitleMatch, error) {
 	if !c.Enabled() { return TitleMatch{}, errors.New("TMDB token is not configured") }
 	endpoint := "search/movie"
