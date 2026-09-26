@@ -35,6 +35,7 @@ fun ClubScreen(
     loggedIn:Boolean,
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
+    onOpenClip:(String)->Unit,
     onOpenRoom:(SocialRoom)->Unit,
     onStory:(List<SocialStory>,Int)->Unit,
     onInbox:()->Unit,
@@ -130,6 +131,7 @@ fun ClubScreen(
                         onStory=onStory,
                         onMedia=onMedia,
                         onCreator=onCreator,
+                        onOpenClip=onOpenClip,
                         onOpenRoom=onOpenRoom,
                         onRequireAuth=onRequireAuth,
                         onComments={commentsFor=it},
@@ -283,6 +285,7 @@ private fun ClubForYou(
     onStory:(List<SocialStory>,Int)->Unit,
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
+    onOpenClip:(String)->Unit,
     onOpenRoom:(SocialRoom)->Unit,
     onRequireAuth:()->Unit,
     onComments:(SocialPost)->Unit,
@@ -367,8 +370,7 @@ private fun ClubForYou(
             item {
                 ClubClipsRow(
                     clips=clips.take(8),
-                    onMedia=onMedia,
-                    onCreator=onCreator
+                    onOpenClip=onOpenClip
                 )
             }
         }
@@ -654,8 +656,7 @@ private fun ClubLiveRoomsRow(
 @Composable
 private fun ClubClipsRow(
     clips:List<ReelFeedItem>,
-    onMedia:(MediaItem)->Unit,
-    onCreator:(Creator)->Unit
+    onOpenClip:(String)->Unit
 ) {
     LazyRow(
         contentPadding=PaddingValues(horizontal=16.dp),
@@ -667,21 +668,7 @@ private fun ClubClipsRow(
                     .height(210.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(FqSurface2)
-                    .clickable {
-                        clip.media?.asMediaItem()?.let(onMedia)
-                            ?: onCreator(
-                                Creator(
-                                    name=clip.author.displayName,
-                                    handle="@"+clip.author.username,
-                                    followers="",
-                                    bio="",
-                                    verified=clip.author.verified,
-                                    id=clip.author.id,
-                                    entityType="user",
-                                    avatarUrl=clip.author.avatarUrl
-                                )
-                            )
-                    }
+.clickable { onOpenClip(clip.id) }
             ) {
                 RemoteImage(
                     clip.coverUrl.takeIf(String::isNotBlank)
