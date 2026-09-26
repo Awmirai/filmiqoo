@@ -84,23 +84,20 @@ fun ConnectedExploreScreen(
     when(val s=state) {
         ReelLoad.Loading -> LoadingPage("در حال آماده‌سازی Explore...")
         is ReelLoad.Error -> {
-            // Backend may be offline during design preview; preserve the rich mock/TMDB explore.
-            ExploreScreen(
-                repository=repository,
-                store=store,
-                onMedia=onMedia,
-                onChat=onChat,
-                onCreator=onCreator
+            ClipsUnavailableState(
+                title="Clips در دسترس نیست",
+                body=s.message,
+                action="تلاش دوباره",
+                onAction={refresh++}
             )
         }
         is ReelLoad.Ready -> {
             if(s.reels.isEmpty()) {
-                ExploreScreen(
-                    repository=repository,
-                    store=store,
-                    onMedia=onMedia,
-                    onChat=onChat,
-                    onCreator=onCreator
+                ClipsUnavailableState(
+                    title="هنوز Clip واقعی منتشر نشده",
+                    body="وقتی اولین Clip منتشر بشه، همین‌جا وارد فید عمودی Filmiqoo می‌شه.",
+                    action="تازه‌سازی",
+                    onAction={refresh++}
                 )
             } else {
                 RealReelsPager(
@@ -718,4 +715,62 @@ private fun compactCount(value: Long): String = when {
     value >= 1_000_000 -> String.format(java.util.Locale.US,"%.1fM",value/1_000_000.0)
     value >= 1_000 -> String.format(java.util.Locale.US,"%.1fK",value/1_000.0)
     else -> value.toString()
+}
+
+
+@Composable
+private fun ClipsUnavailableState(
+    title:String,
+    body:String,
+    action:String,
+    onAction:()->Unit
+) {
+    Box(
+        Modifier.fillMaxSize().background(FqBg),
+        contentAlignment=Alignment.Center
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal=30.dp),
+            horizontalAlignment=Alignment.CenterHorizontally
+        ) {
+            Surface(
+                color=FqSurface,
+                shape=CircleShape,
+                border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+                modifier=Modifier.size(76.dp)
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(
+                        Icons.Default.SmartDisplay,
+                        null,
+                        tint=Color.White,
+                        modifier=Modifier.size(34.dp)
+                    )
+                }
+            }
+            Text(
+                title,
+                fontSize=20.sp,
+                fontWeight=FontWeight.Black,
+                modifier=Modifier.padding(top=16.dp)
+            )
+            Text(
+                body,
+                color=FqMuted,
+                fontSize=11.sp,
+                lineHeight=18.sp,
+                modifier=Modifier.padding(top=7.dp)
+            )
+            OutlinedButton(
+                onClick=onAction,
+                shape=RoundedCornerShape(16.dp),
+                border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+                modifier=Modifier.padding(top=16.dp)
+            ) {
+                Icon(Icons.Default.Refresh,null,modifier=Modifier.size(17.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(action)
+            }
+        }
+    }
 }
