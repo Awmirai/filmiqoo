@@ -1608,7 +1608,7 @@ private fun ClubRooms(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ClubCommentsSheet(
+fun ClubCommentsSheet(
     post:SocialPost,
     social:SocialRepository,
     loggedIn:Boolean,
