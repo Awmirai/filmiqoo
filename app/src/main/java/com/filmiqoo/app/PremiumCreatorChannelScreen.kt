@@ -196,7 +196,13 @@ fun PremiumCreatorChannelScreen(
             ) {
                 when(tab) {
                     0 -> CreatorReelsGrid(s.reels,onOpenClip,onMedia)
-                    1 -> CreatorPostsList(s.posts)
+                    1 -> CreatorPostsList(
+                        posts=s.posts,
+                        social=social,
+                        loggedIn=backend.session.isLoggedIn,
+                        onRequireAuth=onRequireAuth,
+                        onMedia=onMedia
+                    )
                     else -> CreatorAbout(
                         bio=p.bio,
                         verified=p.verified,
@@ -263,7 +269,13 @@ fun PremiumCreatorChannelScreen(
             ) {
                 when(tab) {
                     0 -> CreatorReelsGrid(s.reels,onOpenClip,onMedia)
-                    1 -> CreatorPostsList(s.posts)
+                    1 -> CreatorPostsList(
+                        posts=s.posts,
+                        social=social,
+                        loggedIn=backend.session.isLoggedIn,
+                        onRequireAuth=onRequireAuth,
+                        onMedia=onMedia
+                    )
                     2 -> ChannelRoomsList(s.rooms,onOpenRoom)
                     else -> CreatorAbout(
                         bio=p.bio,
@@ -564,11 +576,31 @@ private fun CreatorReelsGrid(
 }
 
 @Composable
-private fun CreatorPostsList(posts: List<SocialPost>) {
+private fun CreatorPostsList(
+    posts: List<SocialPost>,
+    social: SocialRepository,
+    loggedIn: Boolean,
+    onRequireAuth: () -> Unit,
+    onMedia: (MediaItem) -> Unit
+) {
     if(posts.isEmpty()) {
-        PremiumEmptyState(Icons.Default.DynamicFeed,"هنوز پستی نیست","پست‌های منتشرشده اینجا نمایش داده می‌شن.")
+        PremiumEmptyState(
+            Icons.Default.DynamicFeed,
+            "هنوز پستی نیست",
+            "پست‌های منتشرشده اینجا نمایش داده می‌شن."
+        )
         return
     }
+
+    val scope=rememberCoroutineScope()
+    val liked=remember { mutableStateMapOf<String,Boolean>() }
+    val saved=remember { mutableStateMapOf<String,Boolean>() }
+    val likeDelta=remember { mutableStateMapOf<String,Long>() }
+    val saveDelta=remember { mutableStateMapOf<String,Long>() }
+    val commentDelta=remember { mutableStateMapOf<String,Long>() }
+    val likeBusy=remember { mutableStateMapOf<String,Boolean>() }
+    val saveBusy=remember { mutableStateMapOf<String,Boolean>() }
+    var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
 
     LazyColumn(
         contentPadding=PaddingValues(12.dp),
@@ -576,7 +608,18 @@ private fun CreatorPostsList(posts: List<SocialPost>) {
     ) {
         items(posts,key={it.id}) { post ->
             var reveal by remember(post.id) { mutableStateOf(!post.spoiler) }
-            Surface(color=FqSurface,shape=RoundedCornerShape(20.dp),modifier=Modifier.fillMaxWidth()) {
+            val isLiked=liked[post.id] ?: post.likedByMe
+            val isSaved=saved[post.id] ?: post.savedByMe
+            val likes=(post.likes+(likeDelta[post.id] ?: 0L)).coerceAtLeast(0L)
+            val saves=(post.saves+(saveDelta[post.id] ?: 0L)).coerceAtLeast(0L)
+            val comments=(post.comments+(commentDelta[post.id] ?: 0L)).coerceAtLeast(0L)
+
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(20.dp),
+                border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+                modifier=Modifier.fillMaxWidth()
+            ) {
                 Column(Modifier.padding(14.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         RemoteImage(
@@ -585,11 +628,31 @@ private fun CreatorPostsList(posts: List<SocialPost>) {
                         )
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(post.author.displayName,fontSize=11.sp,fontWeight=FontWeight.Bold)
-                            Text("@"+post.author.username,color=FqMuted,fontSize=11.sp)
+                            Text(
+                                post.author.displayName,
+                                fontSize=11.sp,
+                                fontWeight=FontWeight.Bold
+                            )
+                            Text(
+                                "@"+post.author.username,
+                                color=FqMuted,
+                                fontSize=10.sp
+                            )
                         }
-                        Surface(color=FqSurface2,shape=RoundedCornerShape(8.dp)) {
-                            Text(post.type,fontSize=11.sp,color=FqGold,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp))
+                        Surface(
+                            color=FqSurface2,
+                            shape=RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                when(post.type.lowercase()) {
+                                    "review" -> "Review"
+                                    "poll" -> "Poll"
+                                    else -> "Post"
+                                },
+                                fontSize=9.sp,
+                                color=if(post.type.equals("review",true))FqGold else FqMuted,
+                                modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                            )
                         }
                     }
 
@@ -597,28 +660,193 @@ private fun CreatorPostsList(posts: List<SocialPost>) {
                         Surface(
                             color=FqDanger.copy(alpha=.12f),
                             shape=RoundedCornerShape(14.dp),
-                            modifier=Modifier.fillMaxWidth().padding(top=10.dp).clickable { reveal=true }
+                            modifier=Modifier.fillMaxWidth()
+                                .padding(top=10.dp)
+                                .clickable { reveal=true }
                         ) {
-                            Row(Modifier.padding(13.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Row(
+                                Modifier.padding(13.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
                                 Icon(Icons.Default.VisibilityOff,null,tint=FqDanger)
                                 Spacer(Modifier.width(7.dp))
-                                Text("Spoiler Shield • برای نمایش لمس کن",fontSize=11.sp)
+                                Text(
+                                    "Spoiler Shield • برای نمایش لمس کن",
+                                    fontSize=11.sp
+                                )
                             }
                         }
-                    } else {
-                        Text(post.body,fontSize=11.sp,lineHeight=19.sp,modifier=Modifier.padding(top=10.dp))
+                    } else if(post.body.isNotBlank()) {
+                        Text(
+                            post.body,
+                            fontSize=11.sp,
+                            lineHeight=19.sp,
+                            modifier=Modifier.padding(top=10.dp)
+                        )
                     }
 
-                    Row(Modifier.fillMaxWidth().padding(top=10.dp)) {
-                        Text("♥ "+compactCreatorCount(post.likes),color=FqMuted,fontSize=11.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("💬 "+compactCreatorCount(post.comments),color=FqMuted,fontSize=11.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("🔖 "+compactCreatorCount(post.saves),color=FqMuted,fontSize=11.sp)
+                    post.media?.asMediaItem()?.let { media ->
+                        Surface(
+                            color=FqSurface2,
+                            shape=RoundedCornerShape(16.dp),
+                            modifier=Modifier.fillMaxWidth()
+                                .padding(top=11.dp)
+                                .clickable { onMedia(media) }
+                        ) {
+                            Row(
+                                Modifier.padding(8.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                RemoteImage(
+                                    post.media.posterUrl?.takeIf(String::isNotBlank),
+                                    Modifier.size(48.dp,64.dp)
+                                        .clip(RoundedCornerShape(10.dp)),
+                                    ContentScale.Crop
+                                )
+                                Spacer(Modifier.width(9.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        media.title,
+                                        fontSize=11.sp,
+                                        fontWeight=FontWeight.Bold,
+                                        maxLines=2,
+                                        overflow=TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        "دیدن عنوان",
+                                        color=FqMuted,
+                                        fontSize=9.sp,
+                                        modifier=Modifier.padding(top=3.dp)
+                                    )
+                                }
+                                Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
+                            }
+                        }
+                    }
+
+                    Row(
+                        Modifier.fillMaxWidth().padding(top=9.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick={
+                                if(!loggedIn) {
+                                    onRequireAuth()
+                                } else if(likeBusy[post.id]!=true) {
+                                    val before=isLiked
+                                    liked[post.id]=!before
+                                    likeDelta[post.id]=(likeDelta[post.id] ?: 0L)+
+                                        if(!before)1L else -1L
+                                    likeBusy[post.id]=true
+                                    scope.launch {
+                                        runCatching { social.togglePostLike(post.id) }
+                                            .onSuccess { serverLiked ->
+                                                if(serverLiked != (liked[post.id] ?: false)) {
+                                                    val current=liked[post.id] ?: false
+                                                    liked[post.id]=serverLiked
+                                                    likeDelta[post.id]=
+                                                        (likeDelta[post.id] ?: 0L)+
+                                                        if(serverLiked && !current)1L else -1L
+                                                }
+                                            }
+                                            .onFailure {
+                                                val current=liked[post.id] ?: !before
+                                                liked[post.id]=before
+                                                if(current!=before) {
+                                                    likeDelta[post.id]=
+                                                        (likeDelta[post.id] ?: 0L)+
+                                                        if(before)1L else -1L
+                                                }
+                                            }
+                                        likeBusy.remove(post.id)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                if(isLiked)Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                null,
+                                tint=if(isLiked)FqDanger else FqMuted
+                            )
+                        }
+                        Text(
+                            compactCreatorCount(likes),
+                            color=if(isLiked)FqDanger else FqMuted,
+                            fontSize=9.sp
+                        )
+
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(onClick={commentsFor=post}) {
+                            Icon(Icons.Default.ChatBubbleOutline,null,tint=FqMuted)
+                        }
+                        Text(
+                            compactCreatorCount(comments),
+                            color=FqMuted,
+                            fontSize=9.sp
+                        )
+
+                        Spacer(Modifier.weight(1f))
+                        if(saves>0) {
+                            Text(
+                                compactCreatorCount(saves),
+                                color=FqMuted,
+                                fontSize=9.sp
+                            )
+                        }
+                        IconButton(
+                            onClick={
+                                if(!loggedIn) {
+                                    onRequireAuth()
+                                } else if(saveBusy[post.id]!=true) {
+                                    val before=isSaved
+                                    saved[post.id]=!before
+                                    saveDelta[post.id]=(saveDelta[post.id] ?: 0L)+
+                                        if(!before)1L else -1L
+                                    saveBusy[post.id]=true
+                                    scope.launch {
+                                        runCatching { social.togglePostSave(post.id) }
+                                            .onSuccess { result ->
+                                                val serverSaved=result.first
+                                                val current=saved[post.id] ?: false
+                                                if(serverSaved!=current) {
+                                                    saved[post.id]=serverSaved
+                                                }
+                                                saveDelta[post.id]=result.second-post.saves
+                                            }
+                                            .onFailure {
+                                                saved[post.id]=before
+                                                saveDelta[post.id]=
+                                                    (saveDelta[post.id] ?: 0L)+
+                                                    if(before)1L else -1L
+                                            }
+                                        saveBusy.remove(post.id)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                if(isSaved)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                null,
+                                tint=if(isSaved)Color.White else FqMuted
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    commentsFor?.let { post ->
+        ClubCommentsSheet(
+            post=post,
+            social=social,
+            loggedIn=loggedIn,
+            onRequireAuth=onRequireAuth,
+            onCommentAdded={
+                commentDelta[post.id]=(commentDelta[post.id] ?: 0L)+1L
+            },
+            onDismiss={commentsFor=null}
+        )
     }
 }
 
