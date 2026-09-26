@@ -501,6 +501,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onMedia={ overlay=OverlayRoute.Detail(it) },
                     onChat=openMediaRoom,
                     onWatchParty={ overlay=OverlayRoute.WatchParty(it) },
+                    onClip={ clipId ->
+                        overlay=null
+                        deepLinkReelId=clipId
+                        tab=1
+                    },
                     onPlay={ target ->
                         if (backend.session.isLoggedIn) {
                             overlay=OverlayRoute.Player(target)
