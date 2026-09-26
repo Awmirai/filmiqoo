@@ -14,6 +14,7 @@ type telegramIngestRequest struct {
 	ChatID int64 `json:"chatId"`
 	MessageID int64 `json:"messageId"`
 	FileID string `json:"fileId"`
+	FileUniqueID string `json:"fileUniqueId"`
 	FileNumericID int64 `json:"fileNumericId"`
 	FileName string `json:"fileName"`
 	FileSizeBytes int64 `json:"fileSizeBytes"`
@@ -36,6 +37,12 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 	if body.ChatID == 0 || body.MessageID == 0 || strings.TrimSpace(body.FileName) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error":"chatId, messageId and fileName are required"})
 		return
+	}
+
+	body.FileUniqueID = strings.TrimSpace(body.FileUniqueID)
+	body.StreamHash = strings.TrimSpace(body.StreamHash)
+	if body.StreamHash == "" && body.FileUniqueID != "" {
+		body.StreamHash = computeTGFSBHash(body.FileUniqueID, s.cfg.TelegramStreamHashLength)
 	}
 
 	parsed := ingest.ParseFileName(body.FileName)
