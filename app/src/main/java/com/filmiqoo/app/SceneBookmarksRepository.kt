@@ -19,6 +19,7 @@ data class SceneBookmark(
     fun asPlaybackTarget():PlaybackTarget = PlaybackTarget(
         mediaVersionId=mediaVersionId,
         title=title,
+        mediaTitleId=media?.backendId,
         subtitle=subtitle,
         posterUrl=posterUrl,
         startPositionMs=positionMs
