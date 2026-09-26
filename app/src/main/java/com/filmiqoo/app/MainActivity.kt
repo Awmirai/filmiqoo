@@ -791,6 +791,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             },
                             onNotifications={overlay=OverlayRoute.Notifications},
                             onReleases={overlay=OverlayRoute.Releases},
+                            onClips={tab=1},
+                            onClub={tab=2},
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)}
                         )
                         1 -> ConnectedExploreScreen(
