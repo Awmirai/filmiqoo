@@ -39,6 +39,10 @@ fi
 
 read -r -p "Telegram stream base URL [https://stream.filmiqo.com]: " TELEGRAM_STREAM_BASE_URL </dev/tty
 TELEGRAM_STREAM_BASE_URL="${TELEGRAM_STREAM_BASE_URL:-https://stream.filmiqo.com}"
+if [[ ! "$TELEGRAM_STREAM_BASE_URL" =~ ^https?:// ]]; then
+  echo "Telegram stream base URL must start with http:// or https://"
+  exit 1
+fi
 
 read -r -p "Telegram API ID (optional for now): " TELEGRAM_API_ID </dev/tty
 read -r -s -p "Telegram API hash (optional for now): " TELEGRAM_API_HASH </dev/tty

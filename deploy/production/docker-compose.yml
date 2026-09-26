@@ -34,7 +34,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: minio/minio:latest
     restart: unless-stopped
     command: server /data
     environment:
