@@ -302,9 +302,11 @@ private fun RealReelsPager(
                     )
                 },
                 onShare={
-                    shareText(
+                    FilmiqooDeepLinks.share(
                         context,
-                        "Filmiqoo Clip • "+(reel.media?.title ?: reel.caption.ifBlank{"Clip"})
+                        "Filmiqoo Clip • "+
+                            (reel.media?.title ?: reel.caption.ifBlank{"Clip"}),
+                        FilmiqooDeepLinks.reel(reel.id)
                     )
                 },
                 onMore={moreFor=reel}
