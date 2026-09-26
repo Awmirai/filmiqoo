@@ -322,6 +322,30 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         showSearch = false
     }
 
+    val openMediaRoom: (MediaItem)->Unit = { media ->
+        val mediaId=media.backendId
+        if(mediaId.isNullOrBlank()) {
+            overlay=null
+            tab=2
+        } else {
+            appScope.launch {
+                runCatching { social.roomForMedia(mediaId) }
+                    .onSuccess { room ->
+                        if(room!=null) {
+                            overlay=OverlayRoute.Room(room.id,room.name)
+                        } else {
+                            overlay=null
+                            tab=2
+                        }
+                    }
+                    .onFailure {
+                        overlay=null
+                        tab=2
+                    }
+            }
+        }
+    }
+
     BackHandler(enabled = overlay != null || showSearch) {
         closeOverlay()
     }
@@ -474,7 +498,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     store=store,
                     onBack=closeOverlay,
                     onMedia={ overlay=OverlayRoute.Detail(it) },
-                    onChat={ overlay=OverlayRoute.Chat("روم رسمی " + it.title,it) },
+                    onChat=openMediaRoom,
                     onWatchParty={ overlay=OverlayRoute.WatchParty(it) },
                     onPlay={ target ->
                         if (backend.session.isLoggedIn) {
@@ -554,13 +578,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onRequireAuth={overlay=OverlayRoute.Auth},
                     onMedia={overlay=OverlayRoute.Detail(it)},
                     onClose=closeOverlay
-                )
-                is OverlayRoute.Chat -> ChatRoomScreen(
-                    title=route.title,
-                    media=route.media,
-                    repository=repository,
-                    onBack=closeOverlay,
-                    onMedia={ overlay=OverlayRoute.Detail(it) }
                 )
                 is OverlayRoute.PersonPage -> PersonScreen(
                     personId=route.personId,
@@ -784,7 +801,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             initialReelId=deepLinkReelId,
                             onInitialReelConsumed={deepLinkReelId=null},
                             onMedia={overlay=OverlayRoute.Detail(it)},
-                            onChat={overlay=OverlayRoute.Chat("گفت‌وگو درباره " + it.title,it)},
+                            onChat=openMediaRoom,
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
