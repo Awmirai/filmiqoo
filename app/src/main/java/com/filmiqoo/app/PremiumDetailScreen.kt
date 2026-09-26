@@ -120,9 +120,9 @@ fun PremiumDetailScreen(
 
             val tabs=remember(d.media.type) {
                 if(d.media.type==MediaType.TV) {
-                    listOf("معرفی","قسمت‌ها","بازیگران","Community","اطلاعات")
+                    listOf("معرفی","قسمت‌ها","بازیگران","Club","اطلاعات")
                 } else {
-                    listOf("معرفی","بازیگران","Community","اطلاعات")
+                    listOf("معرفی","بازیگران","Club","اطلاعات")
                 }
             }
             var tab by remember(d.media.key) { mutableIntStateOf(0) }
@@ -902,7 +902,7 @@ private fun PremiumDetailActions(
         item {
             ActionTile(
                 icon=Icons.Default.Forum,
-                label="Community",
+                label="Club",
                 onClick=onChat
             )
         }
@@ -1774,7 +1774,7 @@ private fun PremiumCommunityPanel(
                     }
                     Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Community "+media.title,fontSize=15.sp,fontWeight=FontWeight.Bold)
+                        Text("Club "+media.title,fontSize=15.sp,fontWeight=FontWeight.Bold)
                         Text(
                             "امتیاز کاربران، Review، بحث و Watch Party",
                             color=FqMuted,
@@ -1822,7 +1822,7 @@ private fun PremiumCommunityPanel(
                 modifier=Modifier.fillMaxWidth().padding(top=12.dp)
             ) {
                 Text(
-                    "امتیاز Community وقتی این عنوان وارد Catalog واقعی Filmiqoo بشه فعال می‌شه.",
+                    "امتیاز Club وقتی این عنوان وارد Catalog واقعی Filmiqoo بشه فعال می‌شه.",
                     color=FqMuted,
                     fontSize=11.sp,
                     modifier=Modifier.padding(14.dp)
@@ -1853,7 +1853,7 @@ private fun PremiumCommunityPanel(
                     Column(Modifier.weight(1f)) {
                         Text(
                             if(ratings==null)"در حال دریافت امتیازها..."
-                            else ratings.count.toString()+" امتیاز Community",
+                            else ratings.count.toString()+" امتیاز Club",
                             fontSize=12.sp,
                             fontWeight=FontWeight.Bold
                         )
