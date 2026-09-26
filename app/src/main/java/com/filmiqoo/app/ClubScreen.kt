@@ -44,6 +44,7 @@ fun ClubScreen(
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
     val friendRepo=remember { FriendActivityRepository(backend) }
+    val pulseRepo=remember { PulseRepository(backend) }
 
     var tab by remember { mutableStateOf(ClubTab.FOR_YOU) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -56,6 +57,7 @@ fun ClubScreen(
     var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
     var creators by remember { mutableStateOf<List<SocialChannel>>(emptyList()) }
     var following by remember { mutableStateOf<List<FriendActivityItem>>(emptyList()) }
+    var pulse by remember { mutableStateOf<List<PulseTrendItem>>(emptyList()) }
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
 
     LaunchedEffect(tab,refresh,loggedIn) {
@@ -65,6 +67,7 @@ fun ClubScreen(
         runCatching {
             when(tab) {
                 ClubTab.FOR_YOU -> {
+                    pulse=runCatching { pulseRepo.trending() }.getOrDefault(emptyList())
                     val results=listOf(
                         runCatching { feed=social.feed() },
                         runCatching { stories=social.stories() },
@@ -116,6 +119,7 @@ fun ClubScreen(
             when(tab) {
                 ClubTab.FOR_YOU -> {
                     ClubForYou(
+                        pulse=pulse,
                         stories=stories,
                         clips=clips,
                         feed=feed,
@@ -268,6 +272,7 @@ private fun ClubHeader(
 
 @Composable
 private fun ClubForYou(
+    pulse:List<PulseTrendItem>,
     stories:List<SocialStory>,
     clips:List<ReelFeedItem>,
     feed:List<SocialPost>,
@@ -288,6 +293,7 @@ private fun ClubForYou(
     val context=LocalContext.current
 
     if(
+        pulse.isEmpty() &&
         stories.isEmpty() &&
         clips.isEmpty() &&
         feed.isEmpty() &&
@@ -314,6 +320,25 @@ private fun ClubForYou(
                     stories=stories,
                     onStory=onStory
                 )
+            }
+        }
+
+        if(pulse.isNotEmpty()) {
+            item {
+                ClubSectionTitle(
+                    title="الان زنده",
+                    subtitle="چیزهایی که همین لحظه بین فیلم‌بازها جریان دارن"
+                )
+            }
+            item {
+                LazyRow(
+                    contentPadding=PaddingValues(horizontal=16.dp),
+                    horizontalArrangement=Arrangement.spacedBy(10.dp)
+                ) {
+                    items(pulse,key={it.media.key}) { item ->
+                        ClubPulseCard(item) { onMedia(item.media) }
+                    }
+                }
             }
         }
 
@@ -1468,6 +1493,117 @@ private fun followingActionLabel(type:String):String = when(type.lowercase()) {
     "reel","clip" -> "یک Clip منتشر کرده"
     "watching" -> "الان در حال تماشاست"
     else -> "در Club فعال بوده"
+}
+
+private fun compactClubCount(value:Long):String = when {
+    value>=1_000_000 -> String.format(java.util.Locale.US,"%.1fM",value/1_000_000.0)
+    value>=1_000 -> String.format(java.util.Locale.US,"%.1fK",value/1_000.0)
+    else -> value.toString()
+}
+
+
+@Composable
+private fun ClubPulseCard(
+    item:PulseTrendItem,
+    onClick:()->Unit
+) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(22.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if(item.live) Color(0xFFFF5D6C).copy(alpha=.28f) else FqBorder
+        ),
+        modifier=Modifier.width(238.dp)
+            .height(138.dp)
+            .clickable { onClick() }
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            RemoteImage(
+                item.media.backdropPath ?: item.media.posterPath,
+                Modifier.fillMaxSize(),
+                ContentScale.Crop
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Black.copy(alpha=.90f),
+                            Color.Black.copy(alpha=.48f),
+                            Color.Transparent
+                        )
+                    )
+                )
+            )
+
+            Column(
+                Modifier.fillMaxSize().padding(13.dp),
+                verticalArrangement=Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    if(item.live) {
+                        Box(
+                            Modifier.size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF5D6C))
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "LIVE",
+                            color=Color(0xFFFF7180),
+                            fontSize=9.sp,
+                            fontWeight=FontWeight.Black
+                        )
+                    } else {
+                        Text(
+                            "PULSE",
+                            color=FqGold,
+                            fontSize=9.sp,
+                            fontWeight=FontWeight.Black
+                        )
+                    }
+                }
+
+                Column {
+                    Text(
+                        item.media.title,
+                        color=Color.White,
+                        fontSize=14.sp,
+                        fontWeight=FontWeight.Black,
+                        maxLines=2,
+                        overflow=TextOverflow.Ellipsis
+                    )
+                    Row(
+                        Modifier.padding(top=6.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        if(item.watchingNow>0) {
+                            Icon(
+                                Icons.Default.Visibility,
+                                null,
+                                tint=Color.White.copy(alpha=.74f),
+                                modifier=Modifier.size(13.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                item.watchingNow.toString()+" در حال تماشا",
+                                color=Color.White.copy(alpha=.78f),
+                                fontSize=9.sp
+                            )
+                        }
+                        if(item.reactions>0) {
+                            if(item.watchingNow>0) Spacer(Modifier.width(10.dp))
+                            Text(
+                                "🔥 "+compactClubCount(item.reactions),
+                                color=Color.White.copy(alpha=.78f),
+                                fontSize=9.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun compactClubCount(value:Long):String = when {
