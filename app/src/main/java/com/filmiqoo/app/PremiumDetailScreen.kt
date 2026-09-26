@@ -1498,6 +1498,7 @@ private fun PremiumSeriesPanel(
 
             EpisodeCard(
                 title=title,
+                mediaTitleId=mediaTitleId,
                 seasonNumber=season.number,
                 episode=ep,
                 nextSeasonNumber=next?.first,
@@ -1532,6 +1533,7 @@ private fun PremiumSeriesPanel(
 @Composable
 private fun EpisodeCard(
     title: String,
+    mediaTitleId: String?,
     seasonNumber: Int,
     episode: PlatformEpisode,
     nextSeasonNumber: Int?,
