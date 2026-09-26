@@ -85,6 +85,22 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
 
+    DisposableEffect(backend,context) {
+        val prefs=context.applicationContext.getSharedPreferences(
+            "filmiqoo_session_v1",
+            android.content.Context.MODE_PRIVATE
+        )
+        val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,key ->
+            if(key=="access_token" || key=="refresh_token") {
+                authenticated=backend.session.isLoggedIn
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
     LaunchedEffect(Unit) {
         telemetry.flushPendingCrash()
         telemetry.event(
