@@ -133,138 +133,65 @@ fun ConnectedProfileScreen(
                     }
                 }
 
-                item { SectionHeader(if(kidsMode)"Kids Center" else "مرکز حساب") }
+                item {
+                    SectionHeader(
+                        if(kidsMode)"Kids Center" else "فضای من",
+                        if(kidsMode)"پروفایل تماشا و دسترسی امن" else "چیزهایی که واقعاً هر روز لازم داری"
+                    )
+                }
                 item {
                     if(kidsMode) {
                         ProfileActionRow(
                             icon=Icons.Default.ExitToApp,
                             title="خروج از Kids Mode",
-                            subtitle="نیاز به تأیید والدین",
+                            subtitle="بازگشت امن با تأیید والدین",
                             onClick=onViewerProfiles
                         )
                     } else {
                         ProfileActionRow(
-                            icon=Icons.Default.SwitchAccount,
-                            title="پروفایل‌های تماشا",
-                            subtitle="Multi‑Profile، Kids Mode و Library جدا",
-                            onClick=onViewerProfiles
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.AdminPanelSettings,
-                            title="کنترل والدین",
-                            subtitle="Parental PIN و محافظت خروج از Kids",
-                            onClick=onParentalControls
-                        )
-                        ProfileActionRow(
                             icon=Icons.Default.Edit,
                             title="ویرایش پروفایل",
-                            subtitle="Avatar، Cover، Username، Bio و حریم خصوصی",
+                            subtitle="عکس، نام، Bio و حریم خصوصی",
                             onClick=onEditProfile
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.AutoAwesome,
-                            title="Film DNA",
-                            subtitle="سلیقه واقعی، ژانرها، زبان‌ها و Badgeهای تماشای تو",
-                            onClick=onFilmDna
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.MilitaryTech,
-                            title="Reputation و Badgeها",
-                            subtitle="اعتبار عمومی بر اساس Review، Collection و Community",
-                            onClick={onReputation(s.profile.id)}
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.EventAvailable,
-                            title="تقویم سریال‌های من",
-                            subtitle="قسمت‌های آینده و اعلان آماده‌شدن نسخه پخش",
-                            onClick=onSeriesCalendar
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.CollectionsBookmark,
-                            title="Community Lists",
-                            subtitle="Collectionهای عمومی فیلم‌بازها و Creatorها",
-                            onClick=onSocialCollections
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.Analytics,
-                            title="Creator Studio",
-                            subtitle="Analytics، Reels، Stories و عملکرد کانال‌ها",
-                            onClick=onCreatorStudio
                         )
                         ProfileActionRow(
                             icon=Icons.Default.MarkChatUnread,
                             title="پیام‌ها",
-                            subtitle="DM، گروه‌ها، Roomها و پیام‌های خوانده‌نشده",
+                            subtitle="DM و گفت‌وگوهای واقعی تو",
                             onClick=onInbox
                         )
                         ProfileActionRow(
-                            icon=Icons.Default.Groups,
-                            title="Community و Creator",
-                            subtitle="روم‌ها، کانال‌ها و فعالیت اجتماعی",
-                            onClick=onCommunity
+                            icon=Icons.Default.AutoAwesome,
+                            title="Film DNA",
+                            subtitle="سلیقه سینمایی، ژانرها و الگوی تماشای تو",
+                            onClick=onFilmDna
                         )
                         ProfileActionRow(
-                            icon=Icons.Default.CollectionsBookmark,
-                            title="ذخیره‌های اجتماعی",
-                            subtitle="Saved Postها و Saved Reelها در یک جا",
-                            onClick=onSocialSaves
+                            icon=Icons.Default.Groups,
+                            title="Club",
+                            subtitle="پست‌ها، Roomها و آدم‌هایی که دنبال می‌کنی",
+                            onClick=onCommunity
                         )
                     }
 
                     ProfileActionRow(
                         icon=Icons.Default.VideoLibrary,
-                        title="Library",
-                        subtitle="Favorites، Watchlist و Collectionهای شخصی",
+                        title="کتابخانه",
+                        subtitle="Favorites، Watchlist و لیست‌های شخصی",
                         onClick=onLibrary
                     )
                     ProfileActionRow(
-                        icon=Icons.Default.History,
-                        title="تاریخچه تماشا",
-                        subtitle="Resume، کامل‌شده‌ها و مدیریت تاریخچه",
-                        onClick=onHistory
-                    )
-                    ProfileActionRow(
                         icon=Icons.Default.Download,
-                        title="دانلودهای آفلاین",
-                        subtitle="صف، Pause/Resume، Retry و پخش بدون اینترنت",
+                        title="دانلودها",
+                        subtitle="محتوای آفلاین و صف دانلود",
                         onClick=onDownloads
                     )
 
                     if(!kidsMode) {
                         ProfileActionRow(
-                            icon=Icons.Default.Subtitles,
-                            title="زبان، دوبله و زیرنویس",
-                            subtitle="ترجیحات پخش فارسی و انگلیسی",
-                            onClick=onSettings
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.PersonAddAlt1,
-                            title="درخواست‌های Follow",
-                            subtitle="Accept یا Decline درخواست‌های حساب خصوصی",
-                            onClick=onFollowRequests
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.Star,
-                            title="Close Friends",
-                            subtitle="Audience خصوصی Story برای آدم‌های منتخب",
-                            onClick=onCloseFriends
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.Shield,
-                            title="مرکز ایمنی",
-                            subtitle="Block، Mute و مدیریت تجربه اجتماعی",
-                            onClick=onSafety
-                        )
-                        ProfileActionRow(
-                            icon=Icons.Default.Security,
-                            title="امنیت و دستگاه‌ها",
-                            subtitle="Sessionهای فعال و خروج از دستگاه‌های دیگر",
-                            onClick=onSecurity
-                        )
-                        ProfileActionRow(
                             icon=Icons.Default.Settings,
                             title="تنظیمات",
-                            subtitle="پخش، دانلود، زیرنویس، اعلان‌ها و حریم خصوصی",
+                            subtitle="اکانت، پخش، امنیت، والدین و حریم خصوصی",
                             onClick=onSettings
                         )
                     }
