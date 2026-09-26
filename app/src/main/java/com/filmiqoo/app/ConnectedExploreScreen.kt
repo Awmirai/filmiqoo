@@ -133,6 +133,10 @@ private fun RealReelsPager(
     val liked=remember { mutableStateMapOf<String,Boolean>() }
     val saved=remember { mutableStateMapOf<String,Boolean>() }
     val followed=remember { mutableStateMapOf<String,Boolean>() }
+    val followPending=remember { mutableStateMapOf<String,Boolean>() }
+    val likeBusy=remember { mutableStateMapOf<String,Boolean>() }
+    val saveBusy=remember { mutableStateMapOf<String,Boolean>() }
+    val followBusy=remember { mutableStateMapOf<String,Boolean>() }
     val revealed=remember { mutableStateMapOf<String,Boolean>() }
     var commentsFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var safetyFor by remember { mutableStateOf<ReelFeedItem?>(null) }
@@ -223,32 +227,57 @@ private fun RealReelsPager(
                 active=isCurrent,
                 player=if(isCurrent)player else null,
                 revealed=revealed[reel.id] == true || !reel.spoiler,
-                liked=liked[reel.id] == true,
-                saved=saved[reel.id] == true,
-                followed=followed[reel.author.id] == true,
+                liked=liked[reel.id] ?: reel.likedByMe,
+                saved=saved[reel.id] ?: reel.savedByMe,
+                followed=followed[reel.author.id] ?: reel.followingAuthor,
+                followPending=followPending[reel.author.id] ?: reel.followPending,
                 onReveal={
                     revealed[reel.id]=true
                     if(isCurrent) player.play()
                 },
                 onLike={
-                    if(!loggedIn) onRequireAuth()
-                    else scope.launch {
-                        runCatching { social.toggleReelLike(reel.id) }
-                            .onSuccess { liked[reel.id]=it }
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else if(likeBusy[reel.id]!=true) {
+                        val previous=liked[reel.id] ?: reel.likedByMe
+                        liked[reel.id]=!previous
+                        likeBusy[reel.id]=true
+                        scope.launch {
+                            runCatching { social.toggleReelLike(reel.id) }
+                                .onSuccess { liked[reel.id]=it }
+                                .onFailure { liked[reel.id]=previous }
+                            likeBusy.remove(reel.id)
+                        }
                     }
                 },
                 onSave={
-                    if(!loggedIn) onRequireAuth()
-                    else scope.launch {
-                        runCatching { social.toggleReelSave(reel.id) }
-                            .onSuccess { saved[reel.id]=it }
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else if(saveBusy[reel.id]!=true) {
+                        val previous=saved[reel.id] ?: reel.savedByMe
+                        saved[reel.id]=!previous
+                        saveBusy[reel.id]=true
+                        scope.launch {
+                            runCatching { social.toggleReelSave(reel.id) }
+                                .onSuccess { saved[reel.id]=it }
+                                .onFailure { saved[reel.id]=previous }
+                            saveBusy.remove(reel.id)
+                        }
                     }
                 },
                 onFollow={
-                    if(!loggedIn) onRequireAuth()
-                    else scope.launch {
-                        runCatching { social.toggleUserFollow(reel.author.id) }
-                            .onSuccess { followed[reel.author.id]=it }
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else if(followBusy[reel.author.id]!=true) {
+                        followBusy[reel.author.id]=true
+                        scope.launch {
+                            runCatching { social.toggleUserFollowState(reel.author.id) }
+                                .onSuccess {
+                                    followed[reel.author.id]=it.following
+                                    followPending[reel.author.id]=it.pending
+                                }
+                            followBusy.remove(reel.author.id)
+                        }
                     }
                 },
                 onComment={commentsFor=reel},
@@ -398,6 +427,7 @@ private fun ReelVideoPage(
     liked: Boolean,
     saved: Boolean,
     followed: Boolean,
+    followPending: Boolean,
     onReveal: () -> Unit,
     onLike: () -> Unit,
     onSave: () -> Unit,
@@ -498,9 +528,22 @@ private fun ReelVideoPage(
                     onClick=onFollow,
                     contentPadding=PaddingValues(horizontal=10.dp,vertical=2.dp),
                     modifier=Modifier.height(30.dp),
-                    colors=ButtonDefaults.outlinedButtonColors(contentColor=if(followed)FqGold else Color.White)
+                    colors=ButtonDefaults.outlinedButtonColors(
+                        contentColor=when {
+                            followed -> FqGold
+                            followPending -> FqGoldSoft
+                            else -> Color.White
+                        }
+                    )
                 ) {
-                    Text(if(followed)"دنبال می‌کنی" else "دنبال",fontSize=11.sp)
+                    Text(
+                        when {
+                            followed -> "دنبال می‌کنی"
+                            followPending -> "درخواست شد"
+                            else -> "دنبال"
+                        },
+                        fontSize=11.sp
+                    )
                 }
             }
 
@@ -552,7 +595,16 @@ private fun ReelVideoPage(
             ReelCircleAction(
                 icon=Icons.Default.Favorite,
                 tint=if(liked)FqDanger else Color.White,
-                text=compactCount(reel.likes + if(liked)1 else 0),
+                text=compactCount(
+                    (
+                        reel.likes+
+                            when {
+                                liked && !reel.likedByMe -> 1
+                                !liked && reel.likedByMe -> -1
+                                else -> 0
+                            }
+                    ).coerceAtLeast(0)
+                ),
                 onClick=onLike
             )
             ReelCircleAction(
@@ -564,7 +616,16 @@ private fun ReelVideoPage(
             ReelCircleAction(
                 icon=Icons.Default.Bookmark,
                 tint=if(saved)FqGold else Color.White,
-                text=compactCount(reel.saves + if(saved)1 else 0),
+                text=compactCount(
+                    (
+                        reel.saves+
+                            when {
+                                saved && !reel.savedByMe -> 1
+                                !saved && reel.savedByMe -> -1
+                                else -> 0
+                            }
+                    ).coerceAtLeast(0)
+                ),
                 onClick=onSave
             )
             ReelCircleAction(
