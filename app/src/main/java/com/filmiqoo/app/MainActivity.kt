@@ -752,11 +752,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         selected=tab,
                         kidsMode=activeViewer?.kidsMode==true,
                         onSelected={ index ->
-                            if(index==2) {
-                                overlay=OverlayRoute.Create
-                            } else {
-                                tab=index
-                            }
+                            tab=index
                         }
                     )
                 }
@@ -792,16 +788,25 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
-                        3 -> CommunityScreen(
+                        2 -> FilmiqooClubScreen(
                             social=social,
-                            backend=backend,
                             loggedIn=backend.session.isLoggedIn,
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
+                            onMedia={overlay=OverlayRoute.Detail(it)},
+                            onOpenClips={tab=1},
+                            onCreate={overlay=OverlayRoute.Create},
                             onInbox={overlay=OverlayRoute.Inbox},
-                            onFriendActivity={overlay=OverlayRoute.FriendActivity},
                             onRequireAuth={overlay=OverlayRoute.Auth}
+                        )
+                        3 -> LibraryScreen(
+                            backend=backend,
+                            repository=repository,
+                            onBack={tab=0},
+                            onMedia={overlay=OverlayRoute.Detail(it)},
+                            onPlay={overlay=OverlayRoute.Player(it)},
+                            showBack=false
                         )
                         else -> {
                             if(backend.session.isLoggedIn) {
@@ -811,7 +816,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     kidsMode=activeViewer?.kidsMode==true,
                                     onMedia={overlay=OverlayRoute.Detail(it)},
                                     onPlay={overlay=OverlayRoute.Player(it)},
-                                    onCommunity={tab=3},
+                                    onCommunity={tab=2},
                                     onDownloads={overlay=OverlayRoute.Downloads},
                                     onLibrary={overlay=OverlayRoute.Library},
                                     onSocialSaves={overlay=OverlayRoute.SocialSaves},
@@ -873,15 +878,15 @@ private fun FilmiqooBottomBar(
     val entries=if(kidsMode) {
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.PersonOutline,"پروفایل",4)
+            Triple(Icons.Default.PersonOutline,"من",4)
         )
     } else {
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.Explore,"اکسپلور",1),
-            Triple(Icons.Default.Add,"ساخت",2),
-            Triple(Icons.Default.Groups,"اجتماعی",3),
-            Triple(Icons.Default.PersonOutline,"پروفایل",4)
+            Triple(Icons.Default.Explore,"کشف",1),
+            Triple(Icons.Default.Groups,"کلاب",2),
+            Triple(Icons.Default.VideoLibrary,"کتابخانه",3),
+            Triple(Icons.Default.PersonOutline,"من",4)
         )
     }
 
@@ -904,64 +909,45 @@ private fun FilmiqooBottomBar(
         ) {
             entries.forEach { item ->
                 val active=selected==item.third
-                if(item.third==2) {
-                    Surface(
-                        color=FqGold,
-                        contentColor=Color(0xFF171000),
-                        shape=CircleShape,
-                        shadowElevation=7.dp,
-                        modifier=Modifier.size(54.dp)
-                            .clickable { onSelected(2) }
+                val itemColor=if(active) FqGold else FqMuted
+                Surface(
+                    color=Color.Transparent,
+                    contentColor=itemColor,
+                    shape=RoundedCornerShape(18.dp),
+                    modifier=Modifier.weight(1f)
+                        .heightIn(min=56.dp)
+                        .clickable { onSelected(item.third) }
+                ) {
+                    Column(
+                        Modifier.fillMaxSize()
+                            .padding(horizontal=4.dp,vertical=7.dp),
+                        horizontalAlignment=Alignment.CenterHorizontally,
+                        verticalArrangement=Arrangement.Center
                     ) {
-                        Box(contentAlignment=Alignment.Center) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription="ساخت محتوا",
-                                modifier=Modifier.size(27.dp)
-                            )
-                        }
-                    }
-                } else {
-                    val itemColor=if(active) FqGold else FqMuted
-                    Surface(
-                        color=Color.Transparent,
-                        contentColor=itemColor,
-                        shape=RoundedCornerShape(18.dp),
-                        modifier=Modifier.weight(1f)
-                            .heightIn(min=56.dp)
-                            .clickable { onSelected(item.third) }
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize()
-                                .padding(horizontal=4.dp,vertical=7.dp),
-                            horizontalAlignment=Alignment.CenterHorizontally,
-                            verticalArrangement=Arrangement.Center
+                        Box(
+                            Modifier.height(28.dp)
+                                .widthIn(min=42.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if(active) FqGold.copy(alpha=.12f)
+                                    else Color.Transparent
+                                ),
+                            contentAlignment=Alignment.Center
                         ) {
-                            Box(
-                                Modifier.height(28.dp)
-                                    .widthIn(min=42.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(
-                                        if(active) FqGold.copy(alpha=.12f)
-                                        else Color.Transparent
-                                    ),
-                                contentAlignment=Alignment.Center
-                            ) {
-                                Icon(
-                                    item.first,
-                                    contentDescription=item.second,
-                                    tint=itemColor,
-                                    modifier=Modifier.size(22.dp)
-                                )
-                            }
-                            Text(
-                                item.second,
-                                color=itemColor,
-                                style=MaterialTheme.typography.labelSmall,
-                                maxLines=1,
-                                modifier=Modifier.padding(top=2.dp)
+                            Icon(
+                                item.first,
+                                contentDescription=item.second,
+                                tint=itemColor,
+                                modifier=Modifier.size(22.dp)
                             )
                         }
+                        Text(
+                            item.second,
+                            color=itemColor,
+                            style=MaterialTheme.typography.labelSmall,
+                            maxLines=1,
+                            modifier=Modifier.padding(top=2.dp)
+                        )
                     }
                 }
             }
