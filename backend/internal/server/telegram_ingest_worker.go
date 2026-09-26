@@ -23,6 +23,7 @@ func telegramSourceFingerprint(body telegramIngestRequest) string {
 		body.ChatID,
 		body.MessageID,
 		strings.TrimSpace(body.FileID),
+		strings.TrimSpace(body.FileUniqueID),
 		body.FileNumericID,
 		strings.TrimSpace(body.FileName),
 		body.FileSizeBytes,
