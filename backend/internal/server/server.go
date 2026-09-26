@@ -12,7 +12,6 @@ import (
 	"github.com/Awmirai/filmiqoo/backend/internal/config"
 	"github.com/Awmirai/filmiqoo/backend/internal/objectstore"
 	"github.com/Awmirai/filmiqoo/backend/internal/tmdb"
-	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
@@ -169,7 +168,6 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/watch-parties/{id}", s.watchPartyDetail)
 		r.Get("/live-events", s.liveEvents)
 		r.Get("/live-events/{id}", s.liveEventDetail)
-		r.Get("/realtime", s.realtime)
 		r.Get("/playback/{versionID}", s.playback)
 		r.Get("/media/{key}", s.mediaRedirect)
 
@@ -575,20 +573,6 @@ func (s *Server) channels(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items":items})
-}
-
-func (s *Server) realtime(w http.ResponseWriter, r *http.Request) {
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns:[]string{"*"}})
-	if err != nil { return }
-	defer conn.CloseNow()
-
-	_ = conn.Write(r.Context(), websocket.MessageText, []byte("{\"type\":\"connected\",\"service\":\"filmiqoo-realtime\"}"))
-	for {
-		typ, data, err := conn.Read(r.Context())
-		if err != nil { return }
-		if typ != websocket.MessageText { continue }
-		if err := conn.Write(r.Context(), websocket.MessageText, data); err != nil { return }
-	}
 }
 
 func (s *Server) likeReel(w http.ResponseWriter, r *http.Request) {
