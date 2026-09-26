@@ -134,6 +134,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/catalog/{id}/pulse", s.mediaPulse)
 		r.Get("/pulse/trending", s.trendingMediaPulse)
 		r.Get("/catalog/{id}/reviews", s.mediaReviews)
+		r.Get("/catalog/{id}/clips", s.mediaClips)
 		r.With(
 			s.authRateLimit(
 				"public-search",
