@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import android.os.Environment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -296,6 +297,16 @@ class BackendRepository(context: Context) {
             }
         }
         session.clear()
+    }
+
+    suspend fun tmdbMetadata(path: String, params: Map<String, String> = emptyMap()): JSONObject = withContext(Dispatchers.IO) {
+        val url = (session.baseUrl + "/v1/tmdb").toHttpUrl().newBuilder()
+            .addQueryParameter("path", path)
+            .apply {
+                params.forEach { (key, value) -> addQueryParameter(key, value) }
+            }
+            .build()
+        executeJson(Request.Builder().url(url).get(), authorized = false)
     }
 
     suspend fun catalogHome(): List<MediaItem> = withContext(Dispatchers.IO) {
