@@ -402,6 +402,7 @@ func (s *Server) playbackContext(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w,http.StatusOK,map[string]any{
 		"mediaVersionId":versionID,
+		"mediaTitleId":mediaID,
 		"title":displayTitle,
 		"subtitle":subtitle,
 		"posterUrl":poster,
