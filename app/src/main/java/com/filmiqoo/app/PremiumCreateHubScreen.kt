@@ -44,11 +44,11 @@ private enum class CreateKind(
     val subtitle:String
 ) {
     STORY("Story","عکس، ویدیو یا متن ۲۴ ساعته"),
-    REEL("Reel","ویدیوی کوتاه برای Explore"),
+    REEL("Clip","ویدیوی کوتاه برای Club"),
     POST("Post","پست Community"),
     REVIEW("Review","نقد فیلم یا سریال"),
     POLL("Poll","نظرسنجی واقعی"),
-    CHANNEL("Channel","ساخت Community اختصاصی")
+    CHANNEL("Channel","ساخت فضای Creator یا Community")
 }
 
 private data class CreateDraft(
@@ -170,6 +170,7 @@ fun PremiumCreateHubScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
     var draftSaved by remember { mutableStateOf(false) }
+    var showAdvancedKinds by remember { mutableStateOf(false) }
 
     val picker=rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -225,8 +226,8 @@ fun PremiumCreateHubScreen(
                         Icon(Icons.Default.Close,null)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("Filmiqoo Studio",fontSize=23.sp,fontWeight=FontWeight.Black)
-                        Text("ساخت و انتشار محتوا",color=FqMuted,fontSize=11.sp)
+                        Text("ساخت محتوا",fontSize=23.sp,fontWeight=FontWeight.Black)
+                        Text("یک چیز خوب برای Club بساز",color=FqMuted,fontSize=11.sp)
                     }
                     TextButton(
                         onClick={
@@ -252,40 +253,84 @@ fun PremiumCreateHubScreen(
         }
 
         item {
-            LazyRow(
-                contentPadding=PaddingValues(horizontal=14.dp),
-                horizontalArrangement=Arrangement.spacedBy(8.dp)
-            ) {
-                items(CreateKind.entries) { item ->
-                    FilterChip(
-                        selected=kind==item,
-                        onClick={
-                            kind=item
-                            error=null
-                            if(item==CreateKind.REEL || item==CreateKind.STORY) {
-                                picker.launch(
-                                    PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
+            Column(Modifier.fillMaxWidth()) {
+                LazyRow(
+                    contentPadding=PaddingValues(horizontal=14.dp),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        listOf(
+                            CreateKind.POST,
+                            CreateKind.REVIEW,
+                            CreateKind.REEL,
+                            CreateKind.STORY
+                        )
+                    ) { item ->
+                        FilterChip(
+                            selected=kind==item,
+                            onClick={
+                                kind=item
+                                error=null
+                                if(item==CreateKind.REEL || item==CreateKind.STORY) {
+                                    picker.launch(
+                                        PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                                        )
                                     )
+                                }
+                            },
+                            label={Text(item.label,fontSize=11.sp)},
+                            leadingIcon={
+                                Icon(
+                                    when(item) {
+                                        CreateKind.STORY -> Icons.Default.AutoStories
+                                        CreateKind.REEL -> Icons.Default.SmartDisplay
+                                        CreateKind.POST -> Icons.Default.PostAdd
+                                        CreateKind.REVIEW -> Icons.Default.RateReview
+                                        else -> Icons.Default.Add
+                                    },
+                                    null,
+                                    modifier=Modifier.size(16.dp)
                                 )
                             }
-                        },
-                        label={Text(item.label,fontSize=11.sp)},
-                        leadingIcon={
-                            Icon(
-                                when(item) {
-                                    CreateKind.STORY -> Icons.Default.AutoStories
-                                    CreateKind.REEL -> Icons.Default.VideoLibrary
-                                    CreateKind.POST -> Icons.Default.PostAdd
-                                    CreateKind.REVIEW -> Icons.Default.RateReview
-                                    CreateKind.POLL -> Icons.Default.Poll
-                                    CreateKind.CHANNEL -> Icons.Default.Campaign
+                        )
+                    }
+                    item {
+                        AssistChip(
+                            onClick={showAdvancedKinds=!showAdvancedKinds},
+                            label={Text("بیشتر",fontSize=11.sp)},
+                            leadingIcon={
+                                Icon(
+                                    if(showAdvancedKinds)Icons.Default.ExpandLess else Icons.Default.MoreHoriz,
+                                    null,
+                                    modifier=Modifier.size(16.dp)
+                                )
+                            }
+                        )
+                    }
+                }
+
+                if(showAdvancedKinds || kind==CreateKind.POLL || kind==CreateKind.CHANNEL) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .padding(start=14.dp,end=14.dp,top=8.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            CreateKind.POLL to Icons.Default.Poll,
+                            CreateKind.CHANNEL to Icons.Default.Campaign
+                        ).forEach { (item,icon) ->
+                            FilterChip(
+                                selected=kind==item,
+                                onClick={
+                                    kind=item
+                                    error=null
                                 },
-                                null,
-                                modifier=Modifier.size(16.dp)
+                                label={Text(item.label,fontSize=11.sp)},
+                                leadingIcon={Icon(icon,null,modifier=Modifier.size(16.dp))}
                             )
                         }
-                    )
+                    }
                 }
             }
         }
@@ -301,7 +346,7 @@ fun PremiumCreateHubScreen(
                         Icon(
                             when(kind) {
                                 CreateKind.STORY -> Icons.Default.AutoStories
-                                CreateKind.REEL -> Icons.Default.VideoLibrary
+                                CreateKind.REEL -> Icons.Default.SmartDisplay
                                 CreateKind.POST -> Icons.Default.PostAdd
                                 CreateKind.REVIEW -> Icons.Default.RateReview
                                 CreateKind.POLL -> Icons.Default.Poll
