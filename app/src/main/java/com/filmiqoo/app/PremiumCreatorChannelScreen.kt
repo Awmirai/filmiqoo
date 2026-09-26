@@ -155,7 +155,7 @@ fun PremiumCreatorChannelScreen(
                 followPending=followPending,
                 followBusy=followBusy,
                 tab=tab,
-                tabs=listOf("Reels","پست‌ها","درباره"),
+                tabs=listOf("Clips","پست‌ها","درباره"),
                 onBack=onBack,
                 onRefresh={refresh++},
                 onShare={
@@ -226,7 +226,7 @@ fun PremiumCreatorChannelScreen(
                 followPending=false,
                 followBusy=followBusy,
                 tab=tab,
-                tabs=listOf("Reels","پست‌ها","Stories","اعضا","چت"),
+                tabs=listOf("Clips","پست‌ها","Roomها","درباره"),
                 onBack=onBack,
                 onRefresh={refresh++},
                 onShare={
@@ -264,9 +264,15 @@ fun PremiumCreatorChannelScreen(
                 when(tab) {
                     0 -> CreatorReelsGrid(s.reels,onOpenReels,onMedia)
                     1 -> CreatorPostsList(s.posts)
-                    2 -> ChannelStoriesGrid(s.stories,onStory)
-                    3 -> ChannelMembersList(s.members)
-                    else -> ChannelRoomsList(s.rooms,onOpenRoom)
+                    2 -> ChannelRoomsList(s.rooms,onOpenRoom)
+                    else -> CreatorAbout(
+                        bio=p.bio,
+                        verified=p.verified,
+                        privacy=p.visibility,
+                        members=s.members,
+                        rooms=s.rooms,
+                        onOpenRoom=onOpenRoom
+                    )
                 }
             }
         }
@@ -765,6 +771,17 @@ private fun CreatorAbout(
                         MetricPill(Icons.Default.Verified,if(verified)"تأییدشده" else "عادی")
                         Spacer(Modifier.width(7.dp))
                         MetricPill(Icons.Default.Public,privacy)
+                    }
+                    if(members.isNotEmpty() || rooms.isNotEmpty()) {
+                        HorizontalDivider(color=FqSurface3,modifier=Modifier.padding(vertical=12.dp))
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            if(members.isNotEmpty()) {
+                                MetricPill(Icons.Default.Groups,compactCreatorCount(members.size.toLong())+" تیم")
+                            }
+                            if(rooms.isNotEmpty()) {
+                                MetricPill(Icons.Default.Forum,compactCreatorCount(rooms.size.toLong())+" Room")
+                            }
+                        }
                     }
                 }
             }
