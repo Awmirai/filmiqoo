@@ -844,11 +844,29 @@ private fun ClubPostCard(
                         )
                     }
                 }
-                Text(
-                    "@"+post.author.username,
-                    color=FqMuted,
-                    fontSize=9.sp
-                )
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Text(
+                        "@"+post.author.username,
+                        color=FqMuted,
+                        fontSize=9.sp
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        when(post.type.lowercase()) {
+                            "review" -> "Review"
+                            "poll" -> "Poll"
+                            "announcement" -> "Announcement"
+                            else -> "Post"
+                        },
+                        color=when(post.type.lowercase()) {
+                            "review" -> FqGold
+                            "poll" -> FqBlue
+                            else -> FqMuted
+                        },
+                        fontSize=8.sp,
+                        fontWeight=FontWeight.Bold
+                    )
+                }
             }
         }
 
