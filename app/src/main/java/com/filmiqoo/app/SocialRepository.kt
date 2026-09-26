@@ -251,6 +251,7 @@ data class ReelFeedItem(
     val shares: Long,
     val views: Long,
     val spoiler: Boolean,
+    val likedByMe: Boolean = false,
     val savedByMe: Boolean = false,
     val author: SocialAuthor,
     val media: ReelMediaRef?
@@ -298,6 +299,7 @@ class SocialRepository(
                         shares=x.optLong("shares"),
                         views=x.optLong("views"),
                         spoiler=x.optBoolean("spoiler"),
+                        likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=x.optBoolean("savedByMe"),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
                         media=media
@@ -337,6 +339,7 @@ class SocialRepository(
             shares=x.optLong("shares"),
             views=x.optLong("views"),
             spoiler=x.optBoolean("spoiler"),
+            likedByMe=x.optBoolean("likedByMe"),
             savedByMe=x.optBoolean("savedByMe"),
             author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
             media=media
@@ -438,6 +441,7 @@ class SocialRepository(
                         shares=x.optLong("shares"),
                         views=x.optLong("views"),
                         spoiler=x.optBoolean("spoiler"),
+                        likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=true,
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
                         media=media
