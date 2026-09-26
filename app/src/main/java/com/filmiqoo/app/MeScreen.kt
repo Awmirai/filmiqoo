@@ -547,7 +547,7 @@ private fun MeTabs(
 ) {
     Row(
         Modifier.fillMaxWidth()
-            .padding(horizontal=16.dp,bottom=12.dp)
+            .padding(start=16.dp,end=16.dp,bottom=12.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(FqSurface)
             .padding(4.dp),
@@ -793,7 +793,7 @@ private fun MeSectionTitle(
     subtitle:String
 ) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal=16.dp,top=20.dp,bottom=10.dp)
+        Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=20.dp,bottom=10.dp)
     ) {
         Text(title,fontSize=18.sp,fontWeight=FontWeight.Black)
         Text(subtitle,color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=2.dp))
@@ -849,7 +849,7 @@ private fun MeQuickTools(
     onViewerProfiles:()->Unit
 ) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal=16.dp,top=22.dp)
+        Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=22.dp)
     ) {
         Text("دسترسی سریع",fontSize=16.sp,fontWeight=FontWeight.Black)
         Row(
@@ -914,7 +914,7 @@ private fun MeMoreSheet(
     onLogout:()->Unit
 ) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal=16.dp,bottom=28.dp)
+        Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,bottom=28.dp)
     ) {
         Text(
             "حساب و ابزارها",
