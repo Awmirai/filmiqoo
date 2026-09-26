@@ -408,6 +408,9 @@ private fun ClubForYou(
             items(feed,key={it.id}) { post ->
                 ClubPostCard(
                     post=post,
+                    social=social,
+                    loggedIn=loggedIn,
+                    onRequireAuth=onRequireAuth,
                     onCreator={
                         onCreator(
                             Creator(
@@ -870,6 +873,9 @@ private fun ClubCreatorsRow(
 @Composable
 private fun ClubPostCard(
     post:SocialPost,
+    social:SocialRepository,
+    loggedIn:Boolean,
+    onRequireAuth:()->Unit,
     onCreator:()->Unit,
     onMedia:()->Unit,
     onLike:()->Unit,
@@ -993,6 +999,18 @@ private fun ClubPostCard(
             )
         }
 
+        if(
+            post.type.equals("poll",ignoreCase=true) &&
+            (!post.spoiler || revealed)
+        ) {
+            ClubPollInline(
+                postId=post.id,
+                social=social,
+                loggedIn=loggedIn,
+                onRequireAuth=onRequireAuth
+            )
+        }
+
         post.media?.let { media ->
             Surface(
                 color=FqSurface2,
@@ -1064,6 +1082,127 @@ private fun ClubPostCard(
                     tint=if(post.savedByMe)Color.White else FqMuted
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ClubPollInline(
+    postId:String,
+    social:SocialRepository,
+    loggedIn:Boolean,
+    onRequireAuth:()->Unit
+) {
+    val scope=rememberCoroutineScope()
+    var data by remember(postId) { mutableStateOf<PollData?>(null) }
+    var selectedId by remember(postId) { mutableStateOf<String?>(null) }
+    var loading by remember(postId) { mutableStateOf(true) }
+    var busyOption by remember(postId) { mutableStateOf<String?>(null) }
+
+    fun reload() {
+        scope.launch {
+            loading=true
+            data=runCatching { social.poll(postId) }.getOrNull()
+            selectedId=if(loggedIn) {
+                runCatching { social.pollSelection(postId) }.getOrNull()
+            } else null
+            loading=false
+        }
+    }
+
+    LaunchedEffect(postId,loggedIn) { reload() }
+
+    Surface(
+        color=FqSurface2,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+        modifier=Modifier.fillMaxWidth().padding(top=12.dp)
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            if(loading && data==null) {
+                LinearProgressIndicator(
+                    color=FqBlue,
+                    trackColor=Color.Transparent,
+                    modifier=Modifier.fillMaxWidth().height(2.dp)
+                )
+                return@Column
+            }
+
+            val poll=data ?: return@Column
+            poll.options.forEach { option ->
+                val selected=selectedId==option.id
+                val fraction=if(poll.totalVotes<=0) 0f
+                else (option.votes.toFloat()/poll.totalVotes.toFloat()).coerceIn(0f,1f)
+
+                Surface(
+                    color=if(selected) FqBlue.copy(alpha=.12f) else FqSurface,
+                    shape=RoundedCornerShape(14.dp),
+                    border=androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if(selected) FqBlue.copy(alpha=.38f) else FqBorder
+                    ),
+                    modifier=Modifier.fillMaxWidth()
+                        .padding(vertical=4.dp)
+                        .clickable(enabled=busyOption==null) {
+                            if(!loggedIn) {
+                                onRequireAuth()
+                            } else {
+                                busyOption=option.id
+                                scope.launch {
+                                    runCatching {
+                                        social.votePoll(postId,option.id)
+                                    }.onSuccess { choice ->
+                                        selectedId=choice.takeIf(String::isNotBlank)
+                                        data=runCatching { social.poll(postId) }
+                                            .getOrDefault(poll)
+                                    }
+                                    busyOption=null
+                                }
+                            }
+                        }
+                ) {
+                    Column(Modifier.padding(horizontal=11.dp,vertical=9.dp)) {
+                        Row(verticalAlignment=Alignment.CenterVertically) {
+                            if(selected) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    null,
+                                    tint=FqBlue,
+                                    modifier=Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(
+                                option.label,
+                                fontSize=10.sp,
+                                fontWeight=if(selected) FontWeight.Bold else FontWeight.Medium,
+                                modifier=Modifier.weight(1f)
+                            )
+                            Text(
+                                ((fraction*100).toInt()).toString()+"٪",
+                                color=if(selected) FqBlue else FqMuted,
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress={fraction},
+                            color=if(selected) FqBlue else Color.White.copy(alpha=.30f),
+                            trackColor=Color.White.copy(alpha=.06f),
+                            modifier=Modifier.fillMaxWidth()
+                                .height(3.dp)
+                                .padding(top=7.dp)
+                        )
+                    }
+                }
+            }
+
+            Text(
+                compactClubCount(data?.totalVotes ?: 0L)+" رأی",
+                color=FqMuted,
+                fontSize=9.sp,
+                modifier=Modifier.padding(top=6.dp,start=3.dp)
+            )
         }
     }
 }
