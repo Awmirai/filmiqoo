@@ -61,9 +61,23 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 		        WHERE ff.user_id=$1 AND ff.target_type='post'
 		          AND ff.target_id=p.id AND ff.action='show_more'
 		     ) THEN 90 ELSE 0 END
+		     + CASE WHEN EXISTS(
+		       SELECT 1
+		         FROM post_reactions mine
+		         JOIN posts previous ON previous.id=mine.post_id
+		        WHERE mine.user_id=$1
+		          AND previous.author_user_id=p.author_user_id
+		          AND previous.id<>p.id
+		     ) THEN 45 ELSE 0 END
+		     + CASE
+		         WHEN COALESCE(p.published_at,p.created_at)>now()-interval '18 hours' THEN 95
+		         WHEN COALESCE(p.published_at,p.created_at)>now()-interval '3 days' THEN 55
+		         WHEN COALESCE(p.published_at,p.created_at)>now()-interval '10 days' THEN 20
+		         ELSE 0
+		       END
 		     + LEAST(
 		       p.like_count*2 + p.comment_count*4 + p.save_count*5 + p.share_count*6,
-		       700
+		       520
 		     )
 		   ) DESC,
 		   p.published_at DESC NULLS LAST,p.created_at DESC
@@ -153,10 +167,24 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		        WHERE ff.user_id=$1 AND ff.target_type='reel'
 		          AND ff.target_id=rl.id AND ff.action='show_more'
 		     ) THEN 100 ELSE 0 END
+		     + CASE WHEN EXISTS(
+		       SELECT 1
+		         FROM reel_likes mine
+		         JOIN reels previous ON previous.id=mine.reel_id
+		        WHERE mine.user_id=$1
+		          AND previous.creator_user_id=rl.creator_user_id
+		          AND previous.id<>rl.id
+		     ) THEN 50 ELSE 0 END
+		     + CASE
+		         WHEN COALESCE(rl.published_at,rl.created_at)>now()-interval '12 hours' THEN 110
+		         WHEN COALESCE(rl.published_at,rl.created_at)>now()-interval '2 days' THEN 65
+		         WHEN COALESCE(rl.published_at,rl.created_at)>now()-interval '7 days' THEN 25
+		         ELSE 0
+		       END
 		     + LEAST(
 		       rl.like_count*2 + rl.comment_count*4 + rl.save_count*5 +
-		       rl.share_count*6 + rl.view_count/20,
-		       900
+		       rl.share_count*6 + rl.view_count/25,
+		       650
 		     )
 		   ) DESC,
 		   rl.published_at DESC NULLS LAST,rl.created_at DESC
