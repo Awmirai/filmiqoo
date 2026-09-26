@@ -43,6 +43,8 @@ fun PremiumHomeScreen(
     onSearch: () -> Unit,
     onNotifications: () -> Unit,
     onReleases: () -> Unit,
+    onClips: () -> Unit,
+    onClub: () -> Unit,
     onWatchParty: (MediaItem?) -> Unit
 ) {
     var reload by remember { mutableIntStateOf(0) }
@@ -93,6 +95,8 @@ fun PremiumHomeScreen(
             onSearch=onSearch,
             onNotifications=onNotifications,
             onReleases=onReleases,
+            onClips=onClips,
+            onClub=onClub,
             onWatchParty=onWatchParty,
             onRefresh={reload++}
         )
@@ -114,6 +118,8 @@ private fun PremiumHomeContent(
     onSearch: () -> Unit,
     onNotifications: () -> Unit,
     onReleases: () -> Unit,
+    onClips: () -> Unit,
+    onClub: () -> Unit,
     onWatchParty: (MediaItem?) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -167,24 +173,34 @@ private fun PremiumHomeContent(
             }
         }
 
-        item {
-            LazyRow(
-                contentPadding=PaddingValues(horizontal=FqDimens.Screen),
-                horizontalArrangement=Arrangement.spacedBy(8.dp),
-                modifier=Modifier.padding(top=14.dp)
-            ) {
-                if(kidsMode) {
-                    item { PremiumChip(Icons.Default.ChildCare,"Kids",true){} }
-                    item { PremiumChip(Icons.Default.Movie,"فیلم"){} }
-                    item { PremiumChip(Icons.Default.Tv,"سریال"){} }
-                    item { PremiumChip(Icons.Default.Animation,"انیمیشن"){} }
-                } else {
-                    item { PremiumChip(Icons.Default.LocalFireDepartment,"ترند",true){} }
-                    item { PremiumChip(Icons.Default.Movie,"فیلم"){} }
-                    item { PremiumChip(Icons.Default.Tv,"سریال"){} }
-                    item { PremiumChip(Icons.Default.Animation,"انیمه"){} }
-                    item { PremiumChip(Icons.Default.Language,"ایرانی"){} }
-                    item { PremiumChip(Icons.Default.CalendarMonth,"انتشارها",false,onReleases) }
+        if(!kidsMode) {
+            item {
+                LazyRow(
+                    contentPadding=PaddingValues(horizontal=FqDimens.Screen),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp),
+                    modifier=Modifier.padding(top=14.dp)
+                ) {
+                    item {
+                        PremiumChip(
+                            icon=Icons.Default.SmartDisplay,
+                            label="Clips",
+                            onClick=onClips
+                        )
+                    }
+                    item {
+                        PremiumChip(
+                            icon=Icons.Default.Groups,
+                            label="Club",
+                            onClick=onClub
+                        )
+                    }
+                    item {
+                        PremiumChip(
+                            icon=Icons.Default.CalendarMonth,
+                            label="انتشارها",
+                            onClick=onReleases
+                        )
+                    }
                 }
             }
         }
@@ -257,7 +273,8 @@ private fun PremiumHomeContent(
                 PremiumSectionHeader(
                     title="داغ در Club",
                     subtitle="بر اساس Post، Clip، Like، Save و Share",
-                    icon=Icons.Default.LocalFireDepartment
+                    icon=Icons.Default.LocalFireDepartment,
+                    onMore=onClub
                 )
             }
             item { PremiumPosterRow(items,repository,onMedia) }
@@ -438,6 +455,7 @@ private fun PremiumHeroPager(
                                         PlaybackTarget(
                                             mediaVersionId=media.mediaVersionId,
                                             title=media.title,
+                                            mediaTitleId=media.backendId,
                                             subtitle=listOf(media.year,media.quality).filter(String::isNotBlank).joinToString(" • "),
                                             posterUrl=repository.poster(media.posterPath)
                                         )
