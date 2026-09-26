@@ -137,6 +137,7 @@ private fun RealReelsPager(
     val likeBusy=remember { mutableStateMapOf<String,Boolean>() }
     val saveBusy=remember { mutableStateMapOf<String,Boolean>() }
     val followBusy=remember { mutableStateMapOf<String,Boolean>() }
+    val commentDelta=remember { mutableStateMapOf<String,Long>() }
     val revealed=remember { mutableStateMapOf<String,Boolean>() }
     var commentsFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var moreFor by remember { mutableStateOf<ReelFeedItem?>(null) }
@@ -232,6 +233,7 @@ private fun RealReelsPager(
                 saved=saved[reel.id] ?: reel.savedByMe,
                 followed=followed[reel.author.id] ?: reel.followingAuthor,
                 followPending=followPending[reel.author.id] ?: reel.followPending,
+                commentCount=(reel.comments+(commentDelta[reel.id] ?: 0L)).coerceAtLeast(0L),
                 onReveal={
                     revealed[reel.id]=true
                     if(isCurrent) player.play()
@@ -374,6 +376,9 @@ private fun RealReelsPager(
             social=social,
             loggedIn=loggedIn,
             onRequireAuth=onRequireAuth,
+            onCommentAdded={
+                commentDelta[reel.id]=(commentDelta[reel.id] ?: 0L)+1L
+            },
             onDismiss={commentsFor=null}
         )
     }
@@ -459,6 +464,7 @@ private fun ReelVideoPage(
     saved: Boolean,
     followed: Boolean,
     followPending: Boolean,
+    commentCount: Long,
     onReveal: () -> Unit,
     onLike: () -> Unit,
     onSave: () -> Unit,
@@ -638,7 +644,7 @@ private fun ReelVideoPage(
             ReelCircleAction(
                 icon=Icons.Default.ChatBubble,
                 tint=Color.White,
-                text=compactCount(reel.comments),
+                text=compactCount(commentCount),
                 onClick=onComment
             )
             ReelCircleAction(
@@ -738,6 +744,7 @@ private fun ReelCommentsSheet(
     social: SocialRepository,
     loggedIn: Boolean,
     onRequireAuth: () -> Unit,
+    onCommentAdded: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -761,7 +768,11 @@ private fun ReelCommentsSheet(
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Text("نظرها",fontSize=20.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                Text(compactCount(reel.comments),color=FqMuted,fontSize=11.sp)
+                Text(
+                    compactCount(if(loading)reel.comments else items.size.toLong()),
+                    color=FqMuted,
+                    fontSize=11.sp
+                )
             }
 
             if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
@@ -809,7 +820,11 @@ private fun ReelCommentsSheet(
                         text=""
                         scope.launch {
                             runCatching { social.addReelComment(reel.id,body,spoiler) }
-                                .onSuccess { spoiler=false;reload() }
+                                .onSuccess {
+                                    spoiler=false
+                                    onCommentAdded()
+                                    reload()
+                                }
                         }
                     }
                 }) {
