@@ -35,7 +35,8 @@ fun LibraryScreen(
     repository: TmdbRepository,
     onBack: () -> Unit,
     onMedia: (MediaItem) -> Unit,
-    onPlay: (PlaybackTarget) -> Unit
+    onPlay: (PlaybackTarget) -> Unit,
+    showBack: Boolean = true
 ) {
     val lib=remember { LibraryRepository(backend) }
     val sceneRepo=remember { SceneBookmarksRepository(backend) }
@@ -52,7 +53,7 @@ fun LibraryScreen(
     var activeCollection by remember { mutableStateOf<MediaCollectionDetail?>(null) }
     var showCreate by remember { mutableStateOf(false) }
 
-    BackHandler {
+    BackHandler(enabled=activeCollection!=null || showBack) {
         if(activeCollection!=null) activeCollection=null else onBack()
     }
 
@@ -124,7 +125,8 @@ fun LibraryScreen(
             collectionCount=collections.size,
             sceneCount=sceneBookmarks.size,
             onBack=onBack,
-            onRefresh={refresh++}
+            onRefresh={refresh++},
+            showBack=showBack
         )
 
         TabRow(
@@ -275,7 +277,8 @@ private fun LibraryHeader(
     collectionCount:Int,
     sceneCount:Int,
     onBack:()->Unit,
-    onRefresh:()->Unit
+    onRefresh:()->Unit,
+    showBack:Boolean=true
 ) {
     Box(
         Modifier.fillMaxWidth().height(215.dp).background(
@@ -288,7 +291,9 @@ private fun LibraryHeader(
             Modifier.fillMaxWidth().padding(8.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
-            IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+            if(showBack) {
+                IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+            }
             Spacer(Modifier.weight(1f))
             IconButton(onClick=onRefresh){Icon(Icons.Default.Refresh,null)}
         }
