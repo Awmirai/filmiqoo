@@ -447,6 +447,10 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	tmdbStatus:="disabled"
+	if s.tmdb!=nil && s.tmdb.Enabled() {
+		tmdbStatus="ready"
+	}
 	writeJSON(w,http.StatusOK,map[string]string{
 		"status":"ready",
 		"push":map[bool]string{true:"enabled",false:"disabled"}[s.fcm!=nil],
@@ -454,7 +458,36 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 			true:"ready",
 			false:"disabled",
 		}[strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!=""],
+		"tmdb":tmdbStatus,
+		"telegramStream":s.telegramStreamStatus(r.Context()),
 	})
+}
+
+func (s *Server) telegramStreamStatus(parent context.Context) string {
+	base:=strings.TrimSpace(s.cfg.TelegramStreamBaseURL)
+	if base=="" {
+		return "disabled"
+	}
+	ctx,cancel:=context.WithTimeout(parent,900*time.Millisecond)
+	defer cancel()
+	req,err:=http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		strings.TrimRight(base,"/")+"/",
+		nil,
+	)
+	if err!=nil {
+		return "unavailable"
+	}
+	resp,err:=s.upstreamClient.Do(req)
+	if err!=nil {
+		return "unavailable"
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode>=200 && resp.StatusCode<400 {
+		return "ready"
+	}
+	return "unavailable"
 }
 
 func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
