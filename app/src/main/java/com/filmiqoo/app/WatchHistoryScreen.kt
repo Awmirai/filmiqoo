@@ -38,6 +38,7 @@ fun WatchHistoryScreen(
     var loading by remember { mutableStateOf(true) }
     var items by remember { mutableStateOf<List<WatchHistoryItem>>(emptyList()) }
     var filter by rememberSaveable { mutableIntStateOf(0) }
+    var query by rememberSaveable { mutableStateOf("") }
     var confirmClear by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -52,11 +53,18 @@ fun WatchHistoryScreen(
         loading=false
     }
 
-    val visible=items.filter {
-        when(filter) {
-            1 -> !it.completed
-            2 -> it.completed
-            else -> true
+    val visible=remember(items,filter,query) {
+        val q=query.trim()
+        items.filter { item ->
+            val matchesFilter=when(filter) {
+                1 -> !item.completed
+                2 -> item.completed
+                else -> true
+            }
+            val matchesQuery=q.isBlank() ||
+                item.media.title.contains(q,ignoreCase=true) ||
+                item.episodeLabel.contains(q,ignoreCase=true)
+            matchesFilter && matchesQuery
         }
     }
 
@@ -95,19 +103,49 @@ fun WatchHistoryScreen(
             PremiumChip(Icons.Default.CheckCircle,"تمام‌شده",filter==2){filter=2}
         }
 
+        OutlinedTextField(
+            value=query,
+            onValueChange={query=it},
+            singleLine=true,
+            placeholder={Text("جستجو در تاریخچه...")},
+            leadingIcon={Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))},
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={query=""}) {
+                        Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                    }
+                }
+            },
+            shape=RoundedCornerShape(16.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold.copy(alpha=.6f),
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(horizontal=14.dp,vertical=6.dp)
+        )
+
         if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         error?.let {
             Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
         if(!loading && visible.isEmpty()) {
+            val searching=query.isNotBlank()
             PremiumEmptyState(
-                Icons.Default.History,
-                if(filter==0)"تاریخچه تماشا خالیه" else "چیزی در این فیلتر نیست",
-                if(filter==0)
-                    "هر چیزی که تماشا کنی با موقعیت دقیق اینجا ذخیره می‌شه."
-                else
-                    "فیلتر دیگه‌ای رو انتخاب کن یا تماشای جدیدی شروع کن."
+                if(searching)Icons.Default.SearchOff else Icons.Default.History,
+                when {
+                    searching -> "چیزی پیدا نشد"
+                    filter==0 -> "تاریخچه تماشا خالیه"
+                    else -> "چیزی در این فیلتر نیست"
+                },
+                when {
+                    searching -> "اسم فیلم، سریال یا قسمت رو با عبارت دیگه‌ای جستجو کن."
+                    filter==0 -> "هر چیزی که تماشا کنی با موقعیت دقیق اینجا ذخیره می‌شه."
+                    else -> "فیلتر دیگه‌ای رو انتخاب کن یا تماشای جدیدی شروع کن."
+                }
             )
         } else {
             LazyColumn(
@@ -139,7 +177,7 @@ fun WatchHistoryScreen(
             onDismissRequest={confirmClear=false},
             icon={Icon(Icons.Default.DeleteSweep,null,tint=FqDanger)},
             title={Text("پاک‌کردن تاریخچه؟")},
-            text={Text("هم تاریخچه و هم Continue Watching فعلی پاک می‌شن.")},
+            text={Text("هم تاریخچه و هم «ادامه تماشا»ی فعلی پاک می‌شن.")},
             confirmButton={
                 TextButton(onClick={
                     confirmClear=false
