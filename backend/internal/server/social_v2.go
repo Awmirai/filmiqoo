@@ -203,6 +203,48 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		"publishedAt":publishedAt,
 	})
 }
+func (s *Server) postViewerStates(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
+		writeError(w,http.StatusBadRequest,err)
+		return
+	}
+	if len(body.IDs)>100 {
+		body.IDs=body.IDs[:100]
+	}
+
+	items:=make([]map[string]any,0,len(body.IDs))
+	seen:=map[string]bool{}
+	for _,postID:=range body.IDs {
+		postID=strings.TrimSpace(postID)
+		if postID=="" || seen[postID] { continue }
+		seen[postID]=true
+
+		var liked,saved bool
+		err:=s.db.QueryRow(r.Context(),`
+			SELECT EXISTS(
+			         SELECT 1 FROM post_reactions
+			          WHERE post_id=$1 AND user_id=$2
+			       ),
+			       EXISTS(
+			         SELECT 1 FROM post_saves
+			          WHERE post_id=$1 AND user_id=$2
+			       )
+		`,postID,userID).Scan(&liked,&saved)
+		if err!=nil { continue }
+
+		items=append(items,map[string]any{
+			"id":postID,
+			"likedByMe":liked,
+			"savedByMe":saved,
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+}
+
 func (s *Server) postViewerState(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	postID:=chi.URLParam(r,"id")
