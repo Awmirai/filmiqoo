@@ -25,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 private sealed interface PremiumHomeLoad {
     data object Loading : PremiumHomeLoad
@@ -60,34 +62,53 @@ fun PremiumHomeScreen(
     val activeViewer=if(loggedIn) backend.viewerProfiles.active() else null
     val kidsMode=activeViewer?.kidsMode==true
 
-    LaunchedEffect(badgeRefreshKey,loggedIn,kidsMode) {
+    LaunchedEffect(badgeRefreshKey,reload,loggedIn,kidsMode) {
         unreadNotifications=if(loggedIn && !kidsMode) {
             runCatching { messagingRepo.notifications().second }.getOrDefault(0L)
         } else 0L
     }
 
     LaunchedEffect(reload,loggedIn,activeViewer?.id,kidsMode) {
-        if(loggedIn) {
-            continueItems=runCatching { backend.continueWatching() }.getOrDefault(emptyList())
-            personalized=runCatching { personalizationRepo.load() }.getOrNull()
-            friendsWatching=if(!kidsMode) {
-                runCatching { friendActivityRepo.followingWatching() }.getOrDefault(emptyList())
-            } else emptyList()
-            unreadNotifications=if(!kidsMode) {
-                runCatching { messagingRepo.notifications().second }.getOrDefault(0L)
-            } else 0L
-        } else {
-            continueItems=emptyList()
-            personalized=null
-            friendsWatching=emptyList()
-            unreadNotifications=0L
-        }
         state=PremiumHomeLoad.Loading
-        state=if(kidsMode) {
-            PremiumHomeLoad.Ready(HomeBundle())
-        } else {
-            runCatching { PremiumHomeLoad.Ready(repository.home()) }
-                .getOrElse { PremiumHomeLoad.Error(it.message ?: "خطا در دریافت خانه") }
+        coroutineScope {
+            val homeRequest=async {
+                if(kidsMode) {
+                    PremiumHomeLoad.Ready(HomeBundle())
+                } else {
+                    runCatching { PremiumHomeLoad.Ready(repository.home()) }
+                        .getOrElse {
+                            PremiumHomeLoad.Error(it.message ?: "خطا در دریافت خانه")
+                        }
+                }
+            }
+
+            if(loggedIn) {
+                val continueRequest=async {
+                    runCatching { backend.continueWatching() }
+                        .getOrDefault(emptyList())
+                }
+                val personalizedRequest=async {
+                    runCatching { personalizationRepo.load() }.getOrNull()
+                }
+                val friendsRequest=async {
+                    if(!kidsMode) {
+                        runCatching { friendActivityRepo.followingWatching() }
+                            .getOrDefault(emptyList())
+                    } else {
+                        emptyList()
+                    }
+                }
+
+                continueItems=continueRequest.await()
+                personalized=personalizedRequest.await()
+                friendsWatching=friendsRequest.await()
+            } else {
+                continueItems=emptyList()
+                personalized=null
+                friendsWatching=emptyList()
+            }
+
+            state=homeRequest.await()
         }
     }
 
