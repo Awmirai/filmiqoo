@@ -34,6 +34,32 @@ func (s *Server) liveEvents(w http.ResponseWriter,r *http.Request) {
 	writeJSON(w,http.StatusOK,map[string]any{"items":scanLiveEvents(rows)})
 }
 
+func (s *Server) myLiveEvents(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	rows,err:=s.db.Query(r.Context(),`
+		SELECT le.id::text,le.event_type,le.title,le.description,le.visibility,le.state,
+		       le.playback_url,le.cover_url,le.allow_chat,le.scheduled_at,le.started_at,le.ended_at,
+		       le.viewer_count,le.peak_viewer_count,le.room_id::text,
+		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
+		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,mt.backdrop_url,
+		       mt.year,mt.rating
+		  FROM live_events le
+		  JOIN profiles p ON p.user_id=le.host_user_id
+		  LEFT JOIN media_titles mt ON mt.id=le.media_title_id
+		 WHERE le.host_user_id=$1
+		   AND le.state IN ('scheduled','live')
+		 ORDER BY
+		   CASE WHEN le.state='live' THEN 0 ELSE 1 END,
+		   le.scheduled_at ASC NULLS LAST,
+		   le.created_at DESC
+		 LIMIT 100
+	`,userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	writeJSON(w,http.StatusOK,map[string]any{"items":scanLiveEvents(rows)})
+}
+
 func (s *Server) liveEventDetail(w http.ResponseWriter,r *http.Request) {
 	id:=chi.URLParam(r,"id")
 	row:=s.db.QueryRow(r.Context(),`
