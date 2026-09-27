@@ -46,7 +46,8 @@ fun ClubScreen(
     onCreate:()->Unit,
     onRequireAuth:()->Unit,
     initialPostId:String?=null,
-    onClearFocusedPost:()->Unit={}
+    onClearFocusedPost:()->Unit={},
+    badgeRefreshKey:Int=0
 ) {
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
@@ -75,7 +76,7 @@ fun ClubScreen(
         }
     }
 
-    LaunchedEffect(loggedIn,refresh) {
+    LaunchedEffect(loggedIn,refresh,badgeRefreshKey) {
         unreadMessages=if(loggedIn) {
             runCatching {
                 messagingRepo.inbox().sumOf { it.unread }
