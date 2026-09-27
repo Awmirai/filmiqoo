@@ -366,8 +366,13 @@ class SocialRepository(
     }
 
     suspend fun reel(id:String): ReelFeedItem {
-        val x=backend.getJson("/v1/social/reels/"+id,authorized=false)
-        val viewerState=if(backend.session.isLoggedIn) {
+        val loggedIn=backend.session.isLoggedIn
+        val x=backend.getJson(
+            if(loggedIn)"/v1/social/reels/"+id+"/viewer"
+            else "/v1/social/reels/"+id,
+            authorized=loggedIn
+        )
+        val viewerState=if(loggedIn) {
             runCatching {
                 backend.getJson(
                     "/v1/social/reels/"+id+"/viewer-state",
@@ -464,8 +469,13 @@ class SocialRepository(
 
 
     suspend fun post(id:String):SocialPost {
-        val x=backend.getJson("/v1/social/posts/"+id,authorized=false)
-        val viewerState=if(backend.session.isLoggedIn) {
+        val loggedIn=backend.session.isLoggedIn
+        val x=backend.getJson(
+            if(loggedIn)"/v1/social/posts/"+id+"/viewer"
+            else "/v1/social/posts/"+id,
+            authorized=loggedIn
+        )
+        val viewerState=if(loggedIn) {
             runCatching {
                 backend.getJson(
                     "/v1/social/posts/"+id+"/viewer-state",
