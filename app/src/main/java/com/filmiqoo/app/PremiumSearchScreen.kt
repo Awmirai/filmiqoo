@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,10 +54,14 @@ fun PremiumSearchScreen(
     var query by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<UniversalSearchLoad>(UniversalSearchLoad.Loading) }
     var history by remember { mutableStateOf(searchRepo.history()) }
+    var tabName by rememberSaveable { mutableStateOf(SearchTab.ALL.name) }
+    val selectedTab=runCatching { SearchTab.valueOf(tabName) }
+        .getOrDefault(SearchTab.ALL)
 
     BackHandler { onBack() }
 
     LaunchedEffect(query) {
+        tabName=SearchTab.ALL.name
         delay(if(query.isBlank())100 else 350)
         state=UniversalSearchLoad.Loading
         val q=query.trim()
@@ -102,6 +107,15 @@ fun PremiumSearchScreen(
             )
         }
 
+        val readyState=state as? UniversalSearchLoad.Ready
+        if(query.isNotBlank() && readyState!=null) {
+            SearchTabs(
+                result=readyState.result,
+                selected=selectedTab,
+                onSelected={tabName=it.name}
+            )
+        }
+
         Box(Modifier.weight(1f)) {
             when(val s=state) {
                 UniversalSearchLoad.Loading -> {
@@ -125,6 +139,7 @@ fun PremiumSearchScreen(
                     SearchAllContent(
                         result=s.result,
                         query=query,
+                        selectedTab=selectedTab,
                         repository=repository,
                         onMedia=onMedia,
                         onCreator=onCreator,
@@ -224,17 +239,18 @@ private fun SearchHeader(
 
 @Composable
 private fun SearchTabs(
+    result:UniversalSearchResult,
     selected:SearchTab,
     onSelected:(SearchTab)->Unit
 ) {
-    val items=listOf(
-        SearchTab.ALL to "همه",
-        SearchTab.MEDIA to "فیلم و سریال",
-        SearchTab.USERS to "کاربران",
-        SearchTab.CHANNELS to "کانال‌ها",
-        SearchTab.POSTS to "Postها",
-        SearchTab.REELS to "Clips"
-    )
+    val items=buildList {
+        add(SearchTab.ALL to "همه")
+        if(result.media.isNotEmpty()) add(SearchTab.MEDIA to "فیلم و سریال")
+        if(result.users.isNotEmpty()) add(SearchTab.USERS to "آدم‌ها")
+        if(result.channels.isNotEmpty()) add(SearchTab.CHANNELS to "کانال‌ها")
+        if(result.posts.isNotEmpty()) add(SearchTab.POSTS to "Postها")
+        if(result.reels.isNotEmpty()) add(SearchTab.REELS to "Clips")
+    }
     LazyRow(
         contentPadding=PaddingValues(
             horizontal=FqDimens.Screen,
@@ -292,24 +308,41 @@ private fun RecentSearches(
 private fun SearchAllContent(
     result: UniversalSearchResult,
     query: String,
+    selectedTab: SearchTab,
     repository: TmdbRepository,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
     onOpenPost: (String) -> Unit,
     onOpenClip: (String) -> Unit
 ) {
-    val empty=result.media.isEmpty() && result.users.isEmpty() &&
+    val allEmpty=result.media.isEmpty() && result.users.isEmpty() &&
         result.channels.isEmpty() && result.posts.isEmpty() &&
         result.reels.isEmpty()
+    val selectedEmpty=when(selectedTab) {
+        SearchTab.ALL -> allEmpty
+        SearchTab.MEDIA -> result.media.isEmpty()
+        SearchTab.USERS -> result.users.isEmpty()
+        SearchTab.CHANNELS -> result.channels.isEmpty()
+        SearchTab.POSTS -> result.posts.isEmpty()
+        SearchTab.REELS -> result.reels.isEmpty()
+    }
 
-    if(empty) {
+    if(selectedEmpty) {
         PremiumEmptyState(
             icon=if(query.isBlank())Icons.Default.Explore else Icons.Default.SearchOff,
-            title=if(query.isBlank())"Discover هنوز خالیه" else "چیزی پیدا نشد",
-            body=if(query.isBlank())
-                "با اضافه‌شدن محتوا و Creatorها، پیشنهادهای ترند اینجا ظاهر می‌شن."
-            else
-                "عبارت دیگه‌ای امتحان کن یا اسم اصلی فیلم رو بنویس."
+            title=when {
+                query.isBlank() -> "Discover هنوز خالیه"
+                selectedTab==SearchTab.ALL -> "چیزی پیدا نشد"
+                else -> "در این دسته نتیجه‌ای نیست"
+            },
+            body=when {
+                query.isBlank() ->
+                    "با اضافه‌شدن محتوا و Creatorها، پیشنهادهای ترند اینجا ظاهر می‌شن."
+                selectedTab==SearchTab.ALL ->
+                    "عبارت دیگه‌ای امتحان کن یا اسم اصلی فیلم رو بنویس."
+                else ->
+                    "«همه» رو انتخاب کن یا عبارت جستجو رو کمی تغییر بده."
+            }
         )
         return
     }
@@ -318,7 +351,7 @@ private fun SearchAllContent(
         Modifier.fillMaxSize(),
         contentPadding=PaddingValues(bottom=26.dp)
     ) {
-        if(result.media.isNotEmpty()) {
+        if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.MEDIA) && result.media.isNotEmpty()) {
             item {
                 SearchSectionTitle(
                     title=if(query.isBlank())"ترند فیلم و سریال" else "فیلم و سریال",
@@ -337,7 +370,7 @@ private fun SearchAllContent(
             }
         }
 
-        if(result.users.isNotEmpty()) {
+        if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.USERS) && result.users.isNotEmpty()) {
             item {
                 SearchSectionTitle("آدم‌ها",result.users.size)
             }
@@ -353,7 +386,7 @@ private fun SearchAllContent(
             }
         }
 
-        if(result.channels.isNotEmpty()) {
+        if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.CHANNELS) && result.channels.isNotEmpty()) {
             item {
                 SearchSectionTitle("کانال‌ها",result.channels.size)
             }
@@ -362,7 +395,7 @@ private fun SearchAllContent(
             }
         }
 
-        if(result.posts.isNotEmpty()) {
+        if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.POSTS) && result.posts.isNotEmpty()) {
             item {
                 SearchSectionTitle("Postها",result.posts.size)
             }
@@ -386,7 +419,7 @@ private fun SearchAllContent(
             }
         }
 
-        if(result.reels.isNotEmpty()) {
+        if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.REELS) && result.reels.isNotEmpty()) {
             item {
                 SearchSectionTitle("Clips",result.reels.size)
             }
