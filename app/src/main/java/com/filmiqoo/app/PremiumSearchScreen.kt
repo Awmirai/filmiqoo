@@ -370,6 +370,42 @@ private fun SearchAllContent(
         return
     }
 
+    when(selectedTab) {
+        SearchTab.MEDIA -> {
+            var mediaFilterName by rememberSaveable(query) { mutableStateOf("ALL") }
+            val mediaFilter=when(mediaFilterName) {
+                MediaType.MOVIE.name -> MediaType.MOVIE
+                MediaType.TV.name -> MediaType.TV
+                else -> null
+            }
+            MediaSearchGrid(
+                media=result.media,
+                repository=repository,
+                filter=mediaFilter,
+                onFilter={ mediaFilterName=it?.name ?: "ALL" },
+                onMedia=onMedia
+            )
+            return
+        }
+        SearchTab.USERS -> {
+            UserSearchList(result.users,onCreator)
+            return
+        }
+        SearchTab.CHANNELS -> {
+            ChannelSearchList(result.channels,onCreator)
+            return
+        }
+        SearchTab.POSTS -> {
+            PostSearchList(result.posts,onOpenPost,onCreator)
+            return
+        }
+        SearchTab.REELS -> {
+            ReelSearchGrid(result.reels,onOpenClip,onCreator)
+            return
+        }
+        SearchTab.ALL -> Unit
+    }
+
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding=PaddingValues(bottom=26.dp)
@@ -722,6 +758,48 @@ private fun UserSearchList(
     ) {
         items(users,key={it.id}) { user ->
             UserRow(user){onCreator(user.asCreator())}
+        }
+    }
+}
+
+@Composable
+private fun PostSearchList(
+    posts: List<SocialPost>,
+    onOpenPost: (String) -> Unit,
+    onCreator: (Creator) -> Unit
+) {
+    if(posts.isEmpty()) {
+        PremiumEmptyState(
+            Icons.Default.Article,
+            "پستی پیدا نشد",
+            "متن پست، نام سازنده یا عنوان فیلم رو با عبارت دیگه‌ای جستجو کن."
+        )
+        return
+    }
+
+    LazyColumn(
+        contentPadding=PaddingValues(start=14.dp,end=14.dp,top=10.dp,bottom=24.dp),
+        verticalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
+        items(posts,key={it.id}) { post ->
+            SearchPostCard(
+                post=post,
+                onClick={onOpenPost(post.id)},
+                onCreator={
+                    onCreator(
+                        Creator(
+                            name=post.author.displayName,
+                            handle="@"+post.author.username,
+                            followers="",
+                            bio="",
+                            verified=post.author.verified,
+                            id=post.author.id,
+                            entityType="user",
+                            avatarUrl=post.author.avatarUrl
+                        )
+                    )
+                }
+            )
         }
     }
 }
