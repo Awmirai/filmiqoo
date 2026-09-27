@@ -133,6 +133,7 @@ fun ConnectedExploreScreen(
                     loadingMore=loadingMore,
                     social=social,
                     backend=backend,
+                    store=store,
                     loggedIn=loggedIn,
                     onMedia=onMedia,
                     onCreator=onCreator,
@@ -172,6 +173,7 @@ private fun RealReelsPager(
     loadingMore:Boolean,
     social:SocialRepository,
     backend: BackendRepository,
+    store:LocalStore,
     loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit,
     onCreator:(Creator)->Unit,
@@ -197,7 +199,9 @@ private fun RealReelsPager(
     var moreFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var safetyFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
-    var muted by remember { mutableStateOf(false) }
+    var muted by remember {
+        mutableStateOf(store.getBoolean("clips_muted",false))
+    }
 
     val player=remember {
         ExoPlayer.Builder(context).build().apply {
@@ -319,6 +323,7 @@ private fun RealReelsPager(
 
     LaunchedEffect(muted) {
         player.volume=if(muted)0f else 1f
+        store.putBoolean("clips_muted",muted)
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
