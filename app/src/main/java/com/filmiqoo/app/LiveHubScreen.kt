@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +37,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private enum class LiveHubFilter { ALL, LIVE, UPCOMING }
+
 @Composable
 fun LiveHubScreen(
     backend:BackendRepository,
@@ -54,6 +57,9 @@ fun LiveHubScreen(
     var myUserId by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var filterName by rememberSaveable { mutableStateOf(LiveHubFilter.ALL.name) }
+    val filter=runCatching { LiveHubFilter.valueOf(filterName) }
+        .getOrDefault(LiveHubFilter.ALL)
 
     BackHandler {
         if(selected!=null) selected=null else onBack()
@@ -136,6 +142,25 @@ fun LiveHubScreen(
             }
         }
 
+        LazyRow(
+            contentPadding=PaddingValues(horizontal=14.dp),
+            horizontalArrangement=Arrangement.spacedBy(7.dp)
+        ) {
+            listOf(
+                LiveHubFilter.ALL to "همه",
+                LiveHubFilter.LIVE to "زنده",
+                LiveHubFilter.UPCOMING to "آینده"
+            ).forEach { (item,label) ->
+                item {
+                    FilterChip(
+                        selected=filter==item,
+                        onClick={filterName=item.name},
+                        label={Text(label,fontSize=10.sp)}
+                    )
+                }
+            }
+        }
+
         if(loading) {
             LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         }
@@ -151,14 +176,32 @@ fun LiveHubScreen(
             )
         }
 
-        if(!loading && events.isEmpty()) {
+        val visibleEvents=remember(events,filter) {
+            when(filter) {
+                LiveHubFilter.ALL -> events
+                LiveHubFilter.LIVE -> events.filter { it.state=="live" }
+                LiveHubFilter.UPCOMING -> events.filter { it.state=="scheduled" }
+            }
+        }
+
+        if(!loading && visibleEvents.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.LiveTv,
-                "رویداد فعالی نیست",
-                "سازنده‌ها می‌تونن پخش زنده یا پریمیر جدید بسازن.",
-                "ساخت رویداد"
+                when(filter) {
+                    LiveHubFilter.ALL -> "رویدادی نیست"
+                    LiveHubFilter.LIVE -> "الان پخش زنده‌ای نیست"
+                    LiveHubFilter.UPCOMING -> "رویداد آینده‌ای نیست"
+                },
+                when(filter) {
+                    LiveHubFilter.ALL -> "سازنده‌ها می‌تونن پخش زنده یا پریمیر جدید بسازن."
+                    LiveHubFilter.LIVE -> "رویدادهای در حال پخش وقتی شروع بشن اینجا ظاهر می‌شن."
+                    LiveHubFilter.UPCOMING -> "پخش‌های زمان‌بندی‌شده و پریمیرهای آینده اینجا میاد."
+                },
+                if(filter==LiveHubFilter.ALL)"ساخت رویداد" else null
             ) {
-                if(backend.session.isLoggedIn) showCreate=true else onRequireAuth()
+                if(filter==LiveHubFilter.ALL) {
+                    if(backend.session.isLoggedIn) showCreate=true else onRequireAuth()
+                }
             }
         } else {
             LazyColumn(
@@ -166,7 +209,7 @@ fun LiveHubScreen(
                 verticalArrangement=Arrangement.spacedBy(10.dp),
                 modifier=Modifier.fillMaxSize()
             ) {
-                items(events,key={it.id}) { event ->
+                items(visibleEvents,key={it.id}) { event ->
                     LiveEventCard(
                         event=event,
                         onClick={
