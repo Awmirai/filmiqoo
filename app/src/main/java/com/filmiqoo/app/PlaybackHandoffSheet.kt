@@ -118,7 +118,12 @@ fun PlaybackHandoffSheet(
                 )
             }
 
-            val otherDevices=devices.filterNot { it.current }
+            val otherDevices=devices
+                .filterNot { it.current }
+                .sortedWith(
+                    compareByDescending<PlaybackDevice> { it.online }
+                        .thenBy { it.deviceName.lowercase() }
+                )
             if(!loading && otherDevices.isEmpty()) {
                 Column(
                     Modifier.fillMaxWidth().padding(vertical=34.dp),
@@ -173,7 +178,7 @@ fun PlaybackHandoffSheet(
                                         }.onSuccess {
                                             message="ارسال شد به "+device.deviceName
                                         }.onFailure {
-                                            error=it.message ?: "ارسال Handoff ناموفق بود"
+                                            error=it.message ?: "انتقال پخش ناموفق بود"
                                         }
                                         sendingTo=null
                                     }
@@ -209,7 +214,7 @@ fun PlaybackHandoffSheet(
                                         overflow=TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        if(device.online)"Online" else "اخیراً فعال بوده",
+                                        if(device.online)"آنلاین" else "اخیراً فعال بوده",
                                         color=if(device.online)FqGreen else FqMuted,
                                         fontSize=7.sp,
                                         modifier=Modifier.padding(top=2.dp)
