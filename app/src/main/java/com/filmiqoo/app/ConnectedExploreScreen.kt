@@ -469,6 +469,42 @@ private fun RealReelsPager(
                 )
             }
         }
+
+        AnimatedVisibility(
+            visible=loadingMore && pager.currentPage>=reels.size-3,
+            enter=fadeIn(tween(120)),
+            exit=fadeOut(tween(160)),
+            modifier=Modifier.align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom=18.dp)
+        ) {
+            Surface(
+                color=Color.Black.copy(alpha=.62f),
+                contentColor=Color.White,
+                shape=CircleShape,
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=.10f)
+                )
+            ) {
+                Row(
+                    Modifier.padding(horizontal=12.dp,vertical=8.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        color=Color.White,
+                        strokeWidth=2.dp,
+                        modifier=Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        "در حال آوردن Clipهای بعدی",
+                        fontSize=9.sp,
+                        color=Color.White.copy(alpha=.82f)
+                    )
+                }
+            }
+        }
     }
 
     commentsFor?.let { reel ->
