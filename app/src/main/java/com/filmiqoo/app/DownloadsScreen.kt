@@ -44,6 +44,7 @@ fun DownloadsScreen(
     var downloads by remember { mutableStateOf(OfflineDownloadManager.list(context)) }
     var wifiOnly by remember { mutableStateOf(OfflineDownloadManager.wifiOnly(context)) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var query by rememberSaveable { mutableStateOf("") }
     var confirmClearCompleted by remember { mutableStateOf(false) }
 
     BackHandler { onBack() }
@@ -62,7 +63,15 @@ fun DownloadsScreen(
         )
     val completed=downloads.filter { it.status=="completed" }
         .sortedByDescending { it.createdAt }
-    val visible=if(tab==0) active else completed
+    val sectionItems=if(tab==0) active else completed
+    val visible=remember(sectionItems,query) {
+        val q=query.trim()
+        if(q.isBlank()) sectionItems
+        else sectionItems.filter {
+            it.title.contains(q,ignoreCase=true) ||
+                it.subtitle.contains(q,ignoreCase=true)
+        }
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(FqBg),
@@ -132,6 +141,34 @@ fun DownloadsScreen(
         }
 
         item {
+            OutlinedTextField(
+                value=query,
+                onValueChange={query=it},
+                singleLine=true,
+                placeholder={Text("جستجو بین دانلودها...")},
+                leadingIcon={
+                    Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))
+                },
+                trailingIcon={
+                    if(query.isNotBlank()) {
+                        IconButton(onClick={query=""}) {
+                            Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                        }
+                    }
+                },
+                shape=RoundedCornerShape(16.dp),
+                colors=OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor=FqGold.copy(alpha=.6f),
+                    unfocusedBorderColor=FqBorder,
+                    focusedContainerColor=FqSurface,
+                    unfocusedContainerColor=FqSurface
+                ),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=14.dp,vertical=7.dp)
+            )
+        }
+
+        item {
             DownloadBulkActions(
                 tab=tab,
                 downloads=downloads,
@@ -144,13 +181,20 @@ fun DownloadsScreen(
 
         if(visible.isEmpty()) {
             item {
+                val searching=query.isNotBlank()
                 PremiumEmptyState(
-                    icon=if(tab==0)Icons.Default.CloudDownload else Icons.Default.OfflinePin,
-                    title=if(tab==0)"صف دانلود خالیه" else "هنوز چیزی آفلاین نکردی",
-                    body=if(tab==0)
-                        "از صفحه فیلم یا قسمت، روی دانلود بزن تا اینجا پیشرفت واقعی رو ببینی."
-                    else
-                        "دانلودهای کامل‌شده اینجا می‌مونن و بدون اینترنت پخش می‌شن."
+                    icon=if(searching)Icons.Default.SearchOff
+                        else if(tab==0)Icons.Default.CloudDownload else Icons.Default.OfflinePin,
+                    title=when {
+                        searching -> "دانلودی پیدا نشد"
+                        tab==0 -> "صف دانلود خالیه"
+                        else -> "هنوز چیزی آفلاین نکردی"
+                    },
+                    body=when {
+                        searching -> "اسم فیلم، سریال یا قسمت رو با عبارت دیگه‌ای جستجو کن."
+                        tab==0 -> "از صفحه فیلم یا قسمت، روی دانلود بزن تا اینجا پیشرفت واقعی رو ببینی."
+                        else -> "دانلودهای کامل‌شده اینجا می‌مونن و بدون اینترنت پخش می‌شن."
+                    }
                 )
             }
         } else {
