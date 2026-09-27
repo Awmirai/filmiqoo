@@ -84,7 +84,12 @@ fun MeScreen(
     val social=remember { SocialRepository(backend) }
     var refresh by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<MeLoad>(MeLoad.Loading) }
-    var tab by rememberSaveable { mutableStateOf(MeTab.ACTIVITY) }
+    var tabName by rememberSaveable {
+        mutableStateOf(MeTab.ACTIVITY.name)
+    }
+    val tab=runCatching {
+        MeTab.valueOf(tabName)
+    }.getOrDefault(MeTab.ACTIVITY)
     var showMore by remember { mutableStateOf(false) }
     var deletePostFor by remember { mutableStateOf<SocialPost?>(null) }
     var deleteClipFor by remember { mutableStateOf<ReelFeedItem?>(null) }
@@ -143,7 +148,7 @@ fun MeScreen(
                     item {
                         MeTabs(
                             selected=tab,
-                            onSelected={tab=it}
+                            onSelected={tabName=it.name}
                         )
                     }
                 }
