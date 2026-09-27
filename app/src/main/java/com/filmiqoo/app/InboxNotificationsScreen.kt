@@ -437,6 +437,7 @@ fun ConnectedNotificationsScreen(
     onOpenRoom: (String,String) -> Unit,
     onOpenCreator: (Creator) -> Unit,
     onOpenClip: (String) -> Unit,
+    onOpenPost: (String) -> Unit,
     onOpenMedia: (MediaItem) -> Unit,
     onOpenCollection: (String) -> Unit,
     onOpenWatchParty: (String) -> Unit,
@@ -521,9 +522,11 @@ fun ConnectedNotificationsScreen(
                                         onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
                                     item.entityType=="reel" && !item.entityId.isNullOrBlank() ->
                                         onOpenClip(item.entityId)
+                                    item.entityType=="post" && !item.entityId.isNullOrBlank() ->
+                                        onOpenPost(item.entityId)
                                     item.media!=null ->
                                         onOpenMedia(item.media)
-                                    item.entityType in setOf("user","post","review","story") &&
+                                    item.entityType in setOf("user","review","story") &&
                                         item.actor!=null ->
                                         onOpenCreator(
                                             Creator(
