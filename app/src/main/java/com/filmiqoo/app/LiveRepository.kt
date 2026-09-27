@@ -36,7 +36,15 @@ class LiveRepository(
     }
 
     suspend fun detail(id:String):LiveEvent =
-        parseEvent(backend.getJson("/v1/live-events/"+id,authorized=false))
+        parseEvent(
+            backend.getJson(
+                if(backend.session.isLoggedIn)
+                    "/v1/live-events/"+id+"/viewer"
+                else
+                    "/v1/live-events/"+id,
+                authorized=backend.session.isLoggedIn
+            )
+        )
 
     suspend fun create(
         eventType:String,
