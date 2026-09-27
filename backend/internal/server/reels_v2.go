@@ -9,6 +9,43 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func (s *Server) reelViewerState(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	reelID:=chi.URLParam(r,"id")
+	var liked,saved,following,pending bool
+	err:=s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+		         SELECT 1 FROM reel_likes
+		          WHERE reel_id=$1 AND user_id=$2
+		       ),
+		       EXISTS(
+		         SELECT 1 FROM reel_saves
+		          WHERE reel_id=$1 AND user_id=$2
+		       ),
+		       EXISTS(
+		         SELECT 1
+		           FROM reels rl
+		           JOIN user_follows uf ON uf.followed_user_id=rl.creator_user_id
+		          WHERE rl.id=$1 AND uf.follower_user_id=$2
+		       ),
+		       EXISTS(
+		         SELECT 1
+		           FROM reels rl
+		           JOIN follow_requests fr ON fr.target_user_id=rl.creator_user_id
+		          WHERE rl.id=$1
+		            AND fr.requester_user_id=$2
+		            AND fr.status='pending'
+		       )
+	`,reelID,userID).Scan(&liked,&saved,&following,&pending)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	writeJSON(w,http.StatusOK,map[string]any{
+		"likedByMe":liked,
+		"savedByMe":saved,
+		"followingAuthor":following,
+		"followPending":pending,
+	})
+}
+
 func (s *Server) toggleReelLike(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	reelID:=chi.URLParam(r,"id")
