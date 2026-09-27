@@ -311,18 +311,37 @@ data class ReelFeedItem(
     val media: ReelMediaRef?
 )
 
+data class SocialPage<T>(
+    val items:List<T>,
+    val nextCursor:String?
+)
+
 class SocialRepository(
     private val backend: BackendRepository
 ) {
-    suspend fun reels(): List<ReelFeedItem> {
+    suspend fun reels():List<ReelFeedItem> =
+        reelsPage().items
+
+    suspend fun reelsPage(
+        cursor:String?=null,
+        limit:Int=24
+    ):SocialPage<ReelFeedItem> {
         val loggedIn=backend.session.isLoggedIn
+        val query=buildString {
+            append("?limit=")
+            append(limit.coerceIn(1,40))
+            if(!cursor.isNullOrBlank()) {
+                append("&cursor=")
+                append(java.net.URLEncoder.encode(cursor,"UTF-8"))
+            }
+        }
         val root=backend.getJson(
-            if(loggedIn)"/v1/social/reels/personalized" else "/v1/social/reels",
+            (if(loggedIn)"/v1/social/reels/personalized" else "/v1/social/reels")+query,
             authorized=loggedIn
         )
-        val arr=root.optJSONArray("items") ?: return emptyList()
-        return buildList {
-            for(i in 0 until arr.length()) {
+        val arr=root.optJSONArray("items")
+        val items=buildList {
+            if(arr!=null) for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
                 val mediaObj=x.optJSONObject("media")
                 val kind=mediaObj?.optString("kind").orEmpty()
@@ -363,6 +382,10 @@ class SocialRepository(
                 )
             }
         }
+        return SocialPage(
+            items=items,
+            nextCursor=root.optString("nextCursor").takeIf(String::isNotBlank)
+        )
     }
 
     suspend fun reel(id:String): ReelFeedItem {
@@ -507,18 +530,30 @@ class SocialRepository(
         )
     }
 
-    suspend fun feed(): List<SocialPost> {
+    suspend fun feed():List<SocialPost> =
+        feedPage().items
+
+    suspend fun feedPage(
+        cursor:String?=null,
+        limit:Int=30
+    ):SocialPage<SocialPost> {
         val loggedIn=backend.session.isLoggedIn
+        val query=buildString {
+            append("?limit=")
+            append(limit.coerceIn(1,50))
+            if(!cursor.isNullOrBlank()) {
+                append("&cursor=")
+                append(java.net.URLEncoder.encode(cursor,"UTF-8"))
+            }
+        }
         val root=backend.getJson(
-            if(loggedIn)"/v1/social/feed/personalized" else "/v1/social/feed",
+            (if(loggedIn)"/v1/social/feed/personalized" else "/v1/social/feed")+query,
             authorized=loggedIn
         )
-        val arr=root.optJSONArray("items") ?: return emptyList()
-        return buildList {
-            for(i in 0 until arr.length()) {
+        val arr=root.optJSONArray("items")
+        val items=buildList {
+            if(arr!=null) for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val author=parseAuthor(x.optJSONObject("author") ?: JSONObject())
-                val mediaObj=x.optJSONObject("media")
                 add(
                     SocialPost(
                         id=x.optString("id"),
@@ -532,12 +567,16 @@ class SocialRepository(
                         publishedAt=x.optString("publishedAt").takeIf(String::isNotBlank),
                         likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=x.optBoolean("savedByMe"),
-                        author=author,
-                        media=parseOptionalMedia(mediaObj)
+                        author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+                        media=parseOptionalMedia(x.optJSONObject("media"))
                     )
                 )
             }
         }
+        return SocialPage(
+            items=items,
+            nextCursor=root.optString("nextCursor").takeIf(String::isNotBlank)
+        )
     }
 
     suspend fun savedPosts(): List<SocialPost> {
