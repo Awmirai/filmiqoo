@@ -662,6 +662,36 @@ class SocialRepository(
             authorized=true
         ).optString("selectedOptionId").takeIf(String::isNotBlank)
 
+    suspend fun postViewerStates(
+        ids:List<String>
+    ):Map<String,Pair<Boolean,Boolean>> {
+        if(ids.isEmpty() || !backend.session.isLoggedIn) return emptyMap()
+        val payload=JSONObject().put(
+            "ids",
+            JSONArray().apply {
+                ids.distinct().take(100).forEach(::put)
+            }
+        )
+        val root=backend.postJson(
+            "/v1/social/posts/viewer-states",
+            payload,
+            authorized=true
+        )
+        val arr=root.optJSONArray("items") ?: return emptyMap()
+        return buildMap {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val id=x.optString("id")
+                if(id.isNotBlank()) {
+                    put(
+                        id,
+                        x.optBoolean("likedByMe") to x.optBoolean("savedByMe")
+                    )
+                }
+            }
+        }
+    }
+
     suspend fun togglePostLike(id: String): Boolean =
         backend.postJson("/v1/social/posts/"+id+"/like",JSONObject(),authorized=true)
             .optBoolean("liked")
