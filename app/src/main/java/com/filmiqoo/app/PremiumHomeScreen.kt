@@ -45,7 +45,8 @@ fun PremiumHomeScreen(
     onReleases: () -> Unit,
     onClips: () -> Unit,
     onClub: () -> Unit,
-    onWatchParty: (MediaItem?) -> Unit
+    onWatchParty: (MediaItem?) -> Unit,
+    badgeRefreshKey:Int=0
 ) {
     var reload by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<PremiumHomeLoad>(PremiumHomeLoad.Loading) }
@@ -58,6 +59,12 @@ fun PremiumHomeScreen(
     val messagingRepo=remember { MessagingRepository(backend) }
     val activeViewer=if(loggedIn) backend.viewerProfiles.active() else null
     val kidsMode=activeViewer?.kidsMode==true
+
+    LaunchedEffect(badgeRefreshKey,loggedIn,kidsMode) {
+        unreadNotifications=if(loggedIn && !kidsMode) {
+            runCatching { messagingRepo.notifications().second }.getOrDefault(0L)
+        } else 0L
+    }
 
     LaunchedEffect(reload,loggedIn,activeViewer?.id,kidsMode) {
         if(loggedIn) {
