@@ -51,6 +51,57 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
 }
 
+func (s *Server) postDetail(w http.ResponseWriter,r *http.Request) {
+	postID:=chi.URLParam(r,"id")
+	var id,postType,body,authorID,username,displayName,avatar string
+	var spoiler,verified bool
+	var likes,comments,saves,shares int64
+	var publishedAt *time.Time
+	var mediaID,title,poster *string
+
+	err:=s.db.QueryRow(r.Context(),`
+		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
+		       p.save_count,p.share_count,p.published_at,
+		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
+		       mt.id::text,mt.title,mt.poster_url
+		  FROM posts p
+		  JOIN profiles pr ON pr.user_id=p.author_user_id
+		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
+		 WHERE p.id=$1 AND p.status='published'
+	`,postID).Scan(
+		&id,&postType,&body,&spoiler,&likes,&comments,&saves,&shares,&publishedAt,
+		&authorID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster,
+	)
+	if err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"post not found"})
+		return
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"id":id,
+		"type":postType,
+		"body":body,
+		"spoiler":spoiler,
+		"likes":likes,
+		"comments":comments,
+		"saves":saves,
+		"shares":shares,
+		"publishedAt":publishedAt,
+		"author":map[string]any{
+			"id":authorID,
+			"username":username,
+			"displayName":displayName,
+			"avatarUrl":avatar,
+			"verified":verified,
+		},
+		"media":map[string]any{
+			"id":mediaID,
+			"title":title,
+			"posterUrl":poster,
+		},
+	})
+}
+
 func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	var body struct {
