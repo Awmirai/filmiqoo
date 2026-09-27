@@ -209,6 +209,14 @@ fun MeScreen(
                     }
 
                     MeTab.LIBRARY -> {
+                        item {
+                            MeLibraryActions(
+                                onDownloads=onDownloads,
+                                onHistory=onHistory,
+                                onLibrary=onLibrary
+                            )
+                        }
+
                         if(s.watching.isNotEmpty()) {
                             item {
                                 MeSectionTitle(
@@ -259,16 +267,6 @@ fun MeScreen(
                     }
                 }
 
-                item {
-                    MeQuickTools(
-                        kidsMode=kidsMode,
-                        onInbox=onInbox,
-                        onDownloads=onDownloads,
-                        onHistory=onHistory,
-                        onSettings=onSettings,
-                        onViewerProfiles=onViewerProfiles
-                    )
-                }
             }
 
             if(showMore) {
@@ -1038,6 +1036,43 @@ private fun MeEmptyCard(
             TextButton(onClick=onAction) {
                 Text(action,color=Color.White,fontWeight=FontWeight.Bold)
             }
+        }
+    }
+}
+
+@Composable
+private fun MeLibraryActions(
+    onDownloads:()->Unit,
+    onHistory:()->Unit,
+    onLibrary:()->Unit
+) {
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal=16.dp)
+            .padding(top=8.dp,bottom=2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement=Arrangement.spacedBy(8.dp)
+        ) {
+            MeTool(
+                Icons.Default.Download,
+                "دانلودها",
+                Modifier.weight(1f),
+                onDownloads
+            )
+            MeTool(
+                Icons.Default.History,
+                "تاریخچه",
+                Modifier.weight(1f),
+                onHistory
+            )
+            MeTool(
+                Icons.Default.VideoLibrary,
+                "همه Library",
+                Modifier.weight(1f),
+                onLibrary
+            )
         }
     }
 }
