@@ -1534,7 +1534,7 @@ fun CreatorStudioScreen(
     val repo=remember { CreatorChannelRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
-    var analyticsDays by remember { mutableIntStateOf(30) }
+    var analyticsDays by rememberSaveable { mutableIntStateOf(30) }
     var data by remember { mutableStateOf<CreatorStudioAnalytics?>(null) }
     var analytics by remember { mutableStateOf<CreatorAnalyticsV3?>(null) }
     var scheduled by remember { mutableStateOf<List<ScheduledCreatorItem>>(emptyList()) }
@@ -1554,7 +1554,7 @@ fun CreatorStudioScreen(
     }
 
     if(data==null && error==null) {
-        LoadingPage("در حال جمع‌کردن Analytics...")
+        LoadingPage("در حال آماده‌سازی آمار سازنده...")
         return
     }
 
@@ -1565,7 +1565,7 @@ fun CreatorStudioScreen(
             }
             PremiumEmptyState(
                 Icons.Default.Analytics,
-                "Creator Studio در دسترس نیست",
+                "استودیوی سازنده در دسترس نیست",
                 error ?: "خطا",
                 "تلاش دوباره"
             ){refresh++}
@@ -1602,7 +1602,7 @@ fun CreatorStudioScreen(
                         )
                         Spacer(Modifier.width(10.dp))
                         Column {
-                            Text("Creator Studio",color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                            Text("استودیوی سازنده",color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
                             Text(d.displayName,fontSize=22.sp,fontWeight=FontWeight.Black)
                             Text("@"+d.username,color=FqMuted,fontSize=11.sp)
                         }
@@ -1632,9 +1632,9 @@ fun CreatorStudioScreen(
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Live & Premiere",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text("پخش زنده و پریمیر",fontSize=12.sp,fontWeight=FontWeight.Bold)
                         Text(
-                            "ساخت، زمان‌بندی و مدیریت پخش زنده و Premiere",
+                            "ساخت، زمان‌بندی و مدیریت پخش زنده و پریمیر",
                             color=FqMuted,
                             fontSize=11.sp
                         )
@@ -1646,7 +1646,7 @@ fun CreatorStudioScreen(
 
         item {
             PremiumSectionHeader(
-                "Scheduled",
+                "زمان‌بندی‌شده",
                 if(scheduled.isEmpty())"محتوای زمان‌بندی‌شده‌ای نداری"
                 else scheduled.size.toString()+" محتوای در صف",
                 Icons.Default.ScheduleSend
@@ -1667,7 +1667,7 @@ fun CreatorStudioScreen(
                         Icon(Icons.Default.EventAvailable,null,tint=FqMuted)
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            "Post، Review، Poll و Clip رو برای زمان دقیق برنامه‌ریزی کن.",
+                            "پست، ریویو، نظرسنجی و کلیپ رو برای زمان دقیق برنامه‌ریزی کن.",
                             color=FqMuted,
                             fontSize=11.sp,
                             lineHeight=14.sp
@@ -1699,8 +1699,8 @@ fun CreatorStudioScreen(
 
         item {
             PremiumSectionHeader(
-                "Analytics V3",
-                "Watch Time، Retention، Completion، Rewatch و Conversion واقعی",
+                "تحلیل عملکرد",
+                "زمان تماشا، ماندگاری، تکمیل، بازبینی و تبدیل واقعی",
                 Icons.Default.Insights
             )
         }
@@ -1727,8 +1727,8 @@ fun CreatorStudioScreen(
 
             item {
                 PremiumSectionHeader(
-                    "Watch Time روزانه",
-                    "Sessionهای واقعی Clip در "+a3.days+" روز اخیر",
+                    "زمان تماشای روزانه",
+                    "نشست‌های واقعی تماشای کلیپ در "+a3.days+" روز اخیر",
                     Icons.Default.ShowChart
                 )
             }
@@ -1740,8 +1740,8 @@ fun CreatorStudioScreen(
             if(a3.topReels.isNotEmpty()) {
                 item {
                     PremiumSectionHeader(
-                        "بهترین Clipها",
-                        "بر اساس Session، Watch Time و Completion",
+                        "بهترین کلیپ‌ها",
+                        "بر اساس نشست، زمان تماشا و نرخ تکمیل",
                         Icons.Default.Leaderboard
                     )
                 }
@@ -1765,7 +1765,7 @@ fun CreatorStudioScreen(
                         Modifier.weight(1f)
                     )
                     StudioMetric(
-                        "Story Views",
+                        "بازدید استوری",
                         compactCreatorCount(d.storyViews),
                         Icons.Default.AutoStories,
                         Modifier.weight(1f)
