@@ -198,7 +198,7 @@ fun PremiumCreatorChannelScreen(
                 followPending=followPending,
                 followBusy=followBusy,
                 tab=tab,
-                tabs=listOf("Clips","پست‌ها","درباره"),
+                tabs=listOf("پست‌ها","Clips","درباره"),
                 onBack=onBack,
                 onRefresh={refresh++},
                 onShare={
@@ -233,16 +233,6 @@ fun PremiumCreatorChannelScreen(
                             onFollow=followAction
                         )
                     } else {
-                        CreatorReelsGrid(s.reels,clipsGridState,onOpenClip,onMedia)
-                    }
-                    1 -> if(privateLocked) {
-                        PrivateProfileLockedState(
-                            pending=followPending,
-                            busy=followBusy,
-                            loggedIn=backend.session.isLoggedIn,
-                            onFollow=followAction
-                        )
-                    } else {
                         CreatorPostsList(
                             posts=s.posts,
                             social=social,
@@ -252,6 +242,16 @@ fun PremiumCreatorChannelScreen(
                             onOpenPost=onOpenPost,
                             listState=postsListState
                         )
+                    }
+                    1 -> if(privateLocked) {
+                        PrivateProfileLockedState(
+                            pending=followPending,
+                            busy=followBusy,
+                            loggedIn=backend.session.isLoggedIn,
+                            onFollow=followAction
+                        )
+                    } else {
+                        CreatorReelsGrid(s.reels,clipsGridState,onOpenClip,onMedia)
                     }
                     else -> CreatorAbout(
                         bio=p.bio,
@@ -291,7 +291,7 @@ fun PremiumCreatorChannelScreen(
                 followPending=false,
                 followBusy=followBusy,
                 tab=tab,
-                tabs=listOf("Clips","پست‌ها","Roomها","درباره"),
+                tabs=listOf("پست‌ها","Clips","گفت‌وگوها","درباره"),
                 onBack=onBack,
                 onRefresh={refresh++},
                 onShare={
@@ -333,14 +333,6 @@ fun PremiumCreatorChannelScreen(
                             followed=followed
                         )
                     } else {
-                        CreatorReelsGrid(s.reels,clipsGridState,onOpenClip,onMedia)
-                    }
-                    1 -> if(channelLocked) {
-                        PrivateChannelLockedState(
-                            visibility=p.visibility,
-                            followed=followed
-                        )
-                    } else {
                         CreatorPostsList(
                             posts=s.posts,
                             social=social,
@@ -350,6 +342,14 @@ fun PremiumCreatorChannelScreen(
                             onOpenPost=onOpenPost,
                             listState=postsListState
                         )
+                    }
+                    1 -> if(channelLocked) {
+                        PrivateChannelLockedState(
+                            visibility=p.visibility,
+                            followed=followed
+                        )
+                    } else {
+                        CreatorReelsGrid(s.reels,clipsGridState,onOpenClip,onMedia)
                     }
                     2 -> if(channelLocked) {
                         PrivateChannelLockedState(
