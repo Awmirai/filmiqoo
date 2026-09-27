@@ -1585,7 +1585,9 @@ fun CreatorStudioScreen(
         analytics=runCatching { repo.creatorAnalytics(analyticsDays) }
             .onFailure { error=it.message }
             .getOrNull()
-        scheduled=runCatching { repo.scheduledContent() }.getOrDefault(emptyList())
+        scheduled=runCatching { repo.scheduledContent() }
+            .onFailure { error=error ?: it.message }
+            .getOrDefault(emptyList())
     }
 
     if(data==null && error==null) {
@@ -2078,6 +2080,21 @@ private fun CreatorTopReelCard(item:CreatorTopReelMetric) {
     }
 }
 
+private fun formatScheduledCreatorTime(raw:String):String =
+    runCatching {
+        val local=java.time.Instant.parse(raw)
+            .atZone(java.time.ZoneId.systemDefault())
+        String.format(
+            java.util.Locale.US,
+            "%04d/%02d/%02d • %02d:%02d",
+            local.year,
+            local.monthValue,
+            local.dayOfMonth,
+            local.hour,
+            local.minute
+        )
+    }.getOrDefault(raw.replace("T"," ").take(16))
+
 private fun formatCreatorPercent(value:Double):String =
     String.format(java.util.Locale.US,"%.1f%%",value.coerceIn(0.0,1.0)*100.0)
 
@@ -2140,7 +2157,7 @@ private fun ScheduledCreatorCard(
                         fontWeight=FontWeight.Bold
                     )
                     Text(
-                        item.scheduledAt.replace("T"," ").take(16),
+                        formatScheduledCreatorTime(item.scheduledAt),
                         color=FqGold,
                         fontSize=11.sp,
                         modifier=Modifier.padding(top=2.dp)
