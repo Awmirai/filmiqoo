@@ -581,27 +581,100 @@ func (s *Server) channelDetail(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) channelPosts(w http.ResponseWriter,r *http.Request) {
-	id:=chi.URLParam(r,"id")
+	channelID:=chi.URLParam(r,"id")
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),"",channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelPostsByID(w,r,channelID)
+}
+
+func (s *Server) viewerChannelPosts(w http.ResponseWriter,r *http.Request) {
+	channelID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelPostsByID(w,r,channelID)
+}
+
+func (s *Server) channelPostsByID(
+	w http.ResponseWriter,
+	r *http.Request,
+	channelID string,
+) {
 	rows,err:=s.db.Query(r.Context(),`
-		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,p.published_at,
-		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified
-		  FROM posts p JOIN profiles pr ON pr.user_id=p.author_user_id
+		SELECT p.id::text,p.post_type,p.body,p.spoiler,
+		       p.like_count,p.comment_count,p.save_count,p.share_count,p.published_at,
+		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
+		       mt.id::text,mt.title,mt.poster_url
+		  FROM posts p
+		  JOIN profiles pr ON pr.user_id=p.author_user_id
+		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
 		 WHERE p.channel_id=$1 AND p.status='published'
 		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
 		 LIMIT 100
-	`,id)
+	`,channelID)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
+
 	items:=make([]map[string]any,0)
 	for rows.Next() {
 		var postID,typ,body,userID,username,displayName,avatar string
 		var spoiler,verified bool
-		var likes,comments int64
+		var likes,comments,saves,shares int64
 		var published *time.Time
-		if err:=rows.Scan(&postID,&typ,&body,&spoiler,&likes,&comments,&published,&userID,&username,&displayName,&avatar,&verified); err!=nil { continue }
+		var mediaID,title,poster *string
+		if err:=rows.Scan(
+			&postID,&typ,&body,&spoiler,
+			&likes,&comments,&saves,&shares,&published,
+			&userID,&username,&displayName,&avatar,&verified,
+			&mediaID,&title,&poster,
+		); err!=nil { continue }
+
 		items=append(items,map[string]any{
-			"id":postID,"type":typ,"body":body,"spoiler":spoiler,"likes":likes,"comments":comments,"publishedAt":published,
-			"author":map[string]any{"id":userID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
+			"id":postID,
+			"type":typ,
+			"body":body,
+			"spoiler":spoiler,
+			"likes":likes,
+			"comments":comments,
+			"saves":saves,
+			"shares":shares,
+			"publishedAt":published,
+			"author":map[string]any{
+				"id":userID,
+				"username":username,
+				"displayName":displayName,
+				"avatarUrl":avatar,
+				"verified":verified,
+			},
+			"media":map[string]any{
+				"id":mediaID,
+				"title":title,
+				"posterUrl":poster,
+			},
 		})
 	}
 	writeJSON(w,http.StatusOK,map[string]any{"items":items})
