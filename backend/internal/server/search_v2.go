@@ -157,8 +157,14 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		       mt.id::text,mt.title,mt.poster_url
 		  FROM reels r
 		  JOIN profiles p ON p.user_id=r.creator_user_id
+		  LEFT JOIN channels ch ON ch.id=r.channel_id
 		  LEFT JOIN media_titles mt ON mt.id=r.media_title_id
 		 WHERE r.status='published'
+		   AND (
+		     (r.channel_id IS NULL AND p.private_account=false)
+		     OR
+		     (r.channel_id IS NOT NULL AND ch.visibility='public')
+		   )
 		   AND ($1='' OR r.caption ILIKE $2 ESCAPE E'\\' OR p.username::text ILIKE $2 ESCAPE E'\\' OR p.display_name ILIKE $2 ESCAPE E'\\' OR mt.title ILIKE $2 ESCAPE E'\\')
 		 ORDER BY
 		   CASE
@@ -209,8 +215,11 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		  LEFT JOIN channels ch ON ch.id=ps.channel_id
 		  LEFT JOIN media_titles mt ON mt.id=ps.media_title_id
 		 WHERE ps.status='published'
-		   AND p.private_account=false
-		   AND (ps.channel_id IS NULL OR ch.visibility='public')
+		   AND (
+		     (ps.channel_id IS NULL AND p.private_account=false)
+		     OR
+		     (ps.channel_id IS NOT NULL AND ch.visibility='public')
+		   )
 		   AND (
 		     $1='' OR
 		     ps.body ILIKE $2 ESCAPE E'\\' OR
