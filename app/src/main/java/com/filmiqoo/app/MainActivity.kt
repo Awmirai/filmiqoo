@@ -202,7 +202,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             val id=uri.pathSegments.firstOrNull().orEmpty()
             val kidsMode=activeViewer?.kidsMode==true
             val socialHost=host in setOf(
-                "creator","channel","collection","party","room","room-invite","reel","post"
+                "creator","channel","collection","party","room","room-invite","reel","post","live"
             )
 
             if(kidsMode && socialHost) {
@@ -283,6 +283,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             inviteCode=uri.getQueryParameter("invite")
                                 ?.takeIf(String::isNotBlank)
                         )
+                    }
+
+                    "live" -> {
+                        require(id.isNotBlank())
+                        overlay=OverlayRoute.LiveHub(id)
                     }
 
                     "room" -> {
@@ -789,11 +794,12 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 OverlayRoute.CreatorStudio -> CreatorStudioScreen(
                     backend=backend,
                     onBack=closeOverlay,
-                    onLive={pushOverlay(OverlayRoute.LiveHub)}
+                    onLive={pushOverlay(OverlayRoute.LiveHub())}
                 )
-                OverlayRoute.LiveHub -> LiveHubScreen(
+                is OverlayRoute.LiveHub -> LiveHubScreen(
                     backend=backend,
                     repository=repository,
+                    initialEventId=route.eventId,
                     onBack=closeOverlay,
                     onOpenRoom={id,title->pushOverlay(OverlayRoute.Room(id,title))},
                     onMedia={pushOverlay(OverlayRoute.Detail(it))},
@@ -961,6 +967,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     },
                     onOpenCollection={pushOverlay(OverlayRoute.SocialCollections(it))},
                     onOpenWatchParty={pushOverlay(OverlayRoute.WatchParty(partyId=it))},
+                    onOpenLive={pushOverlay(OverlayRoute.LiveHub(it))},
                     onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)}
                 )
             }
