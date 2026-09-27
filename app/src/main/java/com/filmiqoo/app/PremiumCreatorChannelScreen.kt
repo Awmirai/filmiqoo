@@ -1,6 +1,7 @@
 package com.filmiqoo.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -131,7 +132,7 @@ fun PremiumCreatorChannelScreen(
     }
 
     when(val s=state) {
-        CreatorEntityState.Loading -> LoadingPage("در حال آماده‌سازی پروفایل...")
+        CreatorEntityState.Loading -> CreatorProfileLoadingState()
         is CreatorEntityState.Error -> {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(8.dp)) {
@@ -373,6 +374,126 @@ fun PremiumCreatorChannelScreen(
             },
             onChanged={refresh++}
         )
+    }
+}
+
+@Composable
+private fun CreatorProfileLoadingState() {
+    val transition=rememberInfiniteTransition(label="creatorProfileSkeleton")
+    val alpha by transition.animateFloat(
+        initialValue=.30f,
+        targetValue=.70f,
+        animationSpec=infiniteRepeatable(
+            animation=tween(900),
+            repeatMode=RepeatMode.Reverse
+        ),
+        label="creatorProfileSkeletonAlpha"
+    )
+
+    Column(Modifier.fillMaxSize().background(FqBg)) {
+        Box(
+            Modifier.fillMaxWidth()
+                .height(330.dp)
+                .background(Color.White.copy(alpha=alpha*.06f))
+        ) {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            FqBg.copy(alpha=.92f)
+                        )
+                    )
+                )
+            )
+            Column(
+                Modifier.align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal=18.dp,bottom=12.dp)
+            ) {
+                Row(verticalAlignment=Alignment.Bottom) {
+                    Box(
+                        Modifier.size(92.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha=alpha*.18f))
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f).padding(bottom=6.dp)) {
+                        Box(
+                            Modifier.width(170.dp)
+                                .height(17.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.17f))
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            Modifier.width(96.dp)
+                                .height(9.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.10f))
+                        )
+                    }
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().padding(top=16.dp),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
+                ) {
+                    repeat(4) {
+                        Box(
+                            Modifier.weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha=alpha*.08f))
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(11.dp))
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        Modifier.weight(1f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha=alpha*.14f))
+                    )
+                    Box(
+                        Modifier.weight(.72f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha=alpha*.07f))
+                    )
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=12.dp),
+            horizontalArrangement=Arrangement.spacedBy(10.dp)
+        ) {
+            repeat(3) {
+                Box(
+                    Modifier.width(74.dp)
+                        .height(10.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha=alpha*.10f))
+                )
+            }
+        }
+
+        repeat(3) {
+            Surface(
+                color=Color.White.copy(alpha=alpha*.045f),
+                shape=RoundedCornerShape(20.dp),
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=alpha*.055f)
+                ),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=12.dp,vertical=5.dp)
+                    .height(94.dp)
+            ) {}
+        }
     }
 }
 
