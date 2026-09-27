@@ -265,7 +265,42 @@ func (s *Server) viewerUserReels(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) channelReels(w http.ResponseWriter,r *http.Request) {
-	s.reelsByOwner(w,r,"",chi.URLParam(r,"id"))
+	channelID:=chi.URLParam(r,"id")
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),"",channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.reelsByOwner(w,r,"",channelID)
+}
+
+func (s *Server) viewerChannelReels(w http.ResponseWriter,r *http.Request) {
+	channelID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.reelsByOwner(w,r,"",channelID)
 }
 
 func (s *Server) reelsByOwner(w http.ResponseWriter,r *http.Request,userID string,channelID string) {
@@ -325,6 +360,48 @@ func (s *Server) reelsByOwner(w http.ResponseWriter,r *http.Request,userID strin
 
 func (s *Server) channelStories(w http.ResponseWriter,r *http.Request) {
 	channelID:=chi.URLParam(r,"id")
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),"",channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelStoriesByID(w,r,channelID)
+}
+
+func (s *Server) viewerChannelStories(w http.ResponseWriter,r *http.Request) {
+	channelID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelStoriesByID(w,r,channelID)
+}
+
+func (s *Server) channelStoriesByID(
+	w http.ResponseWriter,
+	r *http.Request,
+	channelID string,
+) {
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT st.id::text,st.story_type,st.media_url,st.thumbnail_url,st.caption,st.spoiler,
 		       st.view_count,st.created_at,st.expires_at,
@@ -334,7 +411,9 @@ func (s *Server) channelStories(w http.ResponseWriter,r *http.Request) {
 		  FROM stories st
 		  JOIN profiles p ON p.user_id=st.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=st.media_title_id
-		 WHERE st.channel_id=$1 AND st.expires_at>now()
+		 WHERE st.channel_id=$1
+		   AND st.expires_at>now()
+		   AND st.close_friends_only=false
 		 ORDER BY st.created_at DESC
 		 LIMIT 100
 	`,channelID)
@@ -377,6 +456,48 @@ func (s *Server) channelStories(w http.ResponseWriter,r *http.Request) {
 
 func (s *Server) channelMembers(w http.ResponseWriter,r *http.Request) {
 	channelID:=chi.URLParam(r,"id")
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),"",channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelMembersByID(w,r,channelID)
+}
+
+func (s *Server) viewerChannelMembers(w http.ResponseWriter,r *http.Request) {
+	channelID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelMembersByID(w,r,channelID)
+}
+
+func (s *Server) channelMembersByID(
+	w http.ResponseWriter,
+	r *http.Request,
+	channelID string,
+) {
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT cm.user_id::text,cm.role,p.username::text,p.display_name,p.avatar_url,p.verified
 		  FROM channel_members cm
@@ -455,15 +576,59 @@ func (s *Server) creatorStudio(w http.ResponseWriter,r *http.Request) {
 
 func (s *Server) channelRooms(w http.ResponseWriter,r *http.Request) {
 	channelID:=chi.URLParam(r,"id")
+	allowed,exists,_,_,err:=
+		s.canViewChannelSocialContent(r.Context(),"",channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelRoomsByID(w,r,channelID,false)
+}
+
+func (s *Server) viewerChannelRooms(w http.ResponseWriter,r *http.Request) {
+	channelID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,member,_,err:=
+		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.channelRoomsByID(w,r,channelID,member)
+}
+
+func (s *Server) channelRoomsByID(
+	w http.ResponseWriter,
+	r *http.Request,
+	channelID string,
+	includePrivate bool,
+) {
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT rm.id::text,rm.name,rm.topic,rm.room_type,rm.member_count,
 		       mt.id::text,mt.title,mt.poster_url
 		  FROM rooms rm
 		  LEFT JOIN media_titles mt ON mt.id=rm.media_title_id
-		 WHERE rm.channel_id=$1 AND rm.visibility='public'
+		 WHERE rm.channel_id=$1
+		   AND (rm.visibility='public' OR $2=true)
 		 ORDER BY rm.member_count DESC,rm.created_at DESC
 		 LIMIT 50
-	`,channelID)
+	`,channelID,includePrivate)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 	items:=make([]map[string]any,0)
