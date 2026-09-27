@@ -261,12 +261,14 @@ fun PremiumDetailScreen(
                                     return@PremiumDetailActions
                                 }
                                 if(seriesFollowBusy) return@PremiumDetailActions
+                                val before=seriesFollowing
+                                seriesFollowing=!before
                                 seriesFollowBusy=true
                                 scope.launch {
                                     runCatching {
                                         seriesAlerts.update(
                                             mediaId=id,
-                                            following=!seriesFollowing,
+                                            following=!before,
                                             notifyNewEpisode=true,
                                             notifyStreamReady=true
                                         )
@@ -277,6 +279,7 @@ fun PremiumDetailScreen(
                                         else
                                             "دنبال‌کردن این سریال متوقف شد."
                                     }.onFailure {
+                                        seriesFollowing=before
                                         message=it.message
                                     }
                                     seriesFollowBusy=false
@@ -286,14 +289,14 @@ fun PremiumDetailScreen(
                                 if(!backend.session.isLoggedIn) {
                                     onRequireAuth()
                                 } else if(d.media.backendId.isNullOrBlank()) {
-                                    message="این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست."
+                                    message="این عنوان هنوز به کاتالوگ Filmiqoo متصل نیست."
                                 } else {
                                     showAvailabilityAlerts=true
                                 }
                             },
                             onCollections={
                                 if(!backend.session.isLoggedIn) {
-                                    message="برای Collectionها باید وارد حساب Filmiqoo شوی."
+                                    onRequireAuth()
                                 } else if(d.media.backendId.isNullOrBlank()) {
                                     message="این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست."
                                 } else {
@@ -304,7 +307,7 @@ fun PremiumDetailScreen(
                                 val id=selectedVersionId
                                 if(id.isNullOrBlank()) return@PremiumDetailActions
                                 if(!backend.session.isLoggedIn) {
-                                    message="برای دانلود باید وارد حساب Filmiqoo شوی."
+                                    onRequireAuth()
                                     return@PremiumDetailActions
                                 }
                                 downloadBusy=true
