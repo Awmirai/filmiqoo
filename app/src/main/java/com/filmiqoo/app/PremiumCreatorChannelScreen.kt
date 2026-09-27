@@ -1,6 +1,7 @@
 package com.filmiqoo.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1394,6 +1395,7 @@ private fun ChannelStoriesGrid(
 
 @Composable
 private fun ChannelMembersList(members: List<ChannelMember>) {
+    val listState=rememberLazyListState()
     if(members.isEmpty()) {
         PremiumEmptyState(Icons.Default.Groups,"عضوی نمایش داده نمی‌شه","اعضای مدیریتی و تیم کانال اینجا دیده می‌شن.")
         return
