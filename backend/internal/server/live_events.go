@@ -181,15 +181,27 @@ func (s *Server) createLiveEvent(w http.ResponseWriter,r *http.Request) {
 	).Scan(&id)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
-	if body.ChannelID!=nil {
+	if body.Visibility=="public" {
 		_,_=tx.Exec(r.Context(),`
+			WITH recipients AS (
+				SELECT uf.follower_user_id AS user_id
+				  FROM user_follows uf
+				 WHERE uf.followed_user_id=$1
+				UNION
+				SELECT cf.user_id
+				  FROM channel_followers cf
+				 WHERE cf.channel_id=$2
+			)
 			INSERT INTO notifications (
 				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
 			)
-			SELECT cf.user_id,$2,'live_scheduled','live',$3,$4,$5
-			  FROM channel_followers cf
-			 WHERE cf.channel_id=$1 AND cf.user_id<>$2
-		`,*body.ChannelID,userID,id,"رویداد جدید: "+body.Title,"یک Live/Premiere جدید زمان‌بندی شد.")
+			SELECT r.user_id,$1,'live_scheduled','live',$3,$4,$5
+			  FROM recipients r
+			 WHERE r.user_id<>$1
+		`,userID,body.ChannelID,id,
+			"رویداد جدید: "+body.Title,
+			"یک پخش زنده یا پریمیر جدید زمان‌بندی شد.",
+		)
 	}
 
 	if err:=tx.Commit(r.Context()); err!=nil {
@@ -321,11 +333,14 @@ func (s *Server) updateLiveEventState(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid live state"}); return
 	}
 
-	var hostID,eventType,currentPlayback string
+	var hostID,eventType,currentPlayback,currentState,title,visibility string
+	var channelID *string
 	err:=s.db.QueryRow(r.Context(),`
-		SELECT host_user_id::text,event_type,playback_url
+		SELECT host_user_id::text,event_type,playback_url,state,title,visibility,channel_id::text
 		  FROM live_events WHERE id=$1
-	`,id).Scan(&hostID,&eventType,&currentPlayback)
+	`,id).Scan(
+		&hostID,&eventType,&currentPlayback,&currentState,&title,&visibility,&channelID,
+	)
 	if err!=nil {
 		writeJSON(w,http.StatusNotFound,map[string]string{"error":"live event not found"}); return
 	}
@@ -357,6 +372,29 @@ func (s *Server) updateLiveEventState(w http.ResponseWriter,r *http.Request) {
 		_,_=s.db.Exec(r.Context(),`
 			UPDATE live_event_viewers SET active=false WHERE live_event_id=$1
 		`,id)
+	}
+
+	if body.State=="live" && currentState!="live" && visibility=="public" {
+		_,_=s.db.Exec(r.Context(),`
+			WITH recipients AS (
+				SELECT uf.follower_user_id AS user_id
+				  FROM user_follows uf
+				 WHERE uf.followed_user_id=$1
+				UNION
+				SELECT cf.user_id
+				  FROM channel_followers cf
+				 WHERE cf.channel_id=$2
+			)
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
+			)
+			SELECT r.user_id,$1,'live_started','live',$3,$4,$5
+			  FROM recipients r
+			 WHERE r.user_id<>$1
+		`,userID,channelID,id,
+			"پخش زنده شروع شد: "+title,
+			"برای تماشا و گفت‌وگوی زنده وارد Filmiqoo شو.",
+		)
 	}
 
 	writeJSON(w,http.StatusOK,map[string]any{
