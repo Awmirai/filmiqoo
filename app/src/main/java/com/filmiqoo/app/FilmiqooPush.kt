@@ -113,6 +113,7 @@ object FilmiqooPush {
             "room" -> "filmiqoo://room/$entityId"
             "release","series","availability","media" -> "filmiqoo://title/$entityId"
             "watch_party","party" -> "filmiqoo://party/$entityId"
+            "live" -> FilmiqooDeepLinks.liveEvent(entityId)
             "reel" -> "filmiqoo://reel/$entityId"
             "post" -> "filmiqoo://post/$entityId"
             "user" -> "filmiqoo://creator/$entityId"
