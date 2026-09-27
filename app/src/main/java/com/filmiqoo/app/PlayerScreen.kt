@@ -1276,6 +1276,14 @@ fun FilmiqooPlayerScreen(
                 durationMs=durationMs,
                 fraction=seekFraction,
                 speed=playbackSpeed,
+                hotMoments=pulseState?.moments.orEmpty(),
+                onHotMoment={ moment ->
+                    seekActive(moment.positionMs)
+                    playerSettingsMessage=
+                        moment.emoji+" لحظه داغ • "+
+                        formatPlayerTime(moment.positionMs)
+                    bumpControls()
+                },
                 onSeekStart={
                     isScrubbing=true
                 },
@@ -1984,6 +1992,8 @@ private fun PlayerBottomControls(
     durationMs: Long,
     fraction: Float,
     speed: Float,
+    hotMoments:List<PulseMoment>,
+    onHotMoment:(PulseMoment)->Unit,
     onSeekStart: () -> Unit,
     onFractionChanged: (Float) -> Unit,
     onSeekFinished: () -> Unit,
@@ -1993,20 +2003,49 @@ private fun PlayerBottomControls(
     Column(
         modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=12.dp)
     ) {
-        Slider(
-            value=fraction.coerceIn(0f,1f),
-            onValueChange={
-                onSeekStart()
-                onFractionChanged(it)
-            },
-            onValueChangeFinished=onSeekFinished,
-            colors=SliderDefaults.colors(
-                thumbColor=FqGold,
-                activeTrackColor=FqGold,
-                inactiveTrackColor=Color.White.copy(alpha=.25f)
-            ),
-            modifier=Modifier.fillMaxWidth()
-        )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            Slider(
+                value=fraction.coerceIn(0f,1f),
+                onValueChange={
+                    onSeekStart()
+                    onFractionChanged(it)
+                },
+                onValueChangeFinished=onSeekFinished,
+                colors=SliderDefaults.colors(
+                    thumbColor=FqGold,
+                    activeTrackColor=FqGold,
+                    inactiveTrackColor=Color.White.copy(alpha=.25f)
+                ),
+                modifier=Modifier.fillMaxWidth()
+            )
+
+            if(durationMs>0L) {
+                hotMoments.take(5).forEach { moment ->
+                    val momentFraction=(
+                        moment.positionMs.toFloat()/durationMs.toFloat()
+                    ).coerceIn(0f,1f)
+                    Surface(
+                        color=FqGold,
+                        contentColor=Color.Black,
+                        shape=CircleShape,
+                        modifier=Modifier.align(Alignment.CenterStart)
+                            .offset(
+                                x=(maxWidth-12.dp)*momentFraction
+                            )
+                            .size(12.dp)
+                            .clickable { onHotMoment(moment) }
+                    ) {
+                        Box(contentAlignment=Alignment.Center) {
+                            Text(
+                                moment.emoji,
+                                fontSize=7.sp,
+                                maxLines=1
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         Row(
             Modifier.fillMaxWidth(),
