@@ -210,6 +210,8 @@ fun PremiumDetailScreen(
                             canDownload=canPlay,
                             onFavorite={
                                 if(favoriteBusy) return@PremiumDetailActions
+                                val before=favorite
+                                favorite=!before
                                 favoriteBusy=true
                                 scope.launch {
                                     runCatching {
@@ -221,6 +223,7 @@ fun PremiumDetailScreen(
                                     }.onSuccess {
                                         favorite=it
                                     }.onFailure {
+                                        favorite=before
                                         message=it.message
                                     }
                                     favoriteBusy=false
@@ -228,16 +231,25 @@ fun PremiumDetailScreen(
                             },
                             onWatchlist={
                                 val id=d.media.backendId
-                                if(id.isNullOrBlank() || !backend.session.isLoggedIn) {
-                                    message="برای Watchlist باید وارد حساب Filmiqoo شوی."
+                                if(id.isNullOrBlank()) {
+                                    message="این عنوان هنوز به کاتالوگ Filmiqoo متصل نیست."
+                                    return@PremiumDetailActions
+                                }
+                                if(!backend.session.isLoggedIn) {
+                                    onRequireAuth()
                                     return@PremiumDetailActions
                                 }
                                 if(watchlistBusy) return@PremiumDetailActions
+                                val before=watchlist
+                                watchlist=!before
                                 watchlistBusy=true
                                 scope.launch {
                                     runCatching { library.toggleWatchlist(id) }
                                         .onSuccess { watchlist=it }
-                                        .onFailure { message=it.message }
+                                        .onFailure {
+                                            watchlist=before
+                                            message=it.message
+                                        }
                                     watchlistBusy=false
                                 }
                             },
