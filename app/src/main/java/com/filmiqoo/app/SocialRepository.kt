@@ -799,6 +799,13 @@ class SocialRepository(
             authorized=true
         ).optLong("shares")
 
+    suspend fun shareReel(id:String,destination:String="system"):Long =
+        backend.postJson(
+            "/v1/social/reels/"+id+"/share",
+            JSONObject().put("destination",destination),
+            authorized=true
+        ).optLong("shares")
+
 
     suspend fun commentViewerStates(
         ids:List<String>
