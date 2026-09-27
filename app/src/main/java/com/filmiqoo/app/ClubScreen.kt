@@ -836,6 +836,8 @@ private fun ClubForYou(
 ) {
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
+    var likeBusyIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var saveBusyIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val focusMode=!focusedPostId.isNullOrBlank()
 
     if(
@@ -946,10 +948,11 @@ private fun ClubForYou(
                     onLike={
                         if(!loggedIn) {
                             onRequireAuth()
-                        } else {
+                        } else if(post.id !in likeBusyIds) {
                             val previousLiked=post.likedByMe
                             val previousLikes=post.likes
                             val optimisticLiked=!previousLiked
+                            likeBusyIds=likeBusyIds+post.id
                             onFeedChange(
                                 feed.map {
                                     if(it.id==post.id) {
@@ -992,16 +995,18 @@ private fun ClubForYou(
                                             }
                                         )
                                     }
+                                likeBusyIds=likeBusyIds-post.id
                             }
                         }
                     },
                     onSave={
                         if(!loggedIn) {
                             onRequireAuth()
-                        } else {
+                        } else if(post.id !in saveBusyIds) {
                             val previousSaved=post.savedByMe
                             val previousSaves=post.saves
                             val optimisticSaved=!previousSaved
+                            saveBusyIds=saveBusyIds+post.id
                             onFeedChange(
                                 feed.map {
                                     if(it.id==post.id) {
@@ -1041,6 +1046,7 @@ private fun ClubForYou(
                                             }
                                         )
                                     }
+                                saveBusyIds=saveBusyIds-post.id
                             }
                         }
                     },
