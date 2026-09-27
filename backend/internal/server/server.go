@@ -206,6 +206,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/posts/{id}/poll/vote", s.votePoll)
 			r.Get("/social/posts/{id}/poll/selection", s.postPollSelection)
 			r.Post("/social/channels", s.createChannel)
+			r.Get("/social/channels/viewer-states", s.channelViewerStates)
 			r.Post("/social/channels/{id}/follow", s.toggleChannelFollow)
 			r.Post("/social/channels/{id}/settings", s.updateChannelSettings)
 			r.Post("/social/channels/{id}/members/{userID}/role", s.changeChannelMemberRole)
