@@ -549,7 +549,9 @@ fun ConnectedNotificationsScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var unread by remember { mutableLongStateOf(0L) }
     var items by remember { mutableStateOf<List<FilmiqooNotification>>(emptyList()) }
-    var filter by remember { mutableStateOf(NotificationFilter.ALL) }
+    var filterName by rememberSaveable { mutableStateOf(NotificationFilter.ALL.name) }
+    val filter=runCatching { NotificationFilter.valueOf(filterName) }
+        .getOrDefault(NotificationFilter.ALL)
 
     BackHandler { onBack() }
 
@@ -597,28 +599,28 @@ fun ConnectedNotificationsScreen(
             item {
                 FilterChip(
                     selected=filter==NotificationFilter.ALL,
-                    onClick={filter=NotificationFilter.ALL},
+                    onClick={filterName=NotificationFilter.ALL.name},
                     label={Text("همه",fontSize=10.sp)}
                 )
             }
             item {
                 FilterChip(
                     selected=filter==NotificationFilter.SOCIAL,
-                    onClick={filter=NotificationFilter.SOCIAL},
+                    onClick={filterName=NotificationFilter.SOCIAL.name},
                     label={Text("اجتماعی",fontSize=10.sp)}
                 )
             }
             item {
                 FilterChip(
                     selected=filter==NotificationFilter.MESSAGES,
-                    onClick={filter=NotificationFilter.MESSAGES},
+                    onClick={filterName=NotificationFilter.MESSAGES.name},
                     label={Text("پیام‌ها",fontSize=10.sp)}
                 )
             }
             item {
                 FilterChip(
                     selected=filter==NotificationFilter.RELEASES,
-                    onClick={filter=NotificationFilter.RELEASES},
+                    onClick={filterName=NotificationFilter.RELEASES.name},
                     label={Text("انتشارها",fontSize=10.sp)}
                 )
             }
@@ -636,8 +638,22 @@ fun ConnectedNotificationsScreen(
         if(!loading && visibleItems.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.NotificationsNone,
-                "اعلانی نداری",
-                "Like، Comment، Follow، Story و پیام‌های جدید اینجا نمایش داده می‌شن."
+                when(filter) {
+                    NotificationFilter.ALL -> "اعلانی نداری"
+                    NotificationFilter.SOCIAL -> "اعلان اجتماعی نداری"
+                    NotificationFilter.MESSAGES -> "اعلان پیام نداری"
+                    NotificationFilter.RELEASES -> "اعلان انتشار نداری"
+                },
+                when(filter) {
+                    NotificationFilter.ALL ->
+                        "لایک، کامنت، دنبال‌کردن، استوری و پیام‌های جدید اینجا نمایش داده می‌شن."
+                    NotificationFilter.SOCIAL ->
+                        "تعامل‌های کلاب، کلیپ‌ها، ریویوها و دنبال‌کردن‌ها اینجا میاد."
+                    NotificationFilter.MESSAGES ->
+                        "پیام خصوصی، Room و دعوت‌های تماشای گروهی اینجا میاد."
+                    NotificationFilter.RELEASES ->
+                        "قسمت جدید، آماده‌شدن پخش و کیفیت‌های تازه اینجا میاد."
+                }
             )
         } else {
             LazyColumn(
@@ -816,17 +832,17 @@ private fun notificationIcon(type:String)=when(type) {
 }
 
 private fun notificationTypeLabel(type:String)=when(type) {
-    "follow" -> "Follow"
-    "follow_request" -> "درخواست Follow"
-    "follow_accepted" -> "Follow پذیرفته شد"
-    "story_reaction" -> "Story Reaction"
-    "story_reply" -> "Story Reply"
-    "post_like" -> "Post Like"
-    "post_comment" -> "Post Comment"
-    "reel_like" -> "Clip Like"
-    "reel_comment" -> "Clip Comment"
-    "review_like" -> "Review Like"
-    "comment_like" -> "Comment Like"
+    "follow" -> "دنبال‌کردن"
+    "follow_request" -> "درخواست دنبال‌کردن"
+    "follow_accepted" -> "درخواست پذیرفته شد"
+    "story_reaction" -> "واکنش به استوری"
+    "story_reply" -> "پاسخ به استوری"
+    "post_like" -> "لایک پست"
+    "post_comment" -> "کامنت پست"
+    "reel_like" -> "لایک کلیپ"
+    "reel_comment" -> "کامنت کلیپ"
+    "review_like" -> "لایک ریویو"
+    "comment_like" -> "لایک کامنت"
     "dm_message" -> "پیام خصوصی"
     "room_message" -> "پیام گروه"
     "release_ready" -> "انتشار"
