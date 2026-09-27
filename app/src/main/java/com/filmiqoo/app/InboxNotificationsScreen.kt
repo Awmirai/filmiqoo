@@ -894,6 +894,7 @@ private fun notificationIcon(type:String)=when(type) {
     "dm_message" -> Icons.Default.MarkChatUnread
     "room_message" -> Icons.Default.Forum
     "live_scheduled","live_started" -> Icons.Default.LiveTv
+    "live_cancelled" -> Icons.Default.EventBusy
     "release_ready" -> Icons.Default.NewReleases
     "new_episode" -> Icons.Default.LiveTv
     "episode_stream_ready" -> Icons.Default.PlayCircle
@@ -923,6 +924,7 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "room_message" -> "پیام گروه"
     "live_scheduled" -> "رویداد زنده زمان‌بندی‌شده"
     "live_started" -> "پخش زنده شروع شد"
+    "live_cancelled" -> "رویداد زنده لغو شد"
     "release_ready" -> "انتشار"
     "new_episode" -> "قسمت جدید"
     "episode_stream_ready" -> "آماده تماشا"
