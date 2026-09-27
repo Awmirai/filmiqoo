@@ -187,6 +187,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/reels", s.createReel)
 			r.Get("/social/reels/{id}/viewer", s.viewerReelDetail)
 			r.Get("/social/reels/{id}/viewer-state", s.reelViewerState)
+			r.Post("/social/reels/{id}/remove", s.removeReel)
 			r.Post("/social/reels/{id}/like", s.toggleReelLike)
 			r.Post("/social/reels/{id}/save", s.toggleReelSave)
 			r.Post("/social/reels/{id}/share", s.shareReel)
