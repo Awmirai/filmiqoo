@@ -74,7 +74,8 @@ private enum class PlayerSettingsTab { QUALITY, AUDIO, SUBTITLE, DISPLAY, SPEED,
 fun FilmiqooPlayerScreen(
     target: PlaybackTarget,
     backend: BackendRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onDiscussion: (String) -> Unit = {}
 ) {
     val context=LocalContext.current
     val activity=context as? Activity
@@ -1273,6 +1274,7 @@ fun FilmiqooPlayerScreen(
                                 formatPlayerTime(moment.positionMs)
                             bumpControls()
                         },
+                        onDiscussion={onDiscussion(mediaId)},
                         modifier=Modifier.align(Alignment.BottomStart)
                             .padding(start=18.dp,bottom=108.dp)
                     )
@@ -3564,6 +3566,7 @@ private fun PlayerPulseBar(
     busy:Boolean,
     onReact:(String)->Unit,
     onJumpToMoment:(PulseMoment)->Unit,
+    onDiscussion:()->Unit,
     modifier:Modifier=Modifier
 ) {
     val reactions=listOf("🔥","😱","😂","❤️","👀")
@@ -3634,6 +3637,30 @@ private fun PlayerPulseBar(
                                     )
                                 }
                             }
+                        }
+                    }
+
+                    Surface(
+                        color=Color.White.copy(alpha=.08f),
+                        contentColor=Color.White,
+                        shape=RoundedCornerShape(10.dp),
+                        modifier=Modifier.clickable { onDiscussion() }
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=8.dp,vertical=5.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Forum,
+                                null,
+                                modifier=Modifier.size(13.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "گفت‌وگو",
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold
+                            )
                         }
                     }
                 }
