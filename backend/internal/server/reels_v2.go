@@ -92,6 +92,68 @@ func (s *Server) toggleReelLike(w http.ResponseWriter,r *http.Request) {
 	writeJSON(w,http.StatusOK,map[string]any{"liked":!exists})
 }
 
+func (s *Server) shareReel(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	reelID:=chi.URLParam(r,"id")
+
+	var body struct {
+		Destination string `json:"destination"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	body.Destination=strings.ToLower(strings.TrimSpace(body.Destination))
+	if body.Destination=="" { body.Destination="system" }
+	switch body.Destination {
+	case "system","dm","story","copy_link":
+	default:
+		body.Destination="system"
+	}
+
+	tx,err:=s.db.Begin(r.Context())
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer tx.Rollback(r.Context())
+
+	tag,err:=tx.Exec(r.Context(),`
+		INSERT INTO reel_share_events (reel_id,user_id,destination)
+		SELECT id,$2,$3
+		  FROM reels
+		 WHERE id=$1 AND status='published'
+	`,reelID,userID,body.Destination)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if tag.RowsAffected()==0 {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"clip not found"})
+		return
+	}
+
+	if _,err=tx.Exec(
+		r.Context(),
+		"UPDATE reels SET share_count=share_count+1 WHERE id=$1",
+		reelID,
+	); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+	var count int64
+	if err:=tx.QueryRow(
+		r.Context(),
+		"SELECT share_count FROM reels WHERE id=$1",
+		reelID,
+	).Scan(&count); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+	if err:=tx.Commit(r.Context()); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"shared":true,
+		"shares":count,
+	})
+}
+
 func (s *Server) toggleReelSave(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	reelID:=chi.URLParam(r,"id")
