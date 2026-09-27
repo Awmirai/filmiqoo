@@ -2433,8 +2433,8 @@ fun ClubCommentsSheet(
     val scope=rememberCoroutineScope()
     var comments by remember(post.id) { mutableStateOf<List<SocialComment>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-    var text by remember { mutableStateOf("") }
-    var spoiler by remember { mutableStateOf(false) }
+    var text by rememberSaveable(post.id) { mutableStateOf("") }
+    var spoiler by rememberSaveable(post.id) { mutableStateOf(false) }
     var replyTo by remember { mutableStateOf<SocialComment?>(null) }
     var sending by remember { mutableStateOf(false) }
     val displayComments=remember(comments) {
@@ -2531,7 +2531,7 @@ fun ClubCommentsSheet(
                                 }
                                 if(comment.spoiler && !reveal) {
                                     Text(
-                                        "⚠ Spoiler Shield • نمایش",
+                                        "⚠ اسپویلر مخفی شده • نمایش",
                                         color=FqDanger,
                                         fontSize=10.sp,
                                         fontWeight=FontWeight.Bold,
@@ -2675,7 +2675,7 @@ fun ClubCommentsSheet(
                 FilterChip(
                     selected=spoiler,
                     onClick={spoiler=!spoiler},
-                    label={Text("Spoiler",fontSize=10.sp)},
+                    label={Text("اسپویلر",fontSize=10.sp)},
                     leadingIcon={
                         Icon(
                             Icons.Default.VisibilityOff,
@@ -2690,11 +2690,18 @@ fun ClubCommentsSheet(
                 ) {
                     OutlinedTextField(
                         value=text,
-                        onValueChange={text=it},
+                        onValueChange={text=it.take(2000)},
                         placeholder={
                             Text(
                                 if(replyTo!=null)"پاسخت رو بنویس..."
                                 else "نظرت رو بنویس..."
+                            )
+                        },
+                        supportingText={
+                            Text(
+                                text.length.toString()+"/2000",
+                                color=if(text.length>1850)FqDanger else FqMuted,
+                                fontSize=9.sp
                             )
                         },
                         singleLine=false,
