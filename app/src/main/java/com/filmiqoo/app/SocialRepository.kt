@@ -474,7 +474,7 @@ class SocialRepository(
                         likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=x.optBoolean("savedByMe"),
                         author=author,
-                        media=mediaObj?.let(::parseMedia)
+                        media=parseOptionalMedia(mediaObj)
                     )
                 )
             }
@@ -501,7 +501,7 @@ class SocialRepository(
                         likedByMe=x.optBoolean("likedByMe"),
                         savedByMe=x.optBoolean("savedByMe",true),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
-                        media=x.optJSONObject("media")?.let(::parseMedia)
+                        media=parseOptionalMedia(x.optJSONObject("media"))
                     )
                 )
             }
@@ -577,7 +577,7 @@ class SocialRepository(
                         createdAt=x.optString("createdAt"),
                         expiresAt=x.optString("expiresAt"),
                         author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
-                        media=x.optJSONObject("media")?.let(::parseMedia),
+                        media=parseOptionalMedia(x.optJSONObject("media")),
                         closeFriendsOnly=x.optBoolean("closeFriendsOnly")
                     )
                 )
@@ -885,7 +885,7 @@ class SocialRepository(
                         topic=x.optString("topic"),
                         type=x.optString("type"),
                         members=x.optLong("members"),
-                        media=x.optJSONObject("media")?.let(::parseMedia)
+                        media=parseOptionalMedia(x.optJSONObject("media"))
                     )
                 )
             }
@@ -1409,6 +1409,14 @@ class SocialRepository(
         avatarUrl=o.optString("avatarUrl"),
         verified=o.optBoolean("verified")
     )
+
+    private fun parseOptionalMedia(o:JSONObject?):SocialMediaRef? {
+        if(o==null) return null
+        val id=o.optString("id")
+        val title=o.optString("title")
+        if(id.isBlank() && title.isBlank()) return null
+        return parseMedia(o)
+    }
 
     private fun parseMedia(o: JSONObject): SocialMediaRef {
         val kind=o.optString("kind")
