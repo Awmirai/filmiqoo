@@ -911,6 +911,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     repository=repository,
                     loggedIn=backend.session.isLoggedIn,
                     onRequireAuth={pushOverlay(OverlayRoute.Auth)},
+                    onOpenClub={
+                        overlayBackStack.clear()
+                        overlay=null
+                        tab=2
+                    },
+                    onOpenClips={
+                        overlayBackStack.clear()
+                        overlay=null
+                        tab=1
+                    },
                     onBack=closeOverlay
                 )
                 OverlayRoute.Notifications -> ConnectedNotificationsScreen(
