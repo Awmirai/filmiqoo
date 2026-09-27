@@ -26,13 +26,20 @@ data class PulseTrendItem(
 class PulseRepository(
     private val backend: BackendRepository
 ) {
-    suspend fun load(mediaId:String):PulseState =
-        parse(
+    suspend fun load(
+        mediaId:String,
+        mediaVersionId:String?=null
+    ):PulseState {
+        val version=mediaVersionId?.trim().orEmpty()
+        val path="/v1/catalog/"+mediaId+"/pulse"+
+            if(version.isBlank()) "" else "?mediaVersionId="+version
+        return parse(
             backend.getJson(
-                "/v1/catalog/"+mediaId+"/pulse",
+                path,
                 authorized=false
             )
         )
+    }
 
     suspend fun trending():List<PulseTrendItem> {
         val root=backend.getJson("/v1/pulse/trending",authorized=false)
@@ -68,17 +75,24 @@ class PulseRepository(
     suspend fun react(
         mediaId:String,
         emoji:String,
-        positionMs:Long=0L
-    ):PulseState =
-        parse(
+        positionMs:Long=0L,
+        mediaVersionId:String?=null
+    ):PulseState {
+        val payload=JSONObject()
+            .put("emoji",emoji)
+            .put("positionMs",positionMs.coerceAtLeast(0L))
+        mediaVersionId?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?.let { payload.put("mediaVersionId",it) }
+
+        return parse(
             backend.postJson(
                 "/v1/catalog/"+mediaId+"/pulse/react",
-                JSONObject()
-                    .put("emoji",emoji)
-                    .put("positionMs",positionMs.coerceAtLeast(0L)),
+                payload,
                 authorized=true
             )
         )
+    }
 
     private fun parse(root:JSONObject):PulseState {
         val reactionsObject=root.optJSONObject("reactions") ?: JSONObject()
