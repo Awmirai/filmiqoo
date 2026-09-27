@@ -10,6 +10,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -922,6 +926,7 @@ private fun FilmiqooBottomBar(
     kidsMode:Boolean=false,
     onSelected:(Int)->Unit
 ) {
+    val haptic=LocalHapticFeedback.current
     val entries=if(kidsMode) {
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
@@ -963,13 +968,33 @@ private fun FilmiqooBottomBar(
             ) {
                 entries.forEach { item ->
                     val active=selected==item.third
+                    val pillColor by animateColorAsState(
+                        if(active) Color.White.copy(alpha=.10f)
+                        else Color.Transparent,
+                        label="bottomBarPill"
+                    )
+                    val iconColor by animateColorAsState(
+                        if(active) Color.White else FqMuted,
+                        label="bottomBarIcon"
+                    )
+                    val indicatorWidth by animateDpAsState(
+                        if(active) 18.dp else 0.dp,
+                        label="bottomBarIndicator"
+                    )
                     Surface(
                         color=Color.Transparent,
-                        contentColor=if(active) Color.White else FqMuted,
+                        contentColor=iconColor,
                         shape=RoundedCornerShape(18.dp),
                         modifier=Modifier.weight(1f)
                             .fillMaxHeight()
-                            .clickable { onSelected(item.third) }
+                            .clickable {
+                                if(!active) {
+                                    haptic.performHapticFeedback(
+                                        HapticFeedbackType.TextHandleMove
+                                    )
+                                    onSelected(item.third)
+                                }
+                            }
                     ) {
                         Column(
                             Modifier.fillMaxSize().padding(vertical=6.dp),
@@ -977,25 +1002,22 @@ private fun FilmiqooBottomBar(
                             verticalArrangement=Arrangement.Center
                         ) {
                             Box(
-                                Modifier.width(38.dp)
-                                    .height(27.dp)
-                                    .clip(RoundedCornerShape(13.dp))
-                                    .background(
-                                        if(active) Color.White.copy(alpha=.09f)
-                                        else Color.Transparent
-                                    ),
+                                Modifier.width(40.dp)
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(pillColor),
                                 contentAlignment=Alignment.Center
                             ) {
                                 Icon(
                                     item.first,
                                     contentDescription=item.second,
-                                    tint=if(active) Color.White else FqMuted,
-                                    modifier=Modifier.size(21.dp)
+                                    tint=iconColor,
+                                    modifier=Modifier.size(if(active)22.dp else 20.dp)
                                 )
                             }
                             Text(
                                 item.second,
-                                color=if(active) Color.White else FqMuted,
+                                color=iconColor,
                                 style=MaterialTheme.typography.labelSmall,
                                 fontWeight=if(active) FontWeight.Bold else FontWeight.Medium,
                                 maxLines=1,
@@ -1003,7 +1025,7 @@ private fun FilmiqooBottomBar(
                             )
                             Box(
                                 Modifier.padding(top=3.dp)
-                                    .width(if(active) 16.dp else 0.dp)
+                                    .width(indicatorWidth)
                                     .height(2.dp)
                                     .clip(CircleShape)
                                     .background(if(active) FqGold else Color.Transparent)
