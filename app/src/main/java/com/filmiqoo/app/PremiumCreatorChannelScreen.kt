@@ -1146,9 +1146,9 @@ private fun CreatorPostsList(
                         ) {
                             Text(
                                 when(post.type.lowercase()) {
-                                    "review" -> "Review"
-                                    "poll" -> "Poll"
-                                    else -> "Post"
+                                    "review" -> "ریویو"
+                                    "poll" -> "نظرسنجی"
+                                    else -> "پست"
                                 },
                                 fontSize=9.sp,
                                 color=if(post.type.equals("review",true))FqGold else FqMuted,
@@ -1794,7 +1794,7 @@ fun CreatorStudioScreen(
             Column(Modifier.padding(horizontal=14.dp)) {
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     StudioMetric(
-                        "بازدید Clipها",
+                        "بازدید کلیپ‌ها",
                         compactCreatorCount(d.reelViews),
                         Icons.Default.Visibility,
                         Modifier.weight(1f)
@@ -1817,7 +1817,7 @@ fun CreatorStudioScreen(
                         Modifier.weight(1f)
                     )
                     StudioMetric(
-                        "Channel Followers",
+                        "دنبال‌کننده کانال",
                         compactCreatorCount(d.channelFollowers),
                         Icons.Default.Campaign,
                         Modifier.weight(1f)
@@ -1827,7 +1827,7 @@ fun CreatorStudioScreen(
         }
 
         item {
-            PremiumSectionHeader("Engagement","تعامل روی Clipها",Icons.Default.Bolt)
+            PremiumSectionHeader("تعامل","تعامل روی کلیپ‌ها",Icons.Default.Bolt)
         }
 
         item {
@@ -1837,16 +1837,16 @@ fun CreatorStudioScreen(
                 modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    StudioStatRow("Like",d.reelLikes,Icons.Default.Favorite)
-                    StudioStatRow("Comment",d.reelComments,Icons.Default.ChatBubble)
-                    StudioStatRow("Save",d.reelSaves,Icons.Default.Bookmark)
-                    StudioStatRow("Share",d.reelShares,Icons.Default.Share)
+                    StudioStatRow("لایک",d.reelLikes,Icons.Default.Favorite)
+                    StudioStatRow("کامنت",d.reelComments,Icons.Default.ChatBubble)
+                    StudioStatRow("ذخیره",d.reelSaves,Icons.Default.Bookmark)
+                    StudioStatRow("اشتراک‌گذاری",d.reelShares,Icons.Default.Share)
                 }
             }
         }
 
         item {
-            PremiumSectionHeader("Content","موجودی Creator",Icons.Default.VideoLibrary)
+            PremiumSectionHeader("محتوا","موجودی محتوای سازنده",Icons.Default.VideoLibrary)
         }
 
         item {
@@ -1855,7 +1855,7 @@ fun CreatorStudioScreen(
                 horizontalArrangement=Arrangement.spacedBy(8.dp)
             ) {
                 PremiumStat(d.posts.toString(),"پست",Modifier.weight(1f))
-                PremiumStat(d.reels.toString(),"Reel",Modifier.weight(1f))
+                PremiumStat(d.reels.toString(),"کلیپ",Modifier.weight(1f))
                 PremiumStat(d.channels.toString(),"کانال",Modifier.weight(1f))
             }
         }
@@ -1881,13 +1881,13 @@ private fun CreatorRetentionMetrics(summary:CreatorAnalyticsSummary) {
     ) {
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             StudioMetric(
-                "Unique Viewers",
+                "بیننده یکتا",
                 compactCreatorCount(summary.uniqueViewers),
                 Icons.Default.PersonSearch,
                 Modifier.weight(1f)
             )
             StudioMetric(
-                "Watch Time",
+                "زمان تماشا",
                 formatCreatorWatchTime(summary.watchMs),
                 Icons.Default.Timer,
                 Modifier.weight(1f)
@@ -1895,13 +1895,13 @@ private fun CreatorRetentionMetrics(summary:CreatorAnalyticsSummary) {
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             StudioMetric(
-                "Completion",
+                "نرخ تکمیل",
                 formatCreatorPercent(summary.completionRate),
                 Icons.Default.TaskAlt,
                 Modifier.weight(1f)
             )
             StudioMetric(
-                "Rewatch",
+                "بازبینی",
                 formatCreatorPercent(summary.rewatchRate),
                 Icons.Default.Replay,
                 Modifier.weight(1f)
@@ -1909,7 +1909,7 @@ private fun CreatorRetentionMetrics(summary:CreatorAnalyticsSummary) {
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             StudioMetric(
-                "Avg Watch",
+                "میانگین تماشا",
                 formatCreatorDuration(summary.averageWatchMs),
                 Icons.Default.AccessTime,
                 Modifier.weight(1f)
@@ -2068,7 +2068,7 @@ private fun CreatorTopReelCard(item:CreatorTopReelMetric) {
                     modifier=Modifier.fillMaxWidth().padding(top=7.dp).height(4.dp)
                 )
                 Text(
-                    compactCreatorCount(item.sessions)+" Session",
+                    compactCreatorCount(item.sessions)+" نشست",
                     color=FqMuted,
                     fontSize=6.sp,
                     modifier=Modifier.padding(top=4.dp)
@@ -2104,6 +2104,8 @@ private fun ScheduledCreatorCard(
     onPublishNow:()->Unit,
     onUnschedule:()->Unit
 ) {
+    var confirmAction by remember(item.kind,item.id) { mutableStateOf<String?>(null) }
+
     Surface(
         color=FqSurface,
         shape=RoundedCornerShape(18.dp),
@@ -2130,8 +2132,8 @@ private fun ScheduledCreatorCard(
                         when(item.contentType) {
                             "review" -> "Review"
                             "poll" -> "Poll"
-                            "announcement" -> "Announcement"
-                            "reel" -> "Reel"
+                            "announcement" -> "اعلان"
+                            "reel" -> "کلیپ"
                             else -> "Post"
                         },
                         fontSize=12.sp,
@@ -2150,7 +2152,7 @@ private fun ScheduledCreatorCard(
                         shape=RoundedCornerShape(7.dp)
                     ) {
                         Text(
-                            "Spoiler",
+                            "اسپویلر",
                             color=FqDanger,
                             fontSize=6.sp,
                             modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
@@ -2184,26 +2186,73 @@ private fun ScheduledCreatorCard(
                 horizontalArrangement=Arrangement.spacedBy(7.dp)
             ) {
                 Button(
-                    onClick=onPublishNow,
+                    onClick={confirmAction="publish"},
                     colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                     shape=RoundedCornerShape(11.dp),
                     modifier=Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.Publish,null,tint=Color.Black,modifier=Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Publish Now",color=Color.Black,fontSize=11.sp)
+                    Text("انتشار همین الان",color=Color.Black,fontSize=11.sp)
                 }
                 OutlinedButton(
-                    onClick=onUnschedule,
+                    onClick={confirmAction="draft"},
                     shape=RoundedCornerShape(11.dp),
                     modifier=Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.EditCalendar,null,modifier=Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("برگردان به Draft",fontSize=11.sp)
+                    Text("برگردان به پیش‌نویس",fontSize=11.sp)
                 }
             }
         }
+    }
+
+    if(confirmAction!=null) {
+        val publishing=confirmAction=="publish"
+        AlertDialog(
+            onDismissRequest={confirmAction=null},
+            icon={
+                Icon(
+                    if(publishing)Icons.Default.Publish else Icons.Default.EditCalendar,
+                    null,
+                    tint=if(publishing)FqGold else FqMuted
+                )
+            },
+            title={
+                Text(
+                    if(publishing)"همین الان منتشر شود؟"
+                    else "به پیش‌نویس برگردد؟"
+                )
+            },
+            text={
+                Text(
+                    if(publishing)
+                        "زمان‌بندی این محتوا لغو می‌شود و همین الان منتشر خواهد شد."
+                    else
+                        "انتشار زمان‌بندی‌شده لغو می‌شود و محتوا برای ویرایش دوباره به حالت پیش‌نویس برمی‌گردد."
+                )
+            },
+            confirmButton={
+                TextButton(
+                    onClick={
+                        val action=confirmAction
+                        confirmAction=null
+                        if(action=="publish") onPublishNow() else onUnschedule()
+                    }
+                ) {
+                    Text(
+                        if(publishing)"انتشار الان" else "برگردان به پیش‌نویس",
+                        color=if(publishing)FqGold else Color.White
+                    )
+                }
+            },
+            dismissButton={
+                TextButton(onClick={confirmAction=null}) {
+                    Text("لغو")
+                }
+            }
+        )
     }
 }
 
