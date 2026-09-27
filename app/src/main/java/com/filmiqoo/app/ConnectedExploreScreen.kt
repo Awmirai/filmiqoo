@@ -47,7 +47,10 @@ import kotlinx.coroutines.withContext
 
 private sealed interface ReelLoad {
     data object Loading : ReelLoad
-    data class Ready(val reels: List<ReelFeedItem>) : ReelLoad
+    data class Ready(
+        val reels:List<ReelFeedItem>,
+        val nextCursor:String?
+    ) : ReelLoad
     data class Error(val message: String) : ReelLoad
 }
 
@@ -70,11 +73,13 @@ fun ConnectedExploreScreen(
     val scope=rememberCoroutineScope()
     var state by remember { mutableStateOf<ReelLoad>(ReelLoad.Loading) }
     var refresh by remember { mutableIntStateOf(0) }
+    var loadingMore by remember { mutableStateOf(false) }
 
     LaunchedEffect(refresh,initialReelId) {
         state=ReelLoad.Loading
         state=runCatching {
-            val feed=social.reels()
+            val page=social.reelsPage()
+            val feed=page.items
             val target=initialReelId
                 ?.takeIf(String::isNotBlank)
                 ?.let { id ->
@@ -87,7 +92,10 @@ fun ConnectedExploreScreen(
                 listOf(target)+feed.filterNot { it.id==target.id }
             }
             if(target!=null) onInitialReelConsumed()
-            ReelLoad.Ready(ordered)
+            ReelLoad.Ready(
+                reels=ordered,
+                nextCursor=page.nextCursor
+            )
         }.getOrElse { ReelLoad.Error(it.message ?: "خطا در دریافت Clips") }
     }
 
@@ -112,12 +120,33 @@ fun ConnectedExploreScreen(
             } else {
                 RealReelsPager(
                     reels=s.reels,
+                    nextCursor=s.nextCursor,
+                    loadingMore=loadingMore,
                     social=social,
                     backend=backend,
                     loggedIn=loggedIn,
                     onMedia=onMedia,
                     onCreator=onCreator,
                     onRequireAuth=onRequireAuth,
+                    onLoadMore={ cursor ->
+                        if(!loadingMore) {
+                            loadingMore=true
+                            scope.launch {
+                                runCatching {
+                                    social.reelsPage(cursor=cursor)
+                                }.onSuccess { page ->
+                                    val current=(state as? ReelLoad.Ready)
+                                        ?: return@onSuccess
+                                    state=ReelLoad.Ready(
+                                        reels=(current.reels+page.items)
+                                            .distinctBy { it.id },
+                                        nextCursor=page.nextCursor
+                                    )
+                                }
+                                loadingMore=false
+                            }
+                        }
+                    },
                     onRefresh={refresh++}
                 )
             }
@@ -128,14 +157,17 @@ fun ConnectedExploreScreen(
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun RealReelsPager(
-    reels: List<ReelFeedItem>,
-    social: SocialRepository,
+    reels:List<ReelFeedItem>,
+    nextCursor:String?,
+    loadingMore:Boolean,
+    social:SocialRepository,
     backend: BackendRepository,
     loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit,
-    onCreator: (Creator) -> Unit,
-    onRequireAuth: () -> Unit,
-    onRefresh: () -> Unit
+    onCreator:(Creator)->Unit,
+    onRequireAuth:()->Unit,
+    onLoadMore:(String)->Unit,
+    onRefresh:()->Unit
 ) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -168,6 +200,23 @@ private fun RealReelsPager(
     }
 
     val current=reels.getOrNull(pager.currentPage)
+
+    LaunchedEffect(
+        pager.currentPage,
+        reels.size,
+        nextCursor,
+        loadingMore
+    ) {
+        val cursor=nextCursor
+        if(
+            !loadingMore &&
+            !cursor.isNullOrBlank() &&
+            reels.isNotEmpty() &&
+            pager.currentPage>=reels.size-4
+        ) {
+            onLoadMore(cursor)
+        }
+    }
 
     LaunchedEffect(pager.currentPage,reels) {
         val reel=reels.getOrNull(pager.currentPage) ?: return@LaunchedEffect
