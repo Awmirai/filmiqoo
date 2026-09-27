@@ -268,7 +268,7 @@ fun FilmiqooPlayerScreen(
                 player.play()
                 castLoadedVersionId=null
                 castDeviceName=""
-                playerSettingsMessage="Cast قطع شد • ادامه روی گوشی"
+                playerSettingsMessage="پخش روی تلویزیون قطع شد • ادامه روی گوشی"
             }
             castConnected=connected
             wasConnected=connected
@@ -297,7 +297,7 @@ fun FilmiqooPlayerScreen(
                 lastCastPositionMs=start
                 castLoadedVersionId=currentVersionId
                 player.pause()
-                playerSettingsMessage="Cast • پخش روی "+
+                playerSettingsMessage="پخش روی "+
                     castController.deviceName().ifBlank { "TV" }
             }
         }
@@ -1875,12 +1875,12 @@ private fun PlayerTopControls(
                 containerColor=FqSurface
             ) {
                 DropdownMenuItem(
-                    text={Text("Moments و گفتگو")},
+                    text={Text("لحظه‌ها و گفتگو")},
                     leadingIcon={Icon(Icons.Default.Forum,null)},
                     onClick={moreOpen=false;onMoments()}
                 )
                 DropdownMenuItem(
-                    text={Text("Bookmark صحنه")},
+                    text={Text("نشانه‌گذاری صحنه")},
                     leadingIcon={Icon(Icons.Default.BookmarkAdd,null)},
                     onClick={moreOpen=false;onBookmarks()}
                 )
@@ -1910,7 +1910,7 @@ private fun PlayerTopControls(
                     onClick={moreOpen=false;onShare()}
                 )
                 DropdownMenuItem(
-                    text={Text("Picture in Picture")},
+                    text={Text("تصویر در تصویر")},
                     leadingIcon={Icon(Icons.Default.PictureInPictureAlt,null)},
                     onClick={moreOpen=false;onPip()}
                 )
