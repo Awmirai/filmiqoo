@@ -73,10 +73,21 @@ fun ConnectedExploreScreen(
 ) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    val networkOnline=rememberNetworkOnline()
     var state by remember { mutableStateOf<ReelLoad>(ReelLoad.Loading) }
     var refresh by remember { mutableIntStateOf(0) }
     var loadingMore by remember { mutableStateOf(false) }
+    var hadOffline by remember { mutableStateOf(false) }
     val startupResumeReelId=remember { resumeReelId }
+
+    LaunchedEffect(networkOnline) {
+        if(!networkOnline) {
+            hadOffline=true
+        } else if(hadOffline && state is ReelLoad.Error) {
+            hadOffline=false
+            refresh++
+        }
+    }
 
     LaunchedEffect(refresh,initialReelId) {
         state=ReelLoad.Loading
@@ -109,7 +120,7 @@ fun ConnectedExploreScreen(
     }
 
     when(val s=state) {
-        ReelLoad.Loading -> LoadingPage("در حال آماده‌سازی Explore...")
+        ReelLoad.Loading -> LoadingPage("در حال آماده‌سازی Clips...")
         is ReelLoad.Error -> {
             ClipsUnavailableState(
                 title="Clips در دسترس نیست",
@@ -168,6 +179,11 @@ fun ConnectedExploreScreen(
                     },
                     onRefresh={refresh++}
                 )
+                if(!networkOnline) {
+                    NetworkOfflineBanner(
+                        modifier=Modifier.padding(horizontal=12.dp,vertical=12.dp)
+                    )
+                }
             }
         }
     }
