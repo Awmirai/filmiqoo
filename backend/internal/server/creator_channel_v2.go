@@ -1,11 +1,54 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 )
+
+func (s *Server) canViewUserSocialContent(
+	ctx context.Context,
+	viewerID string,
+	targetID string,
+) (bool,bool,error) {
+	var privateAccount bool
+	var blocked bool
+	var following bool
+	err:=s.db.QueryRow(ctx,`
+		SELECT p.private_account,
+		       CASE
+		         WHEN $1='' THEN false
+		         ELSE EXISTS(
+		           SELECT 1 FROM blocks b
+		            WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=$2)
+		               OR (b.blocker_user_id=$2 AND b.blocked_user_id=$1)
+		         )
+		       END,
+		       CASE
+		         WHEN $1='' THEN false
+		         ELSE EXISTS(
+		           SELECT 1 FROM user_follows uf
+		            WHERE uf.follower_user_id=$1
+		              AND uf.followed_user_id=$2
+		         )
+		       END
+		  FROM profiles p
+		 WHERE p.user_id=$2
+	`,viewerID,targetID).Scan(&privateAccount,&blocked,&following)
+	if err!=nil {
+		if strings.Contains(strings.ToLower(err.Error()),"no rows") {
+			return false,false,nil
+		}
+		return false,false,err
+	}
+
+	if blocked { return false,true,nil }
+	if viewerID==targetID { return true,true,nil }
+	if !privateAccount { return true,true,nil }
+	return following,true,nil
+}
 
 func (s *Server) publicUserProfile(w http.ResponseWriter,r *http.Request) {
 	id:=chi.URLParam(r,"id")
@@ -34,8 +77,48 @@ func (s *Server) publicUserProfile(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) publicUserPosts(w http.ResponseWriter,r *http.Request) {
-	_ = s.processScheduledContent(r.Context())
 	id:=chi.URLParam(r,"id")
+	allowed,exists,err:=s.canViewUserSocialContent(r.Context(),"",id)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"user not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.userPostsByOwner(w,r,id)
+}
+
+func (s *Server) viewerUserPosts(w http.ResponseWriter,r *http.Request) {
+	targetID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,err:=s.canViewUserSocialContent(r.Context(),viewerID,targetID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"user not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.userPostsByOwner(w,r,targetID)
+}
+
+func (s *Server) userPostsByOwner(
+	w http.ResponseWriter,
+	r *http.Request,
+	id string,
+) {
+	_ = s.processScheduledContent(r.Context())
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
 		       p.save_count,p.share_count,p.published_at,
@@ -78,7 +161,40 @@ func (s *Server) publicUserPosts(w http.ResponseWriter,r *http.Request) {
 }
 
 func (s *Server) publicUserReels(w http.ResponseWriter,r *http.Request) {
-	s.reelsByOwner(w,r,chi.URLParam(r,"id"),"")
+	targetID:=chi.URLParam(r,"id")
+	allowed,exists,err:=s.canViewUserSocialContent(r.Context(),"",targetID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"user not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.reelsByOwner(w,r,targetID,"")
+}
+
+func (s *Server) viewerUserReels(w http.ResponseWriter,r *http.Request) {
+	targetID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,err:=s.canViewUserSocialContent(r.Context(),viewerID,targetID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"user not found"})
+		return
+	}
+	if !allowed {
+		writeJSON(w,http.StatusOK,map[string]any{
+			"items":[]map[string]any{},
+			"locked":true,
+		})
+		return
+	}
+	s.reelsByOwner(w,r,targetID,"")
 }
 
 func (s *Server) channelReels(w http.ResponseWriter,r *http.Request) {
