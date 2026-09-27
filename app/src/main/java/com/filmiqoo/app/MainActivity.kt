@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,6 +82,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var previewMode by remember { mutableStateOf(false) }
     var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by remember { mutableIntStateOf(0) }
+    val bottomTabStateHolder=rememberSaveableStateHolder()
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
     var showSearch by remember { mutableStateOf(false) }
     var activeViewer by remember { mutableStateOf(viewerStore.active()) }
@@ -895,6 +897,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 }
             ) { padding ->
                 Box(Modifier.padding(padding)) {
+                    bottomTabStateHolder.SaveableStateProvider(
+                        key="main-tab-"+tab
+                    ) {
                     when(tab) {
                         0 -> PremiumHomeScreen(
                             repository=repository,
@@ -1017,6 +1022,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                 )
                             }
                         }
+                    }
+                
                     }
                 }
             }
