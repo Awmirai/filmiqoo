@@ -447,7 +447,8 @@ private fun LiveStateBadge(event:LiveEvent,modifier:Modifier=Modifier) {
                     "live" -> "زنده"
                     "scheduled" -> if(event.eventType=="premiere")"پریمیر" else "زمان‌بندی‌شده"
                     "ended" -> "پایان‌یافته"
-                    else -> event.state.uppercase()
+                    "cancelled" -> "لغوشده"
+                    else -> liveStateLabel(event.state)
                 },
                 fontSize=11.sp,
                 fontWeight=FontWeight.Black
@@ -543,10 +544,12 @@ private fun LiveEventDetailScreen(
                                 modifier=Modifier.size(48.dp)
                             )
                             Text(
-                                if(localEvent.state=="scheduled")
-                                    liveScheduleLabel(localEvent)
-                                else
-                                    "پخش پایان یافته",
+                                when(localEvent.state) {
+                                    "scheduled" -> liveScheduleLabel(localEvent)
+                                    "cancelled" -> "این رویداد لغو شده"
+                                    "ended" -> "پخش پایان یافته"
+                                    else -> liveStateLabel(localEvent.state)
+                                },
                                 fontSize=11.sp,
                                 modifier=Modifier.padding(top=7.dp)
                             )
@@ -1126,6 +1129,14 @@ private fun LiveSourceDialog(
         },
         dismissButton={TextButton(onClick=onDismiss){Text("لغو")}}
     )
+}
+
+private fun liveStateLabel(state:String):String=when(state.lowercase()) {
+    "live" -> "زنده"
+    "scheduled" -> "زمان‌بندی‌شده"
+    "ended" -> "پایان‌یافته"
+    "cancelled" -> "لغوشده"
+    else -> state
 }
 
 private fun liveSchedulePresets():List<Pair<String,String>> {
