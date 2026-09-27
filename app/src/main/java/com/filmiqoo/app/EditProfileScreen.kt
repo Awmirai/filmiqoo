@@ -114,7 +114,9 @@ fun EditProfileScreen(
                 Text("هویت عمومی تو در Filmiqoo",color=FqMuted,fontSize=11.sp)
             }
             TextButton(
-                enabled=!saving && username.trim().length>=3 && displayName.trim().length>=2,
+                enabled=!saving &&
+                    username.trim().matches(Regex("^[A-Za-z0-9_.]{3,24}$")) &&
+                    displayName.trim().length in 2..50,
                 onClick={
                     saving=true
                     error=null
@@ -260,13 +262,20 @@ fun EditProfileScreen(
                     OutlinedTextField(
                         value=username,
                         onValueChange={
-                            username=it.filter { c->
-                                c.isLetterOrDigit() || c=='_' || c=='.'
+                            username=it.filter { ch ->
+                                ch in 'a'..'z' ||
+                                    ch in 'A'..'Z' ||
+                                    ch in '0'..'9' ||
+                                    ch=='_' ||
+                                    ch=='.'
                             }.take(24)
                         },
                         label={Text("نام کاربری")},
                         prefix={Text("@")},
                         leadingIcon={Icon(Icons.Default.AlternateEmail,null)},
+                        supportingText={
+                            Text("۳ تا ۲۴ کاراکتر • حروف انگلیسی، عدد، _ یا .")
+                        },
                         singleLine=true,
                         shape=RoundedCornerShape(15.dp),
                         modifier=Modifier.fillMaxWidth()
