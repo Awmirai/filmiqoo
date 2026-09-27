@@ -76,9 +76,10 @@ fun AuthScreen(
     }
 
     val canSubmit=!loading &&
-        password.length>=10 &&
+        password.isNotBlank() &&
         if(register) {
-            email.isNotBlank() &&
+            password.length>=10 &&
+                email.isNotBlank() &&
                 username.trim().length>=3 &&
                 displayName.trim().length>=2
         } else {
