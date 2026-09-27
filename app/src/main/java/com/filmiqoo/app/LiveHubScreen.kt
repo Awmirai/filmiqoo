@@ -30,9 +30,11 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun LiveHubScreen(
@@ -104,10 +106,10 @@ fun LiveHubScreen(
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Box(Modifier.size(9.dp).background(FqDanger,CircleShape))
                         Spacer(Modifier.width(6.dp))
-                        Text("LIVE",color=FqDanger,fontSize=12.sp,fontWeight=FontWeight.Black)
+                        Text("زنده",color=FqDanger,fontSize=12.sp,fontWeight=FontWeight.Black)
                     }
-                    Text("Live & Premiere",fontSize=24.sp,fontWeight=FontWeight.Black)
-                    Text("پخش زنده، پریمیر و Chat همزمان",color=FqMuted,fontSize=11.sp)
+                    Text("پخش زنده و پریمیر",fontSize=24.sp,fontWeight=FontWeight.Black)
+                    Text("پخش زنده، پریمیر و گفت‌وگوی همزمان",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
             }
@@ -119,7 +121,7 @@ fun LiveHubScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text("رویدادها",fontSize=15.sp,fontWeight=FontWeight.Bold)
-                Text("Liveهای در حال پخش و Premiereهای آینده",color=FqMuted,fontSize=11.sp)
+                Text("پخش‌های زنده و پریمیرهای آینده",color=FqMuted,fontSize=11.sp)
             }
             Button(
                 onClick={
@@ -153,7 +155,7 @@ fun LiveHubScreen(
             PremiumEmptyState(
                 Icons.Default.LiveTv,
                 "رویداد فعالی نیست",
-                "Creatorها می‌تونن Live یا Premiere جدید بسازن.",
+                "سازنده‌ها می‌تونن پخش زنده یا پریمیر جدید بسازن.",
                 "ساخت رویداد"
             ) {
                 if(backend.session.isLoggedIn) showCreate=true else onRequireAuth()
@@ -244,7 +246,7 @@ private fun LiveEventCard(
                             overflow=TextOverflow.Ellipsis
                         )
                         Text(
-                            if(event.eventType=="premiere")"Premiere" else "Live Stream",
+                            if(event.eventType=="premiere")"پریمیر" else "پخش زنده",
                             color=FqGold,
                             fontSize=11.sp
                         )
@@ -310,9 +312,9 @@ private fun LiveStateBadge(event:LiveEvent,modifier:Modifier=Modifier) {
             }
             Text(
                 when(event.state) {
-                    "live" -> "LIVE"
-                    "scheduled" -> if(event.eventType=="premiere")"PREMIERE" else "SCHEDULED"
-                    "ended" -> "ENDED"
+                    "live" -> "زنده"
+                    "scheduled" -> if(event.eventType=="premiere")"پریمیر" else "زمان‌بندی‌شده"
+                    "ended" -> "پایان‌یافته"
                     else -> event.state.uppercase()
                 },
                 fontSize=11.sp,
@@ -486,7 +488,7 @@ private fun LiveEventDetailScreen(
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
                             Text(media.title,fontSize=12.sp,fontWeight=FontWeight.Bold)
-                            Text("متصل به Catalog Filmiqoo",color=FqMuted,fontSize=11.sp)
+                            Text("متصل به کاتالوگ Filmiqoo",color=FqMuted,fontSize=11.sp)
                         }
                         Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
                     }
@@ -511,7 +513,7 @@ private fun LiveEventDetailScreen(
                     ) {
                         Icon(Icons.Default.Chat,null,tint=Color.Black)
                         Spacer(Modifier.width(5.dp))
-                        Text("Live Chat",color=Color.Black)
+                        Text("گفت‌وگوی زنده",color=Color.Black)
                     }
                 }
 
@@ -528,7 +530,7 @@ private fun LiveEventDetailScreen(
                                         }.onSuccess {
                                             localEvent=it
                                             onUpdated(it)
-                                        }.onFailure { onError(it.message ?: "شروع Live ناموفق بود") }
+                                        }.onFailure { onError(it.message ?: "شروع پخش زنده ناموفق بود") }
                                     }
                                 }
                                 "live" -> scope.launch {
@@ -538,7 +540,7 @@ private fun LiveEventDetailScreen(
                                     }.onSuccess {
                                         localEvent=it
                                         onUpdated(it)
-                                    }.onFailure { onError(it.message ?: "پایان Live ناموفق بود") }
+                                    }.onFailure { onError(it.message ?: "پایان پخش زنده ناموفق بود") }
                                 }
                             }
                         },
@@ -550,7 +552,7 @@ private fun LiveEventDetailScreen(
                             null
                         )
                         Spacer(Modifier.width(5.dp))
-                        Text(if(localEvent.state=="live")"پایان Live" else "شروع Live")
+                        Text(if(localEvent.state=="live")"پایان پخش" else "شروع پخش")
                     }
                 }
             }
@@ -564,13 +566,13 @@ private fun LiveEventDetailScreen(
                     modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
                 ) {
                     Column(Modifier.padding(13.dp)) {
-                        Text("Host Analytics",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                        Text("آمار میزبان",fontSize=11.sp,fontWeight=FontWeight.Bold)
                         Row(
                             Modifier.fillMaxWidth().padding(top=9.dp),
                             horizontalArrangement=Arrangement.spacedBy(8.dp)
                         ) {
                             PremiumStat(compactLiveCount(localEvent.viewers),"الان",Modifier.weight(1f))
-                            PremiumStat(compactLiveCount(localEvent.peakViewers),"Peak",Modifier.weight(1f))
+                            PremiumStat(compactLiveCount(localEvent.peakViewers),"اوج",Modifier.weight(1f))
                         }
                     }
                 }
@@ -661,19 +663,19 @@ private fun CreateLiveEventDialog(
 
     AlertDialog(
         onDismissRequest={if(!busy)onDismiss()},
-        title={Text("Live / Premiere جدید")},
+        title={Text("پخش زنده / پریمیر جدید")},
         text={
             Column(Modifier.heightIn(max=560.dp)) {
                 Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) {
                     FilterChip(
                         selected=type=="live",
                         onClick={type="live"},
-                        label={Text("Live")}
+                        label={Text("پخش زنده")}
                     )
                     FilterChip(
                         selected=type=="premiere",
                         onClick={type="premiere"},
-                        label={Text("Premiere")}
+                        label={Text("پریمیر")}
                     )
                 }
 
@@ -716,7 +718,7 @@ private fun CreateLiveEventDialog(
                             Column(Modifier.weight(1f)) {
                                 Text(taggedMedia?.title ?: "انتخاب فیلم یا سریال",fontSize=11.sp)
                                 Text(
-                                    "Premiere از نسخه Stream-ready Catalog پخش می‌شه.",
+                                    "پریمیر از نسخه آماده پخش کاتالوگ اجرا می‌شه.",
                                     color=FqMuted,
                                     fontSize=11.sp
                                 )
@@ -728,8 +730,8 @@ private fun CreateLiveEventDialog(
                     OutlinedTextField(
                         value=playbackUrl,
                         onValueChange={playbackUrl=it.take(2000)},
-                        label={Text("HLS playback URL • اختیاری")},
-                        supportingText={Text("می‌تونی بعداً قبل از شروع Live هم واردش کنی.",fontSize=11.sp)},
+                        label={Text("آدرس پخش HLS • اختیاری")},
+                        supportingText={Text("می‌تونی بعداً و قبل از شروع پخش هم واردش کنی.",fontSize=11.sp)},
                         modifier=Modifier.fillMaxWidth().padding(top=7.dp)
                     )
                 }
@@ -738,7 +740,7 @@ private fun CreateLiveEventDialog(
                     Modifier.fillMaxWidth().padding(top=8.dp),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    Text("Live Chat",fontSize=11.sp,modifier=Modifier.weight(1f))
+                    Text("گفت‌وگوی زنده",fontSize=11.sp,modifier=Modifier.weight(1f))
                     Switch(checked=allowChat,onCheckedChange={allowChat=it})
                 }
 
@@ -825,11 +827,11 @@ private fun LiveSourceDialog(
     AlertDialog(
         onDismissRequest=onDismiss,
         icon={Icon(Icons.Default.LiveTv,null,tint=FqDanger)},
-        title={Text("اتصال منبع Live")},
+        title={Text("اتصال منبع پخش زنده")},
         text={
             Column {
                 Text(
-                    "آدرس HLS خروجی Encoder/Live pipeline رو وارد کن. Premiere این مرحله رو لازم نداره.",
+                    "آدرس HLS خروجی انکودر رو وارد کن. پریمیر این مرحله رو لازم نداره.",
                     color=FqMuted,
                     fontSize=11.sp,
                     lineHeight=14.sp
@@ -846,7 +848,7 @@ private fun LiveSourceDialog(
             Button(
                 onClick={onStart(url.trim())},
                 enabled=url.trim().startsWith("http")
-            ) { Text("شروع Live") }
+            ) { Text("شروع پخش") }
         },
         dismissButton={TextButton(onClick=onDismiss){Text("لغو")}}
     )
@@ -863,7 +865,10 @@ private fun parseLiveDateTime(value:String):String? =
 private fun liveScheduleLabel(event:LiveEvent):String {
     if(event.state=="live") return "همین الان در حال پخش"
     val raw=event.scheduledAt ?: return "زمان‌بندی نشده"
-    return raw.replace("T"," ").replace("Z"," UTC").take(20)
+    val instant=runCatching { Instant.parse(raw) }.getOrNull() ?: return raw
+    return instant.atZone(ZoneId.systemDefault()).format(
+        DateTimeFormatter.ofPattern("EEE d MMM • HH:mm",Locale("fa","IR"))
+    )
 }
 
 private fun compactLiveCount(value:Long):String=when {
