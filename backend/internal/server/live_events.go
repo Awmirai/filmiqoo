@@ -62,7 +62,30 @@ func (s *Server) myLiveEvents(w http.ResponseWriter,r *http.Request) {
 
 func (s *Server) liveEventDetail(w http.ResponseWriter,r *http.Request) {
 	id:=chi.URLParam(r,"id")
-	row:=s.db.QueryRow(r.Context(),`
+	item,err:=s.liveEventDetailForViewer(r.Context(),id,"")
+	if err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"live event not found"})
+		return
+	}
+	writeJSON(w,http.StatusOK,item)
+}
+
+func (s *Server) viewerLiveEventDetail(w http.ResponseWriter,r *http.Request) {
+	id:=chi.URLParam(r,"id")
+	userID:=userIDFromContext(r.Context())
+	item,err:=s.liveEventDetailForViewer(r.Context(),id,userID)
+	if err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"live event not found"})
+		return
+	}
+	writeJSON(w,http.StatusOK,item)
+}
+
+func (s *Server) liveEventDetailForViewer(
+	ctx context.Context,
+	id,userID string,
+) (map[string]any,error) {
+	row:=s.db.QueryRow(ctx,`
 		SELECT le.id::text,le.event_type,le.title,le.description,le.visibility,le.state,
 		       le.playback_url,le.cover_url,le.allow_chat,le.scheduled_at,le.started_at,le.ended_at,
 		       le.viewer_count,le.peak_viewer_count,le.room_id::text,
@@ -73,14 +96,22 @@ func (s *Server) liveEventDetail(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles p ON p.user_id=le.host_user_id
 		  LEFT JOIN media_titles mt ON mt.id=le.media_title_id
 		 WHERE le.id=$1
-	`,id)
-
-	item,err:=scanLiveEventRow(row)
-	if err!=nil {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"live event not found"})
-		return
-	}
-	writeJSON(w,http.StatusOK,item)
+		   AND (
+		     le.visibility='public'
+		     OR le.host_user_id::text=$2
+		     OR (
+		       $2<>''
+		       AND le.room_id IS NOT NULL
+		       AND EXISTS(
+		         SELECT 1
+		           FROM room_members rm
+		          WHERE rm.room_id=le.room_id
+		            AND rm.user_id::text=$2
+		       )
+		     )
+		   )
+	`,id,userID)
+	return scanLiveEventRow(row)
 }
 
 func (s *Server) createLiveEvent(w http.ResponseWriter,r *http.Request) {
@@ -220,13 +251,31 @@ func (s *Server) joinLiveEvent(w http.ResponseWriter,r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var roomID *string
-	var state string
+	var state,visibility,hostID string
 	err=tx.QueryRow(r.Context(),`
-		SELECT room_id::text,state FROM live_events WHERE id=$1
-	`,id).Scan(&roomID,&state)
+		SELECT room_id::text,state,visibility,host_user_id::text
+		  FROM live_events
+		 WHERE id=$1
+	`,id).Scan(&roomID,&state,&visibility,&hostID)
 	if err!=nil {
 		writeJSON(w,http.StatusNotFound,map[string]string{"error":"live event not found"}); return
 	}
+
+	if visibility!="public" && hostID!=userID {
+		var member bool
+		if roomID!=nil {
+			_ = tx.QueryRow(r.Context(),`
+				SELECT EXISTS(
+					SELECT 1 FROM room_members
+					 WHERE room_id=$1 AND user_id=$2
+				)
+			`,*roomID,userID).Scan(&member)
+		}
+		if !member {
+			writeJSON(w,http.StatusForbidden,map[string]string{"error":"live event access requires membership"}); return
+		}
+	}
+
 	if state=="ended" || state=="cancelled" {
 		writeJSON(w,http.StatusConflict,map[string]string{"error":"live event is not active"}); return
 	}
