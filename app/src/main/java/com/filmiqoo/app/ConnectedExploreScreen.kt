@@ -139,6 +139,14 @@ fun ConnectedExploreScreen(
                     onCreator=onCreator,
                     onRequireAuth=onRequireAuth,
                     onVisibleReelChanged=onVisibleReelChanged,
+                    onClipRemoved={ removedId ->
+                        val currentState=state as? ReelLoad.Ready
+                        if(currentState!=null) {
+                            state=currentState.copy(
+                                reels=currentState.reels.filterNot { it.id==removedId }
+                            )
+                        }
+                    },
                     onLoadMore={ cursor ->
                         if(!loadingMore) {
                             loadingMore=true
@@ -179,6 +187,7 @@ private fun RealReelsPager(
     onCreator:(Creator)->Unit,
     onRequireAuth:()->Unit,
     onVisibleReelChanged:(String)->Unit,
+    onClipRemoved:(String)->Unit,
     onLoadMore:(String)->Unit,
     onRefresh:()->Unit
 ) {
@@ -198,9 +207,18 @@ private fun RealReelsPager(
     var commentsFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var moreFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var safetyFor by remember { mutableStateOf<ReelFeedItem?>(null) }
+    var deleteFor by remember { mutableStateOf<ReelFeedItem?>(null) }
+    var deleteBusy by remember { mutableStateOf(false) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
+    var currentUserId by remember(loggedIn) { mutableStateOf<String?>(null) }
     var muted by remember {
         mutableStateOf(store.getBoolean("clips_muted",false))
+    }
+
+    LaunchedEffect(loggedIn) {
+        currentUserId=if(loggedIn) {
+            runCatching { backend.me().id }.getOrNull()
+        } else null
     }
 
     val player=remember {
@@ -344,6 +362,7 @@ private fun RealReelsPager(
                 saved=saved[reel.id] ?: reel.savedByMe,
                 followed=followed[reel.author.id] ?: reel.followingAuthor,
                 followPending=followPending[reel.author.id] ?: reel.followPending,
+                ownClip=currentUserId!=null && currentUserId==reel.author.id,
                 commentCount=(reel.comments+(commentDelta[reel.id] ?: 0L)).coerceAtLeast(0L),
                 shareCount=shareCount[reel.id] ?: reel.shares,
                 onReveal={
@@ -543,6 +562,7 @@ private fun RealReelsPager(
     }
 
     moreFor?.let { reel ->
+        val ownClip=currentUserId!=null && currentUserId==reel.author.id
         ModalBottomSheet(
             onDismissRequest={moreFor=null},
             containerColor=FqSurface,
@@ -554,40 +574,118 @@ private fun RealReelsPager(
                     .padding(bottom=24.dp)
             ) {
                 Text(
-                    "گزینه‌های Clip",
+                    if(ownClip)"مدیریت Clip" else "گزینه‌های Clip",
                     fontSize=18.sp,
                     fontWeight=FontWeight.Black,
                     modifier=Modifier.padding(bottom=8.dp)
                 )
-                ReelMoreAction(
-                    icon=Icons.Default.DoNotDisturbOn,
-                    title="علاقه ندارم",
-                    subtitle="Clipهای مشابه کمتر نمایش داده می‌شن."
-                ) {
-                    moreFor=null
-                    if(!loggedIn) {
-                        onRequireAuth()
-                    } else {
-                        scope.launch {
-                            runCatching {
-                                social.feedback("reel",reel.id,"not_interested")
-                            }.onSuccess {
-                                feedbackMessage="این نوع Clip کمتر نمایش داده می‌شه."
-                                onRefresh()
+
+                if(ownClip) {
+                    ReelMoreAction(
+                        icon=Icons.Default.DeleteOutline,
+                        title="حذف Clip",
+                        subtitle="Clip از پروفایل و فید Filmiqoo حذف می‌شه."
+                    ) {
+                        moreFor=null
+                        deleteFor=reel
+                    }
+                } else {
+                    ReelMoreAction(
+                        icon=Icons.Default.DoNotDisturbOn,
+                        title="علاقه ندارم",
+                        subtitle="Clipهای مشابه کمتر نمایش داده می‌شن."
+                    ) {
+                        moreFor=null
+                        if(!loggedIn) {
+                            onRequireAuth()
+                        } else {
+                            scope.launch {
+                                runCatching {
+                                    social.feedback("reel",reel.id,"not_interested")
+                                }.onSuccess {
+                                    feedbackMessage="این نوع Clip کمتر نمایش داده می‌شه."
+                                    onRefresh()
+                                }
                             }
                         }
                     }
-                }
-                ReelMoreAction(
-                    icon=Icons.Default.Shield,
-                    title="ایمنی و گزارش",
-                    subtitle="گزارش، Block یا Mute کردن این حساب"
-                ) {
-                    moreFor=null
-                    if(!loggedIn) onRequireAuth() else safetyFor=reel
+                    ReelMoreAction(
+                        icon=Icons.Default.Shield,
+                        title="ایمنی و گزارش",
+                        subtitle="گزارش، Block یا Mute کردن این حساب"
+                    ) {
+                        moreFor=null
+                        if(!loggedIn) onRequireAuth() else safetyFor=reel
+                    }
                 }
             }
         }
+    }
+
+    deleteFor?.let { reel ->
+        AlertDialog(
+            onDismissRequest={
+                if(!deleteBusy) deleteFor=null
+            },
+            icon={
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    null,
+                    tint=FqDanger
+                )
+            },
+            title={Text("حذف Clip؟")},
+            text={
+                Text(
+                    "این Clip دیگه در فید و پروفایل نمایش داده نمی‌شه. این کار رو فقط برای Clipهای خودت می‌تونی انجام بدی."
+                )
+            },
+            confirmButton={
+                Button(
+                    onClick={
+                        if(!deleteBusy) {
+                            deleteBusy=true
+                            scope.launch {
+                                runCatching {
+                                    social.removeReel(reel.id)
+                                }.onSuccess { removed ->
+                                    if(removed) {
+                                        onClipRemoved(reel.id)
+                                        feedbackMessage="Clip حذف شد."
+                                        deleteFor=null
+                                    }
+                                }.onFailure {
+                                    feedbackMessage=it.message ?: "حذف Clip ناموفق بود."
+                                }
+                                deleteBusy=false
+                            }
+                        }
+                    },
+                    enabled=!deleteBusy,
+                    colors=ButtonDefaults.buttonColors(
+                        containerColor=FqDanger,
+                        contentColor=Color.White
+                    )
+                ) {
+                    if(deleteBusy) {
+                        CircularProgressIndicator(
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text("حذف")
+                }
+            },
+            dismissButton={
+                TextButton(
+                    onClick={deleteFor=null},
+                    enabled=!deleteBusy
+                ) {
+                    Text("انصراف")
+                }
+            }
+        )
     }
 
     safetyFor?.let { reel ->
@@ -624,6 +722,7 @@ private fun ReelVideoPage(
     saved: Boolean,
     followed: Boolean,
     followPending: Boolean,
+    ownClip: Boolean,
     commentCount: Long,
     shareCount: Long,
     onReveal: () -> Unit,
@@ -776,26 +875,28 @@ private fun ReelVideoPage(
                     Text("@"+reel.author.username,color=Color.White.copy(alpha=.7f),fontSize=11.sp)
                 }
                 Spacer(Modifier.width(10.dp))
-                OutlinedButton(
-                    onClick=onFollow,
-                    contentPadding=PaddingValues(horizontal=10.dp,vertical=2.dp),
-                    modifier=Modifier.height(30.dp),
-                    colors=ButtonDefaults.outlinedButtonColors(
-                        contentColor=when {
-                            followed -> FqGold
-                            followPending -> FqGoldSoft
-                            else -> Color.White
-                        }
-                    )
-                ) {
-                    Text(
-                        when {
-                            followed -> "دنبال می‌کنی"
-                            followPending -> "درخواست شد"
-                            else -> "دنبال"
-                        },
-                        fontSize=11.sp
-                    )
+                if(!ownClip) {
+                    OutlinedButton(
+                        onClick=onFollow,
+                        contentPadding=PaddingValues(horizontal=10.dp,vertical=2.dp),
+                        modifier=Modifier.height(30.dp),
+                        colors=ButtonDefaults.outlinedButtonColors(
+                            contentColor=when {
+                                followed -> FqGold
+                                followPending -> FqGoldSoft
+                                else -> Color.White
+                            }
+                        )
+                    ) {
+                        Text(
+                            when {
+                                followed -> "دنبال می‌کنی"
+                                followPending -> "درخواست شد"
+                                else -> "دنبال"
+                            },
+                            fontSize=11.sp
+                        )
+                    }
                 }
             }
 
