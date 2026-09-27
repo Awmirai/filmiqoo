@@ -42,7 +42,8 @@ fun ClubScreen(
     onStory:(List<SocialStory>,Int)->Unit,
     onInbox:()->Unit,
     onCreate:()->Unit,
-    onRequireAuth:()->Unit
+    onRequireAuth:()->Unit,
+    initialPostId:String?=null
 ) {
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
@@ -65,6 +66,12 @@ fun ClubScreen(
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
     var unreadMessages by remember { mutableLongStateOf(0L) }
 
+    LaunchedEffect(initialPostId) {
+        if(!initialPostId.isNullOrBlank()) {
+            tab=ClubTab.FOR_YOU
+        }
+    }
+
     LaunchedEffect(loggedIn,refresh) {
         unreadMessages=if(loggedIn) {
             runCatching {
@@ -73,7 +80,7 @@ fun ClubScreen(
         } else 0L
     }
 
-    LaunchedEffect(tab,refresh,loggedIn) {
+    LaunchedEffect(tab,refresh,loggedIn,initialPostId) {
         loading=true
         error=null
 
@@ -82,7 +89,18 @@ fun ClubScreen(
                 ClubTab.FOR_YOU -> {
                     pulse=runCatching { pulseRepo.trending() }.getOrDefault(emptyList())
                     val results=listOf(
-                        runCatching { feed=social.feed() },
+                        runCatching {
+                            val base=social.feed()
+                            feed=if(initialPostId.isNullOrBlank()) {
+                                base
+                            } else {
+                                val focused=runCatching {
+                                    social.post(initialPostId)
+                                }.getOrNull()
+                                if(focused==null) base
+                                else listOf(focused)+base.filterNot { it.id==focused.id }
+                            }
+                        },
                         runCatching { stories=social.stories() },
                         runCatching { clips=social.reels() },
                         runCatching { rooms=social.rooms() },
