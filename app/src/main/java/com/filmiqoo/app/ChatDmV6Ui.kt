@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -158,7 +159,7 @@ fun RichMessageAttachment(
                         val label=message.locationLabel.orEmpty()
                         val uri=Uri.parse(
                             "geo:$lat,$lng?q=$lat,$lng("+
-                                Uri.encode(label.ifBlank { "Location" })+")"
+                                Uri.encode(label.ifBlank { "موقعیت" })+")"
                         )
                         val intent=Intent(Intent.ACTION_VIEW,uri)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -268,7 +269,7 @@ fun ChatAttachmentMenuSheet(
             ChatAttachmentOption(Icons.Default.AddPhotoAlternate,"عکس یا ویدیو","از گالری") {
                 onDismiss(); onMedia()
             }
-            ChatAttachmentOption(Icons.Default.InsertDriveFile,"فایل / Document","PDF، Word، Excel، ZIP و متن") {
+            ChatAttachmentOption(Icons.Default.InsertDriveFile,"فایل / سند","PDF، Word، Excel، ZIP و متن") {
                 onDismiss(); onDocument()
             }
             ChatAttachmentOption(Icons.Default.LocationOn,"موقعیت مکانی","ارسال مختصات و نام مکان") {
@@ -319,9 +320,9 @@ fun LocationMessageDialog(
     onDismiss:()->Unit,
     onSend:(Double,Double,String)->Unit
 ) {
-    var latitude by remember { mutableStateOf("") }
-    var longitude by remember { mutableStateOf("") }
-    var label by remember { mutableStateOf("") }
+    var latitude by rememberSaveable { mutableStateOf("") }
+    var longitude by rememberSaveable { mutableStateOf("") }
+    var label by rememberSaveable { mutableStateOf("") }
     val lat=latitude.replace(',','.').toDoubleOrNull()
     val lng=longitude.replace(',','.').toDoubleOrNull()
     val valid=lat!=null && lng!=null && lat in -90.0..90.0 && lng in -180.0..180.0
@@ -341,14 +342,14 @@ fun LocationMessageDialog(
                 OutlinedTextField(
                     value=latitude,
                     onValueChange={latitude=it.take(16)},
-                    label={Text("Latitude")},
+                    label={Text("عرض جغرافیایی")},
                     singleLine=true,
                     modifier=Modifier.padding(top=7.dp)
                 )
                 OutlinedTextField(
                     value=longitude,
                     onValueChange={longitude=it.take(16)},
-                    label={Text("Longitude")},
+                    label={Text("طول جغرافیایی")},
                     singleLine=true,
                     modifier=Modifier.padding(top=7.dp)
                 )
@@ -372,9 +373,9 @@ fun ContactMessageDialog(
     onDismiss:()->Unit,
     onSend:(String,String,String)->Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest=onDismiss,
