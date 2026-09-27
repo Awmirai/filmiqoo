@@ -45,9 +45,10 @@ if grep -q '^backend/' <<<"$CHANGED_FILES"; then BACKEND_CHANGED=1; fi
 if grep -q '^deploy/production/' <<<"$CHANGED_FILES"; then PRODUCTION_CHANGED=1; fi
 
 check_workflow() {
-  local workflow_name="$1"
+  local sha="$1"
+  local workflow_name="$2"
   local result
-  result="$(python3 - "$GITHUB_REPO" "$REMOTE_SHA" "$workflow_name" <<'PY'
+  result="$(python3 - "$GITHUB_REPO" "$sha" "$workflow_name" <<'PY'
 import json, sys, urllib.request
 repo, sha, wanted = sys.argv[1:]
 url = f"https://api.github.com/repos/{repo}/actions/runs?head_sha={sha}&per_page=100"
@@ -71,21 +72,25 @@ PY
   case "$result" in
     completed:success) return 0 ;;
     queued:*|in_progress:*|waiting:*|requested:*|pending:*|missing:*)
-      echo "Deferring $REMOTE_SHA: workflow '$workflow_name' is not completed successfully yet ($result)."
+      echo "Deferring $REMOTE_SHA: workflow '$workflow_name' for $sha is not completed successfully yet ($result)."
       return 10
       ;;
     *)
-      echo "Blocking $REMOTE_SHA: workflow '$workflow_name' did not succeed ($result)."
+      echo "Blocking $REMOTE_SHA: workflow '$workflow_name' for $sha did not succeed ($result)."
       return 11
       ;;
   esac
 }
 
+BACKEND_SHA=""
+CONTRACT_SHA=""
 if [[ "$BACKEND_CHANGED" -eq 1 ]]; then
-  check_workflow "Backend CI" || exit 0
+  BACKEND_SHA="$(git rev-list -1 "$LOCAL_SHA..$REMOTE_SHA" -- backend)"
+  check_workflow "$BACKEND_SHA" "Backend CI" || exit 0
 fi
 if [[ "$BACKEND_CHANGED" -eq 1 || "$PRODUCTION_CHANGED" -eq 1 ]]; then
-  check_workflow "Production Contract Checks" || exit 0
+  CONTRACT_SHA="$(git rev-list -1 "$LOCAL_SHA..$REMOTE_SHA" -- backend deploy/production .github/workflows/production-release.yml .github/workflows/production-contract.yml)"
+  check_workflow "$CONTRACT_SHA" "Production Contract Checks" || exit 0
 fi
 
 echo "Updating Filmiqoo source: $LOCAL_SHA -> $REMOTE_SHA"
