@@ -115,23 +115,10 @@ fun PremiumCreatorChannelScreen(
                     management=management,
                     access=access
                 )
-            } else {else {
-                val rawPosts=repo.userPosts(creator.id)
-                val postStates=if(backend.session.isLoggedIn) {
-                    runCatching {
-                        social.postViewerStates(rawPosts.map { it.id })
-                    }.getOrDefault(emptyMap())
-                } else emptyMap()
-                val hydratedPosts=rawPosts.map { post ->
-                    val viewer=postStates[post.id]
-                    if(viewer==null) post else post.copy(
-                        likedByMe=viewer.first,
-                        savedByMe=viewer.second
-                    )
-                }
+            } else {
                 CreatorEntityState.User(
                     profile=repo.userProfile(creator.id),
-                    posts=hydratedPosts,
+                    posts=repo.userPosts(creator.id),
                     reels=repo.userReels(creator.id),
                     relationship=if(backend.session.isLoggedIn) {
                         runCatching { social.userRelationship(creator.id) }.getOrNull()
