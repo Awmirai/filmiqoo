@@ -63,7 +63,9 @@ fun ConnectedExploreScreen(
     store: LocalStore,
     loggedIn: Boolean,
     initialReelId: String? = null,
+    resumeReelId: String? = null,
     onInitialReelConsumed: () -> Unit = {},
+    onVisibleReelChanged: (String) -> Unit = {},
     onMedia: (MediaItem) -> Unit,
     onChat: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
@@ -74,15 +76,17 @@ fun ConnectedExploreScreen(
     var state by remember { mutableStateOf<ReelLoad>(ReelLoad.Loading) }
     var refresh by remember { mutableIntStateOf(0) }
     var loadingMore by remember { mutableStateOf(false) }
+    val startupResumeReelId=remember { resumeReelId }
 
     LaunchedEffect(refresh,initialReelId) {
         state=ReelLoad.Loading
         state=runCatching {
             val page=social.reelsPage()
             val feed=page.items
-            val target=initialReelId
+            val requestedId=initialReelId
                 ?.takeIf(String::isNotBlank)
-                ?.let { id ->
+                ?: startupResumeReelId?.takeIf(String::isNotBlank)
+            val target=requestedId?.let { id ->
                     feed.firstOrNull { it.id==id }
                         ?: runCatching { social.reel(id) }.getOrNull()
                 }
@@ -91,7 +95,12 @@ fun ConnectedExploreScreen(
             } else {
                 listOf(target)+feed.filterNot { it.id==target.id }
             }
-            if(target!=null) onInitialReelConsumed()
+            if(
+                target!=null &&
+                !initialReelId.isNullOrBlank()
+            ) {
+                onInitialReelConsumed()
+            }
             ReelLoad.Ready(
                 reels=ordered,
                 nextCursor=page.nextCursor
@@ -128,6 +137,7 @@ fun ConnectedExploreScreen(
                     onMedia=onMedia,
                     onCreator=onCreator,
                     onRequireAuth=onRequireAuth,
+                    onVisibleReelChanged=onVisibleReelChanged,
                     onLoadMore={ cursor ->
                         if(!loadingMore) {
                             loadingMore=true
@@ -166,6 +176,7 @@ private fun RealReelsPager(
     onMedia: (MediaItem) -> Unit,
     onCreator:(Creator)->Unit,
     onRequireAuth:()->Unit,
+    onVisibleReelChanged:(String)->Unit,
     onLoadMore:(String)->Unit,
     onRefresh:()->Unit
 ) {
@@ -200,6 +211,12 @@ private fun RealReelsPager(
     }
 
     val current=reels.getOrNull(pager.currentPage)
+
+    LaunchedEffect(current?.id) {
+        current?.id
+            ?.takeIf(String::isNotBlank)
+            ?.let(onVisibleReelChanged)
+    }
 
     LaunchedEffect(
         pager.currentPage,
