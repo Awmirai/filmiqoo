@@ -962,6 +962,10 @@ class BackendRepository(context: Context) {
                 "زمان انتشار را حداکثر تا یک سال آینده انتخاب کن."
             "comment must be 1-2000 characters" ->
                 "کامنت باید بین ۱ تا ۲۰۰۰ کاراکتر باشد."
+            "message is empty" ->
+                "پیام نمی‌تواند خالی باشد."
+            "message is too long" ->
+                "پیام حداکثر می‌تواند ۴۰۰۰ کاراکتر باشد."
             "bio is too long" ->
                 "معرفی پروفایل حداکثر ۳۰۰ کاراکتر است."
             "profile images must come from your Filmiqoo uploads" ->
