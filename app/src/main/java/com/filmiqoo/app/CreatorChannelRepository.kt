@@ -157,18 +157,35 @@ class CreatorChannelRepository(
         )
     }
 
-    suspend fun userPosts(id: String): List<SocialPost> =
-        enrichPostViewerState(
+    suspend fun userPosts(id: String): List<SocialPost> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/users/"+id+"/posts/viewer"
+        else
+            "/v1/social/users/"+id+"/posts"
+        return enrichPostViewerState(
             parsePosts(
                 backend.getJson(
-                    "/v1/social/users/"+id+"/posts",
-                    authorized=false
+                    path,
+                    authorized=loggedIn
                 )
             )
         )
+    }
 
-    suspend fun userReels(id: String): List<ReelFeedItem> =
-        parseReels(backend.getJson("/v1/social/users/"+id+"/reels",authorized=false))
+    suspend fun userReels(id: String): List<ReelFeedItem> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/users/"+id+"/reels/viewer"
+        else
+            "/v1/social/users/"+id+"/reels"
+        return parseReels(
+            backend.getJson(
+                path,
+                authorized=loggedIn
+            )
+        )
+    }
 
     suspend fun channelProfile(id: String): PublicChannelProfile {
         val o=backend.getJson("/v1/social/channels/"+id,authorized=false)
