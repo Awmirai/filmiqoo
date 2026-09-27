@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,8 +40,8 @@ fun PlaybackMomentsSheet(
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var moments by remember { mutableStateOf<List<PlaybackMoment>>(emptyList()) }
-    var body by remember { mutableStateOf("") }
-    var spoiler by remember { mutableStateOf(false) }
+    var body by rememberSaveable(mediaVersionId,anchor) { mutableStateOf("") }
+    var spoiler by rememberSaveable(mediaVersionId,anchor) { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -75,7 +76,7 @@ fun PlaybackMomentsSheet(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Moments",fontSize=20.sp,fontWeight=FontWeight.Black)
+                    Text("لحظه‌ها",fontSize=20.sp,fontWeight=FontWeight.Black)
                     Text(
                         "واکنش‌ها و کامنت‌های نزدیک "+formatMomentTime(anchor),
                         color=FqMuted,
@@ -152,7 +153,7 @@ fun PlaybackMomentsSheet(
                         FilterChip(
                             selected=spoiler,
                             onClick={spoiler=!spoiler},
-                            label={Text("Spoiler",fontSize=7.sp)},
+                            label={Text("اسپویلر",fontSize=7.sp)},
                             leadingIcon={
                                 Icon(
                                     Icons.Default.VisibilityOff,
@@ -357,7 +358,7 @@ private fun PlaybackMomentCard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "Spoiler Shield • برای نمایش لمس کن",
+                            "اسپویلر مخفی شده • برای نمایش لمس کن",
                             color=FqDanger,
                             fontSize=7.sp
                         )
