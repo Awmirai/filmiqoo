@@ -295,6 +295,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/watch-parties/{id}/invite-response", s.respondWatchPartyInvite)
 			r.Post("/live-events", s.createLiveEvent)
 			r.Get("/me/live-events", s.myLiveEvents)
+			r.Get("/live-events/{id}/viewer", s.viewerLiveEventDetail)
 			r.Post("/live-events/{id}/join", s.joinLiveEvent)
 			r.Post("/live-events/{id}/leave", s.leaveLiveEvent)
 			r.Post("/live-events/{id}/heartbeat", s.liveHeartbeat)
