@@ -82,6 +82,7 @@ fun PremiumCreatorChannelScreen(
     var followed by remember(creator.id) { mutableStateOf(false) }
     var followPending by remember(creator.id) { mutableStateOf(false) }
     var followBusy by remember { mutableStateOf(false) }
+    var followerDelta by remember(creator.id) { mutableLongStateOf(0L) }
     var tab by rememberSaveable(creator.id,creator.entityType) { mutableIntStateOf(0) }
     val clipsGridState=rememberLazyGridState()
     val postsListState=rememberLazyListState()
@@ -167,12 +168,46 @@ fun PremiumCreatorChannelScreen(
                 if(!backend.session.isLoggedIn) {
                     onRequireAuth()
                 } else if(!followBusy) {
+                    val beforeFollowed=followed
+                    val beforePending=followPending
+                    val beforeDelta=followerDelta
+
+                    when {
+                        beforeFollowed -> {
+                            followed=false
+                            followPending=false
+                            followerDelta=beforeDelta-1L
+                        }
+                        beforePending -> {
+                            followed=false
+                            followPending=false
+                        }
+                        p.privateAccount -> {
+                            followed=false
+                            followPending=true
+                        }
+                        else -> {
+                            followed=true
+                            followPending=false
+                            followerDelta=beforeDelta+1L
+                        }
+                    }
+
                     followBusy=true
                     scope.launch {
                         runCatching { social.toggleUserFollowState(p.id) }
-                            .onSuccess {
-                                followed=it.following
-                                followPending=it.pending
+                            .onSuccess { result ->
+                                val optimisticFollowed=followed
+                                followed=result.following
+                                followPending=result.pending
+                                if(result.following!=optimisticFollowed) {
+                                    followerDelta+=if(result.following)1L else -1L
+                                }
+                            }
+                            .onFailure {
+                                followed=beforeFollowed
+                                followPending=beforePending
+                                followerDelta=beforeDelta
                             }
                         followBusy=false
                     }
@@ -189,7 +224,7 @@ fun PremiumCreatorChannelScreen(
                 avatar=p.avatarUrl,
                 cover=p.coverUrl,
                 verified=p.verified,
-                followers=p.followers,
+                followers=(p.followers+followerDelta).coerceAtLeast(0L),
                 following=p.following,
                 postsCount=p.posts,
                 reelsCount=p.reels,
