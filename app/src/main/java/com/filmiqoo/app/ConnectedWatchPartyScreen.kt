@@ -48,11 +48,12 @@ fun ConnectedWatchPartyScreen(
     val partyRepo=remember { WatchPartyRepository(backend) }
     val listState=rememberLazyListState()
 
-    var partyId by remember(initialPartyId) { mutableStateOf(initialPartyId) }
+    var partyId by rememberSaveable(initialPartyId) { mutableStateOf(initialPartyId) }
     var party by remember { mutableStateOf<WatchPartyInfo?>(null) }
     var meId by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf<List<RoomMessageItem>>(emptyList()) }
-    var text by remember { mutableStateOf("") }
+    var text by rememberSaveable(partyId) { mutableStateOf("") }
+    var sendingMessage by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
     var syncing by remember { mutableStateOf(false) }
@@ -117,7 +118,7 @@ fun ConnectedWatchPartyScreen(
                     joinRequestPending=false
                 }
                 .onFailure {
-                    val message=it.message ?: "ورود به Watch Party ناموفق بود"
+                    val message=it.message ?: "ورود به تماشای گروهی ناموفق بود"
                     privateJoinRequired=message.contains("private",ignoreCase=true)
                     error=if(privateJoinRequired) null else message
                 }
@@ -247,7 +248,7 @@ fun ConnectedWatchPartyScreen(
 
     val p=party
     if(p==null) {
-        LoadingPage("در حال اتصال به Watch Party...")
+        LoadingPage("در حال اتصال به تماشای گروهی...")
         return
     }
 
@@ -625,30 +626,46 @@ fun ConnectedWatchPartyScreen(
         ) {
             OutlinedTextField(
                 value=text,
-                onValueChange={text=it},
+                onValueChange={text=it.take(4000)},
                 placeholder={Text("پیام برای گروه...")},
                 singleLine=true,
                 shape=RoundedCornerShape(20.dp),
                 modifier=Modifier.weight(1f)
             )
-            IconButton(onClick={
-                if(!backend.session.isLoggedIn) {
-                    onRequireAuth()
-                } else if(
-                    text.isNotBlank() &&
-                    p.roomId.isNotBlank() &&
-                    lobby!=null &&
-                    !privateJoinRequired
-                ) {
-                    val sending=text.trim()
-                    text=""
-                    scope.launch {
-                        runCatching { social.sendMessage(p.roomId,sending,false) }
-                            .onFailure { error=it.message }
+            IconButton(
+                enabled=!sendingMessage,
+                onClick={
+                    if(!backend.session.isLoggedIn) {
+                        onRequireAuth()
+                    } else if(
+                        text.isNotBlank() &&
+                        p.roomId.isNotBlank() &&
+                        lobby!=null &&
+                        !privateJoinRequired
+                    ) {
+                        val sending=text.trim()
+                        text=""
+                        sendingMessage=true
+                        scope.launch {
+                            runCatching { social.sendMessage(p.roomId,sending,false) }
+                                .onFailure {
+                                    error=it.message
+                                    if(text.isBlank()) text=sending
+                                }
+                            sendingMessage=false
+                        }
                     }
                 }
-            }) {
-                Icon(Icons.Default.Send,null,tint=if(text.isBlank())FqMuted else FqGold)
+            ) {
+                if(sendingMessage) {
+                    CircularProgressIndicator(
+                        color=FqGold,
+                        strokeWidth=2.dp,
+                        modifier=Modifier.size(18.dp)
+                    )
+                } else {
+                    Icon(Icons.Default.Send,null,tint=if(text.isBlank())FqMuted else FqGold)
+                }
             }
         }
 
@@ -1091,6 +1108,9 @@ private fun WatchPartyLobbySheet(
     onLeaveOrEnd:()->Unit,
     onDismiss:()->Unit
 ) {
+    var confirmLeaveOrEnd by remember { mutableStateOf(false) }
+    val canEnd=lobby.myRole=="host" || lobby.myRole=="cohost"
+
     ModalBottomSheet(
         onDismissRequest=onDismiss,
         containerColor=FqSurface
@@ -1100,10 +1120,10 @@ private fun WatchPartyLobbySheet(
         ) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Waiting Room",fontSize=20.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Black)
+                    Text("اتاق انتظار",fontSize=20.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Black)
                     Text(
                         lobby.participantCount.toString()+" نفر • "+
-                            lobby.readyCount+" Ready",
+                            lobby.readyCount+" آماده",
                         color=FqMuted,fontSize=8.sp
                     )
                 }
@@ -1111,7 +1131,7 @@ private fun WatchPartyLobbySheet(
                     FilterChip(
                         selected=lobby.readyCheckEnabled,
                         onClick={onToggleReadyCheck(!lobby.readyCheckEnabled)},
-                        label={Text("Ready Check",fontSize=7.sp)},
+                        label={Text("بررسی آمادگی",fontSize=7.sp)},
                         leadingIcon={
                             Icon(Icons.Default.HowToReg,null,modifier=Modifier.size(15.dp))
                         }
@@ -1134,7 +1154,7 @@ private fun WatchPartyLobbySheet(
                         null
                     )
                     Spacer(Modifier.width(5.dp))
-                    Text(if(lobby.myReady)"Ready هستم" else "من آماده‌ام")
+                    Text(if(lobby.myReady)"آماده‌ام" else "اعلام آمادگی")
                 }
             }
 
@@ -1207,10 +1227,10 @@ private fun WatchPartyLobbySheet(
                                 }
                                 Text(
                                     when(member.role) {
-                                        "host" -> "Host"
-                                        "cohost" -> "Co-host"
-                                        "moderator" -> "Moderator"
-                                        else -> "Viewer"
+                                        "host" -> "میزبان"
+                                        "cohost" -> "هم‌میزبان"
+                                        "moderator" -> "مدیر"
+                                        else -> "بیننده"
                                     }+" • @"+member.username,
                                     color=FqMuted,fontSize=7.sp
                                 )
@@ -1235,7 +1255,7 @@ private fun WatchPartyLobbySheet(
                                     }
                                 ) {
                                     Text(
-                                        if(member.role=="cohost")"Viewer" else "Co-host",
+                                        if(member.role=="cohost")"بیننده" else "هم‌میزبان",
                                         fontSize=7.sp
                                     )
                                 }
@@ -1247,7 +1267,7 @@ private fun WatchPartyLobbySheet(
 
             OutlinedButton(
                 enabled=!busy,
-                onClick=onLeaveOrEnd,
+                onClick={confirmLeaveOrEnd=true},
                 colors=ButtonDefaults.outlinedButtonColors(contentColor=FqDanger),
                 modifier=Modifier.fillMaxWidth().padding(top=14.dp)
             ) {
@@ -1259,12 +1279,55 @@ private fun WatchPartyLobbySheet(
                 Spacer(Modifier.width(5.dp))
                 Text(
                     if(lobby.myRole=="host" || lobby.myRole=="cohost")
-                        "پایان Watch Party"
+                        "پایان تماشای گروهی"
                     else
-                        "خروج از Watch Party"
+                        "خروج از تماشای گروهی"
                 )
             }
         }
+    }
+
+    if(confirmLeaveOrEnd) {
+        AlertDialog(
+            onDismissRequest={confirmLeaveOrEnd=false},
+            icon={
+                Icon(
+                    if(canEnd)Icons.Default.StopCircle else Icons.Default.ExitToApp,
+                    null,
+                    tint=FqDanger
+                )
+            },
+            title={
+                Text(
+                    if(canEnd)"تماشای گروهی پایان یابد؟"
+                    else "از تماشای گروهی خارج شوی؟"
+                )
+            },
+            text={
+                Text(
+                    if(canEnd)
+                        "پخش برای همه متوقف می‌شود و این جلسه پایان می‌یابد."
+                    else
+                        "از جلسه خارج می‌شوی و برای برگشت باید دوباره وارد شوی."
+                )
+            },
+            confirmButton={
+                TextButton(
+                    enabled=!busy,
+                    onClick={
+                        confirmLeaveOrEnd=false
+                        onLeaveOrEnd()
+                    }
+                ) {
+                    Text(if(canEnd)"پایان جلسه" else "خروج",color=FqDanger)
+                }
+            },
+            dismissButton={
+                TextButton(onClick={confirmLeaveOrEnd=false}) {
+                    Text("لغو")
+                }
+            }
+        )
     }
 }
 
