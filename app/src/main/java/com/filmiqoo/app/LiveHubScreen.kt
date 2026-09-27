@@ -486,11 +486,6 @@ private fun LiveEventDetailScreen(
                     localEvent=fresh
                     onUpdated(fresh)
                 }
-                .onFailure {
-                    if(localEvent.state !in setOf("ended","cancelled")) {
-                        onError(it.message ?: "همگام‌سازی رویداد ناموفق بود")
-                    }
-                }
             if(localEvent.state in setOf("ended","cancelled")) break
         }
     }
