@@ -1472,6 +1472,13 @@ class SocialRepository(
             authorized=true
         ).optBoolean("active")
 
+    suspend fun removeReel(id:String):Boolean =
+        backend.postJson(
+            "/v1/social/reels/"+id+"/remove",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("removed")
+
     suspend fun toggleReelLike(id: String): Boolean =
         backend.postJson("/v1/social/reels/"+id+"/like",JSONObject(),authorized=true)
             .optBoolean("liked")
