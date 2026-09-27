@@ -162,6 +162,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/social/users/{id}/posts", s.publicUserPosts)
 		r.Get("/social/users/{id}/reels", s.publicUserReels)
 		r.Get("/social/users/{id}/collections", s.publicUserCollections)
+		r.Get("/social/posts/{id}", s.postDetail)
 		r.Get("/social/posts/{id}/comments", s.postComments)
 		r.Get("/social/posts/{id}/poll", s.postPoll)
 		r.Get("/social/reels/{id}/comments", s.reelComments)
