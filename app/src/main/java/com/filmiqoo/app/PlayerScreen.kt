@@ -1259,6 +1259,13 @@ fun FilmiqooPlayerScreen(
                                 }
                             }
                         },
+                        onJumpToMoment={ moment ->
+                            seekActive(moment.positionMs)
+                            playerSettingsMessage=
+                                moment.emoji+" لحظه داغ • "+
+                                formatPlayerTime(moment.positionMs)
+                            bumpControls()
+                        },
                         modifier=Modifier.align(Alignment.BottomStart)
                             .padding(start=18.dp,bottom=108.dp)
                     )
@@ -3507,6 +3514,7 @@ private fun PlayerPulseBar(
     state:PulseState?,
     busy:Boolean,
     onReact:(String)->Unit,
+    onJumpToMoment:(PulseMoment)->Unit,
     modifier:Modifier=Modifier
 ) {
     val reactions=listOf("🔥","😱","😂","❤️","👀")
@@ -3519,37 +3527,81 @@ private fun PlayerPulseBar(
         ),
         modifier=modifier
     ) {
-        Row(
+        Column(
             Modifier.padding(horizontal=8.dp,vertical=7.dp),
-            verticalAlignment=Alignment.CenterVertically,
-            horizontalArrangement=Arrangement.spacedBy(4.dp)
+            verticalArrangement=Arrangement.spacedBy(5.dp)
         ) {
-            if(state?.watchingNow ?: 0L > 0L) {
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(7.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFFF5D6C))
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        (state?.watchingNow ?: 0L).toString(),
-                        color=Color.White.copy(alpha=.80f),
-                        fontSize=10.sp,
-                        fontWeight=FontWeight.Bold
-                    )
-                    Spacer(Modifier.width(6.dp))
+            val hottest=state?.moments?.firstOrNull()
+            if((state?.watchingNow ?: 0L)>0L || hottest!=null) {
+                Row(
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(7.dp)
+                ) {
+                    if((state?.watchingNow ?: 0L)>0L) {
+                        Row(verticalAlignment=Alignment.CenterVertically) {
+                            Box(
+                                Modifier.size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFF5D6C))
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                (state?.watchingNow ?: 0L).toString()+" در حال تماشا",
+                                color=Color.White.copy(alpha=.74f),
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    hottest?.let { moment ->
+                        Surface(
+                            color=FqGold.copy(alpha=.16f),
+                            contentColor=FqGold,
+                            shape=RoundedCornerShape(10.dp),
+                            modifier=Modifier.clickable {
+                                onJumpToMoment(moment)
+                            }
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal=8.dp,vertical=5.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Text(moment.emoji,fontSize=12.sp)
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "لحظه داغ "+formatPlayerTime(moment.positionMs),
+                                    fontSize=9.sp,
+                                    fontWeight=FontWeight.Bold
+                                )
+                                if(moment.reactions>1L) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        "• "+moment.reactions,
+                                        color=Color.White.copy(alpha=.60f),
+                                        fontSize=8.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            reactions.forEach { emoji ->
-                Surface(
-                    color=Color.White.copy(alpha=.07f),
-                    shape=CircleShape,
-                    modifier=Modifier.size(36.dp)
-                        .clickable(enabled=!busy) { onReact(emoji) }
-                ) {
-                    Box(contentAlignment=Alignment.Center) {
-                        Text(emoji,fontSize=16.sp)
+
+            Row(
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(4.dp)
+            ) {
+                reactions.forEach { emoji ->
+                    Surface(
+                        color=Color.White.copy(alpha=.07f),
+                        shape=CircleShape,
+                        modifier=Modifier.size(36.dp)
+                            .clickable(enabled=!busy) { onReact(emoji) }
+                    ) {
+                        Box(contentAlignment=Alignment.Center) {
+                            Text(emoji,fontSize=16.sp)
+                        }
                     }
                 }
             }
