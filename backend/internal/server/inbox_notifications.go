@@ -223,7 +223,7 @@ func (s *Server) notifications(w http.ResponseWriter,r *http.Request) {
 		  FROM notifications n
 		  LEFT JOIN profiles p ON p.user_id=n.actor_user_id
 		  LEFT JOIN media_titles mt
-		    ON n.entity_type IN ('release','series','availability') AND mt.id=n.entity_id
+		    ON n.entity_type IN ('release','series','availability','media') AND mt.id=n.entity_id
 		  LEFT JOIN LATERAL (
 		    SELECT id,quality_label,stream_ready
 		      FROM media_versions
