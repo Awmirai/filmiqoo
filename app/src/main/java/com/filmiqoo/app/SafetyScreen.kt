@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,7 +34,8 @@ fun SafetyCenterScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var state by remember { mutableStateOf(SafetyState(emptyList(),emptyList())) }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler { onBack() }
 
@@ -54,7 +56,7 @@ fun SafetyCenterScreen(
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
                 Text("مرکز ایمنی",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text("Block، Mute و کنترل تجربه اجتماعی",color=FqMuted,fontSize=11.sp)
+                Text("مسدودسازی، بی‌صدا کردن و کنترل تجربه اجتماعی",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
@@ -68,13 +70,37 @@ fun SafetyCenterScreen(
                 Icon(Icons.Default.Shield,null,tint=FqGold)
                 Spacer(Modifier.width(9.dp))
                 Text(
-                    "Block ارتباط دوطرفه، Follow و DM را قطع می‌کند. Mute فقط محتوای کاربر را از تجربه تو کنار می‌گذارد.",
+                    "مسدودسازی ارتباط دوطرفه، دنبال‌کردن و پیام خصوصی را قطع می‌کند. بی‌صدا کردن فقط محتوای کاربر را از تجربه تو کنار می‌گذارد.",
                     color=Color.White.copy(alpha=.78f),
                     fontSize=11.sp,
                     lineHeight=14.sp
                 )
             }
         }
+
+        OutlinedTextField(
+            value=query,
+            onValueChange={query=it},
+            singleLine=true,
+            placeholder={Text("جستجو بین حساب‌ها...")},
+            leadingIcon={Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))},
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={query=""}) {
+                        Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                    }
+                }
+            },
+            shape=RoundedCornerShape(16.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold.copy(alpha=.6f),
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(horizontal=14.dp,vertical=6.dp)
+        )
 
         TabRow(
             selectedTabIndex=tab,
@@ -84,12 +110,12 @@ fun SafetyCenterScreen(
             Tab(
                 selected=tab==0,
                 onClick={tab=0},
-                text={Text("Block شده ("+state.blocked.size+")",fontSize=11.sp)}
+                text={Text("مسدودها ("+state.blocked.size+")",fontSize=11.sp)}
             )
             Tab(
                 selected=tab==1,
                 onClick={tab=1},
-                text={Text("Mute شده ("+state.muted.size+")",fontSize=11.sp)}
+                text={Text("بی‌صداها ("+state.muted.size+")",fontSize=11.sp)}
             )
         }
 
@@ -107,14 +133,29 @@ fun SafetyCenterScreen(
         }
 
         val users=if(tab==0)state.blocked else state.muted
-        if(!loading && users.isEmpty()) {
+        val visibleUsers=remember(users,query) {
+            val q=query.trim()
+            if(q.isBlank()) users
+            else users.filter {
+                it.displayName.contains(q,ignoreCase=true) ||
+                    it.username.contains(q,ignoreCase=true)
+            }
+        }
+        if(!loading && visibleUsers.isEmpty()) {
+            val searching=query.isNotBlank()
             PremiumEmptyState(
-                icon=if(tab==0)Icons.Default.Block else Icons.Default.VolumeOff,
-                title=if(tab==0)"کسی Block نشده" else "کسی Mute نشده",
-                body=if(tab==0)
-                    "کاربرانی که Block کنی اینجا قابل مدیریت‌اند."
-                else
-                    "کاربرانی که Mute کنی اینجا قابل مدیریت‌اند."
+                icon=if(searching)Icons.Default.SearchOff
+                    else if(tab==0)Icons.Default.Block else Icons.Default.VolumeOff,
+                title=when {
+                    searching -> "حسابی پیدا نشد"
+                    tab==0 -> "کسی مسدود نشده"
+                    else -> "کسی بی‌صدا نشده"
+                },
+                body=when {
+                    searching -> "نام یا نام کاربری رو با عبارت دیگه‌ای جستجو کن."
+                    tab==0 -> "حساب‌هایی که مسدود کنی اینجا قابل مدیریت‌اند."
+                    else -> "حساب‌هایی که بی‌صدا کنی اینجا قابل مدیریت‌اند."
+                }
             )
         } else {
             LazyColumn(
@@ -122,10 +163,10 @@ fun SafetyCenterScreen(
                 verticalArrangement=Arrangement.spacedBy(8.dp),
                 modifier=Modifier.weight(1f)
             ) {
-                items(users,key={it.id}) { user ->
+                items(visibleUsers,key={it.id}) { user ->
                     SafetyUserRow(
                         user=user,
-                        actionLabel=if(tab==0)"Unblock" else "Unmute",
+                        actionLabel=if(tab==0)"رفع مسدودیت" else "فعال‌کردن صدا",
                         actionIcon=if(tab==0)Icons.Default.LockOpen else Icons.Default.VolumeUp,
                         onUser={onCreator(user.asCreator())},
                         onAction={
@@ -237,15 +278,15 @@ fun SafetyActionSheet(
                 SafetySheetAction(
                     icon=Icons.Default.Flag,
                     title="گزارش",
-                    subtitle="برای بررسی Moderation گزارش ارسال کن.",
+                    subtitle="برای بررسی تیم ایمنی گزارش ارسال کن.",
                     danger=true
                 ) { reportMode=true }
 
                 if(!userTargetId.isNullOrBlank()) {
                     SafetySheetAction(
                         icon=Icons.Default.VolumeOff,
-                        title="Mute",
-                        subtitle="محتوای این کاربر را کمتر ببین.",
+                        title="بی‌صدا کردن",
+                        subtitle="محتوای این کاربر از تجربه تو کنار گذاشته می‌شود.",
                         danger=false
                     ) {
                         if(!busy) {
@@ -253,7 +294,7 @@ fun SafetyActionSheet(
                             scope.launch {
                                 runCatching { repo.toggleMute(userTargetId) }
                                     .onSuccess {
-                                        message=if(it)"کاربر Mute شد." else "Mute برداشته شد."
+                                        message=if(it)"کاربر بی‌صدا شد." else "بی‌صدا بودن برداشته شد."
                                         onChanged()
                                     }
                                     .onFailure { message=it.message }
@@ -264,8 +305,8 @@ fun SafetyActionSheet(
 
                     SafetySheetAction(
                         icon=Icons.Default.Block,
-                        title="Block",
-                        subtitle="Follow و DM دوطرفه قطع می‌شود.",
+                        title="مسدود کردن",
+                        subtitle="دنبال‌کردن و پیام خصوصی دوطرفه قطع می‌شود.",
                         danger=true
                     ) {
                         if(!busy) {
@@ -273,7 +314,7 @@ fun SafetyActionSheet(
                             scope.launch {
                                 runCatching { repo.toggleBlock(userTargetId) }
                                     .onSuccess {
-                                        message=if(it)"کاربر Block شد." else "Block برداشته شد."
+                                        message=if(it)"کاربر مسدود شد." else "مسدودیت برداشته شد."
                                         onChanged()
                                     }
                                     .onFailure { message=it.message }
@@ -289,12 +330,12 @@ fun SafetyActionSheet(
                 ) {
                     items(
                         listOf(
-                            "spam" to "Spam",
+                            "spam" to "هرزنامه",
                             "harassment" to "آزار و اذیت",
                             "hate" to "نفرت‌پراکنی",
                             "sexual" to "محتوای جنسی نامناسب",
                             "violence" to "خشونت",
-                            "spoiler" to "Spoiler بدون هشدار",
+                            "spoiler" to "اسپویلر بدون هشدار",
                             "copyright" to "نقض حق نشر",
                             "impersonation" to "جعل هویت",
                             "misinformation" to "اطلاعات گمراه‌کننده",
