@@ -160,7 +160,7 @@ private fun PremiumHomeContent(
                 subtitle=when {
                     kidsMode -> "فضای امن Kids • فقط محتوای متناسب با پروفایل"
                     loggedIn -> "پیشنهادهای امروز بر اساس تماشای تو"
-                    else -> "فیلم، سریال و Club در یک جا"
+                    else -> "فیلم، سریال، کلیپ و کلاب در یک جا"
                 },
                 onSearch=onSearch,
                 onNotifications=onNotifications,
@@ -199,14 +199,14 @@ private fun PremiumHomeContent(
                     item {
                         PremiumChip(
                             icon=Icons.Default.SmartDisplay,
-                            label="Clips",
+                            label="کلیپ‌ها",
                             onClick=onClips
                         )
                     }
                     item {
                         PremiumChip(
                             icon=Icons.Default.Groups,
-                            label="Club",
+                            label="کلاب",
                             onClick=onClub
                         )
                     }
@@ -276,8 +276,8 @@ private fun PremiumHomeContent(
         personalized?.watchlist?.takeIf { it.isNotEmpty() }?.let { items ->
             item {
                 PremiumSectionHeader(
-                    title="از Watchlist تو",
-                    subtitle="چیزهایی که برای بعد ذخیره کردی",
+                    title="برای بعد",
+                    subtitle="فیلم‌ها و سریال‌هایی که گفتی بعداً می‌بینی",
                     icon=Icons.Default.Bookmark
                 )
             }
@@ -287,8 +287,8 @@ private fun PremiumHomeContent(
         if(!kidsMode) personalized?.communityHot?.takeIf { it.isNotEmpty() }?.let { items ->
             item {
                 PremiumSectionHeader(
-                    title="داغ در Club",
-                    subtitle="بر اساس Post، Clip، Like، Save و Share",
+                    title="داغ در کلاب",
+                    subtitle="بر اساس Post، Clip، لایک، ذخیره و اشتراک‌گذاری",
                     icon=Icons.Default.LocalFireDepartment,
                     onMore=onClub
                 )
