@@ -97,8 +97,10 @@ echo "Updating Filmiqoo source: $LOCAL_SHA -> $REMOTE_SHA"
 
 if [[ "$BACKEND_CHANGED" -eq 1 ]]; then
   if [[ ! -s "$DEPLOY_DIR/backup-password.txt" ]]; then
-    echo "Refusing backend auto-deploy: missing $DEPLOY_DIR/backup-password.txt"
-    exit 4
+    echo "Initializing local backup encryption password..."
+    umask 077
+    openssl rand -base64 48 > "$DEPLOY_DIR/backup-password.txt"
+    chmod 600 "$DEPLOY_DIR/backup-password.txt"
   fi
   echo "Creating verified encrypted database backup before backend deploy..."
   (cd "$DEPLOY_DIR" && bash ./backup.sh)
