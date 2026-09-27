@@ -327,7 +327,7 @@ fun ConnectedWatchPartyScreen(
                     shape=RoundedCornerShape(9.dp)
                 ) {
                     Text(
-                        if(p.state=="live")"● LIVE" else p.state.uppercase(),
+                        if(p.state=="live")"● زنده" else partyStateLabel(p.state),
                         fontSize=8.sp,
                         modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp)
                     )
@@ -392,17 +392,17 @@ fun ConnectedWatchPartyScreen(
                             Spacer(Modifier.width(5.dp))
                             Text(
                                 if(p.state=="scheduled")"شروع الان"
-                                else if(player.isPlaying)"Pause for all"
-                                else "Play for all"
+                                else if(player.isPlaying)"توقف برای همه"
+                                else "پخش برای همه"
                             )
                         }
                     } else {
                         Surface(color=Color.Black.copy(alpha=.55f),shape=RoundedCornerShape(11.dp)) {
                             Text(
                                 if(p.state=="scheduled")
-                                    "Party زمان‌بندی شده • منتظر شروع میزبان"
+                                    "تماشای گروهی زمان‌بندی شده • منتظر شروع میزبان"
                                 else
-                                    "کنترل پخش با میزبان • Sync فعال",
+                                    "کنترل پخش با میزبان • همگام‌سازی فعاله",
                                 fontSize=8.sp,
                                 modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp)
                             )
@@ -450,7 +450,7 @@ fun ConnectedWatchPartyScreen(
                     Icon(Icons.Default.Lock,null,tint=FqGold)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Watch Party خصوصی",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("تماشای گروهی خصوصی",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
                         Text(
                             if(joinRequestPending)"درخواست ورود ارسال شده؛ منتظر تأیید میزبان."
                             else "برای ورود باید میزبان درخواستت رو تأیید کنه.",
@@ -526,7 +526,7 @@ fun ConnectedWatchPartyScreen(
                             modifier=Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(if(reminderEnabled)"Reminder روشن" else "یادم بنداز",fontSize=7.sp)
+                        Text(if(reminderEnabled)"یادآوری فعاله" else "یادم بنداز",fontSize=7.sp)
                     }
                 }
             }
@@ -546,7 +546,7 @@ fun ConnectedWatchPartyScreen(
                     Icon(Icons.Default.HowToReg,null,tint=FqGold)
                     Spacer(Modifier.width(7.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Ready Check",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("آماده‌بودن اعضا",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
                         Text(
                             currentLobby.readyCount.toString()+" از "+currentLobby.participantCount+" نفر آماده‌اند",
                             color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=2.dp)
@@ -579,7 +579,7 @@ fun ConnectedWatchPartyScreen(
                             modifier=Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(if(currentLobby.myReady)"آماده‌ام" else "Ready",fontSize=7.sp)
+                        Text(if(currentLobby.myReady)"آماده‌ام" else "اعلام آمادگی",fontSize=7.sp)
                     }
                 }
             }
@@ -626,7 +626,7 @@ fun ConnectedWatchPartyScreen(
             OutlinedTextField(
                 value=text,
                 onValueChange={text=it},
-                placeholder={Text("پیام Watch Party...")},
+                placeholder={Text("پیام برای گروه...")},
                 singleLine=true,
                 shape=RoundedCornerShape(20.dp),
                 modifier=Modifier.weight(1f)
@@ -1266,6 +1266,13 @@ private fun WatchPartyLobbySheet(
             }
         }
     }
+}
+
+private fun partyStateLabel(state:String):String=when(state.lowercase()) {
+    "scheduled" -> "زمان‌بندی‌شده"
+    "ended" -> "پایان‌یافته"
+    "paused" -> "متوقف"
+    else -> state
 }
 
 private fun formatPartySchedule(value:String):String =
