@@ -608,10 +608,19 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 )
                 OverlayRoute.SocialSaves -> SavedSocialScreen(
                     social=social,
-                    repository=repository,
                     onBack=closeOverlay,
                     onCreator={overlay=OverlayRoute.CreatorPage(it)},
-                    onMedia={overlay=OverlayRoute.Detail(it)}
+                    onMedia={overlay=OverlayRoute.Detail(it)},
+                    onOpenPost={ postId ->
+                        overlay=null
+                        deepLinkPostId=postId
+                        tab=2
+                    },
+                    onOpenClip={ clipId ->
+                        overlay=null
+                        deepLinkReelId=clipId
+                        tab=1
+                    }
                 )
                 OverlayRoute.History -> WatchHistoryScreen(
                     backend=backend,
