@@ -997,6 +997,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onVisibleReelChanged={clipResumeReelId=it},
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
+                            onSearch={showSearch=true},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
                         2 -> ClubScreen(
