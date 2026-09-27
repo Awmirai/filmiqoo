@@ -557,7 +557,7 @@ private fun MeTabs(
         horizontalArrangement=Arrangement.spacedBy(4.dp)
     ) {
         listOf(
-            MeTab.ACTIVITY to "فعالیت",
+            MeTab.ACTIVITY to "پست‌ها",
             MeTab.CLIPS to "کلیپ‌ها",
             MeTab.LIBRARY to "کتابخانه"
         ).forEach { (tab,label) ->
@@ -624,6 +624,17 @@ private fun MePostCard(
                     fontSize=10.sp,
                     fontWeight=FontWeight.Bold
                 )
+                post.publishedAt?.let { value ->
+                    val relative=socialRelativeTime(value)
+                    if(relative.isNotBlank()) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "• "+relative,
+                            color=FqMuted,
+                            fontSize=9.sp
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     compactMeCount(post.likes)+" پسند",
