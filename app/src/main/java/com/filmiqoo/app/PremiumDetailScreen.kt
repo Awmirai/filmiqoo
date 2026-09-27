@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+private enum class SeriesEpisodeFilter { ALL, UNWATCHED, READY }
+
 private sealed interface PremiumDetailLoad {
     data object Loading : PremiumDetailLoad
     data class Ready(
@@ -1280,9 +1282,20 @@ private fun PremiumSeriesPanel(
     onDownload: (PlatformEpisode) -> Unit,
     onDownloadSeason: (PlatformSeason) -> Unit
 ) {
-    var selectedSeason by remember(seasons) {
-        mutableIntStateOf(seasons.firstOrNull()?.number ?: 0)
+    val seasonsKey=remember(seasons) { seasons.joinToString("|") { it.id } }
+    var selectedSeason by rememberSaveable(seasonsKey) {
+        mutableIntStateOf(
+            seasons.firstOrNull { it.number>0 }?.number
+                ?: seasons.firstOrNull()?.number
+                ?: 0
+        )
     }
+    var episodeFilterName by rememberSaveable(seasonsKey) {
+        mutableStateOf(SeriesEpisodeFilter.ALL.name)
+    }
+    val episodeFilter=runCatching {
+        SeriesEpisodeFilter.valueOf(episodeFilterName)
+    }.getOrDefault(SeriesEpisodeFilter.ALL)
     val scope=rememberCoroutineScope()
     val progressRepo=remember { SeriesProgressRepository(backend) }
     var progressRefresh by remember { mutableIntStateOf(0) }
@@ -1490,6 +1503,25 @@ private fun PremiumSeriesPanel(
                     }
                 }
             }
+
+            LazyRow(
+                contentPadding=PaddingValues(horizontal=16.dp),
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
+                listOf(
+                    SeriesEpisodeFilter.ALL to "همه",
+                    SeriesEpisodeFilter.UNWATCHED to "ندیده",
+                    SeriesEpisodeFilter.READY to "آماده پخش"
+                ).forEach { (item,label) ->
+                    item {
+                        FilterChip(
+                            selected=episodeFilter==item,
+                            onClick={episodeFilterName=item.name},
+                            label={Text(label,fontSize=10.sp)}
+                        )
+                    }
+                }
+            }
         }
 
         val allEpisodes=seasons
@@ -1500,7 +1532,52 @@ private fun PremiumSeriesPanel(
                 }
             }
 
-        season?.episodes?.sortedBy { it.number }?.forEach { ep ->
+        val visibleEpisodes=season?.episodes
+            ?.sortedBy { it.number }
+            ?.filter { ep ->
+                when(episodeFilter) {
+                    SeriesEpisodeFilter.ALL -> true
+                    SeriesEpisodeFilter.UNWATCHED ->
+                        watchProgress?.episodes?.get(ep.id)?.completed != true
+                    SeriesEpisodeFilter.READY ->
+                        ep.streamReady && !ep.mediaVersionId.isNullOrBlank()
+                }
+            }
+            .orEmpty()
+
+        if(season!=null && visibleEpisodes.isEmpty()) {
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(18.dp),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=16.dp,vertical=8.dp)
+            ) {
+                Row(
+                    Modifier.padding(14.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(
+                        if(episodeFilter==SeriesEpisodeFilter.UNWATCHED)
+                            Icons.Default.DoneAll
+                        else
+                            Icons.Default.FilterAltOff,
+                        contentDescription=null,
+                        tint=FqMuted
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if(episodeFilter==SeriesEpisodeFilter.UNWATCHED)
+                            "همه قسمت‌های این فصل دیده شده"
+                        else
+                            "قسمتی با این فیلتر پیدا نشد",
+                        color=FqMuted,
+                        fontSize=11.sp
+                    )
+                }
+            }
+        }
+
+        visibleEpisodes.forEach { ep ->
             val currentIndex=allEpisodes.indexOfFirst { it.second.id==ep.id }
             val next=if(currentIndex>=0) {
                 allEpisodes.drop(currentIndex+1).firstOrNull {
