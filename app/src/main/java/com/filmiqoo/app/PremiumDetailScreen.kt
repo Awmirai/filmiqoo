@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,12 +130,12 @@ fun PremiumDetailScreen(
 
             val tabs=remember(d.media.type) {
                 if(d.media.type==MediaType.TV) {
-                    listOf("معرفی","قسمت‌ها","بازیگران","Club","اطلاعات")
+                    listOf("معرفی","قسمت‌ها","بازیگران","کلاب","اطلاعات")
                 } else {
-                    listOf("معرفی","بازیگران","Club","اطلاعات")
+                    listOf("معرفی","بازیگران","کلاب","اطلاعات")
                 }
             }
-            var tab by remember(d.media.key) { mutableIntStateOf(0) }
+            var tab by rememberSaveable(d.media.key) { mutableIntStateOf(0) }
 
             Box(Modifier.fillMaxSize().background(FqBg)) {
                 LazyColumn(Modifier.fillMaxSize()) {
@@ -851,7 +852,7 @@ private fun PremiumDetailActions(
         item {
             ActionTile(
                 icon=if(favorite)Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                label=if(favorite)"موردعلاقه" else "Favorite",
+                label=if(favorite)"علاقه‌مندی ✓" else "علاقه‌مندی",
                 active=favorite,
                 loading=favoriteBusy,
                 onClick=onFavorite
@@ -860,7 +861,7 @@ private fun PremiumDetailActions(
         item {
             ActionTile(
                 icon=if(watchlist)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                label=if(watchlist)"در Watchlist" else "Watchlist",
+                label=if(watchlist)"برای بعد ✓" else "بعداً می‌بینم",
                 active=watchlist,
                 loading=watchlistBusy,
                 onClick=onWatchlist
@@ -889,7 +890,7 @@ private fun PremiumDetailActions(
         item {
             ActionTile(
                 icon=Icons.Default.CollectionsBookmark,
-                label="Collection",
+                label="افزودن به لیست",
                 onClick=onCollections
             )
         }
@@ -906,14 +907,14 @@ private fun PremiumDetailActions(
         item {
             ActionTile(
                 icon=Icons.Default.Groups,
-                label="Watch Party",
+                label="تماشای گروهی",
                 onClick=onWatchParty
             )
         }
         item {
             ActionTile(
                 icon=Icons.Default.Forum,
-                label="Club",
+                label="گفت‌وگو",
                 onClick=onChat
             )
         }
@@ -1787,9 +1788,9 @@ private fun PremiumCommunityPanel(
                     }
                     Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Club "+media.title,fontSize=15.sp,fontWeight=FontWeight.Bold)
+                        Text("کلاب "+media.title,fontSize=15.sp,fontWeight=FontWeight.Bold)
                         Text(
-                            "امتیاز کاربران، Review، بحث و Watch Party",
+                            "امتیاز کاربران، Review، بحث و تماشای گروهی",
                             color=FqMuted,
                             fontSize=11.sp,
                             modifier=Modifier.padding(top=3.dp)
@@ -1822,7 +1823,7 @@ private fun PremiumCommunityPanel(
                     ) {
                         Icon(Icons.Default.Groups,null)
                         Spacer(Modifier.width(5.dp))
-                        Text("Watch Party")
+                        Text("تماشای گروهی")
                     }
                 }
             }
