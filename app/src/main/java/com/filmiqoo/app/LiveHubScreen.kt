@@ -679,6 +679,19 @@ private fun LiveEventDetailScreen(
                         Spacer(Modifier.width(5.dp))
                         Text(if(localEvent.state=="live")"پایان پخش" else "شروع پخش")
                     }
+
+                    if(localEvent.state=="scheduled") {
+                        IconButton(
+                            enabled=!hostActionBusy,
+                            onClick={confirmHostAction="cancel"}
+                        ) {
+                            Icon(
+                                Icons.Default.EventBusy,
+                                contentDescription="لغو رویداد",
+                                tint=FqDanger
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -707,26 +720,41 @@ private fun LiveEventDetailScreen(
 
     if(confirmHostAction!=null) {
         val starting=confirmHostAction=="start"
+        val cancelling=confirmHostAction=="cancel"
         AlertDialog(
             onDismissRequest={
                 if(!hostActionBusy) confirmHostAction=null
             },
             icon={
                 Icon(
-                    if(starting)Icons.Default.PlayCircle else Icons.Default.StopCircle,
+                    when {
+                        starting -> Icons.Default.PlayCircle
+                        cancelling -> Icons.Default.EventBusy
+                        else -> Icons.Default.StopCircle
+                    },
                     null,
                     tint=if(starting)FqGold else FqDanger
                 )
             },
             title={
-                Text(if(starting)"پخش شروع شود؟" else "پخش پایان یابد؟")
+                Text(
+                    when {
+                        starting -> "پخش شروع شود؟"
+                        cancelling -> "رویداد لغو شود؟"
+                        else -> "پخش پایان یابد؟"
+                    }
+                )
             },
             text={
                 Text(
-                    if(starting)
-                        "رویداد برای بیننده‌ها زنده می‌شود و شمارش بیننده شروع خواهد شد."
-                    else
-                        "رویداد پایان می‌یابد و بیننده‌ها دیگر نمی‌توانند به پخش زنده برگردند."
+                    when {
+                        starting ->
+                            "رویداد برای بیننده‌ها زنده می‌شود و شمارش بیننده شروع خواهد شد."
+                        cancelling ->
+                            "این رویداد زمان‌بندی‌شده لغو می‌شود. دنبال‌کننده‌هایی که اعلان گرفته‌اند هم از لغو آن باخبر می‌شوند."
+                        else ->
+                            "رویداد پایان می‌یابد و بیننده‌ها دیگر نمی‌توانند به پخش زنده برگردند."
+                    }
                 )
             },
             confirmButton={
@@ -742,7 +770,11 @@ private fun LiveEventDetailScreen(
                                 runCatching {
                                     live.updateState(
                                         localEvent.id,
-                                        if(starting)"live" else "ended",
+                                        when {
+                                            starting -> "live"
+                                            cancelling -> "cancelled"
+                                            else -> "ended"
+                                        },
                                         if(starting)localEvent.playbackUrl else null
                                     )
                                     live.detail(localEvent.id)
@@ -751,10 +783,11 @@ private fun LiveEventDetailScreen(
                                     onUpdated(it)
                                 }.onFailure {
                                     onError(
-                                        it.message ?: if(starting)
-                                            "شروع پخش زنده ناموفق بود"
-                                        else
-                                            "پایان پخش زنده ناموفق بود"
+                                        it.message ?: when {
+                                            starting -> "شروع پخش زنده ناموفق بود"
+                                            cancelling -> "لغو رویداد ناموفق بود"
+                                            else -> "پایان پخش زنده ناموفق بود"
+                                        }
                                     )
                                 }
                                 hostActionBusy=false
@@ -763,7 +796,11 @@ private fun LiveEventDetailScreen(
                     }
                 ) {
                     Text(
-                        if(starting)"شروع پخش" else "پایان پخش",
+                        when {
+                            starting -> "شروع پخش"
+                            cancelling -> "لغو رویداد"
+                            else -> "پایان پخش"
+                        },
                         color=if(starting)FqGold else FqDanger
                     )
                 }
