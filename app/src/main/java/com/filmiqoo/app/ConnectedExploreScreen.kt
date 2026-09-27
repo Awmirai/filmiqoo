@@ -34,6 +34,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -83,9 +86,10 @@ fun ConnectedExploreScreen(
     LaunchedEffect(networkOnline) {
         if(!networkOnline) {
             hadOffline=true
-        } else if(hadOffline && state is ReelLoad.Error) {
+        } else if(hadOffline) {
+            val shouldRetry=state is ReelLoad.Error
             hadOffline=false
-            refresh++
+            if(shouldRetry) refresh++
         }
     }
 
@@ -241,6 +245,30 @@ private fun RealReelsPager(
         ExoPlayer.Builder(context).build().apply {
             repeatMode=Player.REPEAT_MODE_ONE
             playWhenReady=true
+        }
+    }
+    val lifecycleOwner=LocalLifecycleOwner.current
+    var resumeAfterLifecyclePause by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner,player) {
+        val observer=LifecycleEventObserver { _,event ->
+            when(event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    resumeAfterLifecyclePause=player.isPlaying
+                    player.pause()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if(resumeAfterLifecyclePause) {
+                        player.play()
+                        resumeAfterLifecyclePause=false
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
