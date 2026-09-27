@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +43,7 @@ fun DownloadsScreen(
     var appSettings by remember { mutableStateOf(AppPreferences(context.applicationContext).read()) }
     var downloads by remember { mutableStateOf(OfflineDownloadManager.list(context)) }
     var wifiOnly by remember { mutableStateOf(OfflineDownloadManager.wifiOnly(context)) }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     var confirmClearCompleted by remember { mutableStateOf(false) }
 
     BackHandler { onBack() }
@@ -265,10 +266,10 @@ private fun DownloadBulkActions(
 @Composable
 private fun DownloadPolicySummary(settings:AppSettings) {
     val policies=buildList {
-        if(settings.wifiOnlyDownloads) add("Wi‑Fi")
-        if(settings.downloadRequiresCharging) add("Charging")
-        if(settings.downloadBatteryNotLow) add("Battery OK")
-        if(settings.downloadAvoidRoaming) add("No Roaming")
+        if(settings.wifiOnlyDownloads) add("فقط Wi‑Fi")
+        if(settings.downloadRequiresCharging) add("هنگام شارژ")
+        if(settings.downloadBatteryNotLow) add("باتری کافی")
+        if(settings.downloadAvoidRoaming) add("بدون رومینگ")
     }
 
     Surface(
@@ -283,7 +284,7 @@ private fun DownloadPolicySummary(settings:AppSettings) {
             Icon(Icons.Default.Policy,null,tint=FqGold,modifier=Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text("Download Policy",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                Text("قوانین دانلود",fontSize=11.sp,fontWeight=FontWeight.Bold)
                 Text(
                     if(policies.isEmpty())"بدون محدودیت اضافی"
                     else policies.joinToString(" • "),
@@ -326,10 +327,10 @@ private fun SmartDownloadsControl(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("Smart Downloads",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                Text("دانلود هوشمند",fontSize=11.sp,fontWeight=FontWeight.Bold)
                 Text(
                     if(enabled)
-                        "قسمت دیده‌شده پاک می‌شود و قسمت بعدی صف می‌شود • سقف "+smartLimitLabel(limitMb)
+                        "قسمت دیده‌شده پاک می‌شود و قسمت بعدی خودکار آماده دانلود می‌شود • سقف "+smartLimitLabel(limitMb)
                     else
                         "مدیریت خودکار قسمت‌های سریال خاموش است.",
                     color=FqMuted,
@@ -398,9 +399,9 @@ private fun DownloadsHero(
                 .fillMaxWidth()
                 .padding(start=18.dp,end=18.dp,bottom=20.dp)
         ) {
-            Text("دانلودهای آفلاین",fontSize=28.sp,fontWeight=FontWeight.Black)
+            Text("دانلودها",fontSize=28.sp,fontWeight=FontWeight.Black)
             Text(
-                "فیلم و سریال‌ها رو برای تماشا بدون اینترنت نگه دار.",
+                "فیلم و سریال‌هات رو برای تماشای بدون اینترنت آماده نگه دار.",
                 color=FqMuted,
                 fontSize=12.sp,
                 modifier=Modifier.padding(top=4.dp)
@@ -637,9 +638,9 @@ private fun DownloadCard(
 @Composable
 private fun DownloadPriorityPill(priority:Int) {
     val pair=when(priority) {
-        2 -> "High" to FqDanger
-        0 -> "Low" to FqMuted
-        else -> "Normal" to FqBlue
+        2 -> "بالا" to FqDanger
+        0 -> "پایین" to FqMuted
+        else -> "عادی" to FqBlue
     }
     Surface(
         color=pair.second.copy(alpha=.12f),
@@ -656,9 +657,9 @@ private fun DownloadPriorityPill(priority:Int) {
 }
 
 private fun downloadPriorityLabel(priority:Int):String=when(priority) {
-    2 -> "High"
-    0 -> "Low"
-    else -> "Normal"
+    2 -> "اولویت بالا"
+    0 -> "اولویت پایین"
+    else -> "اولویت عادی"
 }
 
 @Composable
