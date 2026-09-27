@@ -91,6 +91,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
     var showNotificationPrimer by remember { mutableStateOf(false) }
+    var socialBadgeRefresh by remember { mutableIntStateOf(0) }
 
     DisposableEffect(backend,context) {
         val prefs=context.applicationContext.getSharedPreferences(
@@ -324,6 +325,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     val closeOverlay = {
         overlay = null
         showSearch = false
+        socialBadgeRefresh++
     }
 
     val openNotifications = {
@@ -731,6 +733,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     backend=backend,
                     onBack=closeOverlay,
                     onOpenRoom={conversation->
+                        socialBadgeRefresh++
                         overlay=OverlayRoute.Room(conversation.id,conversation.title)
                     }
                 )
@@ -846,19 +849,30 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 OverlayRoute.Notifications -> ConnectedNotificationsScreen(
                     backend=backend,
                     onBack=closeOverlay,
-                    onOpenRoom={id,title->overlay=OverlayRoute.Room(id,title)},
-                    onOpenCreator={overlay=OverlayRoute.CreatorPage(it)},
+                    onOpenRoom={id,title->
+                        socialBadgeRefresh++
+                        overlay=OverlayRoute.Room(id,title)
+                    },
+                    onOpenCreator={
+                        socialBadgeRefresh++
+                        overlay=OverlayRoute.CreatorPage(it)
+                    },
                     onOpenClip={ clipId ->
+                        socialBadgeRefresh++
                         overlay=null
                         deepLinkReelId=clipId
                         tab=1
                     },
                     onOpenPost={ postId ->
+                        socialBadgeRefresh++
                         overlay=null
                         deepLinkPostId=postId
                         tab=2
                     },
-                    onOpenMedia={overlay=OverlayRoute.Detail(it)},
+                    onOpenMedia={
+                        socialBadgeRefresh++
+                        overlay=OverlayRoute.Detail(it)
+                    },
                     onOpenCollection={overlay=OverlayRoute.SocialCollections(it)},
                     onOpenWatchParty={overlay=OverlayRoute.WatchParty(partyId=it)},
                     onFollowRequests={overlay=OverlayRoute.FollowRequests}
@@ -896,7 +910,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onReleases={overlay=OverlayRoute.Releases},
                             onClips={tab=1},
                             onClub={tab=2},
-                            onWatchParty={overlay=OverlayRoute.WatchParty(it)}
+                            onWatchParty={overlay=OverlayRoute.WatchParty(it)},
+                            badgeRefreshKey=socialBadgeRefresh
                         )
                         1 -> ConnectedExploreScreen(
                             social=social,
@@ -931,7 +946,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onCreate={overlay=OverlayRoute.Create},
                             onRequireAuth={overlay=OverlayRoute.Auth},
                             initialPostId=deepLinkPostId,
-                            onClearFocusedPost={deepLinkPostId=null}
+                            onClearFocusedPost={deepLinkPostId=null},
+                            badgeRefreshKey=socialBadgeRefresh
                         )
                         3 -> LibraryScreen(
                             backend=backend,
