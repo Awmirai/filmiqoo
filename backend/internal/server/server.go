@@ -194,6 +194,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/social/posts", s.createPost)
 			r.Get("/social/posts/saved", s.savedPosts)
 			r.Get("/social/reels/saved", s.savedReels)
+			r.Post("/social/posts/viewer-states", s.postViewerStates)
 			r.Get("/social/posts/{id}/viewer-state", s.postViewerState)
 			r.Post("/social/posts/{id}/like", s.togglePostLike)
 			r.Post("/social/posts/{id}/save", s.togglePostSave)
