@@ -1643,6 +1643,9 @@ fun ClubCommentsSheet(
     var spoiler by remember { mutableStateOf(false) }
     var replyTo by remember { mutableStateOf<SocialComment?>(null) }
     var sending by remember { mutableStateOf(false) }
+    val displayComments=remember(comments) {
+        threadedSocialComments(comments)
+    }
 
     fun reload() {
         scope.launch {
@@ -1697,7 +1700,7 @@ fun ClubCommentsSheet(
                     modifier=Modifier.heightIn(max=360.dp),
                     verticalArrangement=Arrangement.spacedBy(12.dp)
                 ) {
-                    items(comments,key={it.id}) { comment ->
+                    items(displayComments,key={it.id}) { comment ->
                         Row(
                             modifier=Modifier.fillMaxWidth()
                                 .padding(
@@ -1711,11 +1714,24 @@ fun ClubCommentsSheet(
                             )
                             Spacer(Modifier.width(9.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(
-                                    comment.author.displayName,
-                                    fontSize=10.sp,
-                                    fontWeight=FontWeight.Bold
-                                )
+                                Row(
+                                    verticalAlignment=Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        comment.author.displayName,
+                                        fontSize=10.sp,
+                                        fontWeight=FontWeight.Bold
+                                    )
+                                    val relative=socialRelativeTime(comment.createdAt)
+                                    if(relative.isNotBlank()) {
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            "• "+relative,
+                                            color=FqMuted,
+                                            fontSize=8.sp
+                                        )
+                                    }
+                                }
                                 var reveal by remember(comment.id) {
                                     mutableStateOf(!comment.spoiler)
                                 }
