@@ -430,6 +430,10 @@ private fun inboxRelativeTime(value:String):String {
     }
 }
 
+private enum class NotificationFilter {
+    ALL, SOCIAL, MESSAGES, RELEASES
+}
+
 @Composable
 fun ConnectedNotificationsScreen(
     backend: BackendRepository,
@@ -450,6 +454,7 @@ fun ConnectedNotificationsScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var unread by remember { mutableLongStateOf(0L) }
     var items by remember { mutableStateOf<List<FilmiqooNotification>>(emptyList()) }
+    var filter by remember { mutableStateOf(NotificationFilter.ALL) }
 
     BackHandler { onBack() }
 
@@ -490,12 +495,50 @@ fun ConnectedNotificationsScreen(
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
 
+        LazyRow(
+            contentPadding=PaddingValues(horizontal=12.dp),
+            horizontalArrangement=Arrangement.spacedBy(7.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected=filter==NotificationFilter.ALL,
+                    onClick={filter=NotificationFilter.ALL},
+                    label={Text("همه",fontSize=10.sp)}
+                )
+            }
+            item {
+                FilterChip(
+                    selected=filter==NotificationFilter.SOCIAL,
+                    onClick={filter=NotificationFilter.SOCIAL},
+                    label={Text("اجتماعی",fontSize=10.sp)}
+                )
+            }
+            item {
+                FilterChip(
+                    selected=filter==NotificationFilter.MESSAGES,
+                    onClick={filter=NotificationFilter.MESSAGES},
+                    label={Text("پیام‌ها",fontSize=10.sp)}
+                )
+            }
+            item {
+                FilterChip(
+                    selected=filter==NotificationFilter.RELEASES,
+                    onClick={filter=NotificationFilter.RELEASES},
+                    label={Text("انتشارها",fontSize=10.sp)}
+                )
+            }
+        }
+
+        val visibleItems=remember(items,filter) {
+            items.filter { notificationMatchesFilter(it.type,filter) }
+        }
+
         if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         error?.let {
             Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
-        if(!loading && items.isEmpty()) {
+        if(!loading && visibleItems.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.NotificationsNone,
                 "اعلانی نداری",
@@ -506,10 +549,16 @@ fun ConnectedNotificationsScreen(
                 contentPadding=PaddingValues(12.dp),
                 verticalArrangement=Arrangement.spacedBy(7.dp)
             ) {
-                items(items,key={it.id}) { item ->
+                items(visibleItems,key={it.id}) { item ->
                     NotificationCard(
                         item=item,
                         onClick={
+                            if(!item.read) {
+                                items=items.map {
+                                    if(it.id==item.id) it.copy(read=true) else it
+                                }
+                                unread=(unread-1L).coerceAtLeast(0L)
+                            }
                             scope.launch {
                                 if(!item.read) runCatching { repo.markNotificationRead(item.id) }
                                 when {
@@ -602,9 +651,45 @@ private fun NotificationCard(
                 }
                 Text(notificationTypeLabel(item.type),color=FqGold,fontSize=11.sp,modifier=Modifier.padding(top=4.dp))
             }
-            Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
+            Column(horizontalAlignment=Alignment.End) {
+                val relative=inboxRelativeTime(item.createdAt)
+                if(relative.isNotBlank()) {
+                    Text(
+                        relative,
+                        color=FqMuted,
+                        fontSize=8.sp
+                    )
+                    Spacer(Modifier.height(5.dp))
+                }
+                Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
+            }
         }
     }
+}
+
+private fun notificationMatchesFilter(
+    type:String,
+    filter:NotificationFilter
+):Boolean = when(filter) {
+    NotificationFilter.ALL -> true
+    NotificationFilter.SOCIAL ->
+        type.startsWith("follow") ||
+        type.startsWith("story_") ||
+        type.startsWith("post_") ||
+        type.startsWith("reel_") ||
+        type.startsWith("review_") ||
+        type=="collection_update"
+    NotificationFilter.MESSAGES ->
+        type in setOf(
+            "dm_message","room_message","watch_party_invite",
+            "watch_party_reminder","watch_party_join_request",
+            "watch_party_join_approved","watch_party_join_declined"
+        )
+    NotificationFilter.RELEASES ->
+        type in setOf(
+            "release_ready","new_episode",
+            "episode_stream_ready","availability_ready"
+        )
 }
 
 private fun notificationIcon(type:String)=when(type) {
