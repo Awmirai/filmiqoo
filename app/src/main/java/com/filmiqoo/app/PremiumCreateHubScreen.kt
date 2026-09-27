@@ -258,8 +258,8 @@ fun PremiumCreateHubScreen(
             caption.trim().isNotBlank() &&
                 pollOptions.map(String::trim).filter(String::isNotBlank).distinct().size>=2
         CreateKind.CHANNEL ->
-            channelName.trim().length>=2 &&
-                channelSlug.trim().length>=3
+            channelName.trim().length in 2..80 &&
+                channelSlug.trim().matches(Regex("^[a-z0-9_.-]{3,40}$"))
     }
 
     LazyColumn(
@@ -425,8 +425,14 @@ fun PremiumCreateHubScreen(
                             onName={channelName=it.take(80)},
                             onSlug={
                                 channelSlug=it.lowercase()
-                                    .filter { c->c.isLetterOrDigit() || c=='_' || c=='.' }
-                                    .take(32)
+                                    .filter { ch ->
+                                        ch in 'a'..'z' ||
+                                            ch in '0'..'9' ||
+                                            ch=='_' ||
+                                            ch=='.' ||
+                                            ch=='-'
+                                    }
+                                    .take(40)
                             },
                             onBio={channelBio=it.take(500)},
                             onVisibility={visibility=it}
