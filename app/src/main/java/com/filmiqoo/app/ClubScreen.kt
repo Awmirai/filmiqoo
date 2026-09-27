@@ -612,7 +612,16 @@ private fun ClubForYou(
                     onShare={
                         if(loggedIn) {
                             scope.launch {
-                                runCatching { social.sharePost(post.id,"system") }
+                                runCatching {
+                                    social.sharePost(post.id,"system")
+                                }.onSuccess { count ->
+                                    onFeedChange(
+                                        feed.map {
+                                            if(it.id==post.id) it.copy(shares=count)
+                                            else it
+                                        }
+                                    )
+                                }
                             }
                         }
                         val destination=FilmiqooDeepLinks.post(post.id)
