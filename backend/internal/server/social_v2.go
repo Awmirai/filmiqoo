@@ -367,6 +367,138 @@ func (s *Server) addPostComment(w http.ResponseWriter,r *http.Request) {
 	writeJSON(w,http.StatusCreated,map[string]any{"id":id})
 }
 
+func (s *Server) commentViewerStates(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
+		writeError(w,http.StatusBadRequest,err)
+		return
+	}
+	if len(body.IDs)>200 { body.IDs=body.IDs[:200] }
+
+	items:=make([]map[string]any,0,len(body.IDs))
+	seen:=map[string]bool{}
+	for _,commentID:=range body.IDs {
+		commentID=strings.TrimSpace(commentID)
+		if commentID=="" || seen[commentID] { continue }
+		seen[commentID]=true
+
+		var liked bool
+		err:=s.db.QueryRow(r.Context(),`
+			SELECT EXISTS(
+				SELECT 1 FROM comment_reactions
+				 WHERE comment_id=$1 AND user_id=$2
+			)
+		`,commentID,userID).Scan(&liked)
+		if err!=nil { continue }
+		items=append(items,map[string]any{
+			"id":commentID,
+			"likedByMe":liked,
+		})
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+}
+
+func (s *Server) toggleCommentLike(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	commentID:=chi.URLParam(r,"id")
+
+	tx,err:=s.db.Begin(r.Context())
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer tx.Rollback(r.Context())
+
+	var exists bool
+	_ = tx.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1 FROM comment_reactions
+			 WHERE comment_id=$1 AND user_id=$2
+		)
+	`,commentID,userID).Scan(&exists)
+
+	if exists {
+		_,err=tx.Exec(r.Context(),`
+			DELETE FROM comment_reactions
+			 WHERE comment_id=$1 AND user_id=$2
+		`,commentID,userID)
+		if err==nil {
+			_,err=tx.Exec(r.Context(),`
+				UPDATE comments
+				   SET like_count=GREATEST(like_count-1,0)
+				 WHERE id=$1
+			`,commentID)
+		}
+	} else {
+		_,err=tx.Exec(r.Context(),`
+			INSERT INTO comment_reactions (comment_id,user_id,reaction)
+			VALUES ($1,$2,'like')
+		`,commentID,userID)
+		if err==nil {
+			_,err=tx.Exec(r.Context(),`
+				UPDATE comments
+				   SET like_count=like_count+1
+				 WHERE id=$1
+			`,commentID)
+		}
+	}
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+	if !exists {
+		var authorID string
+		var postID,reelID *string
+		if scanErr:=tx.QueryRow(r.Context(),`
+			SELECT author_user_id::text,post_id::text,reel_id::text
+			  FROM comments
+			 WHERE id=$1
+		`,commentID).Scan(&authorID,&postID,&reelID); scanErr==nil && authorID!=userID {
+			entityType:=""
+			entityID:=""
+			switch {
+			case postID!=nil && *postID!="":
+				entityType="post"
+				entityID=*postID
+			case reelID!=nil && *reelID!="":
+				entityType="reel"
+				entityID=*reelID
+			}
+			if entityID!="" {
+				_,_=tx.Exec(r.Context(),`
+					INSERT INTO notifications (
+						user_id,actor_user_id,notification_type,
+						entity_type,entity_id,title
+					)
+					SELECT $1,$2,'comment_like',$3,$4,'پسند جدید روی کامنت'
+					WHERE NOT EXISTS (
+						SELECT 1 FROM notifications
+						 WHERE user_id=$1
+						   AND actor_user_id=$2
+						   AND notification_type='comment_like'
+						   AND entity_type=$3
+						   AND entity_id=$4
+						   AND created_at>now()-interval '12 hours'
+					)
+				`,authorID,userID,entityType,entityID)
+			}
+		}
+	}
+
+	var likes int64
+	_ = tx.QueryRow(r.Context(),
+		"SELECT like_count FROM comments WHERE id=$1",
+		commentID,
+	).Scan(&likes)
+
+	if err:=tx.Commit(r.Context()); err!=nil {
+		writeError(w,http.StatusInternalServerError,err)
+		return
+	}
+	writeJSON(w,http.StatusOK,map[string]any{
+		"liked":!exists,
+		"likes":likes,
+	})
+}
+
 func (s *Server) postComments(w http.ResponseWriter,r *http.Request) {
 	postID:=chi.URLParam(r,"id")
 	rows,err:=s.db.Query(r.Context(),`
