@@ -318,6 +318,14 @@ class SocialRepository(
 
     suspend fun reel(id:String): ReelFeedItem {
         val x=backend.getJson("/v1/social/reels/"+id,authorized=false)
+        val viewerState=if(backend.session.isLoggedIn) {
+            runCatching {
+                backend.getJson(
+                    "/v1/social/reels/"+id+"/viewer-state",
+                    authorized=true
+                )
+            }.getOrNull()
+        } else null
         val mediaObj=x.optJSONObject("media")
         val kind=mediaObj?.optString("kind").orEmpty()
         val media=mediaObj?.let {
@@ -346,10 +354,14 @@ class SocialRepository(
             shares=x.optLong("shares"),
             views=x.optLong("views"),
             spoiler=x.optBoolean("spoiler"),
-            likedByMe=x.optBoolean("likedByMe"),
-            savedByMe=x.optBoolean("savedByMe"),
-            followingAuthor=x.optBoolean("followingAuthor"),
-            followPending=x.optBoolean("followPending"),
+            likedByMe=viewerState?.optBoolean("likedByMe")
+                ?: x.optBoolean("likedByMe"),
+            savedByMe=viewerState?.optBoolean("savedByMe")
+                ?: x.optBoolean("savedByMe"),
+            followingAuthor=viewerState?.optBoolean("followingAuthor")
+                ?: x.optBoolean("followingAuthor"),
+            followPending=viewerState?.optBoolean("followPending")
+                ?: x.optBoolean("followPending"),
             author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
             media=media
         )
@@ -404,6 +416,14 @@ class SocialRepository(
 
     suspend fun post(id:String):SocialPost {
         val x=backend.getJson("/v1/social/posts/"+id,authorized=false)
+        val viewerState=if(backend.session.isLoggedIn) {
+            runCatching {
+                backend.getJson(
+                    "/v1/social/posts/"+id+"/viewer-state",
+                    authorized=true
+                )
+            }.getOrNull()
+        } else null
         return SocialPost(
             id=x.optString("id"),
             type=x.optString("type","post"),
@@ -414,10 +434,17 @@ class SocialRepository(
             saves=x.optLong("saves"),
             shares=x.optLong("shares"),
             publishedAt=x.optString("publishedAt").takeIf(String::isNotBlank),
-            likedByMe=x.optBoolean("likedByMe"),
-            savedByMe=x.optBoolean("savedByMe"),
+            likedByMe=viewerState?.optBoolean("likedByMe")
+                ?: x.optBoolean("likedByMe"),
+            savedByMe=viewerState?.optBoolean("savedByMe")
+                ?: x.optBoolean("savedByMe"),
             author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
-            media=x.optJSONObject("media")?.let(::parseMedia)
+            media=x.optJSONObject("media")
+                ?.takeIf {
+                    it.optString("id").isNotBlank() ||
+                        it.optString("title").isNotBlank()
+                }
+                ?.let(::parseMedia)
         )
     }
 
