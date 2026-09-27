@@ -38,7 +38,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private enum class LiveHubFilter { ALL, LIVE, UPCOMING }
+private enum class LiveHubFilter { ALL, LIVE, UPCOMING, MINE }
 
 @Composable
 fun LiveHubScreen(
@@ -54,6 +54,7 @@ fun LiveHubScreen(
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var events by remember { mutableStateOf<List<LiveEvent>>(emptyList()) }
+    var myEventIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<LiveEvent?>(null) }
     var myUserId by remember { mutableStateOf<String?>(null) }
@@ -88,9 +89,23 @@ fun LiveHubScreen(
         if(backend.session.isLoggedIn && myUserId==null) {
             myUserId=runCatching { backend.me().id }.getOrNull()
         }
-        events=runCatching { live.events() }
+        val publicEvents=runCatching { live.events() }
             .onFailure { error=it.message }
             .getOrDefault(emptyList())
+        val ownEvents=if(backend.session.isLoggedIn) {
+            runCatching { live.myEvents() }
+                .onFailure { error=error ?: it.message }
+                .getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        myEventIds=ownEvents.map { it.id }.toSet()
+        events=(publicEvents+ownEvents)
+            .distinctBy { it.id }
+            .sortedWith(
+                compareBy<LiveEvent> { if(it.state=="live")0 else 1 }
+                    .thenBy { it.scheduledAt ?: "9999" }
+            )
         loading=false
     }
 
@@ -172,11 +187,12 @@ fun LiveHubScreen(
             contentPadding=PaddingValues(horizontal=14.dp),
             horizontalArrangement=Arrangement.spacedBy(7.dp)
         ) {
-            listOf(
-                LiveHubFilter.ALL to "همه",
-                LiveHubFilter.LIVE to "زنده",
-                LiveHubFilter.UPCOMING to "آینده"
-            ).forEach { (item,label) ->
+            buildList {
+                add(LiveHubFilter.ALL to "همه")
+                add(LiveHubFilter.LIVE to "زنده")
+                add(LiveHubFilter.UPCOMING to "آینده")
+                if(backend.session.isLoggedIn) add(LiveHubFilter.MINE to "رویدادهای من")
+            }.forEach { (item,label) ->
                 item {
                     FilterChip(
                         selected=filter==item,
@@ -202,11 +218,12 @@ fun LiveHubScreen(
             )
         }
 
-        val visibleEvents=remember(events,filter) {
+        val visibleEvents=remember(events,filter,myEventIds) {
             when(filter) {
                 LiveHubFilter.ALL -> events
                 LiveHubFilter.LIVE -> events.filter { it.state=="live" }
                 LiveHubFilter.UPCOMING -> events.filter { it.state=="scheduled" }
+                LiveHubFilter.MINE -> events.filter { it.id in myEventIds }
             }
         }
 
@@ -217,15 +234,17 @@ fun LiveHubScreen(
                     LiveHubFilter.ALL -> "رویدادی نیست"
                     LiveHubFilter.LIVE -> "الان پخش زنده‌ای نیست"
                     LiveHubFilter.UPCOMING -> "رویداد آینده‌ای نیست"
+                    LiveHubFilter.MINE -> "رویدادی نساختی"
                 },
                 when(filter) {
                     LiveHubFilter.ALL -> "سازنده‌ها می‌تونن پخش زنده یا پریمیر جدید بسازن."
                     LiveHubFilter.LIVE -> "رویدادهای در حال پخش وقتی شروع بشن اینجا ظاهر می‌شن."
                     LiveHubFilter.UPCOMING -> "پخش‌های زمان‌بندی‌شده و پریمیرهای آینده اینجا میاد."
+                    LiveHubFilter.MINE -> "رویدادهای عمومی، خصوصی و دعوتی خودت اینجا نمایش داده می‌شن."
                 },
-                if(filter==LiveHubFilter.ALL)"ساخت رویداد" else null
+                if(filter==LiveHubFilter.ALL || filter==LiveHubFilter.MINE)"ساخت رویداد" else null
             ) {
-                if(filter==LiveHubFilter.ALL) {
+                if(filter==LiveHubFilter.ALL || filter==LiveHubFilter.MINE) {
                     if(backend.session.isLoggedIn) showCreate=true else onRequireAuth()
                 }
             }
@@ -307,7 +326,19 @@ private fun LiveEventCard(
                             overflow=TextOverflow.Ellipsis
                         )
                         Text(
-                            if(event.eventType=="premiere")"پریمیر" else "پخش زنده",
+                            buildString {
+                                append(if(event.eventType=="premiere")"پریمیر" else "پخش زنده")
+                                if(event.visibility!="public") {
+                                    append(" • ")
+                                    append(
+                                        when(event.visibility) {
+                                            "private" -> "خصوصی"
+                                            "invite" -> "دعوتی"
+                                            else -> event.visibility
+                                        }
+                                    )
+                                }
+                            },
                             color=FqGold,
                             fontSize=11.sp
                         )
