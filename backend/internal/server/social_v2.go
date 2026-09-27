@@ -607,6 +607,57 @@ func (s *Server) channelPosts(w http.ResponseWriter,r *http.Request) {
 	writeJSON(w,http.StatusOK,map[string]any{"items":items})
 }
 
+func (s *Server) channelViewerStates(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	raw:=strings.TrimSpace(r.URL.Query().Get("ids"))
+	if raw=="" {
+		writeJSON(w,http.StatusOK,map[string]any{"items":[]map[string]any{}})
+		return
+	}
+
+	parts:=strings.Split(raw,",")
+	if len(parts)>100 { parts=parts[:100] }
+	clean:=make([]string,0,len(parts))
+	seen:=map[string]bool{}
+	for _,id:=range parts {
+		id=strings.TrimSpace(id)
+		if id=="" || seen[id] { continue }
+		seen[id]=true
+		clean=append(clean,id)
+	}
+	if len(clean)==0 {
+		writeJSON(w,http.StatusOK,map[string]any{"items":[]map[string]any{}})
+		return
+	}
+
+	rows,err:=s.db.Query(r.Context(),`
+		WITH target AS (
+			SELECT unnest(string_to_array($1,',')::uuid[]) AS id
+		)
+		SELECT t.id::text,
+		       EXISTS(
+		         SELECT 1 FROM channel_followers cf
+		          WHERE cf.channel_id=t.id AND cf.user_id=$2
+		       )
+		  FROM target t
+	`,strings.Join(clean,","),userID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	defer rows.Close()
+
+	items:=make([]map[string]any,0,len(clean))
+	for rows.Next() {
+		var id string
+		var following bool
+		if rows.Scan(&id,&following)==nil {
+			items=append(items,map[string]any{
+				"id":id,
+				"followingByMe":following,
+			})
+		}
+	}
+	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+}
+
 func (s *Server) toggleChannelFollow(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	channelID:=chi.URLParam(r,"id")
