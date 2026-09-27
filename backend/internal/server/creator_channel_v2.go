@@ -51,6 +51,72 @@ func (s *Server) canViewUserSocialContent(
 	return following,true,nil
 }
 
+func (s *Server) canViewChannelSocialContent(
+	ctx context.Context,
+	viewerID string,
+	channelID string,
+) (bool,bool,bool,string,error) {
+	var visibility string
+	var member bool
+	err:=s.db.QueryRow(ctx,`
+		SELECT c.visibility,
+		       CASE
+		         WHEN $1='' THEN false
+		         ELSE EXISTS(
+		           SELECT 1 FROM channel_members cm
+		            WHERE cm.channel_id=c.id AND cm.user_id=$1
+		         )
+		       END
+		  FROM channels c
+		 WHERE c.id=$2
+	`,viewerID,channelID).Scan(&visibility,&member)
+	if err!=nil {
+		if strings.Contains(strings.ToLower(err.Error()),"no rows") {
+			return false,false,false,"",nil
+		}
+		return false,false,false,"",err
+	}
+	allowed:=visibility=="public" || member
+	return allowed,true,member,visibility,nil
+}
+
+func (s *Server) channelViewerAccess(w http.ResponseWriter,r *http.Request) {
+	channelID:=chi.URLParam(r,"id")
+	viewerID:=userIDFromContext(r.Context())
+	allowed,exists,member,visibility,err:=
+		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		return
+	}
+
+	var role string
+	if member {
+		_ = s.db.QueryRow(r.Context(),`
+			SELECT role
+			  FROM channel_members
+			 WHERE channel_id=$1 AND user_id=$2
+		`,channelID,viewerID).Scan(&role)
+	}
+
+	var following bool
+	_ = s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+			SELECT 1 FROM channel_followers
+			 WHERE channel_id=$1 AND user_id=$2
+		)
+	`,channelID,viewerID).Scan(&following)
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"allowed":allowed,
+		"member":member,
+		"visibility":visibility,
+		"role":role,
+		"following":following,
+	})
+}
+
 func (s *Server) publicUserProfile(w http.ResponseWriter,r *http.Request) {
 	id:=chi.URLParam(r,"id")
 	var username,displayName,bio,avatar,cover string
