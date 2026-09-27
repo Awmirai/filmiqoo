@@ -37,6 +37,12 @@ import java.time.Duration
 
 private enum class ClubTab { FOR_YOU, FOLLOWING, ROOMS }
 
+private fun clubTabSubtitle(tab:ClubTab)=when(tab) {
+    ClubTab.FOR_YOU -> "پیشنهادهای شخصی، Reviewها و اتفاق‌های داغ فیلم و سریال"
+    ClubTab.FOLLOWING -> "آخرین Post، Review و فعالیت آدم‌ها و Channelهایی که دنبال می‌کنی"
+    ClubTab.ROOMS -> "گفت‌وگوهای زنده برای فیلم‌ها، سریال‌ها و قسمت‌ها"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClubScreen(
@@ -681,9 +687,12 @@ private fun ClubHeader(
                     letterSpacing=(-0.5).sp
                 )
                 Text(
-                    "سینما وقتی جذابه که درباره‌ش حرف بزنی",
+                    clubTabSubtitle(selected),
                     color=FqMuted,
                     fontSize=11.sp,
+                    lineHeight=16.sp,
+                    maxLines=2,
+                    overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=2.dp)
                 )
             }
@@ -732,10 +741,10 @@ private fun ClubHeader(
             horizontalArrangement=Arrangement.spacedBy(4.dp)
         ) {
             listOf(
-                ClubTab.FOR_YOU to "فید",
-                ClubTab.FOLLOWING to "دنبال می‌کنی",
-                ClubTab.ROOMS to "گفت‌وگوها"
-            ).forEach { (tab,label) ->
+                Triple(ClubTab.FOR_YOU,Icons.Default.AutoAwesome,"برای تو"),
+                Triple(ClubTab.FOLLOWING,Icons.Default.PeopleAlt,"دنبال‌ها"),
+                Triple(ClubTab.ROOMS,Icons.Default.Forum,"گفت‌وگوها")
+            ).forEach { (tab,icon,label) ->
                 val active=selected==tab
                 val bg by animateColorAsState(
                     if(active) Color.White else Color.Transparent,
@@ -762,12 +771,24 @@ private fun ClubHeader(
                             }
                         }
                 ) {
-                    Box(contentAlignment=Alignment.Center) {
+                    Row(
+                        horizontalArrangement=Arrangement.Center,
+                        verticalAlignment=Alignment.CenterVertically,
+                        modifier=Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            icon,
+                            contentDescription=null,
+                            tint=fg,
+                            modifier=Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
                         Text(
                             label,
                             color=fg,
-                            fontSize=11.sp,
-                            fontWeight=if(active)FontWeight.Bold else FontWeight.Medium
+                            fontSize=10.sp,
+                            fontWeight=if(active)FontWeight.Bold else FontWeight.Medium,
+                            maxLines=1
                         )
                     }
                 }
@@ -884,8 +905,8 @@ private fun ClubForYou(
                     }
                 } else {
                     ClubSectionTitle(
-                        title="فید شما",
-                        subtitle="Review، نظر و پیشنهاد از آدم‌ها و عنوان‌هایی که بهت می‌خورن"
+                        title="برای تو",
+                        subtitle="Review، نظر و پیشنهادهایی که با سلیقه و فعالیتت هماهنگ‌ترن"
                     )
                 }
             }
@@ -2006,6 +2027,36 @@ private fun ClubFollowingFeed(
         contentPadding=PaddingValues(horizontal=12.dp,vertical=10.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)
     ) {
+        item {
+            Row(
+                Modifier.fillMaxWidth()
+                    .padding(horizontal=4.dp,vertical=4.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "از دنبال‌شده‌ها",
+                        fontSize=20.sp,
+                        fontWeight=FontWeight.Black
+                    )
+                    Text(
+                        "آخرین فعالیت آدم‌ها و Channelهایی که خودت انتخاب کردی",
+                        color=FqMuted,
+                        fontSize=10.sp,
+                        lineHeight=15.sp,
+                        modifier=Modifier.padding(top=2.dp)
+                    )
+                }
+                IconButton(onClick=onRefresh) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription="تازه‌سازی",
+                        tint=FqMuted,
+                        modifier=Modifier.size(19.dp)
+                    )
+                }
+            }
+        }
         items(items,key={it.type+"_"+it.entityId+"_"+it.createdAt}) { item ->
             Surface(
                 color=FqSurface,
@@ -2241,22 +2292,23 @@ private fun ClubRooms(
     ) {
         item {
             Text(
-                "Roomها",
+                "گفت‌وگوهای زنده",
                 fontSize=22.sp,
                 fontWeight=FontWeight.Black,
                 modifier=Modifier.padding(start=4.dp,end=4.dp,bottom=4.dp)
             )
             Text(
-                "بحث فیلم‌ها، سریال‌ها و قسمت‌ها",
+                "برای هر فیلم، سریال یا قسمت وارد بحث مرتبطش شو",
                 color=FqMuted,
                 fontSize=10.sp,
+                lineHeight=15.sp,
                 modifier=Modifier.padding(start=4.dp,end=4.dp,bottom=9.dp)
             )
             OutlinedTextField(
                 value=roomQuery,
                 onValueChange={roomQuery=it},
                 singleLine=true,
-                placeholder={Text("جستجو در Roomها...")},
+                placeholder={Text("فیلم، سریال یا موضوع گفتگو...")},
                 leadingIcon={
                     Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))
                 },
@@ -2281,8 +2333,8 @@ private fun ClubRooms(
             item {
                 PremiumEmptyState(
                     icon=Icons.Default.SearchOff,
-                    title="Room پیدا نشد",
-                    body="اسم فیلم، سریال یا موضوع گفتگو رو با عبارت دیگه‌ای جستجو کن."
+                    title="گفت‌وگویی پیدا نشد",
+                    body="اسم فیلم، سریال یا موضوع رو با عبارت دیگه‌ای جستجو کن."
                 )
             }
         }
