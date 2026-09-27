@@ -54,6 +54,7 @@ fun LiveHubScreen(
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var events by remember { mutableStateOf<List<LiveEvent>>(emptyList()) }
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<LiveEvent?>(null) }
     var myUserId by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
@@ -63,7 +64,22 @@ fun LiveHubScreen(
         .getOrDefault(LiveHubFilter.ALL)
 
     BackHandler {
-        if(selected!=null) selected=null else onBack()
+        if(selectedId!=null || selected!=null) {
+            selectedId=null
+            selected=null
+        } else onBack()
+    }
+
+    LaunchedEffect(selectedId) {
+        val id=selectedId ?: return@LaunchedEffect
+        runCatching { live.detail(id) }
+            .onSuccess {
+                if(selectedId==id) selected=it
+            }
+            .onFailure {
+                error=it.message
+                if(selectedId==id && selected==null) selectedId=null
+            }
     }
 
     LaunchedEffect(refresh) {
@@ -85,7 +101,11 @@ fun LiveHubScreen(
             live=live,
             isHost=myUserId==event.host.id,
             loggedIn=backend.session.isLoggedIn,
-            onBack={selected=null;refresh++},
+            onBack={
+                selectedId=null
+                selected=null
+                refresh++
+            },
             onOpenRoom=onOpenRoom,
             onMedia=onMedia,
             onRequireAuth=onRequireAuth,
@@ -95,6 +115,11 @@ fun LiveHubScreen(
             },
             onError={error=it}
         )
+        return
+    }
+
+    if(selectedId!=null && selected==null) {
+        LoadingPage("در حال بازکردن رویداد...")
         return
     }
 
@@ -214,13 +239,8 @@ fun LiveHubScreen(
                     LiveEventCard(
                         event=event,
                         onClick={
-                            scope.launch {
-                                loading=true
-                                selected=runCatching { live.detail(event.id) }
-                                    .onFailure { error=it.message }
-                                    .getOrDefault(event)
-                                loading=false
-                            }
+                            selectedId=event.id
+                            selected=event
                         }
                     )
                 }
@@ -236,11 +256,8 @@ fun LiveHubScreen(
             onDismiss={showCreate=false},
             onCreated={id->
                 showCreate=false
-                scope.launch {
-                    runCatching { live.detail(id) }
-                        .onSuccess { selected=it }
-                        .onFailure { refresh++ }
-                }
+                selected=null
+                selectedId=id
             },
             onError={error=it}
         )
