@@ -696,6 +696,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         deepLinkReelId=clipId
                         tab=1
                     },
+                    onOpenPost={ postId ->
+                        overlay=null
+                        deepLinkPostId=postId
+                        tab=2
+                    },
                     onStartDm={userId,title->
                         if(!backend.session.isLoggedIn) {
                             overlay=OverlayRoute.Auth
