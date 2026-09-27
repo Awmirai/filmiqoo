@@ -921,6 +921,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         overlay=null
                         tab=1
                     },
+                    onOpenStudio={
+                        overlayBackStack.clear()
+                        overlay=OverlayRoute.CreatorStudio
+                    },
                     onBack=closeOverlay
                 )
                 OverlayRoute.Notifications -> ConnectedNotificationsScreen(
