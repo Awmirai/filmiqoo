@@ -170,13 +170,41 @@ private fun RealReelsPager(
 
     LaunchedEffect(pager.currentPage,reels) {
         val reel=reels.getOrNull(pager.currentPage) ?: return@LaunchedEffect
-        player.stop()
-        player.clearMediaItems()
-        if(reel.playbackUrl.isNotBlank()) {
-            player.setMediaItem(ExoMediaItem.fromUri(reel.playbackUrl))
-            player.prepare()
-            player.playWhenReady=true
+        val playable=reels.filter { it.playbackUrl.isNotBlank() }
+        val expectedIds=playable.map { it.id }
+        val existingIds=(0 until player.mediaItemCount).map {
+            player.getMediaItemAt(it).mediaId
         }
+
+        if(existingIds!=expectedIds) {
+            player.stop()
+            player.setMediaItems(
+                playable.map { item ->
+                    ExoMediaItem.Builder()
+                        .setMediaId(item.id)
+                        .setUri(item.playbackUrl)
+                        .build()
+                }
+            )
+            if(playable.isNotEmpty()) {
+                player.prepare()
+            }
+        }
+
+        val playerIndex=(0 until player.mediaItemCount)
+            .firstOrNull {
+                player.getMediaItemAt(it).mediaId==reel.id
+            }
+
+        if(playerIndex!=null) {
+            if(player.currentMediaItemIndex!=playerIndex) {
+                player.seekToDefaultPosition(playerIndex)
+            }
+            player.playWhenReady=true
+        } else {
+            player.pause()
+        }
+
         if(loggedIn) {
             delay(1800)
             runCatching { social.markReelViewed(reel.id) }
