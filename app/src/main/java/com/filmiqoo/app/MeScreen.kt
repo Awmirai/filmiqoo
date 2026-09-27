@@ -1167,15 +1167,20 @@ private fun MeMoreSheet(
             modifier=Modifier.padding(bottom=10.dp)
         )
 
+        MeSheetSectionTitle("اجتماعی")
         MeSheetRow(Icons.Default.Analytics,"Creator Studio",onCreatorStudio)
         MeSheetRow(Icons.Default.CollectionsBookmark,"ذخیره‌های اجتماعی",onSocialSaves)
-        MeSheetRow(Icons.Default.SwitchAccount,"پروفایل‌های تماشا",onViewerProfiles)
-        MeSheetRow(Icons.Default.AdminPanelSettings,"کنترل والدین",onParentalControls)
         MeSheetRow(Icons.Default.PersonAddAlt1,"درخواست‌های Follow",onFollowRequests)
         MeSheetRow(Icons.Default.Star,"Close Friends",onCloseFriends)
         MeSheetRow(Icons.Default.MilitaryTech,"Reputation و Badgeها",onReputation)
-        MeSheetRow(Icons.Default.EventAvailable,"تقویم سریال‌ها",onSeriesCalendar)
         MeSheetRow(Icons.Default.CollectionsBookmark,"Club Lists",onSocialCollections)
+
+        MeSheetSectionTitle("تماشا و خانواده")
+        MeSheetRow(Icons.Default.SwitchAccount,"پروفایل‌های تماشا",onViewerProfiles)
+        MeSheetRow(Icons.Default.AdminPanelSettings,"کنترل والدین",onParentalControls)
+        MeSheetRow(Icons.Default.EventAvailable,"تقویم سریال‌ها",onSeriesCalendar)
+
+        MeSheetSectionTitle("حساب و امنیت")
         MeSheetRow(Icons.Default.Shield,"مرکز ایمنی",onSafety)
         MeSheetRow(Icons.Default.Security,"امنیت و دستگاه‌ها",onSecurity)
         MeSheetRow(Icons.Default.Settings,"همه تنظیمات",onSettings)
@@ -1200,6 +1205,22 @@ private fun MeMoreSheet(
             }
         }
     }
+}
+
+@Composable
+private fun MeSheetSectionTitle(title:String) {
+    Text(
+        title,
+        color=FqMuted,
+        fontSize=10.sp,
+        fontWeight=FontWeight.Bold,
+        modifier=Modifier.padding(
+            start=12.dp,
+            end=12.dp,
+            top=14.dp,
+            bottom=4.dp
+        )
+    )
 }
 
 @Composable
