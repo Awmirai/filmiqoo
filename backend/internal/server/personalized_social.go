@@ -8,6 +8,7 @@ import (
 func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
 	userID:=userIDFromContext(r.Context())
+	limit,offset:=socialPageParams(r,30,50)
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
 		       p.save_count,p.share_count,p.published_at,
@@ -111,8 +112,8 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 		     )
 		   ) DESC,
 		   p.published_at DESC NULLS LAST,p.created_at DESC
-		 LIMIT 50
-	`,userID)
+		 LIMIT $2 OFFSET $3
+	`,userID,limit,offset)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -139,12 +140,16 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
+	writeJSON(w,http.StatusOK,map[string]any{
+		"items":items,
+		"nextCursor":nextSocialCursor(offset,len(items),limit),
+	})
 }
 
 func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
 	userID:=userIDFromContext(r.Context())
+	limit,offset:=socialPageParams(r,24,40)
 	rows,err:=s.db.Query(r.Context(),`
 		WITH playback_quality AS (
 		  SELECT reel_id,
@@ -293,8 +298,8 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		     )
 		   ) DESC,
 		   rl.published_at DESC NULLS LAST,rl.created_at DESC
-		 LIMIT 60
-	`,userID)
+		 LIMIT $2 OFFSET $3
+	`,userID,limit,offset)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -333,7 +338,10 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 			},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
+	writeJSON(w,http.StatusOK,map[string]any{
+		"items":items,
+		"nextCursor":nextSocialCursor(offset,len(items),limit),
+	})
 }
 
 func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
