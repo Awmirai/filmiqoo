@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +37,7 @@ fun WatchHistoryScreen(
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var items by remember { mutableStateOf<List<WatchHistoryItem>>(emptyList()) }
-    var filter by remember { mutableIntStateOf(0) }
+    var filter by rememberSaveable { mutableIntStateOf(0) }
     var confirmClear by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -66,8 +67,16 @@ fun WatchHistoryScreen(
         ) {
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
-                Text("تاریخچه تماشا",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text(items.size.toString()+" مورد اخیر",color=FqMuted,fontSize=11.sp)
+                Text("تماشای من",fontSize=22.sp,fontWeight=FontWeight.Black)
+                Text(
+                    when(filter) {
+                        1 -> visible.size.toString()+" مورد نیمه‌کاره"
+                        2 -> visible.size.toString()+" مورد تمام‌شده"
+                        else -> items.size.toString()+" مورد اخیر"
+                    },
+                    color=FqMuted,
+                    fontSize=11.sp
+                )
             }
             if(items.isNotEmpty()) {
                 TextButton(onClick={confirmClear=true}) {
@@ -94,8 +103,11 @@ fun WatchHistoryScreen(
         if(!loading && visible.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.History,
-                "تاریخچه خالیه",
-                "هر چیزی که تماشا کنی با موقعیت دقیق اینجا ذخیره می‌شه."
+                if(filter==0)"تاریخچه تماشا خالیه" else "چیزی در این فیلتر نیست",
+                if(filter==0)
+                    "هر چیزی که تماشا کنی با موقعیت دقیق اینجا ذخیره می‌شه."
+                else
+                    "فیلتر دیگه‌ای رو انتخاب کن یا تماشای جدیدی شروع کن."
             )
         } else {
             LazyColumn(
