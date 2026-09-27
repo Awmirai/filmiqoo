@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,7 +84,7 @@ fun MeScreen(
     val social=remember { SocialRepository(backend) }
     var refresh by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<MeLoad>(MeLoad.Loading) }
-    var tab by remember { mutableStateOf(MeTab.ACTIVITY) }
+    var tab by rememberSaveable { mutableStateOf(MeTab.ACTIVITY) }
     var showMore by remember { mutableStateOf(false) }
     var deletePostFor by remember { mutableStateOf<SocialPost?>(null) }
     var deleteClipFor by remember { mutableStateOf<ReelFeedItem?>(null) }
