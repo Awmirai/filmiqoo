@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,8 +36,8 @@ fun SceneBookmarksSheet(
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var items by remember { mutableStateOf<List<SceneBookmark>>(emptyList()) }
-    var note by remember { mutableStateOf("") }
-    var tag by remember { mutableStateOf("") }
+    var note by rememberSaveable(mediaVersionId) { mutableStateOf("") }
+    var tag by rememberSaveable(mediaVersionId) { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<SceneBookmark?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -46,7 +47,7 @@ fun SceneBookmarksSheet(
         error=null
         runCatching { repo.forVersion(mediaVersionId) }
             .onSuccess { items=it }
-            .onFailure { error=it.message ?: "دریافت Bookmarkها ناموفق بود" }
+            .onFailure { error=it.message ?: "دریافت نشانه‌ها ناموفق بود" }
         loading=false
     }
 
@@ -72,7 +73,7 @@ fun SceneBookmarksSheet(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Scene Bookmarks",fontSize=20.sp,fontWeight=FontWeight.Black)
+                    Text("نشانه‌های صحنه",fontSize=20.sp,fontWeight=FontWeight.Black)
                     Text(
                         "لحظه‌های خصوصی خودت • فقط برای حساب تو",
                         color=FqMuted,
@@ -112,7 +113,7 @@ fun SceneBookmarksSheet(
                     OutlinedTextField(
                         value=tag,
                         onValueChange={tag=it.take(48)},
-                        label={Text("Tag اختیاری")},
+                        label={Text("برچسب اختیاری")},
                         placeholder={Text("مثلاً Plot Twist")},
                         singleLine=true,
                         modifier=Modifier.fillMaxWidth().padding(top=7.dp)
@@ -144,7 +145,7 @@ fun SceneBookmarksSheet(
                                         tag=""
                                         refresh++
                                     }.onFailure {
-                                        error=it.message ?: "ذخیره Bookmark ناموفق بود"
+                                        error=it.message ?: "ذخیره نشانه ناموفق بود"
                                     }
                                     saving=false
                                 }
@@ -196,7 +197,7 @@ fun SceneBookmarksSheet(
                             modifier=Modifier.size(42.dp)
                         )
                         Text(
-                            "هنوز Scene Bookmark نداری",
+                            "هنوز نشانه‌ای برای این ویدیو نداری",
                             fontSize=11.sp,
                             fontWeight=FontWeight.Bold,
                             modifier=Modifier.padding(top=8.dp)
@@ -302,7 +303,7 @@ private fun SceneBookmarkRow(
                 Modifier.weight(1f).clickable { onSeek() }
             ) {
                 Text(
-                    item.note.ifBlank { "Scene Bookmark" },
+                    item.note.ifBlank { "نشانه صحنه" },
                     fontSize=9.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=2,
@@ -334,13 +335,13 @@ private fun SceneBookmarkEditDialog(
     onDismiss:()->Unit,
     onSave:(String,String)->Unit
 ) {
-    var note by remember(item.id) { mutableStateOf(item.note) }
-    var tag by remember(item.id) { mutableStateOf(item.tag) }
+    var note by rememberSaveable(item.id) { mutableStateOf(item.note) }
+    var tag by rememberSaveable(item.id) { mutableStateOf(item.tag) }
 
     AlertDialog(
         onDismissRequest=onDismiss,
         icon={Icon(Icons.Default.Bookmark,null,tint=FqGold)},
-        title={Text("ویرایش Scene Bookmark")},
+        title={Text("ویرایش نشانه صحنه")},
         text={
             Column {
                 Text(
@@ -360,7 +361,7 @@ private fun SceneBookmarkEditDialog(
                 OutlinedTextField(
                     value=tag,
                     onValueChange={tag=it.take(48)},
-                    label={Text("Tag")},
+                    label={Text("برچسب")},
                     singleLine=true,
                     modifier=Modifier.fillMaxWidth().padding(top=7.dp)
                 )
