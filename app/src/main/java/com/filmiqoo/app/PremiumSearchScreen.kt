@@ -58,6 +58,13 @@ fun PremiumSearchScreen(
     val selectedTab=runCatching { SearchTab.valueOf(tabName) }
         .getOrDefault(SearchTab.ALL)
 
+    fun recordCurrentSearch() {
+        val q=query.trim()
+        if(q.length<2) return
+        searchRepo.recordHistory(q)
+        history=searchRepo.history()
+    }
+
     BackHandler { onBack() }
 
     LaunchedEffect(query) {
@@ -99,7 +106,11 @@ fun PremiumSearchScreen(
         if(query.isBlank() && history.isNotEmpty()) {
             RecentSearches(
                 history=history,
-                onSelect={query=it},
+                onSelect={
+                    searchRepo.recordHistory(it)
+                    history=searchRepo.history()
+                    query=it
+                },
                 onClear={
                     searchRepo.clearHistory()
                     history=emptyList()
@@ -141,10 +152,22 @@ fun PremiumSearchScreen(
                         query=query,
                         selectedTab=selectedTab,
                         repository=repository,
-                        onMedia=onMedia,
-                        onCreator=onCreator,
-                        onOpenPost=onOpenPost,
-                        onOpenClip=onOpenClip
+                        onMedia={
+                            recordCurrentSearch()
+                            onMedia(it)
+                        },
+                        onCreator={
+                            recordCurrentSearch()
+                            onCreator(it)
+                        },
+                        onOpenPost={
+                            recordCurrentSearch()
+                            onOpenPost(it)
+                        },
+                        onOpenClip={
+                            recordCurrentSearch()
+                            onOpenClip(it)
+                        }
                     )
                 }
             }
