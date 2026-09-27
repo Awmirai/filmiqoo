@@ -53,7 +53,7 @@ fun FollowRequestsScreen(
         ) {
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
-                Text("درخواست‌های Follow",fontSize=22.sp,fontWeight=FontWeight.Black)
+                Text("درخواست‌های دنبال‌کردن",fontSize=22.sp,fontWeight=FontWeight.Black)
                 Text(
                     if(requests.isEmpty())"درخواست جدیدی نداری"
                     else requests.size.toString()+" درخواست در انتظار",
@@ -81,7 +81,7 @@ fun FollowRequestsScreen(
             PremiumEmptyState(
                 Icons.Default.PersonAddDisabled,
                 "درخواستی در انتظار نیست",
-                "اگر حسابت Private باشه، درخواست‌های Follow اینجا ظاهر می‌شن."
+                "اگر حسابت خصوصی باشه، درخواست‌های دنبال‌کردن اینجا ظاهر می‌شن."
             )
         } else {
             LazyColumn(
@@ -201,7 +201,7 @@ private fun FollowRequestCard(
                         Icon(Icons.Default.Check,null,tint=Color.Black)
                     }
                     Spacer(Modifier.width(4.dp))
-                    Text("Accept",color=Color.Black,fontSize=11.sp)
+                    Text("پذیرفتن",color=Color.Black,fontSize=11.sp)
                 }
 
                 OutlinedButton(
@@ -212,7 +212,7 @@ private fun FollowRequestCard(
                 ) {
                     Icon(Icons.Default.Close,null,modifier=Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Decline",fontSize=11.sp)
+                    Text("رد کردن",fontSize=11.sp)
                 }
             }
         }
