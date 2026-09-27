@@ -32,6 +32,14 @@ data class PublicChannelProfile(
     val reels: Long
 )
 
+data class ChannelViewerAccess(
+    val allowed:Boolean,
+    val member:Boolean,
+    val visibility:String,
+    val role:String,
+    val following:Boolean
+)
+
 data class ChannelMember(
     val id: String,
     val role: String,
@@ -187,6 +195,21 @@ class CreatorChannelRepository(
         )
     }
 
+    suspend fun channelViewerAccess(id:String):ChannelViewerAccess? {
+        if(!backend.session.isLoggedIn) return null
+        val o=backend.getJson(
+            "/v1/social/channels/"+id+"/viewer-access",
+            authorized=true
+        )
+        return ChannelViewerAccess(
+            allowed=o.optBoolean("allowed"),
+            member=o.optBoolean("member"),
+            visibility=o.optString("visibility"),
+            role=o.optString("role"),
+            following=o.optBoolean("following")
+        )
+    }
+
     suspend fun channelProfile(id: String): PublicChannelProfile {
         val o=backend.getJson("/v1/social/channels/"+id,authorized=false)
         return PublicChannelProfile(
@@ -205,24 +228,48 @@ class CreatorChannelRepository(
         )
     }
 
-    suspend fun channelPosts(id: String): List<SocialPost> =
-        enrichPostViewerState(
+    suspend fun channelPosts(id:String):List<SocialPost> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/channels/"+id+"/posts/viewer"
+        else
+            "/v1/social/channels/"+id+"/posts"
+        return enrichPostViewerState(
             parsePosts(
-                backend.getJson(
-                    "/v1/social/channels/"+id+"/posts",
-                    authorized=false
-                )
+                backend.getJson(path,authorized=loggedIn)
             )
         )
+    }
 
-    suspend fun channelReels(id: String): List<ReelFeedItem> =
-        parseReels(backend.getJson("/v1/social/channels/"+id+"/reels",authorized=false))
+    suspend fun channelReels(id:String):List<ReelFeedItem> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/channels/"+id+"/reels/viewer"
+        else
+            "/v1/social/channels/"+id+"/reels"
+        return parseReels(
+            backend.getJson(path,authorized=loggedIn)
+        )
+    }
 
-    suspend fun channelStories(id: String): List<SocialStory> =
-        parseStories(backend.getJson("/v1/social/channels/"+id+"/stories",authorized=false))
+    suspend fun channelStories(id:String):List<SocialStory> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/channels/"+id+"/stories/viewer"
+        else
+            "/v1/social/channels/"+id+"/stories"
+        return parseStories(
+            backend.getJson(path,authorized=loggedIn)
+        )
+    }
 
-    suspend fun channelMembers(id: String): List<ChannelMember> {
-        val root=backend.getJson("/v1/social/channels/"+id+"/members",authorized=false)
+    suspend fun channelMembers(id:String):List<ChannelMember> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/channels/"+id+"/members/viewer"
+        else
+            "/v1/social/channels/"+id+"/members"
+        val root=backend.getJson(path,authorized=loggedIn)
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
@@ -241,8 +288,13 @@ class CreatorChannelRepository(
         }
     }
 
-    suspend fun channelRooms(id: String): List<SocialRoom> {
-        val root=backend.getJson("/v1/social/channels/"+id+"/rooms",authorized=false)
+    suspend fun channelRooms(id:String):List<SocialRoom> {
+        val loggedIn=backend.session.isLoggedIn
+        val path=if(loggedIn)
+            "/v1/social/channels/"+id+"/rooms/viewer"
+        else
+            "/v1/social/channels/"+id+"/rooms"
+        val root=backend.getJson(path,authorized=loggedIn)
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
