@@ -852,6 +852,9 @@ private fun ReelCommentsSheet(
     var spoiler by remember { mutableStateOf(false) }
     var replyTo by remember { mutableStateOf<SocialComment?>(null) }
     var loading by remember { mutableStateOf(true) }
+    val displayComments=remember(items) {
+        threadedSocialComments(items)
+    }
 
     fun reload() {
         scope.launch {
@@ -881,8 +884,11 @@ private fun ReelCommentsSheet(
                 modifier=Modifier.weight(1f).padding(top=8.dp),
                 verticalArrangement=Arrangement.spacedBy(7.dp)
             ) {
-                items(items.size,key={items[it].id}) { index ->
-                    val c=items[index]
+                items(
+                    displayComments.size,
+                    key={displayComments[it].id}
+                ) { index ->
+                    val c=displayComments[index]
                     var reveal by remember(c.id) { mutableStateOf(!c.spoiler) }
                     Row(
                         Modifier.fillMaxWidth()
@@ -892,7 +898,24 @@ private fun ReelCommentsSheet(
                         RemoteImage(c.author.avatarUrl.takeIf(String::isNotBlank),Modifier.size(34.dp).clip(CircleShape))
                         Spacer(Modifier.width(7.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(c.author.displayName,color=FqGold,fontSize=11.sp)
+                            Row(
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    c.author.displayName,
+                                    color=FqGold,
+                                    fontSize=11.sp
+                                )
+                                val relative=socialRelativeTime(c.createdAt)
+                                if(relative.isNotBlank()) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "• "+relative,
+                                        color=FqMuted,
+                                        fontSize=8.sp
+                                    )
+                                }
+                            }
                             if(c.spoiler && !reveal) {
                                 Text(
                                     "⚠ Spoiler Shield • نمایش",
