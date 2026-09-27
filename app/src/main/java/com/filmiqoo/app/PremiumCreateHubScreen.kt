@@ -200,6 +200,39 @@ fun PremiumCreateHubScreen(
         scheduledAtMillis=scheduledAtMillis ?: 0L
     )
 
+    LaunchedEffect(
+        kind,
+        caption,
+        spoiler,
+        closeFriendsOnly,
+        allowComments,
+        channelName,
+        channelSlug,
+        channelBio,
+        visibility,
+        pollOptions.toList(),
+        taggedMedia?.backendId,
+        taggedMedia?.title,
+        scheduledAtMillis
+    ) {
+        delay(700)
+        val snapshot=currentDraft()
+        val hasMeaningfulDraft=
+            kind!=CreateKind.POST ||
+            caption.isNotBlank() ||
+            spoiler ||
+            closeFriendsOnly ||
+            !allowComments ||
+            channelName.isNotBlank() ||
+            channelSlug.isNotBlank() ||
+            channelBio.isNotBlank() ||
+            visibility!="public" ||
+            pollOptions.any(String::isNotBlank) ||
+            taggedMedia!=null ||
+            scheduledAtMillis!=null
+        if(hasMeaningfulDraft) drafts.write(snapshot) else drafts.clear()
+    }
+
     val canPublish=when(kind) {
         CreateKind.REEL -> selectedUri!=null
         CreateKind.STORY -> selectedUri!=null || caption.isNotBlank()
@@ -529,9 +562,9 @@ fun PremiumCreateHubScreen(
                                     )
                                     Text(
                                         if(taggedMedia==null)
-                                            "اختیاری • محتوا رو به Catalog وصل کن"
+                                            "اختیاری • محتوا رو به کاتالوگ وصل کن"
                                         else
-                                            "متصل به Catalog Filmiqoo",
+                                            "متصل به کاتالوگ Filmiqoo",
                                         color=FqMuted,
                                         fontSize=11.sp
                                     )
