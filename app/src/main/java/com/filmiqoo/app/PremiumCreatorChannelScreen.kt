@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,7 +77,7 @@ fun PremiumCreatorChannelScreen(
     var followed by remember(creator.id) { mutableStateOf(false) }
     var followPending by remember(creator.id) { mutableStateOf(false) }
     var followBusy by remember { mutableStateOf(false) }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable(creator.id,creator.entityType) { mutableIntStateOf(0) }
     var safetyTargetType by remember { mutableStateOf<String?>(null) }
     var safetyTargetId by remember { mutableStateOf<String?>(null) }
     var safetyUserId by remember { mutableStateOf<String?>(null) }
@@ -550,7 +551,9 @@ private fun CreatorEntityScaffold(
             )
 
             Row(
-                Modifier.fillMaxWidth().padding(9.dp),
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=9.dp,vertical=7.dp),
                 verticalAlignment=Alignment.CenterVertically
             ) {
                 IconButton(
@@ -587,7 +590,13 @@ private fun CreatorEntityScaffold(
             ) {
                 Row(verticalAlignment=Alignment.Bottom) {
                     Box(
-                        Modifier.size(92.dp).background(FqGold,CircleShape).padding(3.dp)
+                        Modifier.size(92.dp)
+                            .background(
+                                if(verified) FqGold
+                                else Color.White.copy(alpha=.16f),
+                                CircleShape
+                            )
+                            .padding(3.dp)
                     ) {
                         RemoteImage(
                             avatar.takeIf(String::isNotBlank),
@@ -598,7 +607,13 @@ private fun CreatorEntityScaffold(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment=Alignment.CenterVertically) {
-                            Text(name,fontSize=24.sp,fontWeight=FontWeight.Black)
+                            Text(
+                                name,
+                                fontSize=24.sp,
+                                fontWeight=FontWeight.Black,
+                                maxLines=1,
+                                overflow=TextOverflow.Ellipsis
+                            )
                             if(verified) {
                                 Spacer(Modifier.width(5.dp))
                                 Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(18.dp))
@@ -618,17 +633,14 @@ private fun CreatorEntityScaffold(
                     }
                 }
 
-                Row(
-                    Modifier.fillMaxWidth().padding(top=13.dp),
-                    horizontalArrangement=Arrangement.spacedBy(8.dp)
-                ) {
-                    CreatorCountCard(compactCreatorCount(followers),"دنبال‌کننده",Modifier.weight(1f))
-                    if(!isChannel) {
-                        CreatorCountCard(compactCreatorCount(following),"دنبال‌شده",Modifier.weight(1f))
-                    }
-                    CreatorCountCard(compactCreatorCount(postsCount),"پست",Modifier.weight(1f))
-                    CreatorCountCard(compactCreatorCount(reelsCount),"Clip",Modifier.weight(1f))
-                }
+                CreatorMetricsBar(
+                    followers=followers,
+                    following=following,
+                    posts=postsCount,
+                    clips=reelsCount,
+                    showFollowing=!isChannel,
+                    modifier=Modifier.padding(top=13.dp)
+                )
 
                 if(!selfProfile) {
                     Row(
@@ -692,23 +704,120 @@ private fun CreatorEntityScaffold(
             }
         }
 
-        ScrollableTabRow(
-            selectedTabIndex=tab,
-            containerColor=FqBg,
-            contentColor=FqGold,
-            edgePadding=10.dp,
-            divider={}
-        ) {
-            tabs.forEachIndexed { i,label ->
-                Tab(
-                    selected=tab==i,
-                    onClick={onTab(i)},
-                    text={Text(label,fontSize=11.sp)}
-                )
-            }
-        }
+        CreatorProfileTabs(
+            selected=tab,
+            tabs=tabs,
+            onSelected=onTab
+        )
 
         Box(Modifier.weight(1f)) { content() }
+    }
+}
+
+@Composable
+private fun CreatorMetricsBar(
+    followers:Long,
+    following:Long,
+    posts:Long,
+    clips:Long,
+    showFollowing:Boolean,
+    modifier:Modifier=Modifier
+) {
+    val metrics=buildList {
+        add(compactCreatorCount(followers) to "دنبال‌کننده")
+        if(showFollowing) add(compactCreatorCount(following) to "دنبال‌شده")
+        add(compactCreatorCount(posts) to "پست")
+        add(compactCreatorCount(clips) to "Clip")
+    }
+    Surface(
+        color=Color.Black.copy(alpha=.28f),
+        shape=RoundedCornerShape(16.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha=.07f)
+        ),
+        modifier=modifier.fillMaxWidth()
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical=10.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            metrics.forEachIndexed { index,(value,label) ->
+                Column(
+                    Modifier.weight(1f),
+                    horizontalAlignment=Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        value,
+                        fontSize=14.sp,
+                        fontWeight=FontWeight.Black
+                    )
+                    Text(
+                        label,
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        modifier=Modifier.padding(top=2.dp)
+                    )
+                }
+                if(index<metrics.lastIndex) {
+                    Box(
+                        Modifier.width(1.dp)
+                            .height(25.dp)
+                            .background(Color.White.copy(alpha=.08f))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreatorProfileTabs(
+    selected:Int,
+    tabs:List<String>,
+    onSelected:(Int)->Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .padding(horizontal=12.dp,vertical=9.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(FqSurface)
+            .padding(4.dp),
+        horizontalArrangement=Arrangement.spacedBy(4.dp)
+    ) {
+        tabs.forEachIndexed { index,label ->
+            val active=selected==index
+            val bg by animateColorAsState(
+                if(active) Color.White else Color.Transparent,
+                animationSpec=tween(180),
+                label="creatorTabBg"
+            )
+            val fg by animateColorAsState(
+                if(active) Color.Black else FqMuted,
+                animationSpec=tween(180),
+                label="creatorTabFg"
+            )
+            Surface(
+                color=bg,
+                contentColor=fg,
+                shape=RoundedCornerShape(14.dp),
+                modifier=Modifier.weight(1f)
+                    .height(38.dp)
+                    .clickable {
+                        if(!active) onSelected(index)
+                    }
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Text(
+                        label,
+                        color=fg,
+                        fontSize=10.sp,
+                        fontWeight=if(active) FontWeight.Bold else FontWeight.Medium,
+                        maxLines=1
+                    )
+                }
+            }
+        }
     }
 }
 
