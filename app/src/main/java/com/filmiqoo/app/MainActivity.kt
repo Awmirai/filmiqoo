@@ -90,6 +90,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var deepLinkPostId by remember { mutableStateOf<String?>(null) }
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
+    var showNotificationPrimer by remember { mutableStateOf(false) }
 
     DisposableEffect(backend,context) {
         val prefs=context.applicationContext.getSharedPreferences(
@@ -118,17 +119,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
     LaunchedEffect(authenticated) {
         if(authenticated && FilmiqooPush.initialize(context.applicationContext)) {
-            if(
-                Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                )!=PackageManager.PERMISSION_GRANTED
-            ) {
-                notificationPermissionLauncher.launch(
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
-            }
             runCatching {
                 FilmiqooPush.registerIfPossible(
                     context.applicationContext,
@@ -336,6 +326,20 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         showSearch = false
     }
 
+    val openNotifications = {
+        overlay=OverlayRoute.Notifications
+        if(
+            Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU &&
+            FilmiqooPush.isConfigured() &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            )!=PackageManager.PERMISSION_GRANTED
+        ) {
+            showNotificationPrimer=true
+        }
+    }
+
     val openMediaRoom: (MediaItem)->Unit = { media ->
         val mediaId=media.backendId
         if(mediaId.isNullOrBlank()) {
@@ -362,6 +366,42 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
     BackHandler(enabled = overlay != null || showSearch) {
         closeOverlay()
+    }
+
+    if(showNotificationPrimer) {
+        AlertDialog(
+            onDismissRequest={showNotificationPrimer=false},
+            icon={
+                Icon(
+                    Icons.Default.NotificationsActive,
+                    null,
+                    tint=FqGold
+                )
+            },
+            title={Text("اعلان‌های Filmiqoo")},
+            text={
+                Text(
+                    "برای Like، Comment، پیام، قسمت جدید و Watch Party به‌موقع باخبر شو. کنترل اعلان‌ها همیشه دست خودته."
+                )
+            },
+            confirmButton={
+                Button(
+                    onClick={
+                        showNotificationPrimer=false
+                        notificationPermissionLauncher.launch(
+                            Manifest.permission.POST_NOTIFICATIONS
+                        )
+                    }
+                ) {
+                    Text("فعال کردن")
+                }
+            },
+            dismissButton={
+                TextButton(onClick={showNotificationPrimer=false}) {
+                    Text("بعداً")
+                }
+            }
+        )
     }
 
     pendingHandoff?.let { handoff ->
@@ -821,7 +861,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     showSearch=true
                                 }
                             },
-                            onNotifications={overlay=OverlayRoute.Notifications},
+                            onNotifications=openNotifications,
                             onReleases={overlay=OverlayRoute.Releases},
                             onClips={tab=1},
                             onClub={tab=2},
