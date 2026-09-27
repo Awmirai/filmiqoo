@@ -402,6 +402,25 @@ class SocialRepository(
     }
 
 
+    suspend fun post(id:String):SocialPost {
+        val x=backend.getJson("/v1/social/posts/"+id,authorized=false)
+        return SocialPost(
+            id=x.optString("id"),
+            type=x.optString("type","post"),
+            body=x.optString("body"),
+            spoiler=x.optBoolean("spoiler"),
+            likes=x.optLong("likes"),
+            comments=x.optLong("comments"),
+            saves=x.optLong("saves"),
+            shares=x.optLong("shares"),
+            publishedAt=x.optString("publishedAt").takeIf(String::isNotBlank),
+            likedByMe=x.optBoolean("likedByMe"),
+            savedByMe=x.optBoolean("savedByMe"),
+            author=parseAuthor(x.optJSONObject("author") ?: JSONObject()),
+            media=x.optJSONObject("media")?.let(::parseMedia)
+        )
+    }
+
     suspend fun feed(): List<SocialPost> {
         val loggedIn=backend.session.isLoggedIn
         val root=backend.getJson(
