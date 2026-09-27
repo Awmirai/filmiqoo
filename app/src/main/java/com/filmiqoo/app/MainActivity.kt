@@ -87,6 +87,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var viewerReady by remember { mutableStateOf(!authenticated) }
     var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
     var deepLinkReelId by remember { mutableStateOf<String?>(null) }
+    var clipResumeReelId by remember { mutableStateOf<String?>(null) }
     var deepLinkPostId by remember { mutableStateOf<String?>(null) }
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
@@ -921,7 +922,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             store=store,
                             loggedIn=backend.session.isLoggedIn,
                             initialReelId=deepLinkReelId,
+                            resumeReelId=clipResumeReelId,
                             onInitialReelConsumed={deepLinkReelId=null},
+                            onVisibleReelChanged={clipResumeReelId=it},
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onChat=openMediaRoom,
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
