@@ -322,10 +322,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         }
     }
 
-    val closeOverlay = {
-        overlay = null
-        showSearch = false
+    val closeOverlay:()->Unit = {
+        overlay=null
+        showSearch=false
         socialBadgeRefresh++
+        Unit
     }
 
     val openNotifications = {
