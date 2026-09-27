@@ -8,6 +8,31 @@ import (
 
 func (s *Server) reelDetail(w http.ResponseWriter,r *http.Request) {
     id:=chi.URLParam(r,"id")
+    allowed,exists,err:=s.canViewReel(r.Context(),"",id)
+    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+    if !exists || !allowed {
+        writeJSON(w,http.StatusNotFound,map[string]string{"error":"reel not found"})
+        return
+    }
+    s.reelDetailByID(w,r,id)
+}
+
+func (s *Server) viewerReelDetail(w http.ResponseWriter,r *http.Request) {
+    id:=chi.URLParam(r,"id")
+    userID:=userIDFromContext(r.Context())
+    allowed,exists,err:=s.canViewReel(r.Context(),userID,id)
+    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+    if !exists || !allowed {
+        writeJSON(w,http.StatusNotFound,map[string]string{"error":"reel not found"})
+        return
+    }
+    s.reelDetailByID(w,r,id)
+}
+func (s *Server) reelDetailByID(
+    w http.ResponseWriter,
+    r *http.Request,
+    id string,
+) {
     row:=s.db.QueryRow(r.Context(), `
         SELECT rl.id::text,rl.caption,rl.playback_url,rl.cover_url,rl.duration_ms,
                rl.like_count,rl.comment_count,rl.save_count,rl.share_count,rl.view_count,rl.spoiler,
@@ -66,9 +91,15 @@ func (s *Server) mediaClips(w http.ResponseWriter,r *http.Request) {
                mt.year,mt.rating
           FROM reels rl
           JOIN profiles p ON p.user_id=rl.creator_user_id
+          LEFT JOIN channels ch ON ch.id=rl.channel_id
           JOIN media_titles mt ON mt.id=rl.media_title_id
          WHERE rl.media_title_id=$1
            AND rl.status='published'
+           AND (
+             (rl.channel_id IS NULL AND p.private_account=false)
+             OR
+             (rl.channel_id IS NOT NULL AND ch.visibility='public')
+           )
          ORDER BY
            (rl.like_count*2 + rl.comment_count*4 + rl.save_count*5 +
             rl.share_count*6 + rl.view_count/25) DESC,
