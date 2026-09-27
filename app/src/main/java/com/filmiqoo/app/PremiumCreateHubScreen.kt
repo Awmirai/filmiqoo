@@ -122,6 +122,7 @@ fun PremiumCreateHubScreen(
     onRequireAuth:()->Unit,
     onOpenClub:()->Unit,
     onOpenClips:()->Unit,
+    onOpenStudio:()->Unit,
     onBack:()->Unit
 ) {
     val context=LocalContext.current
@@ -171,6 +172,7 @@ fun PremiumCreateHubScreen(
     var publishStage by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
+    var successScheduled by remember { mutableStateOf(false) }
     var draftSaved by remember { mutableStateOf(false) }
     var showAdvancedKinds by remember { mutableStateOf(false) }
 
@@ -666,6 +668,15 @@ fun PremiumCreateHubScreen(
                         onRequireAuth()
                         return@Button
                     }
+                    val willSchedule=
+                        kind in setOf(
+                            CreateKind.POST,
+                            CreateKind.REVIEW,
+                            CreateKind.POLL,
+                            CreateKind.REEL
+                        ) &&
+                        scheduledAtMillis!=null &&
+                        scheduledAtMillis!!>System.currentTimeMillis()+120_000L
                     publishing=true
                     error=null
                     scope.launch {
@@ -676,7 +687,7 @@ fun PremiumCreateHubScreen(
                                 scheduledAtMillis!!>System.currentTimeMillis()+120_000L
                             when(kind) {
                                 CreateKind.POST -> {
-                                    publishStage="در حال ثبت Post..."
+                                    publishStage="در حال ثبت پست..."
                                     social.createPost(
                                         body=caption.trim(),
                                         type="post",
@@ -684,10 +695,10 @@ fun PremiumCreateHubScreen(
                                         mediaTitleId=mediaId,
                                         scheduledAt=scheduledIso
                                     )
-                                    if(isScheduled)"Post زمان‌بندی شد." else "Post منتشر شد."
+                                    if(isScheduled)"پست زمان‌بندی شد." else "پست منتشر شد."
                                 }
                                 CreateKind.REVIEW -> {
-                                    publishStage="در حال انتشار Review..."
+                                    publishStage="در حال انتشار ریویو..."
                                     social.createPost(
                                         body=caption.trim(),
                                         type="review",
@@ -695,10 +706,10 @@ fun PremiumCreateHubScreen(
                                         mediaTitleId=mediaId,
                                         scheduledAt=scheduledIso
                                     )
-                                    if(isScheduled)"Review زمان‌بندی شد." else "Review منتشر شد."
+                                    if(isScheduled)"ریویو زمان‌بندی شد." else "ریویو منتشر شد."
                                 }
                                 CreateKind.POLL -> {
-                                    publishStage="در حال ساخت Poll..."
+                                    publishStage="در حال ساخت نظرسنجی..."
                                     social.createPost(
                                         body=caption.trim(),
                                         type="poll",
@@ -709,13 +720,13 @@ fun PremiumCreateHubScreen(
                                             .distinct(),
                                         scheduledAt=scheduledIso
                                     )
-                                    if(isScheduled)"Poll زمان‌بندی شد." else "Poll منتشر شد."
+                                    if(isScheduled)"نظرسنجی زمان‌بندی شد." else "نظرسنجی منتشر شد."
                                 }
                                 CreateKind.STORY -> {
                                     if(selectedUri!=null) {
-                                        publishStage="در حال آپلود Story..."
+                                        publishStage="در حال آپلود استوری..."
                                         val ticket=social.uploadMedia(context,selectedUri!!,"story")
-                                        publishStage="در حال انتشار Story..."
+                                        publishStage="در حال انتشار استوری..."
                                         social.createMediaStory(
                                             ticket=ticket,
                                             caption=caption.trim(),
@@ -724,7 +735,7 @@ fun PremiumCreateHubScreen(
                                             closeFriendsOnly=closeFriendsOnly
                                         )
                                     } else {
-                                        publishStage="در حال انتشار Story متنی..."
+                                        publishStage="در حال انتشار استوری متنی..."
                                         social.createTextStory(
                                             caption=caption.trim(),
                                             spoiler=spoiler,
@@ -733,14 +744,14 @@ fun PremiumCreateHubScreen(
                                         )
                                     }
                                     if(closeFriendsOnly)
-                                        "Story فقط برای Close Friends منتشر شد."
+                                        "استوری فقط برای دوستان نزدیک منتشر شد."
                                     else
-                                        "Story برای ۲۴ ساعت منتشر شد."
+                                        "استوری برای ۲۴ ساعت منتشر شد."
                                 }
                                 CreateKind.REEL -> {
-                                    publishStage="در حال آپلود Clip..."
+                                    publishStage="در حال آپلود کلیپ..."
                                     val ticket=social.uploadMedia(context,selectedUri!!,"reel")
-                                    publishStage="در حال انتشار Clip..."
+                                    publishStage="در حال انتشار کلیپ..."
                                     social.createReel(
                                         uploadId=ticket.uploadId,
                                         caption=caption.trim(),
@@ -749,20 +760,21 @@ fun PremiumCreateHubScreen(
                                         mediaTitleId=mediaId,
                                         scheduledAt=scheduledIso
                                     )
-                                    if(isScheduled)"Clip زمان‌بندی شد." else "Clip منتشر شد."
+                                    if(isScheduled)"کلیپ زمان‌بندی شد." else "کلیپ منتشر شد."
                                 }
                                 CreateKind.CHANNEL -> {
-                                    publishStage="در حال ساخت Channel..."
+                                    publishStage="در حال ساخت کانال..."
                                     social.createChannel(
                                         name=channelName.trim(),
                                         slug=channelSlug.trim(),
                                         bio=channelBio.trim(),
                                         visibility=visibility
                                     )
-                                    "Channel @"+channelSlug.trim()+" ساخته شد."
+                                    "کانال @"+channelSlug.trim()+" ساخته شد."
                                 }
                             }
                         }.onSuccess {
+                            successScheduled=willSchedule
                             success=it
                             drafts.clear()
                             caption=""
@@ -790,10 +802,10 @@ fun PremiumCreateHubScreen(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     when(kind) {
-                        CreateKind.REEL -> if(scheduledAtMillis!=null)"آپلود و زمان‌بندی Clip" else "آپلود و انتشار Clip"
-                        CreateKind.STORY -> "انتشار Story"
-                        CreateKind.POLL -> if(scheduledAtMillis!=null)"زمان‌بندی Poll" else "انتشار Poll"
-                        CreateKind.CHANNEL -> "ساخت Channel"
+                        CreateKind.REEL -> if(scheduledAtMillis!=null)"آپلود و زمان‌بندی کلیپ" else "آپلود و انتشار کلیپ"
+                        CreateKind.STORY -> "انتشار استوری"
+                        CreateKind.POLL -> if(scheduledAtMillis!=null)"زمان‌بندی نظرسنجی" else "انتشار نظرسنجی"
+                        CreateKind.CHANNEL -> "ساخت کانال"
                         else -> if(scheduledAtMillis!=null)"زمان‌بندی انتشار" else "انتشار"
                     },
                     color=Color.Black,
@@ -804,7 +816,7 @@ fun PremiumCreateHubScreen(
 
         item {
             Text(
-                "UGC روی Object Storage/CDN Filmiqoo ذخیره می‌شود؛ Telegram فقط برای فایل اصلی فیلم و سریال باقی می‌ماند.",
+                "قبل از انتشار، اسپویل و سطح دسترسی محتوا رو یک‌بار بررسی کن.",
                 color=FqMuted,
                 fontSize=11.sp,
                 lineHeight=13.sp,
@@ -837,7 +849,11 @@ fun PremiumCreateHubScreen(
     }
 
     success?.let { message ->
-        val destinationLabel=if(kind==CreateKind.REEL)"دیدن کلیپ‌ها" else "رفتن به کلاب"
+        val destinationLabel=when {
+            successScheduled -> "دیدن زمان‌بندی‌ها"
+            kind==CreateKind.REEL -> "دیدن کلیپ‌ها"
+            else -> "رفتن به کلاب"
+        }
         AlertDialog(
             onDismissRequest={success=null},
             icon={Icon(Icons.Default.CheckCircle,null,tint=FqGreen)},
@@ -847,7 +863,11 @@ fun PremiumCreateHubScreen(
                 TextButton(
                     onClick={
                         success=null
-                        if(kind==CreateKind.REEL) onOpenClips() else onOpenClub()
+                        when {
+                            successScheduled -> onOpenStudio()
+                            kind==CreateKind.REEL -> onOpenClips()
+                            else -> onOpenClub()
+                        }
                     }
                 ) {
                     Text(destinationLabel)
