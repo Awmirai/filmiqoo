@@ -44,7 +44,8 @@ private sealed interface CreatorEntityState {
         val stories: List<SocialStory>,
         val members: List<ChannelMember>,
         val rooms: List<SocialRoom>,
-        val management: ChannelManageOverview?
+        val management: ChannelManageOverview?,
+        val access: ChannelViewerAccess?
     ): CreatorEntityState
     data class Error(val message: String): CreatorEntityState
 }
@@ -90,32 +91,31 @@ fun PremiumCreatorChannelScreen(
         state=CreatorEntityState.Loading
         state=runCatching {
             if(creator.entityType=="channel") {
+                val profile=repo.channelProfile(creator.id)
+                val access=if(backend.session.isLoggedIn) {
+                    runCatching {
+                        repo.channelViewerAccess(creator.id)
+                    }.getOrNull()
+                } else null
                 val management=if(backend.session.isLoggedIn) {
                     runCatching { repo.manageOverview(creator.id) }.getOrNull()
                 } else null
-                val rawPosts=repo.channelPosts(creator.id)
-                val postStates=if(backend.session.isLoggedIn) {
-                    runCatching {
-                        social.postViewerStates(rawPosts.map { it.id })
-                    }.getOrDefault(emptyMap())
-                } else emptyMap()
-                val hydratedPosts=rawPosts.map { post ->
-                    val viewer=postStates[post.id]
-                    if(viewer==null) post else post.copy(
-                        likedByMe=viewer.first,
-                        savedByMe=viewer.second
-                    )
-                }
                 CreatorEntityState.Channel(
-                    profile=repo.channelProfile(creator.id),
-                    posts=hydratedPosts,
-                    reels=repo.channelReels(creator.id),
-                    stories=repo.channelStories(creator.id),
-                    members=repo.channelMembers(creator.id),
-                    rooms=repo.channelRooms(creator.id),
-                    management=management
+                    profile=profile,
+                    posts=runCatching { repo.channelPosts(creator.id) }
+                        .getOrDefault(emptyList()),
+                    reels=runCatching { repo.channelReels(creator.id) }
+                        .getOrDefault(emptyList()),
+                    stories=runCatching { repo.channelStories(creator.id) }
+                        .getOrDefault(emptyList()),
+                    members=runCatching { repo.channelMembers(creator.id) }
+                        .getOrDefault(emptyList()),
+                    rooms=runCatching { repo.channelRooms(creator.id) }
+                        .getOrDefault(emptyList()),
+                    management=management,
+                    access=access
                 )
-            } else {
+            } else {else {
                 val rawPosts=repo.userPosts(creator.id)
                 val postStates=if(backend.session.isLoggedIn) {
                     runCatching {
@@ -267,6 +267,13 @@ fun PremiumCreatorChannelScreen(
         }
         is CreatorEntityState.Channel -> {
             val p=s.profile
+            val channelMember=s.access?.member == true || s.management!=null
+            val channelLocked=p.visibility!="public" && !channelMember
+
+            LaunchedEffect(p.id,s.access) {
+                followed=s.access?.following == true
+            }
+
             CreatorEntityScaffold(
                 name=p.name,
                 handle="@"+p.slug,
@@ -320,21 +327,42 @@ fun PremiumCreatorChannelScreen(
                 }
             ) {
                 when(tab) {
-                    0 -> CreatorReelsGrid(s.reels,onOpenClip,onMedia)
-                    1 -> CreatorPostsList(
-                        posts=s.posts,
-                        social=social,
-                        loggedIn=backend.session.isLoggedIn,
-                        onRequireAuth=onRequireAuth,
-                        onMedia=onMedia
-                    )
-                    2 -> ChannelRoomsList(s.rooms,onOpenRoom)
+                    0 -> if(channelLocked) {
+                        PrivateChannelLockedState(
+                            visibility=p.visibility,
+                            followed=followed
+                        )
+                    } else {
+                        CreatorReelsGrid(s.reels,onOpenClip,onMedia)
+                    }
+                    1 -> if(channelLocked) {
+                        PrivateChannelLockedState(
+                            visibility=p.visibility,
+                            followed=followed
+                        )
+                    } else {
+                        CreatorPostsList(
+                            posts=s.posts,
+                            social=social,
+                            loggedIn=backend.session.isLoggedIn,
+                            onRequireAuth=onRequireAuth,
+                            onMedia=onMedia
+                        )
+                    }
+                    2 -> if(channelLocked) {
+                        PrivateChannelLockedState(
+                            visibility=p.visibility,
+                            followed=followed
+                        )
+                    } else {
+                        ChannelRoomsList(s.rooms,onOpenRoom)
+                    }
                     else -> CreatorAbout(
                         bio=p.bio,
                         verified=p.verified,
                         privacy=p.visibility,
-                        members=s.members,
-                        rooms=s.rooms,
+                        members=if(channelLocked) emptyList() else s.members,
+                        rooms=if(channelLocked) emptyList() else s.rooms,
                         onOpenRoom=onOpenRoom
                     )
                 }
@@ -581,6 +609,65 @@ private fun CreatorCountCard(value:String,label:String,modifier:Modifier=Modifie
         Column(Modifier.padding(vertical=9.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(value,fontSize=13.sp,fontWeight=FontWeight.Black)
             Text(label,color=FqMuted,fontSize=11.sp)
+        }
+    }
+}
+
+@Composable
+private fun PrivateChannelLockedState(
+    visibility:String,
+    followed:Boolean
+) {
+    Box(
+        Modifier.fillMaxWidth()
+            .padding(horizontal=20.dp,vertical=34.dp),
+        contentAlignment=Alignment.Center
+    ) {
+        Column(horizontalAlignment=Alignment.CenterHorizontally) {
+            Surface(
+                color=FqSurface2,
+                shape=CircleShape,
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=.08f)
+                ),
+                modifier=Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(
+                        if(visibility=="invite")
+                            Icons.Default.MarkEmailUnread
+                        else
+                            Icons.Default.Lock,
+                        null,
+                        tint=Color.White,
+                        modifier=Modifier.size(30.dp)
+                    )
+                }
+            }
+            Text(
+                if(visibility=="invite")
+                    "این Channel فقط با دعوت باز می‌شه"
+                else
+                    "این Channel خصوصی است",
+                fontSize=18.sp,
+                fontWeight=FontWeight.Black,
+                modifier=Modifier.padding(top=14.dp)
+            )
+            Text(
+                when {
+                    visibility=="invite" ->
+                        "برای دیدن Post، Clip و Roomها باید عضو Channel باشی و از طریق دعوت وارد بشی."
+                    followed ->
+                        "Follow فعاله، اما محتوای خصوصی فقط برای اعضای Channel نمایش داده می‌شه."
+                    else ->
+                        "Follow کردن برای دنبال‌کردن Channel است؛ دسترسی به محتوای خصوصی فقط برای اعضاست."
+                },
+                color=FqMuted,
+                fontSize=11.sp,
+                lineHeight=18.sp,
+                modifier=Modifier.padding(top=6.dp)
+            )
         }
     }
 }
