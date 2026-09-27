@@ -838,6 +838,7 @@ private fun ClubForYou(
     val context=LocalContext.current
     var likeBusyIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var saveBusyIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val latestFeed=rememberUpdatedState(feed)
     val focusMode=!focusedPostId.isNullOrBlank()
 
     if(
@@ -970,7 +971,7 @@ private fun ClubForYou(
                                 runCatching { social.togglePostLike(post.id) }
                                     .onSuccess { liked->
                                         onFeedChange(
-                                            feed.map {
+                                            latestFeed.value.map {
                                                 if(it.id==post.id) {
                                                     it.copy(
                                                         likedByMe=liked,
@@ -985,7 +986,7 @@ private fun ClubForYou(
                                     }
                                     .onFailure {
                                         onFeedChange(
-                                            feed.map {
+                                            latestFeed.value.map {
                                                 if(it.id==post.id) {
                                                     it.copy(
                                                         likedByMe=previousLiked,
@@ -1024,7 +1025,7 @@ private fun ClubForYou(
                                 runCatching { social.togglePostSave(post.id) }
                                     .onSuccess { result->
                                         onFeedChange(
-                                            feed.map {
+                                            latestFeed.value.map {
                                                 if(it.id==post.id) {
                                                     it.copy(
                                                         savedByMe=result.first,
@@ -1036,7 +1037,7 @@ private fun ClubForYou(
                                     }
                                     .onFailure {
                                         onFeedChange(
-                                            feed.map {
+                                            latestFeed.value.map {
                                                 if(it.id==post.id) {
                                                     it.copy(
                                                         savedByMe=previousSaved,
@@ -1059,7 +1060,7 @@ private fun ClubForYou(
                                     social.sharePost(post.id,"system")
                                 }.onSuccess { count ->
                                     onFeedChange(
-                                        feed.map {
+                                        latestFeed.value.map {
                                             if(it.id==post.id) it.copy(shares=count)
                                             else it
                                         }
