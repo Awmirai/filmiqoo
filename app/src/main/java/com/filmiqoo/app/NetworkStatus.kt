@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +59,10 @@ fun rememberNetworkOnline():Boolean {
         }
 
         runCatching {
-            manager.registerDefaultNetworkCallback(callback)
+            manager.registerDefaultNetworkCallback(
+                callback,
+                Handler(Looper.getMainLooper())
+            )
         }
 
         onDispose {
