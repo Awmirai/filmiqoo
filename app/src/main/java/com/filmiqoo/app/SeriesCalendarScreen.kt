@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun SeriesCalendarScreen(
@@ -30,7 +34,7 @@ fun SeriesCalendarScreen(
     onMedia:(MediaItem)->Unit
 ) {
     val alerts=remember { SeriesAlertsRepository(backend) }
-    var days by remember { mutableIntStateOf(60) }
+    var days by rememberSaveable { mutableIntStateOf(60) }
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -75,11 +79,15 @@ fun SeriesCalendarScreen(
                     Modifier.fillMaxWidth().padding(horizontal=14.dp),
                     horizontalArrangement=Arrangement.spacedBy(7.dp)
                 ) {
-                    listOf(30,60,90).forEach { value ->
+                    listOf(
+                        30 to "۳۰ روز",
+                        60 to "۲ ماه",
+                        90 to "۳ ماه"
+                    ).forEach { (value,label) ->
                         FilterChip(
                             selected=days==value,
                             onClick={days=value},
-                            label={Text(value.toString()+" روز",fontSize=11.sp)}
+                            label={Text(label,fontSize=11.sp)}
                         )
                     }
                 }
@@ -106,7 +114,7 @@ fun SeriesCalendarScreen(
                 body="از صفحه سریال‌ها دکمه «دنبال‌کردن سریال» رو بزن تا قسمت‌های آینده اینجا بیاد."
             )
         } else {
-            val grouped=items.groupBy { it.airDate }
+            val grouped=items.groupBy { it.airDate }.toSortedMap()
             LazyColumn(
                 contentPadding=PaddingValues(horizontal=12.dp,vertical=10.dp),
                 verticalArrangement=Arrangement.spacedBy(9.dp),
@@ -247,5 +255,13 @@ private fun SeriesCalendarCard(
 
 private fun formatSeriesCalendarDate(value:String):String {
     if(value.isBlank()) return "—"
-    return value
+    val date=runCatching { LocalDate.parse(value) }.getOrNull() ?: return value
+    val today=LocalDate.now()
+    return when(date) {
+        today -> "امروز"
+        today.plusDays(1) -> "فردا"
+        else -> date.format(
+            DateTimeFormatter.ofPattern("EEE، d MMM",Locale("fa","IR"))
+        )
+    }
 }
