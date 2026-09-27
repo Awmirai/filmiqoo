@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +43,7 @@ fun SocialCollectionsScreen(
     val repo=remember { SocialCollectionsRepository(backend) }
     val scope=rememberCoroutineScope()
 
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var discover by remember { mutableStateOf<List<SocialCollection>>(emptyList()) }
@@ -51,6 +52,7 @@ fun SocialCollectionsScreen(
     var detail by remember { mutableStateOf<SocialCollectionDetail?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     var followBusy by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler {
         if(detail!=null) detail=null else onBack()
@@ -135,6 +137,18 @@ fun SocialCollectionsScreen(
         return
     }
 
+    val normalizedQuery=query.trim()
+    val activeCollections=if(tab==0) discover else following
+    val visibleCollections=remember(activeCollections,normalizedQuery) {
+        if(normalizedQuery.isBlank()) activeCollections
+        else activeCollections.filter { collection ->
+            collection.name.contains(normalizedQuery,ignoreCase=true) ||
+                collection.description.contains(normalizedQuery,ignoreCase=true) ||
+                collection.owner.displayName.contains(normalizedQuery,ignoreCase=true) ||
+                collection.owner.username.contains(normalizedQuery,ignoreCase=true)
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(FqBg)) {
         Box(
             Modifier.fillMaxWidth().background(
@@ -149,12 +163,38 @@ fun SocialCollectionsScreen(
             ) {
                 IconButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,null) }
                 Column(Modifier.weight(1f)) {
-                    Text("Community Lists",fontSize=23.sp,fontWeight=FontWeight.Black)
-                    Text("Collectionهای عمومی فیلم‌بازها و Creatorها",color=FqMuted,fontSize=11.sp)
+                    Text("لیست‌های کلاب",fontSize=23.sp,fontWeight=FontWeight.Black)
+                    Text("لیست‌های عمومی فیلم‌بازها و سازنده‌ها",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={refresh++}) { Icon(Icons.Default.Refresh,null) }
             }
         }
+
+        OutlinedTextField(
+            value=query,
+            onValueChange={query=it},
+            singleLine=true,
+            placeholder={Text("جستجو بین لیست‌ها...")},
+            leadingIcon={
+                Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))
+            },
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={query=""}) {
+                        Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                    }
+                }
+            },
+            shape=RoundedCornerShape(16.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold.copy(alpha=.6f),
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(horizontal=12.dp,vertical=8.dp)
+        )
 
         TabRow(
             selectedTabIndex=tab,
@@ -190,15 +230,20 @@ fun SocialCollectionsScreen(
             )
         }
 
-        val items=if(tab==0)discover else following
-        if(!loading && items.isEmpty()) {
+        if(!loading && visibleCollections.isEmpty()) {
+            val searching=normalizedQuery.isNotBlank()
             PremiumEmptyState(
-                icon=Icons.Default.CollectionsBookmark,
-                title=if(tab==0)"Collection عمومی هنوز کمه" else "Collectionی رو دنبال نکردی",
-                body=if(tab==0)
-                    "Collectionهای Public کاربران و Creatorها اینجا ظاهر می‌شن."
-                else
-                    "از تب کشف، لیست‌های خوب رو Follow کن تا آپدیت‌هاشون رو بگیری."
+                icon=if(searching)Icons.Default.SearchOff else Icons.Default.CollectionsBookmark,
+                title=when {
+                    searching -> "لیستی پیدا نشد"
+                    tab==0 -> "لیست عمومی هنوز کمه"
+                    else -> "لیستی رو دنبال نکردی"
+                },
+                body=when {
+                    searching -> "اسم لیست یا سازنده رو با عبارت دیگه‌ای جستجو کن."
+                    tab==0 -> "لیست‌های عمومی کاربران و سازنده‌ها اینجا ظاهر می‌شن."
+                    else -> "از تب کشف، لیست‌های خوب رو دنبال کن تا آپدیت‌هاشون رو بگیری."
+                }
             )
         } else {
             LazyColumn(
@@ -206,7 +251,7 @@ fun SocialCollectionsScreen(
                 verticalArrangement=Arrangement.spacedBy(9.dp),
                 modifier=Modifier.fillMaxSize()
             ) {
-                items(items,key={it.id}) { collection ->
+                items(visibleCollections,key={it.id}) { collection ->
                     SocialCollectionCard(
                         collection=collection.copy(
                             following=collection.id in followingIds
@@ -495,8 +540,8 @@ private fun SocialCollectionDetailScreen(
         if(detail.items.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.PlaylistAdd,
-                "این Collection خالیه",
-                "Curator هنوز عنوانی اضافه نکرده."
+                "این لیست خالیه",
+                "سازنده هنوز عنوانی اضافه نکرده."
             )
         } else {
             LazyVerticalGrid(
