@@ -60,6 +60,7 @@ fun ClubScreen(
     val friendRepo=remember { FriendActivityRepository(backend) }
     val pulseRepo=remember { PulseRepository(backend) }
     val messagingRepo=remember { MessagingRepository(backend) }
+    val networkOnline=rememberNetworkOnline()
 
     var tab by remember { mutableStateOf(ClubTab.FOR_YOU) }
     val forYouListState=rememberLazyListState()
@@ -86,6 +87,16 @@ fun ClubScreen(
     var currentUserId by remember(loggedIn) { mutableStateOf<String?>(null) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var unreadMessages by remember { mutableLongStateOf(0L) }
+    var hadOffline by remember { mutableStateOf(false) }
+
+    LaunchedEffect(networkOnline) {
+        if(!networkOnline) {
+            hadOffline=true
+        } else if(hadOffline && error!=null) {
+            hadOffline=false
+            refresh++
+        }
+    }
 
     LaunchedEffect(initialPostId) {
         if(!initialPostId.isNullOrBlank()) {
@@ -166,6 +177,13 @@ fun ClubScreen(
                     if(loggedIn) onCreate() else onRequireAuth()
                 }
             )
+
+            if(!networkOnline) {
+                NetworkOfflineBanner(
+                    modifier=Modifier.fillMaxWidth()
+                        .padding(horizontal=12.dp,vertical=6.dp)
+                )
+            }
 
             val initialLoading=loading && when(tab) {
                 ClubTab.FOR_YOU ->
