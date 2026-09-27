@@ -82,11 +82,57 @@ func (s *Server) mediaPulse(w http.ResponseWriter, r *http.Request) {
 		recent += count
 	}
 
+	moments:=make([]map[string]any,0)
+	momentRows,momentErr:=s.db.Query(r.Context(),`
+		WITH buckets AS (
+			SELECT
+				(position_ms/15000)*15000 AS position_ms,
+				COUNT(*) AS reactions,
+				COUNT(*) FILTER (WHERE emoji='🔥') AS fire,
+				COUNT(*) FILTER (WHERE emoji='😱') AS shock,
+				COUNT(*) FILTER (WHERE emoji='😂') AS laugh,
+				COUNT(*) FILTER (WHERE emoji='❤️') AS love,
+				COUNT(*) FILTER (WHERE emoji='👀') AS eyes
+			  FROM media_pulse_reactions
+			 WHERE media_title_id=$1
+			   AND position_ms>0
+			   AND created_at>now()-interval '30 days'
+			 GROUP BY (position_ms/15000)*15000
+			HAVING COUNT(*)>=2
+		)
+		SELECT position_ms,reactions,
+		       CASE GREATEST(fire,shock,laugh,love,eyes)
+		         WHEN fire THEN '🔥'
+		         WHEN shock THEN '😱'
+		         WHEN laugh THEN '😂'
+		         WHEN love THEN '❤️'
+		         ELSE '👀'
+		       END AS emoji
+		  FROM buckets
+		 ORDER BY reactions DESC,position_ms ASC
+		 LIMIT 5
+	`,mediaID)
+	if momentErr==nil {
+		defer momentRows.Close()
+		for momentRows.Next() {
+			var positionMS,reactions int64
+			var emoji string
+			if momentRows.Scan(&positionMS,&reactions,&emoji)==nil {
+				moments=append(moments,map[string]any{
+					"positionMs":positionMS,
+					"reactions":reactions,
+					"emoji":emoji,
+				})
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"watchingNow": watchingNow,
 		"reactions":   counts,
 		"recent":      recent,
 		"live":        watchingNow > 0 || recent >= 5,
+		"moments":     moments,
 	})
 }
 
