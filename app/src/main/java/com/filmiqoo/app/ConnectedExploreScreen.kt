@@ -148,6 +148,7 @@ private fun RealReelsPager(
     val saveBusy=remember { mutableStateMapOf<String,Boolean>() }
     val followBusy=remember { mutableStateMapOf<String,Boolean>() }
     val commentDelta=remember { mutableStateMapOf<String,Long>() }
+    val shareCount=remember { mutableStateMapOf<String,Long>() }
     val revealed=remember { mutableStateMapOf<String,Boolean>() }
     var commentsFor by remember { mutableStateOf<ReelFeedItem?>(null) }
     var moreFor by remember { mutableStateOf<ReelFeedItem?>(null) }
@@ -273,6 +274,7 @@ private fun RealReelsPager(
                 followed=followed[reel.author.id] ?: reel.followingAuthor,
                 followPending=followPending[reel.author.id] ?: reel.followPending,
                 commentCount=(reel.comments+(commentDelta[reel.id] ?: 0L)).coerceAtLeast(0L),
+                shareCount=shareCount[reel.id] ?: reel.shares,
                 onReveal={
                     revealed[reel.id]=true
                     if(isCurrent) player.play()
@@ -347,6 +349,15 @@ private fun RealReelsPager(
                             (reel.media?.title ?: reel.caption.ifBlank{"Clip"}),
                         FilmiqooDeepLinks.reel(reel.id)
                     )
+                    if(loggedIn) {
+                        scope.launch {
+                            runCatching {
+                                social.shareReel(reel.id,"system")
+                            }.onSuccess { count ->
+                                shareCount[reel.id]=count
+                            }
+                        }
+                    }
                 },
                 onMore={moreFor=reel}
             )
@@ -507,6 +518,7 @@ private fun ReelVideoPage(
     followed: Boolean,
     followPending: Boolean,
     commentCount: Long,
+    shareCount: Long,
     onReveal: () -> Unit,
     onLike: () -> Unit,
     onSave: () -> Unit,
@@ -764,7 +776,7 @@ private fun ReelVideoPage(
             ReelCircleAction(
                 icon=Icons.Default.Share,
                 tint=Color.White,
-                text=compactCount(reel.shares),
+                text=compactCount(shareCount),
                 onClick=onShare
             )
             ReelCircleAction(
