@@ -37,6 +37,8 @@ fun LibraryScreen(
     onBack: () -> Unit,
     onMedia: (MediaItem) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
+    onDownloads: () -> Unit = {},
+    onHistory: () -> Unit = {},
     showBack: Boolean = true
 ) {
     val lib=remember { LibraryRepository(backend) }
@@ -130,6 +132,11 @@ fun LibraryScreen(
             onBack=onBack,
             onRefresh={refresh++},
             showBack=showBack
+        )
+
+        LibraryQuickAccess(
+            onDownloads=onDownloads,
+            onHistory=onHistory
         )
 
         TabRow(
@@ -323,6 +330,90 @@ private fun LibraryHeader(
                 PremiumStat(collectionCount.toString(),"لیست",Modifier.weight(1f))
                 PremiumStat(sceneCount.toString(),"لحظه",Modifier.weight(1f))
             }
+        }
+    }
+}
+
+@Composable
+private fun LibraryQuickAccess(
+    onDownloads:()->Unit,
+    onHistory:()->Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .padding(horizontal=12.dp,vertical=8.dp),
+        horizontalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
+        LibraryQuickCard(
+            icon=Icons.Default.DownloadForOffline,
+            title="دانلودها",
+            subtitle="صف دانلود و تماشای آفلاین",
+            modifier=Modifier.weight(1f),
+            onClick=onDownloads
+        )
+        LibraryQuickCard(
+            icon=Icons.Default.History,
+            title="تماشای من",
+            subtitle="ادامه تماشا و تاریخچه",
+            modifier=Modifier.weight(1f),
+            onClick=onHistory
+        )
+    }
+}
+
+@Composable
+private fun LibraryQuickCard(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    subtitle:String,
+    modifier:Modifier=Modifier,
+    onClick:()->Unit
+) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+        modifier=modifier.clickable { onClick() }
+    ) {
+        Row(
+            Modifier.padding(horizontal=12.dp,vertical=11.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(38.dp)
+                    .background(FqGold.copy(alpha=.11f),RoundedCornerShape(12.dp)),
+                contentAlignment=Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription=null,
+                    tint=FqGold,
+                    modifier=Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    fontSize=11.sp,
+                    fontWeight=FontWeight.Bold
+                )
+                Text(
+                    subtitle,
+                    color=FqMuted,
+                    fontSize=8.sp,
+                    lineHeight=11.sp,
+                    maxLines=2,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=2.dp)
+                )
+            }
+            Icon(
+                Icons.Default.ChevronLeft,
+                contentDescription=null,
+                tint=FqMuted,
+                modifier=Modifier.size(17.dp)
+            )
         }
     }
 }
