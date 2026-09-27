@@ -42,16 +42,19 @@ fun InboxScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<InboxConversation>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
+    var unreadOnly by rememberSaveable { mutableStateOf(false) }
 
     val unreadCount=remember(items) { items.sumOf { it.unread } }
-    val filteredItems=remember(items,query) {
+    val filteredItems=remember(items,query,unreadOnly) {
         val q=query.trim()
-        if(q.isBlank()) items
-        else items.filter {
-            it.title.contains(q,ignoreCase=true) ||
-                it.otherUsername.contains(q,ignoreCase=true) ||
-                it.lastMessage.contains(q,ignoreCase=true) ||
-                it.topic.contains(q,ignoreCase=true)
+        items.filter { item ->
+            val matchesUnread=!unreadOnly || item.unread>0
+            val matchesQuery=q.isBlank() ||
+                item.title.contains(q,ignoreCase=true) ||
+                item.otherUsername.contains(q,ignoreCase=true) ||
+                item.lastMessage.contains(q,ignoreCase=true) ||
+                item.topic.contains(q,ignoreCase=true)
+            matchesUnread && matchesQuery
         }
     }
 
@@ -165,6 +168,38 @@ fun InboxScreen(
                 ),
                 modifier=Modifier.fillMaxWidth().padding(top=10.dp)
             )
+
+            Row(
+                Modifier.fillMaxWidth().padding(top=7.dp),
+                horizontalArrangement=Arrangement.spacedBy(7.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected=unreadOnly,
+                    onClick={unreadOnly=!unreadOnly},
+                    leadingIcon={
+                        Icon(
+                            if(unreadOnly)Icons.Default.MarkChatRead
+                            else Icons.Default.MarkChatUnread,
+                            null,
+                            modifier=Modifier.size(16.dp)
+                        )
+                    },
+                    label={
+                        Text(
+                            if(unreadOnly)"خوانده‌نشده‌ها" else "فقط خوانده‌نشده",
+                            fontSize=10.sp
+                        )
+                    }
+                )
+                if(unreadCount>0L) {
+                    Text(
+                        unreadCount.toString()+" پیام خوانده‌نشده",
+                        color=FqMuted,
+                        fontSize=10.sp
+                    )
+                }
+            }
         }
 
         val initialLoading=loading && items.isEmpty()
@@ -191,6 +226,7 @@ fun InboxScreen(
             InboxLoadingState()
         } else if(filteredItems.isEmpty()) {
             val searching=query.isNotBlank()
+            val filteringUnread=unreadOnly && !searching
             PremiumEmptyState(
                 icon=when {
                     searching -> Icons.Default.SearchOff
@@ -199,11 +235,13 @@ fun InboxScreen(
                 },
                 title=when {
                     searching -> "گفتگویی پیدا نشد"
+                    filteringUnread -> "پیام خوانده‌نشده‌ای نداری"
                     archivedView -> "آرشیو خالیه"
                     else -> "هنوز مکالمه‌ای نداری"
                 },
                 body=when {
                     searching -> "اسم، نام کاربری یا متن گفتگو رو با عبارت دیگه‌ای جستجو کن."
+                    filteringUnread -> "همه گفتگوهای این بخش رو دیدی."
                     archivedView -> "گفتگوهایی که آرشیو می‌کنی اینجا می‌مونن."
                     else -> "از پروفایل یک نفر روی «پیام» بزن یا وارد گفت‌وگوهای کلاب شو."
                 }
@@ -414,11 +452,11 @@ private fun InboxCard(
                     Surface(color=FqSurface2,shape=RoundedCornerShape(7.dp)) {
                         Text(
                             when(item.type) {
-                                "dm" -> "DM"
-                                "group" -> "Group"
-                                "watch_party" -> "Watch Party"
-                                "episode" -> "Episode Room"
-                                else -> "Room"
+                                "dm" -> "پیام خصوصی"
+                                "group" -> "گروه"
+                                "watch_party" -> "تماشای گروهی"
+                                "episode" -> "گفتگوی قسمت"
+                                else -> "گفتگو"
                             },
                             color=FqMuted,
                             fontSize=6.sp,
@@ -650,7 +688,7 @@ fun ConnectedNotificationsScreen(
                     NotificationFilter.SOCIAL ->
                         "تعامل‌های کلاب، کلیپ‌ها، ریویوها و دنبال‌کردن‌ها اینجا میاد."
                     NotificationFilter.MESSAGES ->
-                        "پیام خصوصی، Room و دعوت‌های تماشای گروهی اینجا میاد."
+                        "پیام خصوصی، گفتگو و دعوت‌های تماشای گروهی اینجا میاد."
                     NotificationFilter.RELEASES ->
                         "قسمت جدید، آماده‌شدن پخش و کیفیت‌های تازه اینجا میاد."
                 }
@@ -849,9 +887,9 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "new_episode" -> "قسمت جدید"
     "episode_stream_ready" -> "آماده تماشا"
     "availability_ready" -> "نسخه جدید"
-    "collection_update" -> "Collection"
-    "watch_party_reminder" -> "Watch Party"
-    "watch_party_invite" -> "دعوت Watch Party"
+    "collection_update" -> "لیست کلاب"
+    "watch_party_reminder" -> "تماشای گروهی"
+    "watch_party_invite" -> "دعوت تماشای گروهی"
     "watch_party_join_request" -> "درخواست ورود"
     "watch_party_join_approved" -> "ورود تأیید شد"
     "watch_party_join_declined" -> "درخواست رد شد"
