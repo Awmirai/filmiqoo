@@ -472,6 +472,7 @@ private fun LiveEventDetailScreen(
     onError:(String)->Unit
 ) {
     val scope=rememberCoroutineScope()
+    val context=LocalContext.current
     var localEvent by remember(event.id,event.state,event.playbackUrl) { mutableStateOf(event) }
     var joined by remember(event.id) { mutableStateOf(false) }
     var showSource by remember { mutableStateOf(false) }
@@ -578,6 +579,40 @@ private fun LiveEventDetailScreen(
                         modifier=Modifier.background(Color.Black.copy(alpha=.45f),CircleShape)
                     ) { Icon(Icons.Default.ArrowBack,null) }
                     Spacer(Modifier.weight(1f))
+                    if(localEvent.visibility=="public") {
+                        IconButton(
+                            onClick={
+                                FilmiqooDeepLinks.share(
+                                    context,
+                                    localEvent.title,
+                                    FilmiqooDeepLinks.liveEvent(localEvent.id)
+                                )
+                            },
+                            modifier=Modifier.background(
+                                Color.Black.copy(alpha=.45f),
+                                CircleShape
+                            )
+                        ) {
+                            Icon(Icons.Default.Share,contentDescription="اشتراک‌گذاری")
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    } else if(isHost && localEvent.roomId!=null) {
+                        IconButton(
+                            onClick={
+                                onOpenRoom(
+                                    localEvent.roomId!!,
+                                    localEvent.title
+                                )
+                            },
+                            modifier=Modifier.background(
+                                Color.Black.copy(alpha=.45f),
+                                CircleShape
+                            )
+                        ) {
+                            Icon(Icons.Default.GroupAdd,contentDescription="دعوت و دسترسی")
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    }
                     LiveStateBadge(localEvent)
                 }
             }
