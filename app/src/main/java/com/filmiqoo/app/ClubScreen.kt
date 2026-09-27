@@ -80,7 +80,6 @@ fun ClubScreen(
     var feedNextCursor by remember { mutableStateOf<String?>(null) }
     var feedLoadingMore by remember { mutableStateOf(false) }
     var stories by remember { mutableStateOf<List<SocialStory>>(emptyList()) }
-    var clips by remember { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
     var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
     var creators by remember { mutableStateOf<List<SocialChannel>>(emptyList()) }
     var following by remember { mutableStateOf<List<FriendActivityItem>>(emptyList()) }
@@ -147,7 +146,6 @@ fun ClubScreen(
                             }
                         },
                         runCatching { stories=social.stories() },
-                        runCatching { clips=social.reels() },
                         runCatching { rooms=social.rooms() },
                         runCatching { creators=social.channels() }
                     )
@@ -196,7 +194,6 @@ fun ClubScreen(
                 ClubTab.FOR_YOU ->
                     pulse.isEmpty() &&
                     stories.isEmpty() &&
-                    clips.isEmpty() &&
                     feed.isEmpty() &&
                     rooms.isEmpty() &&
                     creators.isEmpty()
@@ -224,7 +221,6 @@ fun ClubScreen(
                         listState=forYouListState,
                         pulse=pulse,
                         stories=stories,
-                        clips=clips,
                         feed=feed,
                         rooms=rooms,
                         creators=creators,
@@ -787,7 +783,6 @@ private fun ClubForYou(
     listState:LazyListState,
     pulse:List<PulseTrendItem>,
     stories:List<SocialStory>,
-    clips:List<ReelFeedItem>,
     feed:List<SocialPost>,
     rooms:List<SocialRoom>,
     creators:List<SocialChannel>,
@@ -817,7 +812,6 @@ private fun ClubForYou(
     if(
         pulse.isEmpty() &&
         stories.isEmpty() &&
-        clips.isEmpty() &&
         feed.isEmpty() &&
         rooms.isEmpty() &&
         creators.isEmpty()
@@ -865,72 +859,6 @@ private fun ClubForYou(
             }
         }
 
-        if(!focusMode && rooms.isNotEmpty()) {
-            item {
-                ClubSectionTitle(
-                    title="Roomهای Club",
-                    subtitle="گفت‌وگوهای مرتبط با فیلم‌ها و سریال‌ها"
-                )
-            }
-            item {
-                ClubLiveRoomsRow(
-                    rooms=rooms.take(8),
-                    onOpenRoom=onOpenRoom
-                )
-            }
-        }
-
-        if(!focusMode && clips.isNotEmpty()) {
-            item {
-                ClubSectionTitle(
-                    title="Clips",
-                    subtitle="لحظه‌های کوتاه، مستقیم از فیلم‌بازها"
-                )
-            }
-            item {
-                ClubClipsRow(
-                    clips=clips.take(8),
-                    onOpenClip=onOpenClip
-                )
-            }
-        }
-
-        if(!focusMode && creators.isNotEmpty()) {
-            item {
-                ClubSectionTitle(
-                    title="آدم‌ها و رسانه‌ها",
-                    subtitle="چیزهایی که ارزش دنبال‌کردن دارن"
-                )
-            }
-            item {
-                ClubCreatorsRow(
-                    channels=creators.take(10),
-                    social=social,
-                    loggedIn=loggedIn,
-                    onRequireAuth=onRequireAuth,
-                    onCreator=onCreator,
-                    onFollowChanged={id,following->
-                        onCreatorsChange(
-                            creators.map { channel ->
-                                if(channel.id!=id) channel
-                                else {
-                                    val delta=when {
-                                        following && !channel.followingByMe -> 1L
-                                        !following && channel.followingByMe -> -1L
-                                        else -> 0L
-                                    }
-                                    channel.copy(
-                                        followingByMe=following,
-                                        followers=(channel.followers+delta).coerceAtLeast(0)
-                                    )
-                                }
-                            }
-                        )
-                    }
-                )
-            }
-        }
-
         if(feed.isNotEmpty()) {
             item {
                 if(focusMode) {
@@ -958,8 +886,8 @@ private fun ClubForYou(
                     }
                 } else {
                     ClubSectionTitle(
-                        title="برای تو",
-                        subtitle="Review، نظر و پیشنهاد؛ بدون شلوغ‌کاری"
+                        title="فید شما",
+                        subtitle="Review، نظر و پیشنهاد از آدم‌ها و عنوان‌هایی که بهت می‌خورن"
                     )
                 }
             }
@@ -1150,6 +1078,99 @@ private fun ClubForYou(
                             fontSize=10.sp
                         )
                     }
+                }
+            }
+
+            if(!focusMode && rooms.isNotEmpty()) {
+                item {
+                    ClubSectionTitle(
+                        title="گفت‌وگوها",
+                        subtitle="Roomهای زنده برای ادامه بحث بعد از دیدن"
+                    )
+                }
+                item {
+                    ClubLiveRoomsRow(
+                        rooms=rooms.take(8),
+                        onOpenRoom=onOpenRoom
+                    )
+                }
+            }
+
+            if(!focusMode && creators.isNotEmpty()) {
+                item {
+                    ClubSectionTitle(
+                        title="پیشنهاد برای دنبال‌کردن",
+                        subtitle="آدم‌ها و رسانه‌هایی که به سلیقه‌ات نزدیکن"
+                    )
+                }
+                item {
+                    ClubCreatorsRow(
+                        channels=creators.take(10),
+                        social=social,
+                        loggedIn=loggedIn,
+                        onRequireAuth=onRequireAuth,
+                        onCreator=onCreator,
+                        onFollowChanged={id,following->
+                            onCreatorsChange(
+                                creators.map { channel->
+                                    if(channel.id!=id) channel
+                                    else {
+                                        val delta=when {
+                                            following && !channel.followingByMe -> 1L
+                                            !following && channel.followingByMe -> -1L
+                                            else -> 0L
+                                        }
+                                        channel.copy(
+                                            followingByMe=following,
+                                            followers=(channel.followers+delta).coerceAtLeast(0)
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        if(!focusMode && feed.isEmpty()) {
+            if(rooms.isNotEmpty()) {
+                item {
+                    ClubSectionTitle(
+                        title="گفت‌وگوها",
+                        subtitle="Roomهای فعال Club"
+                    )
+                }
+                item {
+                    ClubLiveRoomsRow(
+                        rooms=rooms.take(8),
+                        onOpenRoom=onOpenRoom
+                    )
+                }
+            }
+            if(creators.isNotEmpty()) {
+                item {
+                    ClubSectionTitle(
+                        title="آدم‌های پیشنهادی",
+                        subtitle="برای ساختن فید شخصی، چند نفر رو دنبال کن"
+                    )
+                }
+                item {
+                    ClubCreatorsRow(
+                        channels=creators.take(10),
+                        social=social,
+                        loggedIn=loggedIn,
+                        onRequireAuth=onRequireAuth,
+                        onCreator=onCreator,
+                        onFollowChanged={id,following->
+                            onCreatorsChange(
+                                creators.map { channel->
+                                    if(channel.id!=id) channel
+                                    else channel.copy(followingByMe=following)
+                                }
+                            )
+                        }
+                    )
                 }
             }
         }
