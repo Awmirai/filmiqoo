@@ -46,8 +46,7 @@ fun SettingsScreen(
     fun persist(next: AppSettings) {
         settings=next
         if(!backend.session.isLoggedIn) {
-            AppPreferences(context).write(next)
-            OfflineDownloadManager.setWifiOnly(context,next.wifiOnlyDownloads)
+            settings=repo.saveLocal(next)
             return
         }
         saving=true
