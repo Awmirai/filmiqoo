@@ -952,7 +952,7 @@ private fun ChannelComposer(
     OutlinedTextField(
         value=name,
         onValueChange=onName,
-        label={Text("نام Channel")},
+        label={Text("نام کانال")},
         singleLine=true,
         shape=RoundedCornerShape(15.dp),
         modifier=Modifier.fillMaxWidth().padding(top=12.dp)
@@ -960,8 +960,11 @@ private fun ChannelComposer(
     OutlinedTextField(
         value=slug,
         onValueChange=onSlug,
-        label={Text("Channel ID")},
+        label={Text("شناسه کانال")},
         prefix={Text("@")},
+        supportingText={
+            Text("۳ تا ۴۰ کاراکتر • حروف انگلیسی، عدد، _ ، . یا -")
+        },
         singleLine=true,
         shape=RoundedCornerShape(15.dp),
         modifier=Modifier.fillMaxWidth().padding(top=8.dp)
@@ -969,7 +972,7 @@ private fun ChannelComposer(
     OutlinedTextField(
         value=bio,
         onValueChange=onBio,
-        label={Text("معرفی Channel")},
+        label={Text("معرفی کانال")},
         minLines=3,
         maxLines=5,
         shape=RoundedCornerShape(15.dp),
