@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,12 +38,33 @@ fun SavedSocialScreen(
     onOpenClip:(String)->Unit
 ) {
     val scope=rememberCoroutineScope()
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var posts by remember { mutableStateOf<List<SocialPost>>(emptyList()) }
     var reels by remember { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
+    var query by rememberSaveable { mutableStateOf("") }
+
+    val normalizedQuery=query.trim()
+    val filteredPosts=remember(posts,normalizedQuery) {
+        if(normalizedQuery.isBlank()) posts
+        else posts.filter { post ->
+            post.body.contains(normalizedQuery,ignoreCase=true) ||
+                post.author.displayName.contains(normalizedQuery,ignoreCase=true) ||
+                post.author.username.contains(normalizedQuery,ignoreCase=true) ||
+                post.media?.title.orEmpty().contains(normalizedQuery,ignoreCase=true)
+        }
+    }
+    val filteredReels=remember(reels,normalizedQuery) {
+        if(normalizedQuery.isBlank()) reels
+        else reels.filter { reel ->
+            reel.caption.contains(normalizedQuery,ignoreCase=true) ||
+                reel.author.displayName.contains(normalizedQuery,ignoreCase=true) ||
+                reel.author.username.contains(normalizedQuery,ignoreCase=true) ||
+                reel.media?.title.orEmpty().contains(normalizedQuery,ignoreCase=true)
+        }
+    }
 
     BackHandler { onBack() }
 
@@ -77,6 +99,32 @@ fun SavedSocialScreen(
             }
         }
 
+        OutlinedTextField(
+            value=query,
+            onValueChange={query=it},
+            singleLine=true,
+            placeholder={Text("جستجو بین ذخیره‌ها...")},
+            leadingIcon={
+                Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))
+            },
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={query=""}) {
+                        Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                    }
+                }
+            },
+            shape=RoundedCornerShape(16.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold.copy(alpha=.6f),
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(horizontal=12.dp,vertical=8.dp)
+        )
+
         TabRow(
             selectedTabIndex=tab,
             containerColor=FqBg,
@@ -85,12 +133,12 @@ fun SavedSocialScreen(
             Tab(
                 selected=tab==0,
                 onClick={tab=0},
-                text={Text("Postها ("+posts.size+")",fontSize=11.sp)}
+                text={Text("پست‌ها ("+posts.size+")",fontSize=11.sp)}
             )
             Tab(
                 selected=tab==1,
                 onClick={tab=1},
-                text={Text("Clipها ("+reels.size+")",fontSize=11.sp)}
+                text={Text("کلیپ‌ها ("+reels.size+")",fontSize=11.sp)}
             )
         }
 
@@ -108,11 +156,14 @@ fun SavedSocialScreen(
         }
 
         if(tab==0) {
-            if(!loading && posts.isEmpty()) {
+            if(!loading && filteredPosts.isEmpty()) {
                 PremiumEmptyState(
-                    Icons.Default.BookmarkBorder,
-                    "Saved Post نداری",
-                    "از Club پست‌ها رو Save کن تا اینجا جمع بشن."
+                    if(normalizedQuery.isBlank())Icons.Default.BookmarkBorder else Icons.Default.SearchOff,
+                    if(normalizedQuery.isBlank())"پست ذخیره‌شده‌ای نداری" else "پستی پیدا نشد",
+                    if(normalizedQuery.isBlank())
+                        "از کلاب پست‌ها رو ذخیره کن تا اینجا جمع بشن."
+                    else
+                        "عبارت جستجو رو تغییر بده یا پاکش کن."
                 )
             } else {
                 LazyColumn(
@@ -120,7 +171,7 @@ fun SavedSocialScreen(
                     verticalArrangement=Arrangement.spacedBy(9.dp),
                     modifier=Modifier.fillMaxSize()
                 ) {
-                    items(posts,key={it.id}) { post ->
+                    items(filteredPosts,key={it.id}) { post ->
                         SavedPostCard(
                             post=post,
                             onOpen={onOpenPost(post.id)},
@@ -130,7 +181,7 @@ fun SavedSocialScreen(
                                         name=post.author.displayName,
                                         handle="@"+post.author.username,
                                         followers="",
-                                        bio="عضو Community Filmiqoo",
+                                        bio="عضو جامعه Filmiqoo",
                                         verified=post.author.verified,
                                         id=post.author.id,
                                         entityType="user",
@@ -153,11 +204,14 @@ fun SavedSocialScreen(
                 }
             }
         } else {
-            if(!loading && reels.isEmpty()) {
+            if(!loading && filteredReels.isEmpty()) {
                 PremiumEmptyState(
-                    Icons.Default.VideoLibrary,
-                    "Saved Clip نداری",
-                    "Clipهایی که Save می‌کنی اینجا جمع می‌شن."
+                    if(normalizedQuery.isBlank())Icons.Default.VideoLibrary else Icons.Default.SearchOff,
+                    if(normalizedQuery.isBlank())"کلیپ ذخیره‌شده‌ای نداری" else "کلیپی پیدا نشد",
+                    if(normalizedQuery.isBlank())
+                        "کلیپ‌هایی که ذخیره می‌کنی اینجا جمع می‌شن."
+                    else
+                        "عبارت جستجو رو تغییر بده یا پاکش کن."
                 )
             } else {
                 LazyVerticalGrid(
@@ -167,7 +221,7 @@ fun SavedSocialScreen(
                     verticalArrangement=Arrangement.spacedBy(8.dp),
                     modifier=Modifier.fillMaxSize()
                 ) {
-                    items(reels,key={it.id}) { reel ->
+                    items(filteredReels,key={it.id}) { reel ->
                         SavedReelCard(
                             reel=reel,
                             onClick={onOpenClip(reel.id)},
