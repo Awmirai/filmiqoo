@@ -684,26 +684,31 @@ private fun CreateLiveEventDialog(
 ) {
     val live=remember { LiveRepository(backend) }
     val scope=rememberCoroutineScope()
-    var type by remember { mutableStateOf("live") }
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var visibility by remember { mutableStateOf("public") }
-    var playbackUrl by remember { mutableStateOf("") }
-    var allowChat by remember { mutableStateOf(true) }
-    var scheduledText by remember {
+    var type by rememberSaveable { mutableStateOf("live") }
+    var title by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var visibility by rememberSaveable { mutableStateOf("public") }
+    var playbackUrl by rememberSaveable { mutableStateOf("") }
+    var allowChat by rememberSaveable { mutableStateOf(true) }
+    var scheduledText by rememberSaveable {
         mutableStateOf(
             LocalDateTime.now().plusHours(1)
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
         )
     }
-    var taggedMedia by remember { mutableStateOf<MediaItem?>(null) }
+    var taggedMediaId by rememberSaveable { mutableStateOf<String?>(null) }
+    var taggedMediaTitle by rememberSaveable { mutableStateOf("") }
+    var taggedMediaPoster by rememberSaveable { mutableStateOf<String?>(null) }
+    var taggedMediaBackdrop by rememberSaveable { mutableStateOf<String?>(null) }
     var showMediaPicker by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
     val scheduledIso=parseLiveDateTime(scheduledText)
+    val scheduledInstant=scheduledIso?.let { runCatching { Instant.parse(it) }.getOrNull() }
+    val scheduleValid=scheduledInstant?.isAfter(Instant.now().plusSeconds(120))==true
     val canCreate=title.trim().length>=2 &&
-        scheduledIso!=null &&
-        (type!="premiere" || !taggedMedia?.backendId.isNullOrBlank())
+        scheduleValid &&
+        (type!="premiere" || !taggedMediaId.isNullOrBlank())
 
     AlertDialog(
         onDismissRequest={if(!busy)onDismiss()},
@@ -744,10 +749,40 @@ private fun CreateLiveEventDialog(
                     value=scheduledText,
                     onValueChange={scheduledText=it.take(16)},
                     label={Text("زمان • YYYY-MM-DD HH:mm")},
-                    isError=scheduledIso==null,
+                    isError=!scheduleValid,
+                    supportingText={
+                        Text(
+                            if(scheduledIso==null)
+                                "فرمت زمان معتبر نیست."
+                            else if(!scheduleValid)
+                                "زمان شروع باید حداقل چند دقیقه در آینده باشد."
+                            else
+                                "زمان بر اساس ساعت دستگاه ثبت می‌شود.",
+                            fontSize=10.sp
+                        )
+                    },
                     singleLine=true,
                     modifier=Modifier.fillMaxWidth().padding(top=7.dp)
                 )
+
+                LazyRow(
+                    horizontalArrangement=Arrangement.spacedBy(6.dp),
+                    contentPadding=PaddingValues(top=6.dp)
+                ) {
+                    items(liveSchedulePresets()) { preset ->
+                        AssistChip(
+                            onClick={scheduledText=preset.second},
+                            label={Text(preset.first,fontSize=10.sp)},
+                            leadingIcon={
+                                Icon(
+                                    Icons.Default.Schedule,
+                                    null,
+                                    modifier=Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    }
+                }
 
                 if(type=="premiere") {
                     Surface(
@@ -760,7 +795,7 @@ private fun CreateLiveEventDialog(
                             Icon(Icons.Default.Movie,null,tint=FqGold)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(taggedMedia?.title ?: "انتخاب فیلم یا سریال",fontSize=11.sp)
+                                Text(taggedMediaTitle.ifBlank { "انتخاب فیلم یا سریال" },fontSize=11.sp)
                                 Text(
                                     "پریمیر از نسخه آماده پخش کاتالوگ اجرا می‌شه.",
                                     color=FqMuted,
@@ -816,10 +851,10 @@ private fun CreateLiveEventDialog(
                                 description=description,
                                 visibility=visibility,
                                 playbackUrl=playbackUrl,
-                                coverUrl=taggedMedia?.backdropPath ?: taggedMedia?.posterPath ?: "",
+                                coverUrl=taggedMediaBackdrop ?: taggedMediaPoster ?: "",
                                 allowChat=allowChat,
                                 scheduledAtIso=iso,
-                                mediaTitleId=taggedMedia?.backendId
+                                mediaTitleId=taggedMediaId
                             )
                         }.onSuccess {
                             busy=false
@@ -854,7 +889,10 @@ private fun CreateLiveEventDialog(
             repository=repository,
             onDismiss={showMediaPicker=false},
             onSelected={
-                taggedMedia=it
+                taggedMediaId=it.backendId
+                taggedMediaTitle=it.title
+                taggedMediaPoster=it.posterPath
+                taggedMediaBackdrop=it.backdropPath
                 showMediaPicker=false
             }
         )
@@ -895,6 +933,20 @@ private fun LiveSourceDialog(
             ) { Text("شروع پخش") }
         },
         dismissButton={TextButton(onClick=onDismiss){Text("لغو")}}
+    )
+}
+
+private fun liveSchedulePresets():List<Pair<String,String>> {
+    val formatter=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    val now=java.time.ZonedDateTime.now()
+    val tonight=now.withHour(21).withMinute(0).withSecond(0).withNano(0).let {
+        if(it.isAfter(now.plusMinutes(2))) it else it.plusDays(1)
+    }
+    val tomorrow=now.plusDays(1).withHour(20).withMinute(0).withSecond(0).withNano(0)
+    return listOf(
+        "۱ ساعت دیگر" to now.plusHours(1).format(formatter),
+        "امشب ۲۱" to tonight.format(formatter),
+        "فردا ۲۰" to tomorrow.format(formatter)
     )
 }
 
