@@ -258,9 +258,9 @@ fun InboxScreen(
                             items=items.map {
                                 if(it.id==conversation.id) it.copy(unread=0L) else it
                             }
+                            onOpenRoom(conversation)
                             scope.launch {
                                 runCatching { repo.markRoomRead(conversation.id) }
-                                onOpenRoom(conversation)
                             }
                         },
                         onArchive={
@@ -730,43 +730,48 @@ fun ConnectedNotificationsScreen(
                     NotificationCard(
                         item=item,
                         onClick={
-                            if(!item.read) {
+                            val wasUnread=!item.read
+                            if(wasUnread) {
                                 items=items.map {
                                     if(it.id==item.id) it.copy(read=true) else it
                                 }
                                 unread=(unread-1L).coerceAtLeast(0L)
                             }
-                            scope.launch {
-                                if(!item.read) runCatching { repo.markNotificationRead(item.id) }
-                                when {
-                                    item.type=="follow_request" -> onFollowRequests()
-                                    item.entityType=="collection" && !item.entityId.isNullOrBlank() ->
-                                        onOpenCollection(item.entityId)
-                                    item.entityType=="watch_party" && !item.entityId.isNullOrBlank() ->
-                                        onOpenWatchParty(item.entityId)
-                                    item.entityType=="room" && !item.entityId.isNullOrBlank() ->
-                                        onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
-                                    item.entityType=="reel" && !item.entityId.isNullOrBlank() ->
-                                        onOpenClip(item.entityId)
-                                    item.entityType=="post" && !item.entityId.isNullOrBlank() ->
-                                        onOpenPost(item.entityId)
-                                    item.media!=null ->
-                                        onOpenMedia(item.media)
-                                    item.entityType in setOf("user","review","story") &&
-                                        item.actor!=null ->
-                                        onOpenCreator(
-                                            Creator(
-                                                name=item.actor.displayName,
-                                                handle="@"+item.actor.username,
-                                                followers="",
-                                                bio="",
-                                                verified=item.actor.verified,
-                                                id=item.actor.id,
-                                                entityType="user",
-                                                avatarUrl=item.actor.avatarUrl
-                                            )
+
+                            when {
+                                item.type=="follow_request" -> onFollowRequests()
+                                item.entityType=="collection" && !item.entityId.isNullOrBlank() ->
+                                    onOpenCollection(item.entityId)
+                                item.entityType=="watch_party" && !item.entityId.isNullOrBlank() ->
+                                    onOpenWatchParty(item.entityId)
+                                item.entityType=="room" && !item.entityId.isNullOrBlank() ->
+                                    onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
+                                item.entityType=="reel" && !item.entityId.isNullOrBlank() ->
+                                    onOpenClip(item.entityId)
+                                item.entityType=="post" && !item.entityId.isNullOrBlank() ->
+                                    onOpenPost(item.entityId)
+                                item.media!=null ->
+                                    onOpenMedia(item.media)
+                                item.entityType in setOf("user","review","story") &&
+                                    item.actor!=null ->
+                                    onOpenCreator(
+                                        Creator(
+                                            name=item.actor.displayName,
+                                            handle="@"+item.actor.username,
+                                            followers="",
+                                            bio="",
+                                            verified=item.actor.verified,
+                                            id=item.actor.id,
+                                            entityType="user",
+                                            avatarUrl=item.actor.avatarUrl
                                         )
-                                    else -> refresh++
+                                    )
+                                else -> refresh++
+                            }
+
+                            if(wasUnread) {
+                                scope.launch {
+                                    runCatching { repo.markNotificationRead(item.id) }
                                 }
                             }
                         }
