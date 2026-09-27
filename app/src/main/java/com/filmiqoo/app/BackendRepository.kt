@@ -928,10 +928,46 @@ class BackendRepository(context: Context) {
         }
 
     private fun apiError(raw: String, code: Int): String {
-        return runCatching { JSONObject(raw).optString("error") }
+        val message=runCatching { JSONObject(raw).optString("error") }
             .getOrNull()
             ?.takeIf(String::isNotBlank)
-            ?: "خطای سرور (" + code + ")"
+            ?: return "خطای سرور ("+code+")"
+
+        return when(message) {
+            "invalid email" ->
+                "ایمیل واردشده معتبر نیست."
+            "username must be 3-24 characters using letters, numbers, _ or ." ->
+                "نام کاربری باید ۳ تا ۲۴ کاراکتر و فقط شامل حروف انگلیسی، عدد، _ یا . باشد."
+            "displayName must be 2-50 characters" ->
+                "نام نمایشی باید بین ۲ تا ۵۰ کاراکتر باشد."
+            "password must be 10-128 characters" ->
+                "رمز عبور باید بین ۱۰ تا ۱۲۸ کاراکتر باشد."
+            "email or username already exists" ->
+                "این ایمیل یا نام کاربری قبلاً استفاده شده است."
+            "login and password are required" ->
+                "ایمیل/نام کاربری و رمز عبور را وارد کن."
+            "invalid credentials" ->
+                "ایمیل، نام کاربری یا رمز عبور درست نیست."
+            "invalid channel slug or name" ->
+                "نام یا شناسه کانال معتبر نیست."
+            "channel slug already exists" ->
+                "این شناسه کانال قبلاً گرفته شده است."
+            "invalid visibility" ->
+                "سطح دسترسی انتخاب‌شده معتبر نیست."
+            "post body must be 1-5000 characters" ->
+                "متن محتوا باید بین ۱ تا ۵۰۰۰ کاراکتر باشد."
+            "poll requires 2-6 unique options" ->
+                "نظرسنجی باید بین ۲ تا ۶ گزینه متفاوت داشته باشد."
+            "scheduledAt is too far in the future" ->
+                "زمان انتشار را حداکثر تا یک سال آینده انتخاب کن."
+            "comment must be 1-2000 characters" ->
+                "کامنت باید بین ۱ تا ۲۰۰۰ کاراکتر باشد."
+            "bio is too long" ->
+                "معرفی پروفایل حداکثر ۳۰۰ کاراکتر است."
+            "profile images must come from your Filmiqoo uploads" ->
+                "عکس پروفایل و کاور باید از فایل‌های آپلودشده خودت در Filmiqoo باشند."
+            else -> message
+        }
     }
 
     private fun sanitizeFileName(value: String): String =
