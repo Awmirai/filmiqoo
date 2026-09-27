@@ -61,6 +61,7 @@ fun LiveHubScreen(
     var showCreate by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var filterName by rememberSaveable { mutableStateOf(LiveHubFilter.ALL.name) }
+    var query by rememberSaveable { mutableStateOf("") }
     val filter=runCatching { LiveHubFilter.valueOf(filterName) }
         .getOrDefault(LiveHubFilter.ALL)
 
@@ -203,6 +204,30 @@ fun LiveHubScreen(
             }
         }
 
+        OutlinedTextField(
+            value=query,
+            onValueChange={query=it},
+            singleLine=true,
+            placeholder={Text("جستجو در رویدادها...")},
+            leadingIcon={Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))},
+            trailingIcon={
+                if(query.isNotBlank()) {
+                    IconButton(onClick={query=""}) {
+                        Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                    }
+                }
+            },
+            shape=RoundedCornerShape(16.dp),
+            colors=OutlinedTextFieldDefaults.colors(
+                focusedBorderColor=FqGold.copy(alpha=.6f),
+                unfocusedBorderColor=FqBorder,
+                focusedContainerColor=FqSurface,
+                unfocusedContainerColor=FqSurface
+            ),
+            modifier=Modifier.fillMaxWidth()
+                .padding(horizontal=14.dp,vertical=7.dp)
+        )
+
         if(loading) {
             LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         }
@@ -218,25 +243,39 @@ fun LiveHubScreen(
             )
         }
 
-        val visibleEvents=remember(events,filter,myEventIds) {
-            when(filter) {
-                LiveHubFilter.ALL -> events
-                LiveHubFilter.LIVE -> events.filter { it.state=="live" }
-                LiveHubFilter.UPCOMING -> events.filter { it.state=="scheduled" }
-                LiveHubFilter.MINE -> events.filter { it.id in myEventIds }
+        val visibleEvents=remember(events,filter,myEventIds,query) {
+            val q=query.trim()
+            events.filter { event ->
+                val matchesFilter=when(filter) {
+                    LiveHubFilter.ALL -> true
+                    LiveHubFilter.LIVE -> event.state=="live"
+                    LiveHubFilter.UPCOMING -> event.state=="scheduled"
+                    LiveHubFilter.MINE -> event.id in myEventIds
+                }
+                val matchesQuery=q.isBlank() ||
+                    event.title.contains(q,ignoreCase=true) ||
+                    event.description.contains(q,ignoreCase=true) ||
+                    event.host.displayName.contains(q,ignoreCase=true) ||
+                    event.host.username.contains(q,ignoreCase=true) ||
+                    event.media?.title?.contains(q,ignoreCase=true)==true
+                matchesFilter && matchesQuery
             }
         }
 
         if(!loading && visibleEvents.isEmpty()) {
             PremiumEmptyState(
-                Icons.Default.LiveTv,
-                when(filter) {
+                if(query.isNotBlank())Icons.Default.SearchOff else Icons.Default.LiveTv,
+                if(query.isNotBlank()) {
+                    "رویدادی پیدا نشد"
+                } else when(filter) {
                     LiveHubFilter.ALL -> "رویدادی نیست"
                     LiveHubFilter.LIVE -> "الان پخش زنده‌ای نیست"
                     LiveHubFilter.UPCOMING -> "رویداد آینده‌ای نیست"
                     LiveHubFilter.MINE -> "رویدادی نساختی"
                 },
-                when(filter) {
+                if(query.isNotBlank()) {
+                    "عنوان رویداد، نام میزبان یا اسم فیلم رو با عبارت دیگه‌ای جستجو کن."
+                } else when(filter) {
                     LiveHubFilter.ALL -> "سازنده‌ها می‌تونن پخش زنده یا پریمیر جدید بسازن."
                     LiveHubFilter.LIVE -> "رویدادهای در حال پخش وقتی شروع بشن اینجا ظاهر می‌شن."
                     LiveHubFilter.UPCOMING -> "پخش‌های زمان‌بندی‌شده و پریمیرهای آینده اینجا میاد."
