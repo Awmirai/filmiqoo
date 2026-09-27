@@ -34,6 +34,7 @@ import java.time.Duration
 
 private enum class ClubTab { FOR_YOU, FOLLOWING, ROOMS }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClubScreen(
     social:SocialRepository,
@@ -71,6 +72,9 @@ fun ClubScreen(
     var following by remember { mutableStateOf<List<FriendActivityItem>>(emptyList()) }
     var pulse by remember { mutableStateOf<List<PulseTrendItem>>(emptyList()) }
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
+    var moreFor by remember { mutableStateOf<SocialPost?>(null) }
+    var safetyFor by remember { mutableStateOf<SocialPost?>(null) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var unreadMessages by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(initialPostId) {
@@ -191,6 +195,7 @@ fun ClubScreen(
                         onOpenRoom=onOpenRoom,
                         onRequireAuth=onRequireAuth,
                         onComments={commentsFor=it},
+                        onMore={moreFor=it},
                         onFeedChange={feed=it},
                         onCreatorsChange={creators=it},
                         onRefresh={refresh++},
@@ -247,6 +252,143 @@ fun ClubScreen(
             },
             onDismiss={commentsFor=null}
         )
+    }
+
+    moreFor?.let { post ->
+        ModalBottomSheet(
+            onDismissRequest={moreFor=null},
+            containerColor=FqSurface,
+            dragHandle={BottomSheetDefaults.DragHandle(color=FqMuted)}
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .padding(horizontal=16.dp)
+                    .padding(bottom=26.dp)
+            ) {
+                Text(
+                    "گزینه‌های Post",
+                    fontSize=18.sp,
+                    fontWeight=FontWeight.Black,
+                    modifier=Modifier.padding(bottom=8.dp)
+                )
+                ClubMoreAction(
+                    icon=Icons.Default.DoNotDisturbOn,
+                    title="علاقه ندارم",
+                    subtitle="این Post و محتوای مشابه کمتر نمایش داده می‌شن."
+                ) {
+                    moreFor=null
+                    if(!loggedIn) {
+                        onRequireAuth()
+                    } else {
+                        scope.launch {
+                            runCatching {
+                                social.feedback("post",post.id,"not_interested")
+                            }.onSuccess {
+                                feed=feed.filterNot { it.id==post.id }
+                                feedbackMessage="این نوع محتوا کمتر نمایش داده می‌شه."
+                            }.onFailure { error=it.message }
+                        }
+                    }
+                }
+
+                post.media?.id?.takeIf(String::isNotBlank)?.let { mediaId ->
+                    ClubMoreAction(
+                        icon=Icons.Default.MovieFilter,
+                        title="کمتر از این عنوان",
+                        subtitle="Postهای مرتبط با این فیلم یا سریال کمتر نمایش داده می‌شن."
+                    ) {
+                        moreFor=null
+                        if(!loggedIn) {
+                            onRequireAuth()
+                        } else {
+                            scope.launch {
+                                runCatching {
+                                    social.feedback("media",mediaId,"not_interested")
+                                }.onSuccess {
+                                    feed=feed.filterNot { it.media?.id==mediaId }
+                                    feedbackMessage="محتوای این عنوان کمتر نمایش داده می‌شه."
+                                }.onFailure { error=it.message }
+                            }
+                        }
+                    }
+                }
+
+                ClubMoreAction(
+                    icon=Icons.Default.Shield,
+                    title="ایمنی و گزارش",
+                    subtitle="Report، Mute یا Block کردن این حساب"
+                ) {
+                    moreFor=null
+                    if(!loggedIn) onRequireAuth() else safetyFor=post
+                }
+            }
+        }
+    }
+
+    safetyFor?.let { post ->
+        SafetyActionSheet(
+            backend=backend,
+            targetType="post",
+            targetId=post.id,
+            targetLabel="Post از "+post.author.displayName,
+            userTargetId=post.author.id,
+            onDismiss={safetyFor=null},
+            onChanged={
+                feed=feed.filterNot { it.author.id==post.author.id }
+                safetyFor=null
+            }
+        )
+    }
+
+    feedbackMessage?.let { message ->
+        Snackbar(
+            modifier=Modifier.padding(16.dp),
+            action={
+                TextButton(onClick={feedbackMessage=null}) {
+                    Text("باشه")
+                }
+            }
+        ) {
+            Text(message)
+        }
+    }
+}
+
+@Composable
+private fun ClubMoreAction(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    subtitle:String,
+    onClick:()->Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+            .padding(horizontal=12.dp,vertical=13.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ) {
+        Surface(
+            color=FqSurface2,
+            contentColor=Color.White,
+            shape=CircleShape,
+            modifier=Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment=Alignment.Center) {
+                Icon(icon,null,modifier=Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+            Text(
+                subtitle,
+                color=FqMuted,
+                fontSize=10.sp,
+                modifier=Modifier.padding(top=2.dp)
+            )
+        }
+        Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
     }
 }
 
@@ -507,6 +649,7 @@ private fun ClubForYou(
     onOpenRoom:(SocialRoom)->Unit,
     onRequireAuth:()->Unit,
     onComments:(SocialPost)->Unit,
+    onMore:(SocialPost)->Unit,
     onFeedChange:(List<SocialPost>)->Unit,
     onCreatorsChange:(List<SocialChannel>)->Unit,
     onRefresh:()->Unit,
@@ -790,6 +933,7 @@ private fun ClubForYou(
                         }
                     },
                     onComments={onComments(post)},
+                    onMore={onMore(post)},
                     onShare={
                         if(loggedIn) {
                             scope.launch {
@@ -1208,6 +1352,7 @@ private fun ClubPostCard(
     onLike:()->Unit,
     onSave:()->Unit,
     onComments:()->Unit,
+    onMore:()->Unit,
     onShare:()->Unit
 ) {
     var revealed by remember(post.id) { mutableStateOf(!post.spoiler) }
@@ -1277,6 +1422,17 @@ private fun ClubPostCard(
                         }
                     }
                 }
+            }
+            IconButton(
+                onClick=onMore,
+                modifier=Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.MoreHoriz,
+                    contentDescription="گزینه‌های پست",
+                    tint=FqMuted,
+                    modifier=Modifier.size(20.dp)
+                )
             }
         }
 
