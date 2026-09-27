@@ -109,16 +109,16 @@ fun SettingsScreen(
             SettingsSwitchRow("پخش خودکار قسمت بعد","بعد از پایان قسمت، قسمت بعدی شروع شود.",settings.autoplayNext) {
                 persist(settings.copy(autoplayNext=it))
             }
-            SettingsSwitchRow("پخش خودکار Preview","Preview و Heroها خودکار پخش شوند.",settings.autoplayPreviews) {
+            SettingsSwitchRow("پخش خودکار پیش‌نمایش","پیش‌نمایش‌ها و بنرهای اصلی خودکار پخش شوند.",settings.autoplayPreviews) {
                 persist(settings.copy(autoplayPreviews=it))
             }
-            SettingsSwitchRow("رد کردن Intro","اگر Marker موجود باشد تیتراژ آغازین خودکار رد شود.",settings.skipIntro) {
+            SettingsSwitchRow("رد کردن تیتراژ آغازین","اگر نشانگر زمان موجود باشد، تیتراژ آغازین خودکار رد شود.",settings.skipIntro) {
                 persist(settings.copy(skipIntro=it))
             }
-            SettingsSwitchRow("رد کردن Recap","مرور قسمت قبل در صورت وجود Marker خودکار رد شود.",settings.skipRecap) {
+            SettingsSwitchRow("رد کردن مرور قسمت قبل","در صورت وجود نشانگر، مرور قسمت قبل خودکار رد شود.",settings.skipRecap) {
                 persist(settings.copy(skipRecap=it))
             }
-            SettingsSwitchRow("رفتن به قسمت بعد در Credits","وقتی Credits شروع شد، اگر قسمت بعد موجود باشد سریع‌تر به Next Episode برو.",settings.skipCredits) {
+            SettingsSwitchRow("رفتن به قسمت بعد در تیتراژ پایانی","با شروع تیتراژ پایانی، در صورت وجود قسمت بعد سریع‌تر واردش شو.",settings.skipCredits) {
                 persist(settings.copy(skipCredits=it))
             }
         }
@@ -137,9 +137,9 @@ fun SettingsScreen(
         item {
             SettingsChoiceRow(
                 title="نسبت تصویر",
-                subtitle="نمایش پیش‌فرض ویدیو در Player",
+                subtitle="نمایش پیش‌فرض ویدیو در پخش‌کننده",
                 value=resizeModeLabel(settings.playerResizeMode),
-                options=listOf("Fit","Fill","Zoom")
+                options=listOf("جاگذاری","پر کردن","زوم")
             ) { selected ->
                 persist(settings.copy(playerResizeMode=resizeModeCode(selected)))
             }
@@ -147,26 +147,26 @@ fun SettingsScreen(
 
         item { SettingsSectionTitle("صدا و زیرنویس",Icons.Default.Subtitles) }
         item {
-            SettingsSwitchRow("زیرنویس پیش‌فرض","در صورت وجود Track مناسب فعال باشد.",settings.subtitlesEnabled) {
+            SettingsSwitchRow("زیرنویس پیش‌فرض","در صورت وجود زیرنویس مناسب فعال باشد.",settings.subtitlesEnabled) {
                 persist(settings.copy(subtitlesEnabled=it))
             }
             SettingsChoiceRow(
-                "زبان صدا","Track صوتی ترجیحی",
+                "زبان صدا","صدای ترجیحی",
                 languageLabel(settings.defaultAudioLanguage),
                 listOf("فارسی","English","Deutsch","العربية","Türkçe","한국어","日本語")
             ) { persist(settings.copy(defaultAudioLanguage=languageCode(it))) }
             SettingsChoiceRow(
-                "زبان زیرنویس","زبان ترجیحی Subtitle",
+                "زبان زیرنویس","زبان ترجیحی زیرنویس",
                 languageLabel(settings.defaultSubtitleLanguage),
                 listOf("فارسی","English","Deutsch","العربية","Türkçe","한국어","日本語")
             ) { persist(settings.copy(defaultSubtitleLanguage=languageCode(it))) }
             SettingsChoiceRow(
-                "اندازه زیرنویس","اندازه پیش‌فرض متن Subtitle",
+                "اندازه زیرنویس","اندازه پیش‌فرض متن زیرنویس",
                 subtitleScaleLabel(settings.subtitleScale),
                 listOf("کوچک","معمولی","بزرگ","خیلی بزرگ")
             ) { persist(settings.copy(subtitleScale=subtitleScaleValue(it))) }
             SettingsChoiceRow(
-                "موقعیت زیرنویس","فاصله Subtitle از پایین تصویر",
+                "موقعیت زیرنویس","فاصله زیرنویس از پایین تصویر",
                 subtitlePositionLabel(settings.subtitleBottomPadding),
                 listOf("پایین","معمولی","بالاتر")
             ) { persist(settings.copy(subtitleBottomPadding=subtitlePositionValue(it))) }
@@ -185,35 +185,35 @@ fun SettingsScreen(
                 persist(settings.copy(downloadRequiresCharging=it))
             }
             SettingsSwitchRow(
-                "Battery not low",
-                "وقتی باتری در وضعیت Low است دانلود جدید شروع نشود.",
+                "باتری کافی",
+                "وقتی شارژ باتری پایین است دانلود جدید شروع نشود.",
                 settings.downloadBatteryNotLow
             ) {
                 persist(settings.copy(downloadBatteryNotLow=it))
             }
             SettingsSwitchRow(
-                "جلوگیری از Roaming",
-                "روی شبکه موبایل Roaming دانلودها متوقف بمانند.",
+                "جلوگیری از رومینگ",
+                "هنگام رومینگ شبکه موبایل، دانلودها متوقف بمانند.",
                 settings.downloadAvoidRoaming
             ) {
                 persist(settings.copy(downloadAvoidRoaming=it))
             }
             SettingsSwitchRow(
-                "Smart Downloads",
-                "قسمت دیده‌شده را از زنجیره Smart پاک کن و قسمت بعدی را خودکار به صف اضافه کن.",
+                "دانلود هوشمند",
+                "قسمت دیده‌شده را پاک کن و قسمت بعدی را خودکار به صف اضافه کن.",
                 settings.smartDownloads
             ) {
                 persist(settings.copy(smartDownloads=it))
             }
-            SettingsSwitchRow("Data Saver","برای شبکه ضعیف مصرف داده کمتر شود.",settings.dataSaver) {
+            SettingsSwitchRow("صرفه‌جویی داده","برای اینترنت محدود یا ضعیف مصرف داده کمتر شود.",settings.dataSaver) {
                 persist(settings.copy(dataSaver=it))
             }
         }
 
         item {
             SettingsChoiceRow(
-                title="سقف فضای Smart Downloads",
-                subtitle="فقط دانلودهای Smart برای آزادسازی خودکار فضا مدیریت می‌شوند.",
+                title="سقف فضای دانلود هوشمند",
+                subtitle="فقط دانلودهای هوشمند برای آزادسازی خودکار فضا مدیریت می‌شوند.",
                 value=downloadLimitLabel(settings.downloadStorageLimitMb),
                 options=listOf("5 GB","10 GB","20 GB","50 GB","بدون محدودیت")
             ) { selected ->
@@ -221,25 +221,25 @@ fun SettingsScreen(
             }
         }
 
-        item { SettingsSectionTitle("Community و Privacy",Icons.Default.Security) }
+        item { SettingsSectionTitle("جامعه و حریم خصوصی",Icons.Default.Security) }
         item {
-            SettingsSwitchRow("Spoiler Shield","محتوای علامت‌خورده تا لمس کاربر مخفی بماند.",settings.spoilerShield) {
+            SettingsSwitchRow("محافظ اسپویل","محتوای علامت‌خورده تا لمس کاربر مخفی بماند.",settings.spoilerShield) {
                 persist(settings.copy(spoilerShield=it))
             }
-            SettingsSwitchRow("حساب خصوصی","Follower جدید نیاز به تأیید داشته باشد.",settings.privateAccount) {
+            SettingsSwitchRow("حساب خصوصی","دنبال‌کننده جدید نیاز به تأیید داشته باشد.",settings.privateAccount) {
                 persist(settings.copy(privateAccount=it))
             }
         }
 
         item { SettingsSectionTitle("اعلان‌ها",Icons.Default.Notifications) }
         item {
-            SettingsSwitchRow("اجتماعی","Follow، Like، Story reaction و فعالیت Creatorها.",settings.notificationsSocial) {
+            SettingsSwitchRow("اجتماعی","دنبال‌کردن، لایک، واکنش استوری و فعالیت سازنده‌ها.",settings.notificationsSocial) {
                 persist(settings.copy(notificationsSocial=it))
             }
-            SettingsSwitchRow("پیام‌ها","DM و Roomهای مهم.",settings.notificationsMessages) {
+            SettingsSwitchRow("پیام‌ها","پیام خصوصی و گفت‌وگوهای مهم.",settings.notificationsMessages) {
                 persist(settings.copy(notificationsMessages=it))
             }
-            SettingsSwitchRow("انتشار فیلم و سریال","قسمت جدید، Release و محتوای Watchlist.",settings.notificationsReleases) {
+            SettingsSwitchRow("انتشار فیلم و سریال","قسمت جدید، انتشارها و عناوین «بعداً می‌بینم».",settings.notificationsReleases) {
                 persist(settings.copy(notificationsReleases=it))
             }
         }
@@ -259,7 +259,7 @@ fun SettingsScreen(
                             if(backend.session.isLoggedIn)
                                 "تنظیمات بین دستگاه‌های حساب Filmiqoo همگام می‌شوند."
                             else
-                                "در Preview تنظیمات فقط روی همین دستگاه ذخیره می‌شوند.",
+                                "بدون ورود به حساب، تنظیمات فقط روی همین دستگاه ذخیره می‌شوند.",
                             color=FqMuted,fontSize=11.sp,lineHeight=14.sp
                         )
                     }
@@ -427,14 +427,14 @@ private fun languageCode(label:String)=when(label) {
 
 
 private fun resizeModeLabel(code:String)=when(code) {
-    "fill" -> "Fill"
-    "zoom" -> "Zoom"
-    else -> "Fit"
+    "fill" -> "پر کردن"
+    "zoom" -> "زوم"
+    else -> "جاگذاری"
 }
 
 private fun resizeModeCode(label:String)=when(label) {
-    "Fill" -> "fill"
-    "Zoom" -> "zoom"
+    "پر کردن" -> "fill"
+    "زوم" -> "zoom"
     else -> "fit"
 }
 
