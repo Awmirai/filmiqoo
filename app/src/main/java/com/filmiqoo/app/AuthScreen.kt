@@ -75,13 +75,21 @@ fun AuthScreen(
         }
     }
 
+    val cleanEmail=email.trim()
+    val cleanUsername=username.trim()
+    val usernameValid=cleanUsername.matches(Regex("^[A-Za-z0-9_.]{3,24}$"))
+    val emailValid=cleanEmail.length<=254 &&
+        cleanEmail.contains("@") &&
+        !cleanEmail.startsWith("@") &&
+        !cleanEmail.endsWith("@")
+
     val canSubmit=!loading &&
         password.isNotBlank() &&
         if(register) {
-            password.length>=10 &&
-                email.isNotBlank() &&
-                username.trim().length>=3 &&
-                displayName.trim().length>=2
+            password.length in 10..128 &&
+                emailValid &&
+                usernameValid &&
+                displayName.trim().length in 2..50
         } else {
             login.isNotBlank()
         }
@@ -205,12 +213,20 @@ fun AuthScreen(
                     )
                     OutlinedTextField(
                         value=username,
-                        onValueChange={username=it.replace(" ","")},
+                        onValueChange={
+                            username=it.filter { ch ->
+                                ch in 'a'..'z' ||
+                                    ch in 'A'..'Z' ||
+                                    ch in '0'..'9' ||
+                                    ch=='_' ||
+                                    ch=='.'
+                            }.take(24)
+                        },
                         label={Text("نام کاربری")},
                         singleLine=true,
                         leadingIcon={Icon(Icons.Default.AlternateEmail,null)},
                         supportingText={
-                            Text("حداقل ۳ کاراکتر، بدون فاصله")
+                            Text("۳ تا ۲۴ کاراکتر • حروف انگلیسی، عدد، _ یا .")
                         },
                         shape=RoundedCornerShape(16.dp),
                         modifier=Modifier.fillMaxWidth()
