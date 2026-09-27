@@ -42,6 +42,7 @@ fun ReleaseCenterScreen(
     var reminderKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var reminderBusy by remember { mutableStateOf<Set<String>>(emptySet()) }
     var filter by rememberSaveable { mutableIntStateOf(0) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler { onBack() }
 
@@ -57,12 +58,21 @@ fun ReleaseCenterScreen(
         loading=false
     }
 
-    val visible=releases.filter {
-        when(filter) {
-            1 -> it.media.type==MediaType.MOVIE
-            2 -> it.media.type==MediaType.TV
-            3 -> it.media.streamReady
-            else -> true
+    val visible=remember(releases,filter,query,reminderKeys) {
+        val q=query.trim()
+        releases.filter { item ->
+            val matchesFilter=when(filter) {
+                1 -> item.media.type==MediaType.MOVIE
+                2 -> item.media.type==MediaType.TV
+                3 -> item.media.streamReady
+                4 -> repo.reminderKey(item) in reminderKeys
+                else -> true
+            }
+            val matchesQuery=q.isBlank() ||
+                item.media.title.contains(q,ignoreCase=true) ||
+                item.media.originalTitle.contains(q,ignoreCase=true) ||
+                item.media.overview.contains(q,ignoreCase=true)
+            matchesFilter && matchesQuery
         }
     }
     val featured=visible.firstOrNull { (it.daysAway ?: Int.MAX_VALUE)>=0 } ?: visible.firstOrNull()
@@ -204,7 +214,42 @@ fun ReleaseCenterScreen(
                 item { PremiumChip(Icons.Default.Movie,"فیلم",filter==1){filter=1} }
                 item { PremiumChip(Icons.Default.Tv,"سریال",filter==2){filter=2} }
                 item { PremiumChip(Icons.Default.PlayCircle,"قابل پخش",filter==3){filter=3} }
+                if(backend.session.isLoggedIn) {
+                    item {
+                        PremiumChip(
+                            Icons.Default.NotificationsActive,
+                            "یادآوری‌های من",
+                            filter==4
+                        ){filter=4}
+                    }
+                }
             }
+        }
+
+        item {
+            OutlinedTextField(
+                value=query,
+                onValueChange={query=it},
+                singleLine=true,
+                placeholder={Text("جستجو در انتشارها...")},
+                leadingIcon={Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))},
+                trailingIcon={
+                    if(query.isNotBlank()) {
+                        IconButton(onClick={query=""}) {
+                            Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                        }
+                    }
+                },
+                shape=RoundedCornerShape(16.dp),
+                colors=OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor=FqGold.copy(alpha=.6f),
+                    unfocusedBorderColor=FqBorder,
+                    focusedContainerColor=FqSurface,
+                    unfocusedContainerColor=FqSurface
+                ),
+                modifier=Modifier.fillMaxWidth()
+                    .padding(horizontal=14.dp,vertical=5.dp)
+            )
         }
 
         if(loading) {
@@ -225,9 +270,17 @@ fun ReleaseCenterScreen(
         if(!loading && visible.isEmpty()) {
             item {
                 PremiumEmptyState(
-                    Icons.Default.EventBusy,
-                    "در این فیلتر چیزی پیدا نشد",
-                    "فیلتر دیگه‌ای رو انتخاب کن یا بعداً دوباره انتشارهای تازه رو بررسی کن."
+                    if(query.isNotBlank())Icons.Default.SearchOff else Icons.Default.EventBusy,
+                    when {
+                        query.isNotBlank() -> "انتشاری پیدا نشد"
+                        filter==4 -> "یادآوری فعالی نداری"
+                        else -> "در این فیلتر چیزی پیدا نشد"
+                    },
+                    when {
+                        query.isNotBlank() -> "عنوان فیلم یا سریال رو با عبارت دیگه‌ای جستجو کن."
+                        filter==4 -> "روی زنگ کنار انتشارهای آینده بزن تا اینجا جمع بشن."
+                        else -> "فیلتر دیگه‌ای رو انتخاب کن یا بعداً دوباره انتشارهای تازه رو بررسی کن."
+                    }
                 )
             }
         } else {
@@ -360,7 +413,7 @@ private fun ReleaseRow(
                     if(item.media.streamReady) {
                         Surface(color=FqGreen.copy(alpha=.15f),shape=RoundedCornerShape(7.dp)) {
                             Text(
-                                item.media.quality.ifBlank{"Ready"},
+                                item.media.quality.ifBlank{"آماده"},
                                 color=FqGreen,
                                 fontSize=6.sp,
                                 modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
