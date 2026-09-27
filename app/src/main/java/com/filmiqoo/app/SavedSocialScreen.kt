@@ -21,24 +21,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem as ExoMediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.launch
 
 @Composable
 fun SavedSocialScreen(
     social:SocialRepository,
-    repository:TmdbRepository,
     onBack:()->Unit,
     onCreator:(Creator)->Unit,
-    onMedia:(MediaItem)->Unit
+    onMedia:(MediaItem)->Unit,
+    onOpenPost:(String)->Unit,
+    onOpenClip:(String)->Unit
 ) {
     val scope=rememberCoroutineScope()
     var tab by remember { mutableIntStateOf(0) }
@@ -47,11 +43,8 @@ fun SavedSocialScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var posts by remember { mutableStateOf<List<SocialPost>>(emptyList()) }
     var reels by remember { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
-    var selectedReel by remember { mutableStateOf<ReelFeedItem?>(null) }
 
-    BackHandler {
-        if(selectedReel!=null) selectedReel=null else onBack()
-    }
+    BackHandler { onBack() }
 
     LaunchedEffect(refresh) {
         loading=true
@@ -63,41 +56,6 @@ fun SavedSocialScreen(
             error=it.message ?: "خطا در دریافت ذخیره‌های اجتماعی"
         }
         loading=false
-    }
-
-    selectedReel?.let { reel ->
-        SavedReelViewer(
-            reel=reel,
-            onBack={selectedReel=null},
-            onCreator={
-                onCreator(
-                    Creator(
-                        name=reel.author.displayName,
-                        handle="@"+reel.author.username,
-                        followers="",
-                        bio="Creator در Filmiqoo",
-                        verified=reel.author.verified,
-                        id=reel.author.id,
-                        entityType="user",
-                        avatarUrl=reel.author.avatarUrl
-                    )
-                )
-            },
-            onMedia={
-                reel.media?.asMediaItem()?.let(onMedia)
-            },
-            onRemove={
-                scope.launch {
-                    runCatching { social.toggleReelSave(reel.id) }
-                        .onSuccess {
-                            reels=reels.filterNot { it.id==reel.id }
-                            selectedReel=null
-                        }
-                        .onFailure { error=it.message }
-                }
-            }
-        )
-        return
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
@@ -113,7 +71,7 @@ fun SavedSocialScreen(
                 IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                 Column(Modifier.weight(1f)) {
                     Text("ذخیره‌های اجتماعی",fontSize=22.sp,fontWeight=FontWeight.Black)
-                    Text("Postها و Reelهایی که برای بعد نگه داشتی",color=FqMuted,fontSize=11.sp)
+                    Text("Postها و Clipهایی که برای بعد نگه داشتی",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
             }
@@ -132,7 +90,7 @@ fun SavedSocialScreen(
             Tab(
                 selected=tab==1,
                 onClick={tab=1},
-                text={Text("Reelها ("+reels.size+")",fontSize=11.sp)}
+                text={Text("Clipها ("+reels.size+")",fontSize=11.sp)}
             )
         }
 
@@ -154,7 +112,7 @@ fun SavedSocialScreen(
                 PremiumEmptyState(
                     Icons.Default.BookmarkBorder,
                     "Saved Post نداری",
-                    "از Community پست‌ها رو Save کن تا اینجا جمع بشن."
+                    "از Club پست‌ها رو Save کن تا اینجا جمع بشن."
                 )
             } else {
                 LazyColumn(
@@ -165,6 +123,7 @@ fun SavedSocialScreen(
                     items(posts,key={it.id}) { post ->
                         SavedPostCard(
                             post=post,
+                            onOpen={onOpenPost(post.id)},
                             onCreator={
                                 onCreator(
                                     Creator(
@@ -197,8 +156,8 @@ fun SavedSocialScreen(
             if(!loading && reels.isEmpty()) {
                 PremiumEmptyState(
                     Icons.Default.VideoLibrary,
-                    "Saved Reel نداری",
-                    "Reelهایی که Save می‌کنی اینجا قابل پخش‌اند."
+                    "Saved Clip نداری",
+                    "Clipهایی که Save می‌کنی اینجا جمع می‌شن."
                 )
             } else {
                 LazyVerticalGrid(
@@ -211,7 +170,7 @@ fun SavedSocialScreen(
                     items(reels,key={it.id}) { reel ->
                         SavedReelCard(
                             reel=reel,
-                            onClick={selectedReel=reel},
+                            onClick={onOpenClip(reel.id)},
                             onRemove={
                                 scope.launch {
                                     runCatching { social.toggleReelSave(reel.id) }
@@ -230,6 +189,7 @@ fun SavedSocialScreen(
 @Composable
 private fun SavedPostCard(
     post:SocialPost,
+    onOpen:()->Unit,
     onCreator:()->Unit,
     onMedia:()->Unit,
     onRemove:()->Unit
@@ -240,6 +200,7 @@ private fun SavedPostCard(
         color=FqSurface,
         shape=RoundedCornerShape(18.dp),
         modifier=Modifier.fillMaxWidth()
+            .clickable { onOpen() }
     ) {
         Column(Modifier.padding(13.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
@@ -378,120 +339,4 @@ private fun SavedReelCard(
             )
         }
     }
-}
-
-@Composable
-private fun SavedReelViewer(
-    reel:ReelFeedItem,
-    onBack:()->Unit,
-    onCreator:()->Unit,
-    onMedia:()->Unit,
-    onRemove:()->Unit
-) {
-    var revealed by remember(reel.id) { mutableStateOf(!reel.spoiler) }
-
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
-        Row(
-            Modifier.fillMaxWidth().padding(8.dp),
-            verticalAlignment=Alignment.CenterVertically
-        ) {
-            IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
-            Text("Saved Reel",fontSize=16.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
-            IconButton(onClick=onRemove){Icon(Icons.Default.BookmarkRemove,null,tint=FqGold)}
-        }
-
-        Box(
-            Modifier.fillMaxWidth().weight(1f),
-            contentAlignment=Alignment.Center
-        ) {
-            if(reel.spoiler && !revealed) {
-                Box(
-                    Modifier.fillMaxSize().background(Color(0xFF111318))
-                        .clickable { revealed=true },
-                    contentAlignment=Alignment.Center
-                ) {
-                    Column(horizontalAlignment=Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(52.dp))
-                        Text("Spoiler Shield",color=FqDanger,fontSize=17.sp,modifier=Modifier.padding(top=8.dp))
-                        Text("برای پخش لمس کن",color=FqMuted,fontSize=11.sp)
-                    }
-                }
-            } else if(reel.playbackUrl.isNotBlank()) {
-                SavedReelPlayer(
-                    url=reel.playbackUrl,
-                    modifier=Modifier.fillMaxSize()
-                )
-            } else {
-                RemoteImage(
-                    reel.coverUrl.takeIf(String::isNotBlank),
-                    Modifier.fillMaxSize(),
-                    ContentScale.Fit
-                )
-            }
-        }
-
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                RemoteImage(
-                    reel.author.avatarUrl.takeIf(String::isNotBlank),
-                    Modifier.size(42.dp).clip(CircleShape)
-                )
-                Spacer(Modifier.width(8.dp))
-                Column(
-                    Modifier.weight(1f).clickable { onCreator() }
-                ) {
-                    Text(reel.author.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
-                    Text("@"+reel.author.username,color=FqMuted,fontSize=11.sp)
-                }
-                reel.media?.asMediaItem()?.let {
-                    OutlinedButton(onClick=onMedia) {
-                        Icon(Icons.Default.Movie,null,modifier=Modifier.size(15.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("عنوان",fontSize=11.sp)
-                    }
-                }
-            }
-            if(reel.caption.isNotBlank()) {
-                Text(reel.caption,fontSize=11.sp,lineHeight=16.sp,modifier=Modifier.padding(top=9.dp))
-            }
-            Row(Modifier.padding(top=8.dp)) {
-                Text("♥ "+reel.likes,color=FqMuted,fontSize=11.sp)
-                Spacer(Modifier.width(12.dp))
-                Text("💬 "+reel.comments,color=FqMuted,fontSize=11.sp)
-                Spacer(Modifier.width(12.dp))
-                Text("▶ "+reel.views,color=FqMuted,fontSize=11.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SavedReelPlayer(
-    url:String,
-    modifier:Modifier=Modifier
-) {
-    val context=LocalContext.current
-    val player=remember(url) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(ExoMediaItem.fromUri(url))
-            repeatMode=ExoPlayer.REPEAT_MODE_ONE
-            playWhenReady=true
-            prepare()
-        }
-    }
-
-    DisposableEffect(player) {
-        onDispose { player.release() }
-    }
-
-    AndroidView(
-        factory={ctx->
-            PlayerView(ctx).apply {
-                useController=true
-                this.player=player
-            }
-        },
-        update={it.player=player},
-        modifier=modifier
-    )
 }
