@@ -238,6 +238,33 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		"publishedAt":publishedAt,
 	})
 }
+func (s *Server) removePost(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	postID:=chi.URLParam(r,"id")
+
+	var removedID string
+	err:=s.db.QueryRow(r.Context(),`
+		UPDATE posts
+		   SET status='removed',
+		       updated_at=now()
+		 WHERE id=$1
+		   AND author_user_id=$2
+		   AND status<>'removed'
+		RETURNING id::text
+	`,postID,userID).Scan(&removedID)
+	if err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{
+			"error":"post not found or not owned by user",
+		})
+		return
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"id":removedID,
+		"removed":true,
+	})
+}
+
 func (s *Server) postViewerStates(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	var body struct {
