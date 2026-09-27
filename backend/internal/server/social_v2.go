@@ -14,7 +14,7 @@ var channelSlugPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]{3,40}$`)
 
 func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
-	limit:=30
+	limit,offset:=socialPageParams(r,30,50)
 	rows,err:=s.db.Query(r.Context(),`
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
 		       p.save_count,p.share_count,p.published_at,
@@ -31,8 +31,8 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 		     (p.channel_id IS NOT NULL AND ch.visibility='public')
 		   )
 		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
-		 LIMIT $1
-	`,limit)
+		 LIMIT $1 OFFSET $2
+	`,limit,offset)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -54,7 +54,10 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
+	writeJSON(w,http.StatusOK,map[string]any{
+		"items":items,
+		"nextCursor":nextSocialCursor(offset,len(items),limit),
+	})
 }
 
 func (s *Server) postDetail(w http.ResponseWriter,r *http.Request) {
