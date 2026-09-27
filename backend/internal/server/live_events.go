@@ -397,6 +397,29 @@ func (s *Server) updateLiveEventState(w http.ResponseWriter,r *http.Request) {
 		)
 	}
 
+	if body.State=="cancelled" && currentState=="scheduled" && visibility=="public" {
+		_,_=s.db.Exec(r.Context(),`
+			WITH recipients AS (
+				SELECT uf.follower_user_id AS user_id
+				  FROM user_follows uf
+				 WHERE uf.followed_user_id=$1
+				UNION
+				SELECT cf.user_id
+				  FROM channel_followers cf
+				 WHERE cf.channel_id=$2
+			)
+			INSERT INTO notifications (
+				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
+			)
+			SELECT r.user_id,$1,'live_cancelled','live',$3,$4,$5
+			  FROM recipients r
+			 WHERE r.user_id<>$1
+		`,userID,channelID,id,
+			"رویداد لغو شد: "+title,
+			"این پخش زنده یا پریمیر دیگر برگزار نمی‌شود.",
+		)
+	}
+
 	writeJSON(w,http.StatusOK,map[string]any{
 		"id":id,"state":body.State,"playbackUrl":playback,
 	})
