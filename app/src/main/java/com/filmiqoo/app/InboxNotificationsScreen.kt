@@ -1,6 +1,7 @@
 package com.filmiqoo.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -160,8 +161,13 @@ fun InboxScreen(
             )
         }
 
-        if(loading) {
-            LinearProgressIndicator(color=Color.White,modifier=Modifier.fillMaxWidth())
+        val initialLoading=loading && items.isEmpty()
+        if(loading && !initialLoading) {
+            LinearProgressIndicator(
+                color=Color.White,
+                trackColor=Color.Transparent,
+                modifier=Modifier.fillMaxWidth().height(2.dp)
+            )
         }
 
         error?.let {
@@ -175,7 +181,9 @@ fun InboxScreen(
             )
         }
 
-        if(!loading && filteredItems.isEmpty()) {
+        if(initialLoading) {
+            InboxLoadingState()
+        } else if(filteredItems.isEmpty()) {
             PremiumEmptyState(
                 icon=if(archivedView)Icons.Default.Archive else Icons.Default.MarkChatUnread,
                 title=if(archivedView)"آرشیو خالیه" else "هنوز مکالمه‌ای نداری",
@@ -230,6 +238,76 @@ fun InboxScreen(
                                 }
                             }
                         }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InboxLoadingState() {
+    val transition=rememberInfiniteTransition(label="inboxSkeleton")
+    val alpha by transition.animateFloat(
+        initialValue=.30f,
+        targetValue=.68f,
+        animationSpec=infiniteRepeatable(
+            animation=tween(850),
+            repeatMode=RepeatMode.Reverse
+        ),
+        label="inboxSkeletonAlpha"
+    )
+
+    LazyColumn(
+        contentPadding=PaddingValues(
+            start=12.dp,
+            end=12.dp,
+            top=10.dp,
+            bottom=24.dp
+        ),
+        verticalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
+        items(6) {
+            Surface(
+                color=Color.White.copy(alpha=alpha*.045f),
+                shape=RoundedCornerShape(20.dp),
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=alpha*.06f)
+                ),
+                modifier=Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    Modifier.padding(12.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha=alpha*.16f))
+                    )
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f)) {
+                        Box(
+                            Modifier.width(132.dp)
+                                .height(10.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.15f))
+                        )
+                        Spacer(Modifier.height(7.dp))
+                        Box(
+                            Modifier.fillMaxWidth(.82f)
+                                .height(8.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.09f))
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Box(
+                        Modifier.width(30.dp)
+                            .height(8.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha=alpha*.08f))
                     )
                 }
             }
