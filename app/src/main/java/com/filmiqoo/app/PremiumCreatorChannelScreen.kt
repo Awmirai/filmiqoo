@@ -161,6 +161,25 @@ fun PremiumCreatorChannelScreen(
         }
         is CreatorEntityState.User -> {
             val p=s.profile
+            val privateLocked=
+                p.privateAccount &&
+                s.relationship?.self != true &&
+                s.relationship?.following != true
+            val followAction:()->Unit = {
+                if(!backend.session.isLoggedIn) {
+                    onRequireAuth()
+                } else if(!followBusy) {
+                    followBusy=true
+                    scope.launch {
+                        runCatching { social.toggleUserFollowState(p.id) }
+                            .onSuccess {
+                                followed=it.following
+                                followPending=it.pending
+                            }
+                        followBusy=false
+                    }
+                }
+            }
             LaunchedEffect(p.id,s.relationship) {
                 followed=s.relationship?.following == true
                 followPending=s.relationship?.pending == true
@@ -206,31 +225,35 @@ fun PremiumCreatorChannelScreen(
                 onMessage=if(s.relationship?.self==true) null
                     else { { onStartDm(p.id,p.displayName) } },
                 onReputation={onReputation(p.id)},
-                onFollow={
-                    if(!backend.session.isLoggedIn) {
-                        onRequireAuth()
-                    } else if(!followBusy) {
-                        followBusy=true
-                        scope.launch {
-                            runCatching { social.toggleUserFollowState(p.id) }
-                                .onSuccess {
-                                    followed=it.following
-                                    followPending=it.pending
-                                }
-                            followBusy=false
-                        }
-                    }
-                }
+                onFollow=followAction
             ) {
                 when(tab) {
-                    0 -> CreatorReelsGrid(s.reels,onOpenClip,onMedia)
-                    1 -> CreatorPostsList(
-                        posts=s.posts,
-                        social=social,
-                        loggedIn=backend.session.isLoggedIn,
-                        onRequireAuth=onRequireAuth,
-                        onMedia=onMedia
-                    )
+                    0 -> if(privateLocked) {
+                        PrivateProfileLockedState(
+                            pending=followPending,
+                            busy=followBusy,
+                            loggedIn=backend.session.isLoggedIn,
+                            onFollow=followAction
+                        )
+                    } else {
+                        CreatorReelsGrid(s.reels,onOpenClip,onMedia)
+                    }
+                    1 -> if(privateLocked) {
+                        PrivateProfileLockedState(
+                            pending=followPending,
+                            busy=followBusy,
+                            loggedIn=backend.session.isLoggedIn,
+                            onFollow=followAction
+                        )
+                    } else {
+                        CreatorPostsList(
+                            posts=s.posts,
+                            social=social,
+                            loggedIn=backend.session.isLoggedIn,
+                            onRequireAuth=onRequireAuth,
+                            onMedia=onMedia
+                        )
+                    }
                     else -> CreatorAbout(
                         bio=p.bio,
                         verified=p.verified,
@@ -558,6 +581,86 @@ private fun CreatorCountCard(value:String,label:String,modifier:Modifier=Modifie
         Column(Modifier.padding(vertical=9.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             Text(value,fontSize=13.sp,fontWeight=FontWeight.Black)
             Text(label,color=FqMuted,fontSize=11.sp)
+        }
+    }
+}
+
+@Composable
+private fun PrivateProfileLockedState(
+    pending:Boolean,
+    busy:Boolean,
+    loggedIn:Boolean,
+    onFollow:()->Unit
+) {
+    Box(
+        Modifier.fillMaxWidth()
+            .padding(horizontal=20.dp,vertical=34.dp),
+        contentAlignment=Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment=Alignment.CenterHorizontally
+        ) {
+            Surface(
+                color=FqSurface2,
+                shape=CircleShape,
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=.08f)
+                ),
+                modifier=Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(
+                        Icons.Default.Lock,
+                        null,
+                        tint=Color.White,
+                        modifier=Modifier.size(30.dp)
+                    )
+                }
+            }
+            Text(
+                "این حساب خصوصی است",
+                fontSize=18.sp,
+                fontWeight=FontWeight.Black,
+                modifier=Modifier.padding(top=14.dp)
+            )
+            Text(
+                if(pending)
+                    "درخواست Follow ارسال شده؛ بعد از تأیید، Post و Clipها اینجا باز می‌شن."
+                else
+                    "برای دیدن Post و Clipهای این حساب باید Follow تأیید بشه.",
+                color=FqMuted,
+                fontSize=11.sp,
+                lineHeight=18.sp,
+                modifier=Modifier.padding(top=6.dp)
+            )
+            Button(
+                onClick=onFollow,
+                enabled=!busy && !pending,
+                colors=ButtonDefaults.buttonColors(
+                    containerColor=Color.White,
+                    contentColor=Color.Black
+                ),
+                shape=RoundedCornerShape(15.dp),
+                modifier=Modifier.padding(top=14.dp)
+            ) {
+                Icon(
+                    if(pending)Icons.Default.HourglassTop
+                    else if(loggedIn)Icons.Default.PersonAdd
+                    else Icons.Default.Login,
+                    null,
+                    modifier=Modifier.size(17.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    when {
+                        pending -> "درخواست ارسال شده"
+                        loggedIn -> "Follow کردن"
+                        else -> "ورود برای Follow"
+                    },
+                    fontWeight=FontWeight.Bold
+                )
+            }
         }
     }
 }
