@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -31,14 +32,14 @@ fun AuthScreen(
     onPreview:()->Unit
 ) {
     val scope=rememberCoroutineScope()
-    var register by remember { mutableStateOf(false) }
-    var login by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var displayName by remember { mutableStateOf("") }
+    var register by rememberSaveable { mutableStateOf(false) }
+    var login by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
+    var displayName by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var server by remember { mutableStateOf(backend.session.baseUrl) }
+    var server by rememberSaveable { mutableStateOf(backend.session.baseUrl) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showDeveloperOptions by remember { mutableStateOf(false) }
@@ -182,7 +183,7 @@ fun AuthScreen(
                     if(register)
                         "چند ثانیه بیشتر طول نمی‌کشه."
                     else
-                        "برای ادامه تماشا و Community وارد حسابت شو.",
+                        "برای ادامه تماشا و کلاب وارد حسابت شو.",
                     color=FqMuted,
                     style=MaterialTheme.typography.bodySmall,
                     modifier=Modifier.padding(top=3.dp,bottom=16.dp)
@@ -344,7 +345,7 @@ fun AuthScreen(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "Session امن • کنترل دستگاه‌ها • حذف و خروجی اطلاعات",
+                        "نشست امن • کنترل دستگاه‌ها • حذف و دریافت خروجی اطلاعات",
                         color=FqMuted,
                         style=MaterialTheme.typography.labelSmall,
                         textAlign=TextAlign.Center
