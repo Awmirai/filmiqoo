@@ -63,7 +63,12 @@ fun ClubScreen(
     val messagingRepo=remember { MessagingRepository(backend) }
     val networkOnline=rememberNetworkOnline()
 
-    var tab by rememberSaveable { mutableStateOf(ClubTab.FOR_YOU) }
+    var tabName by rememberSaveable {
+        mutableStateOf(ClubTab.FOR_YOU.name)
+    }
+    val tab=runCatching {
+        ClubTab.valueOf(tabName)
+    }.getOrDefault(ClubTab.FOR_YOU)
     val forYouListState=rememberLazyListState()
     val followingListState=rememberLazyListState()
     val roomsListState=rememberLazyListState()
@@ -102,7 +107,7 @@ fun ClubScreen(
 
     LaunchedEffect(initialPostId) {
         if(!initialPostId.isNullOrBlank()) {
-            tab=ClubTab.FOR_YOU
+            tabName=ClubTab.FOR_YOU.name
         }
     }
 
@@ -173,7 +178,7 @@ fun ClubScreen(
             ClubHeader(
                 selected=tab,
                 unreadMessages=unreadMessages,
-                onSelected={tab=it},
+                onSelected={tabName=it.name},
                 onInbox=onInbox,
                 onCreate={
                     if(loggedIn) onCreate() else onRequireAuth()
