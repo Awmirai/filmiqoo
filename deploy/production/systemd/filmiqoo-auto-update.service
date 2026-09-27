@@ -1,0 +1,11 @@
+[Unit]
+Description=Filmiqoo safe GitHub auto-update
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/filmiqoo/repo
+ExecStart=/usr/bin/bash /opt/filmiqoo/repo/deploy/production/auto-update.sh
