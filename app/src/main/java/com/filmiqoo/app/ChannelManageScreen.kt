@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +49,9 @@ fun ChannelManageScreen(
     var bio by remember { mutableStateOf("") }
     var visibility by remember { mutableStateOf("public") }
 
-    var tab by remember { mutableStateOf(ChannelManageTab.GENERAL) }
+    var tabName by rememberSaveable { mutableStateOf(ChannelManageTab.GENERAL.name) }
+    val tab=runCatching { ChannelManageTab.valueOf(tabName) }
+        .getOrDefault(ChannelManageTab.GENERAL)
     var showCreateRoom by remember { mutableStateOf(false) }
     var editRoom by remember { mutableStateOf<ManagedChannelRoom?>(null) }
 
@@ -85,7 +88,7 @@ fun ChannelManageScreen(
                 Icon(Icons.Default.ArrowBack,null)
             }
             Column(Modifier.weight(1f)) {
-                Text("Channel Studio",fontSize=22.sp,fontWeight=FontWeight.Black)
+                Text("مدیریت کانال",fontSize=22.sp,fontWeight=FontWeight.Black)
                 Text(
                     overview?.let{"@"+it.slug+" • "+roleLabel(it.myRole)}
                         ?: "مدیریت کانال",
@@ -125,7 +128,7 @@ fun ChannelManageScreen(
             PremiumEmptyState(
                 icon=Icons.Default.AdminPanelSettings,
                 title="دسترسی مدیریت نداری",
-                body="فقط Owner، Admin یا Moderator می‌تونن وارد Channel Studio بشن."
+                body="فقط مالک، مدیر یا ناظر کانال به این بخش دسترسی دارن."
             )
             return@Column
         }
@@ -138,11 +141,11 @@ fun ChannelManageScreen(
             listOf(
                 ChannelManageTab.GENERAL to "عمومی",
                 ChannelManageTab.TEAM to "تیم",
-                ChannelManageTab.ROOMS to "Roomها"
+                ChannelManageTab.ROOMS to "گفت‌وگوها"
             ).forEach { item ->
                 Tab(
                     selected=tab==item.first,
-                    onClick={tab=item.first},
+                    onClick={tabName=item.first.name},
                     text={Text(item.second,fontSize=11.sp)}
                 )
             }
@@ -198,17 +201,17 @@ fun ChannelManageScreen(
                                     ) {
                                         PremiumStat(
                                             compactChannelCount(data.followers),
-                                            "Follower",
+                                            "دنبال‌کننده",
                                             Modifier.weight(1f)
                                         )
                                         PremiumStat(
                                             compactChannelCount(data.posts),
-                                            "Post",
+                                            "پست",
                                             Modifier.weight(1f)
                                         )
                                         PremiumStat(
                                             compactChannelCount(data.reels),
-                                            "Reel",
+                                            "کلیپ",
                                             Modifier.weight(1f)
                                         )
                                     }
@@ -220,7 +223,7 @@ fun ChannelManageScreen(
                             OutlinedTextField(
                                 value=name,
                                 onValueChange={name=it.take(80)},
-                                label={Text("نام Channel")},
+                                label={Text("نام کانال")},
                                 singleLine=true,
                                 shape=RoundedCornerShape(15.dp),
                                 modifier=Modifier.fillMaxWidth(),
@@ -232,7 +235,7 @@ fun ChannelManageScreen(
                             OutlinedTextField(
                                 value=bio,
                                 onValueChange={bio=it.take(500)},
-                                label={Text("Bio")},
+                                label={Text("معرفی کانال")},
                                 minLines=4,
                                 maxLines=7,
                                 supportingText={
@@ -312,7 +315,7 @@ fun ChannelManageScreen(
                                     Icon(Icons.Default.Info,null,tint=FqGold)
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        "Moderator می‌تونه Roomها و Community را مدیریت کند؛ Admin علاوه بر آن تنظیمات کانال را تغییر می‌دهد؛ Owner کنترل نقش‌ها را دارد.",
+                                        "ناظر می‌تونه گفت‌وگوها و جامعه کانال رو مدیریت کنه؛ مدیر علاوه بر اون تنظیمات کانال رو تغییر می‌ده؛ مالک کنترل نقش‌ها رو هم در اختیار داره.",
                                         color=FqMuted,
                                         fontSize=11.sp,
                                         lineHeight=14.sp
@@ -329,7 +332,7 @@ fun ChannelManageScreen(
                     PremiumEmptyState(
                         Icons.Default.GroupOff,
                         "عضوی نیست",
-                        "اعضای Channel اینجا نمایش داده می‌شن."
+                        "اعضای کانال اینجا نمایش داده می‌شن."
                     )
                 } else {
                     LazyColumn(
@@ -358,7 +361,7 @@ fun ChannelManageScreen(
                                         runCatching {
                                             repo.removeMember(channelId,member.id)
                                         }.onSuccess {
-                                            message="عضو از Channel حذف شد."
+                                            message="عضو از کانال حذف شد."
                                             refresh++
                                         }.onFailure { error=it.message }
                                         saving=false
@@ -377,9 +380,9 @@ fun ChannelManageScreen(
                         verticalAlignment=Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Roomهای Channel",fontSize=13.sp,fontWeight=FontWeight.Bold)
+                            Text("گفت‌وگوهای کانال",fontSize=13.sp,fontWeight=FontWeight.Bold)
                             Text(
-                                "Slow Mode و Privacy هر Room جداست.",
+                                "سرعت ارسال پیام و حریم خصوصی هر گفت‌وگو جدا تنظیم می‌شه.",
                                 color=FqMuted,
                                 fontSize=11.sp
                             )
@@ -390,15 +393,15 @@ fun ChannelManageScreen(
                             shape=RoundedCornerShape(12.dp)
                         ) {
                             Icon(Icons.Default.Add,null,tint=Color.Black)
-                            Text("Room",color=Color.Black,fontSize=11.sp)
+                            Text("گفت‌وگو",color=Color.Black,fontSize=11.sp)
                         }
                     }
 
                     if(rooms.isEmpty()) {
                         PremiumEmptyState(
                             Icons.Default.Forum,
-                            "Roomی ساخته نشده",
-                            "برای Chat عمومی، بحث موضوعی یا Announcement یک Room بساز."
+                            "گفت‌وگویی ساخته نشده",
+                            "برای چت عمومی، بحث موضوعی یا اعلامیه یک گفت‌وگو بساز."
                         )
                     } else {
                         LazyColumn(
@@ -421,7 +424,7 @@ fun ChannelManageScreen(
 
     if(showCreateRoom) {
         RoomSettingsDialog(
-            title="Room جدید",
+            title="گفت‌وگوی جدید",
             initialName="",
             initialTopic="",
             initialVisibility="public",
@@ -441,7 +444,7 @@ fun ChannelManageScreen(
                         )
                     }.onSuccess {
                         showCreateRoom=false
-                        message="Room ساخته شد."
+                        message="گفت‌وگو ساخته شد."
                         refresh++
                     }.onFailure { error=it.message }
                     saving=false
@@ -472,7 +475,7 @@ fun ChannelManageScreen(
                         )
                     }.onSuccess {
                         editRoom=null
-                        message="تنظیمات Room ذخیره شد."
+                        message="تنظیمات گفت‌وگو ذخیره شد."
                         refresh++
                     }.onFailure { error=it.message }
                     saving=false
