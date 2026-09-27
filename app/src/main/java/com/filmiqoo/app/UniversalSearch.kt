@@ -195,8 +195,6 @@ class UniversalSearchRepository(
             }
         }
 
-        if(query.isNotBlank()) saveHistory(query)
-
         return UniversalSearchResult(
             media=media,
             users=users,
@@ -217,7 +215,7 @@ class UniversalSearchRepository(
             .edit().remove("items").apply()
     }
 
-    private fun saveHistory(query: String) {
+    fun recordHistory(query: String) {
         val clean=query.trim()
         if(clean.length<2) return
         val next=(listOf(clean)+history()).distinct().take(10)
