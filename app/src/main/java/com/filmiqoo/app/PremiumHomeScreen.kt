@@ -240,7 +240,9 @@ private fun PremiumHomeContent(
                 PremiumEmptyState(
                     icon=Icons.Default.PlayCircleOutline,
                     title="صف تماشات خالیه",
-                    body="وقتی یک فیلم یا قسمت رو شروع کنی، اینجا با زمان دقیق ادامه نمایش داده می‌شه."
+                    body="وقتی یک فیلم یا قسمت رو شروع کنی، اینجا با زمان دقیق ادامه نمایش داده می‌شه.",
+                    action="پیدا کردن چیزی برای تماشا",
+                    onAction=onSearch
                 )
             }
         }
@@ -249,7 +251,7 @@ private fun PremiumHomeContent(
             item {
                 PremiumSectionHeader(
                     title="دوستان الان دارن می‌بینن",
-                    subtitle="فعالیت زنده افرادی که Follow کردی",
+                    subtitle="فعالیت زنده افرادی که دنبال کردی",
                     icon=Icons.Default.Groups
                 )
             }
@@ -300,7 +302,7 @@ private fun PremiumHomeContent(
             item {
                 PremiumSectionHeader(
                     title="تازه برای تو",
-                    subtitle="جدیدترین عنوان‌های Catalog متناسب با سلیقه‌ات",
+                    subtitle="جدیدترین عنوان‌های متناسب با سلیقه‌ات",
                     icon=Icons.Default.NewReleases
                 )
             }
@@ -310,7 +312,7 @@ private fun PremiumHomeContent(
         if(top10.isNotEmpty()) {
             item {
                 PremiumSectionHeader(
-                    title="Top 10 امروز",
+                    title="۱۰ تای برتر امروز",
                     subtitle="محبوب‌ترین‌ها در Filmiqoo",
                     icon=Icons.Default.EmojiEvents
                 )
@@ -773,6 +775,6 @@ private fun personalizationSubtitle(bundle: PersonalizedHomeBundle?):String {
             )
         }
     }
-    return if(parts.isEmpty()) "بر اساس تماشا، Favorite و Watchlist تو"
+    return if(parts.isEmpty()) "بر اساس تماشا، علاقه‌مندی‌ها و «بعداً می‌بینم»"
     else "بر اساس علاقه‌ات به "+parts.joinToString(" و ")
 }
