@@ -75,6 +75,7 @@ fun FilmiqooPlayerScreen(
     target: PlaybackTarget,
     backend: BackendRepository,
     onBack: () -> Unit,
+    onRequireAuth: () -> Unit = {},
     onDiscussion: (String) -> Unit = {}
 ) {
     val context=LocalContext.current
@@ -1203,11 +1204,23 @@ fun FilmiqooPlayerScreen(
                         }
                     }
                 },
-                onMoments={momentsOpen=true},
-                onBookmarks={bookmarksOpen=true},
-                onDialogueSearch={dialogueSearchOpen=true},
+                onMoments={
+                    if(backend.session.isLoggedIn) momentsOpen=true
+                    else onRequireAuth()
+                },
+                onBookmarks={
+                    if(backend.session.isLoggedIn) bookmarksOpen=true
+                    else onRequireAuth()
+                },
+                onDialogueSearch={
+                    if(backend.session.isLoggedIn) dialogueSearchOpen=true
+                    else onRequireAuth()
+                },
                 onQueue={queueOpen=true},
-                onHandoff={handoffOpen=true},
+                onHandoff={
+                    if(backend.session.isLoggedIn) handoffOpen=true
+                    else onRequireAuth()
+                },
                 onShare={
                     sharePlayerMoment(
                         context=context,
