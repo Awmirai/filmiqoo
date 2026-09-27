@@ -39,6 +39,7 @@ fun ClubScreen(
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
     onOpenClip:(String)->Unit,
+    onOpenPost:(String)->Unit,
     onOpenRoom:(SocialRoom)->Unit,
     onStory:(List<SocialStory>,Int)->Unit,
     onInbox:()->Unit,
@@ -207,6 +208,7 @@ fun ClubScreen(
                             onMedia=onMedia,
                             onCreator=onCreator,
                             onOpenClip=onOpenClip,
+                            onOpenPost=onOpenPost,
                             onRequireAuth=onRequireAuth,
                             onRefresh={refresh++}
                         )
@@ -1516,6 +1518,7 @@ private fun ClubFollowingFeed(
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
     onOpenClip:(String)->Unit,
+    onOpenPost:(String)->Unit,
     onRequireAuth:()->Unit,
     onRefresh:()->Unit
 ) {
@@ -1713,6 +1716,39 @@ private fun ClubFollowingFeed(
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     "دیدن Clip",
+                                    fontSize=10.sp,
+                                    fontWeight=FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    if(item.type.lowercase() in listOf("post","review")) {
+                        Surface(
+                            color=Color.White,
+                            contentColor=Color.Black,
+                            shape=RoundedCornerShape(14.dp),
+                            modifier=Modifier.padding(top=12.dp)
+                                .clickable { onOpenPost(item.entityId) }
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal=12.dp,vertical=9.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    if(item.type.equals("review",true))
+                                        Icons.Default.RateReview
+                                    else
+                                        Icons.Default.Notes,
+                                    null,
+                                    modifier=Modifier.size(17.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if(item.type.equals("review",true))
+                                        "دیدن Review"
+                                    else
+                                        "دیدن Post",
                                     fontSize=10.sp,
                                     fontWeight=FontWeight.Bold
                                 )
