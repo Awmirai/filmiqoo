@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,8 +47,8 @@ fun ConnectedRoomScreen(
     val scope=rememberCoroutineScope()
     val listState=rememberLazyListState()
     var messages by remember(roomId) { mutableStateOf<List<RoomMessageItem>>(emptyList()) }
-    var text by remember { mutableStateOf("") }
-    var spoiler by remember { mutableStateOf(false) }
+    var text by rememberSaveable(roomId) { mutableStateOf("") }
+    var spoiler by rememberSaveable(roomId) { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var syncing by remember { mutableStateOf(true) }
     var realtimeConnected by remember { mutableStateOf(false) }
@@ -416,12 +417,12 @@ fun ConnectedRoomScreen(
                                     when(other?.presence) {
                                         "watching" -> "آنلاین • در حال تماشا"
                                         "online" -> "آنلاین"
-                                        else -> if(realtimeConnected) "Realtime متصل" else "آفلاین"
+                                        else -> if(realtimeConnected) "ارتباط زنده برقرار" else "آفلاین"
                                     }
                                 }
                                 loggedIn && memberState!=null ->
                                     (memberState?.online ?: 0L).toString()+" آنلاین"
-                                realtimeConnected -> "Realtime متصل"
+                                realtimeConnected -> "ارتباط زنده برقرار"
                                 syncing -> "در حال همگام‌سازی..."
                                 loggedIn -> "در حال بازیابی اتصال..."
                                 else -> "فقط مشاهده"
@@ -466,7 +467,7 @@ fun ConnectedRoomScreen(
                         )
                     }
                     DropdownMenuItem(
-                        text={Text("پیام‌های Pin شده")},
+                        text={Text("پیام‌های سنجاق‌شده")},
                         leadingIcon={Icon(Icons.Default.PushPin,null)},
                         onClick={
                             headerMenuOpen=false
@@ -688,7 +689,7 @@ fun ConnectedRoomScreen(
                                                 }
                                                 if(loggedIn) {
                                                     DropdownMenuItem(
-                                                        text={Text(if(msg.pinned)"برداشتن Pin" else "Pin پیام")},
+                                                        text={Text(if(msg.pinned)"برداشتن سنجاق" else "سنجاق پیام")},
                                                         leadingIcon={Icon(Icons.Default.PushPin,null)},
                                                         onClick={
                                                             menuOpen=false
@@ -696,7 +697,7 @@ fun ConnectedRoomScreen(
                                                                 runCatching {
                                                                     social.toggleMessagePin(roomId,msg.id)
                                                                 }.onSuccess {
-                                                                    actionMessage=if(it)"پیام Pin شد." else "Pin برداشته شد."
+                                                                    actionMessage=if(it)"پیام سنجاق شد." else "سنجاق برداشته شد."
                                                                     refresh()
                                                                 }.onFailure {
                                                                     error=it.message
@@ -780,7 +781,7 @@ fun ConnectedRoomScreen(
                                         modifier=Modifier.fillMaxWidth().padding(top=6.dp)
                                     ) {
                                         Column(Modifier.padding(8.dp)) {
-                                            Text(msg.replyAuthor ?: "Reply",color=FqGold,fontSize=11.sp)
+                                            Text(msg.replyAuthor ?: "پاسخ",color=FqGold,fontSize=11.sp)
                                             Text(
                                                 msg.replyPreview,
                                                 color=FqMuted,
@@ -793,7 +794,7 @@ fun ConnectedRoomScreen(
 
                                 if(msg.spoiler && !reveal) {
                                     Text(
-                                        "⚠ Spoiler Shield • نمایش پیام",
+                                        "⚠ اسپویلر مخفی شده • نمایش پیام",
                                         color=FqDanger,
                                         fontSize=11.sp,
                                         modifier=Modifier.padding(top=5.dp).clickable { reveal=true }
@@ -1068,7 +1069,7 @@ fun ConnectedRoomScreen(
                             ) {
                                 PremiumChip(
                                     icon=Icons.Default.VisibilityOff,
-                                    label="Spoiler",
+                                    label="اسپویلر",
                                     active=spoiler,
                                     onClick={spoiler=!spoiler}
                                 )
@@ -1416,7 +1417,7 @@ fun ConnectedRoomScreen(
                 if(index>=0) {
                     scope.launch { listState.animateScrollToItem(index) }
                 } else {
-                    actionMessage="پیام Pin شده قدیمی‌تر از لیست فعلی است."
+                    actionMessage="پیام سنجاق‌شده قدیمی‌تر از لیست فعلی است."
                 }
             }
         )
@@ -1465,7 +1466,7 @@ private fun RoomMessageSearchSheet(
     onDismiss:()->Unit,
     onJump:(String)->Unit
 ) {
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable(roomId) { mutableStateOf("") }
     var results by remember { mutableStateOf<List<RoomMessageItem>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1500,7 +1501,7 @@ private fun RoomMessageSearchSheet(
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("جستجوی پیام",fontSize=19.sp)
-                    Text("داخل همین Room",color=FqMuted,fontSize=11.sp)
+                    Text("داخل همین گفتگو",color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick=onDismiss){Icon(Icons.Default.Close,null)}
             }
@@ -1510,6 +1511,13 @@ private fun RoomMessageSearchSheet(
                 onValueChange={query=it.take(120)},
                 placeholder={Text("کلمه یا جمله...")},
                 leadingIcon={Icon(Icons.Default.Search,null)},
+                trailingIcon={
+                    if(query.isNotBlank()) {
+                        IconButton(onClick={query=""}) {
+                            Icon(Icons.Default.Close,null)
+                        }
+                    }
+                },
                 singleLine=true,
                 modifier=Modifier.fillMaxWidth(),
                 shape=RoundedCornerShape(16.dp)
