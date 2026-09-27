@@ -1869,6 +1869,7 @@ private fun ClubFollowingFeed(
     }
 
     LazyColumn(
+        state=listState,
         contentPadding=PaddingValues(horizontal=12.dp,vertical=10.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)
     ) {
