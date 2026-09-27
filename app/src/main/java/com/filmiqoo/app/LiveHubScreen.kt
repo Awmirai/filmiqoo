@@ -478,6 +478,23 @@ private fun LiveEventDetailScreen(
     var hostActionBusy by remember { mutableStateOf(false) }
     var confirmHostAction by remember { mutableStateOf<String?>(null) }
 
+    LaunchedEffect(event.id) {
+        while(isActive) {
+            delay(3_000)
+            runCatching { live.detail(event.id) }
+                .onSuccess { fresh ->
+                    localEvent=fresh
+                    onUpdated(fresh)
+                }
+                .onFailure {
+                    if(localEvent.state !in setOf("ended","cancelled")) {
+                        onError(it.message ?: "همگام‌سازی رویداد ناموفق بود")
+                    }
+                }
+            if(localEvent.state in setOf("ended","cancelled")) break
+        }
+    }
+
     LaunchedEffect(event.id,loggedIn) {
         if(loggedIn) {
             runCatching { live.join(event.id) }
