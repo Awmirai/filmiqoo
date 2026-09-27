@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,12 +37,13 @@ fun InboxScreen(
     val repo=remember { MessagingRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
-    var archivedView by remember { mutableStateOf(false) }
+    var archivedView by rememberSaveable { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<InboxConversation>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
 
+    val unreadCount=remember(items) { items.sumOf { it.unread } }
     val filteredItems=remember(items,query) {
         val q=query.trim()
         if(q.isBlank()) items
@@ -91,7 +93,11 @@ fun InboxScreen(
                         fontWeight=FontWeight.Black
                     )
                     Text(
-                        if(archivedView)"آرشیو گفتگوها" else "گفتگوهای تو",
+                        when {
+                            archivedView -> "آرشیو گفتگوها"
+                            unreadCount>0L -> "گفتگوهای تو • "+unreadCount+" خوانده‌نشده"
+                            else -> "گفتگوهای تو"
+                        },
                         color=FqMuted,
                         fontSize=11.sp
                     )
@@ -184,13 +190,23 @@ fun InboxScreen(
         if(initialLoading) {
             InboxLoadingState()
         } else if(filteredItems.isEmpty()) {
+            val searching=query.isNotBlank()
             PremiumEmptyState(
-                icon=if(archivedView)Icons.Default.Archive else Icons.Default.MarkChatUnread,
-                title=if(archivedView)"آرشیو خالیه" else "هنوز مکالمه‌ای نداری",
-                body=if(archivedView)
-                    "گفتگوهایی که آرشیو می‌کنی اینجا می‌مونن."
-                else
-                    "از پروفایل یک نفر روی «پیام» بزن یا وارد Roomهای Club شو."
+                icon=when {
+                    searching -> Icons.Default.SearchOff
+                    archivedView -> Icons.Default.Archive
+                    else -> Icons.Default.MarkChatUnread
+                },
+                title=when {
+                    searching -> "گفتگویی پیدا نشد"
+                    archivedView -> "آرشیو خالیه"
+                    else -> "هنوز مکالمه‌ای نداری"
+                },
+                body=when {
+                    searching -> "اسم، نام کاربری یا متن گفتگو رو با عبارت دیگه‌ای جستجو کن."
+                    archivedView -> "گفتگوهایی که آرشیو می‌کنی اینجا می‌مونن."
+                    else -> "از پروفایل یک نفر روی «پیام» بزن یا وارد گفت‌وگوهای کلاب شو."
+                }
             )
         } else {
             LazyColumn(
