@@ -1,5 +1,6 @@
 package com.filmiqoo.app
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -548,6 +551,7 @@ private fun MeTabs(
     selected:MeTab,
     onSelected:(MeTab)->Unit
 ) {
+    val haptic=LocalHapticFeedback.current
     Row(
         Modifier.fillMaxWidth()
             .padding(start=16.dp,end=16.dp,bottom=12.dp)
@@ -562,17 +566,35 @@ private fun MeTabs(
             MeTab.LIBRARY to "کتابخانه"
         ).forEach { (tab,label) ->
             val active=selected==tab
+            val bg by animateColorAsState(
+                if(active) Color.White else Color.Transparent,
+                animationSpec=tween(180),
+                label="meTabBg"
+            )
+            val fg by animateColorAsState(
+                if(active) Color.Black else FqMuted,
+                animationSpec=tween(180),
+                label="meTabFg"
+            )
             Surface(
-                color=if(active) Color.White else Color.Transparent,
-                contentColor=if(active) Color.Black else FqMuted,
+                color=bg,
+                contentColor=fg,
                 shape=RoundedCornerShape(14.dp),
                 modifier=Modifier.weight(1f)
                     .height(38.dp)
-                    .clickable { onSelected(tab) }
+                    .clickable {
+                        if(!active) {
+                            haptic.performHapticFeedback(
+                                HapticFeedbackType.TextHandleMove
+                            )
+                            onSelected(tab)
+                        }
+                    }
             ) {
                 Box(contentAlignment=Alignment.Center) {
                     Text(
                         label,
+                        color=fg,
                         fontSize=11.sp,
                         fontWeight=if(active) FontWeight.Bold else FontWeight.Medium
                     )
