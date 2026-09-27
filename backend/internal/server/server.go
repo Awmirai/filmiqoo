@@ -556,6 +556,7 @@ func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
+	limit,offset:=socialPageParams(r,24,40)
 	rows, err := s.db.Query(r.Context(), `
 		SELECT r.id::text,r.caption,r.playback_url,r.cover_url,r.duration_ms,
 		       r.like_count,r.comment_count,r.save_count,r.share_count,r.view_count,r.spoiler,
@@ -573,8 +574,8 @@ func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
 		     (r.channel_id IS NOT NULL AND ch.visibility='public')
 		   )
 		 ORDER BY r.published_at DESC NULLS LAST,r.created_at DESC
-		 LIMIT 50
-	`)
+		 LIMIT $1 OFFSET $2
+	`,limit,offset)
 	if err != nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -611,7 +612,10 @@ func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items,"nextCursor":nil})
+	writeJSON(w,http.StatusOK,map[string]any{
+		"items":items,
+		"nextCursor":nextSocialCursor(offset,len(items),limit),
+	})
 }
 
 func (s *Server) channels(w http.ResponseWriter, r *http.Request) {
