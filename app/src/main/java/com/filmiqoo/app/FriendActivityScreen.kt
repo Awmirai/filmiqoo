@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+private enum class FriendActivityFilter { ALL, WATCHING, POSTS, CLIPS, REVIEWS }
 
 @Composable
 fun FriendActivityScreen(
@@ -35,6 +39,19 @@ fun FriendActivityScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<FriendActivityItem>>(emptyList()) }
+    var filterName by rememberSaveable { mutableStateOf(FriendActivityFilter.ALL.name) }
+    val filter=runCatching { FriendActivityFilter.valueOf(filterName) }
+        .getOrDefault(FriendActivityFilter.ALL)
+
+    val visibleItems=remember(items,filter) {
+        when(filter) {
+            FriendActivityFilter.ALL -> items
+            FriendActivityFilter.WATCHING -> items.filter { it.type=="watching" }
+            FriendActivityFilter.POSTS -> items.filter { it.type=="post" }
+            FriendActivityFilter.CLIPS -> items.filter { it.type=="reel" }
+            FriendActivityFilter.REVIEWS -> items.filter { it.type=="review" }
+        }
+    }
 
     BackHandler { onBack() }
 
@@ -56,11 +73,32 @@ fun FriendActivityScreen(
             Column(Modifier.weight(1f)) {
                 Text("فعالیت دوستان",fontSize=22.sp,fontWeight=FontWeight.Black)
                 Text(
-                    "تماشا، Post، Reel و Review افرادی که Follow کردی",
+                    "تماشا، پست، کلیپ و ریویوی افرادی که دنبال کردی",
                     color=FqMuted,fontSize=11.sp
                 )
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
+        }
+
+        LazyRow(
+            contentPadding=PaddingValues(horizontal=12.dp),
+            horizontalArrangement=Arrangement.spacedBy(7.dp)
+        ) {
+            listOf(
+                FriendActivityFilter.ALL to "همه",
+                FriendActivityFilter.WATCHING to "تماشا",
+                FriendActivityFilter.POSTS to "پست",
+                FriendActivityFilter.CLIPS to "کلیپ",
+                FriendActivityFilter.REVIEWS to "ریویو"
+            ).forEach { (item,label) ->
+                item {
+                    FilterChip(
+                        selected=filter==item,
+                        onClick={filterName=item.name},
+                        label={Text(label,fontSize=10.sp)}
+                    )
+                }
+            }
         }
 
         if(loading) {
@@ -76,11 +114,14 @@ fun FriendActivityScreen(
             )
         }
 
-        if(!loading && items.isEmpty()) {
+        if(!loading && visibleItems.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.Diversity3,
-                "فعلاً فعالیتی نیست",
-                "وقتی افرادی که Follow کردی چیزی ببینن یا محتوا منتشر کنن، اینجا ظاهر می‌شه."
+                if(filter==FriendActivityFilter.ALL)"فعلاً فعالیتی نیست" else "در این فیلتر فعالیتی نیست",
+                if(filter==FriendActivityFilter.ALL)
+                    "وقتی افرادی که دنبال کردی چیزی ببینن یا محتوا منتشر کنن، اینجا ظاهر می‌شه."
+                else
+                    "فیلتر دیگه‌ای رو انتخاب کن یا بعداً دوباره بررسی کن."
             )
         } else {
             LazyColumn(
@@ -88,7 +129,7 @@ fun FriendActivityScreen(
                 verticalArrangement=Arrangement.spacedBy(9.dp),
                 modifier=Modifier.fillMaxSize()
             ) {
-                items(items,key={it.type+":"+it.entityId+":"+it.actor.id}) { item ->
+                items(visibleItems,key={it.type+":"+it.entityId+":"+it.actor.id}) { item ->
                     FriendActivityCard(
                         item=item,
                         repository=repository,
@@ -185,7 +226,7 @@ private fun FriendActivityCard(
                         Icon(Icons.Default.VisibilityOff,null,tint=FqDanger)
                         Spacer(Modifier.width(7.dp))
                         Text(
-                            "Spoiler Shield • برای نمایش لمس کن",
+                            "اسپویلر مخفی شده • برای نمایش لمس کن",
                             color=FqDanger,fontSize=11.sp
                         )
                     }
@@ -244,9 +285,9 @@ private fun FriendActivityCard(
 
 private fun activitySentence(item:FriendActivityItem):String=when(item.type) {
     "watching" -> "الان داره «"+(item.media?.title ?: "یک عنوان")+"» رو می‌بینه"
-    "reel" -> "یک Reel جدید منتشر کرد"
-    "review" -> "یک Review جدید نوشت"
-    "post" -> "یک Post جدید منتشر کرد"
+    "reel" -> "یک کلیپ جدید منتشر کرد"
+    "review" -> "یک ریویوی جدید نوشت"
+    "post" -> "یک پست جدید منتشر کرد"
     else -> "فعالیت جدید"
 }
 
