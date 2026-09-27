@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-private enum class SearchTab { ALL, MEDIA, USERS, CHANNELS, REELS }
+private enum class SearchTab { ALL, MEDIA, USERS, CHANNELS, POSTS, REELS }
 
 private sealed interface UniversalSearchLoad {
     data object Loading : UniversalSearchLoad
@@ -44,6 +44,7 @@ fun PremiumSearchScreen(
     onBack: () -> Unit,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
+    onOpenPost: (String) -> Unit,
     onOpenClip: (String) -> Unit
 ) {
     val context=LocalContext.current
@@ -71,6 +72,7 @@ fun PremiumSearchScreen(
                         media=fallbackMedia,
                         users=emptyList(),
                         channels=emptyList(),
+                        posts=emptyList(),
                         reels=emptyList()
                     )
                 )
@@ -126,6 +128,7 @@ fun PremiumSearchScreen(
                         repository=repository,
                         onMedia=onMedia,
                         onCreator=onCreator,
+                        onOpenPost=onOpenPost,
                         onOpenClip=onOpenClip
                     )
                 }
@@ -171,7 +174,7 @@ private fun SearchHeader(
                     fontWeight=FontWeight.Black
                 )
                 Text(
-                    "فیلم، سریال، آدم‌ها و Clips",
+                    "فیلم، سریال، آدم‌ها، Post و Clips",
                     color=FqMuted,
                     style=MaterialTheme.typography.bodySmall,
                     modifier=Modifier.padding(top=2.dp)
@@ -229,7 +232,8 @@ private fun SearchTabs(
         SearchTab.MEDIA to "فیلم و سریال",
         SearchTab.USERS to "کاربران",
         SearchTab.CHANNELS to "کانال‌ها",
-        SearchTab.REELS to "Reels"
+        SearchTab.POSTS to "Postها",
+        SearchTab.REELS to "Clips"
     )
     LazyRow(
         contentPadding=PaddingValues(
@@ -291,10 +295,12 @@ private fun SearchAllContent(
     repository: TmdbRepository,
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
+    onOpenPost: (String) -> Unit,
     onOpenClip: (String) -> Unit
 ) {
     val empty=result.media.isEmpty() && result.users.isEmpty() &&
-        result.channels.isEmpty() && result.reels.isEmpty()
+        result.channels.isEmpty() && result.posts.isEmpty() &&
+        result.reels.isEmpty()
 
     if(empty) {
         PremiumEmptyState(
@@ -356,6 +362,30 @@ private fun SearchAllContent(
             }
         }
 
+        if(result.posts.isNotEmpty()) {
+            item {
+                SearchSectionTitle("Postها",result.posts.size)
+            }
+            items(result.posts.take(6),key={it.id}) { post ->
+                SearchPostCard(
+                    post=post,
+                    onClick={onOpenPost(post.id)},
+                    onCreator={onCreator(
+                        Creator(
+                            name=post.author.displayName,
+                            handle="@"+post.author.username,
+                            followers="",
+                            bio="",
+                            verified=post.author.verified,
+                            id=post.author.id,
+                            entityType="user",
+                            avatarUrl=post.author.avatarUrl
+                        )
+                    )}
+                )
+            }
+        }
+
         if(result.reels.isNotEmpty()) {
             item {
                 SearchSectionTitle("Clips",result.reels.size)
@@ -371,6 +401,136 @@ private fun SearchAllContent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchPostCard(
+    post:SocialPost,
+    onClick:()->Unit,
+    onCreator:()->Unit
+) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
+        modifier=Modifier.fillMaxWidth()
+            .padding(horizontal=16.dp,vertical=4.dp)
+            .clickable { onClick() }
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                RemoteImage(
+                    post.author.avatarUrl.takeIf(String::isNotBlank),
+                    Modifier.size(36.dp)
+                        .clip(CircleShape)
+                        .clickable { onCreator() }
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(
+                    Modifier.weight(1f)
+                        .clickable { onCreator() }
+                ) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text(
+                            post.author.displayName,
+                            fontSize=10.sp,
+                            fontWeight=FontWeight.Bold,
+                            maxLines=1,
+                            overflow=TextOverflow.Ellipsis
+                        )
+                        if(post.author.verified) {
+                            Spacer(Modifier.width(3.dp))
+                            Icon(
+                                Icons.Default.Verified,
+                                null,
+                                tint=Color(0xFF4AB7FF),
+                                modifier=Modifier.size(12.dp)
+                            )
+                        }
+                    }
+                    val relative=post.publishedAt
+                        ?.let(::socialRelativeTime)
+                        .orEmpty()
+                    Text(
+                        buildString {
+                            append("@"+post.author.username)
+                            if(relative.isNotBlank()) append(" • "+relative)
+                        },
+                        color=FqMuted,
+                        fontSize=8.sp
+                    )
+                }
+                Surface(
+                    color=FqSurface2,
+                    shape=RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        when(post.type.lowercase()) {
+                            "review" -> "Review"
+                            "poll" -> "Poll"
+                            else -> "Post"
+                        },
+                        color=if(post.type.equals("review",true))FqGold else FqMuted,
+                        fontSize=8.sp,
+                        fontWeight=FontWeight.Bold,
+                        modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                    )
+                }
+            }
+
+            if(post.spoiler) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top=9.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.VisibilityOff,
+                        null,
+                        tint=FqDanger,
+                        modifier=Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        "Spoiler Shield • برای دیدن Post بازش کن",
+                        color=FqDanger,
+                        fontSize=9.sp,
+                        fontWeight=FontWeight.Bold
+                    )
+                }
+            } else if(post.body.isNotBlank()) {
+                Text(
+                    post.body,
+                    fontSize=11.sp,
+                    lineHeight=17.sp,
+                    maxLines=3,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=9.dp)
+                )
+            }
+
+            Row(
+                Modifier.fillMaxWidth().padding(top=8.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                post.media?.title?.takeIf(String::isNotBlank)?.let {
+                    Text(
+                        "🎬 "+it,
+                        color=FqMuted,
+                        fontSize=8.sp,
+                        maxLines=1,
+                        overflow=TextOverflow.Ellipsis,
+                        modifier=Modifier.weight(1f)
+                    )
+                } ?: Spacer(Modifier.weight(1f))
+                Text(
+                    compactSearchCount(post.likes)+" ♥  "+
+                        compactSearchCount(post.comments)+" 💬",
+                    color=FqMuted,
+                    fontSize=8.sp
+                )
             }
         }
     }
