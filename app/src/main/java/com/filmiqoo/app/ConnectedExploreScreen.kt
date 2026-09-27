@@ -810,17 +810,75 @@ private fun ReelCommentsSheet(
                                     modifier=Modifier.padding(top=3.dp)
                                 )
                             }
-                            TextButton(
-                                onClick={
-                                    if(loggedIn) replyTo=c
-                                    else onRequireAuth()
-                                },
-                                contentPadding=PaddingValues(
-                                    horizontal=0.dp,
-                                    vertical=2.dp
-                                )
-                            ) {
-                                Text("پاسخ",color=FqMuted,fontSize=9.sp)
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                TextButton(
+                                    onClick={
+                                        if(loggedIn) replyTo=c
+                                        else onRequireAuth()
+                                    },
+                                    contentPadding=PaddingValues(
+                                        horizontal=0.dp,
+                                        vertical=2.dp
+                                    )
+                                ) {
+                                    Text("پاسخ",color=FqMuted,fontSize=9.sp)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                IconButton(
+                                    onClick={
+                                        if(!loggedIn) {
+                                            onRequireAuth()
+                                        } else {
+                                            val before=c.likedByMe
+                                            val optimistic=!before
+                                            items=items.map {
+                                                if(it.id==c.id) {
+                                                    it.copy(
+                                                        likedByMe=optimistic,
+                                                        likes=(
+                                                            it.likes+
+                                                                if(optimistic)1 else -1
+                                                        ).coerceAtLeast(0)
+                                                    )
+                                                } else it
+                                            }
+                                            scope.launch {
+                                                runCatching {
+                                                    social.toggleCommentLike(c.id)
+                                                }.onSuccess { result ->
+                                                    items=items.map {
+                                                        if(it.id==c.id) {
+                                                            it.copy(
+                                                                likedByMe=result.first,
+                                                                likes=result.second
+                                                            )
+                                                        } else it
+                                                    }
+                                                }.onFailure {
+                                                    reload()
+                                                }
+                                            }
+                                        }
+                                    },
+                                    modifier=Modifier.size(30.dp)
+                                ) {
+                                    Icon(
+                                        if(c.likedByMe)
+                                            Icons.Default.Favorite
+                                        else
+                                            Icons.Default.FavoriteBorder,
+                                        null,
+                                        tint=if(c.likedByMe)FqDanger else FqMuted,
+                                        modifier=Modifier.size(14.dp)
+                                    )
+                                }
+                                if(c.likes>0) {
+                                    Text(
+                                        compactCount(c.likes),
+                                        color=if(c.likedByMe)FqDanger else FqMuted,
+                                        fontSize=8.sp
+                                    )
+                                }
                             }
                         }
                     }
