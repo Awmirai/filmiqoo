@@ -3,6 +3,7 @@ package com.filmiqoo.app
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -66,6 +67,7 @@ private data class CreateDraft(
     val poll3:String="",
     val mediaBackendId:String?=null,
     val mediaTitle:String?=null,
+    val attachmentUri:String?=null,
     val scheduledAtMillis:Long=0L
 )
 
@@ -87,6 +89,7 @@ private class CreateDraftStore(context:Context) {
         poll3=prefs.getString("poll3","") ?: "",
         mediaBackendId=prefs.getString("media_id",null),
         mediaTitle=prefs.getString("media_title",null),
+        attachmentUri=prefs.getString("attachment_uri",null),
         scheduledAtMillis=prefs.getLong("scheduled_at_ms",0L)
     )
 
@@ -106,6 +109,7 @@ private class CreateDraftStore(context:Context) {
             .putString("poll3",d.poll3)
             .putString("media_id",d.mediaBackendId)
             .putString("media_title",d.mediaTitle)
+            .putString("attachment_uri",d.attachmentUri)
             .putLong("scheduled_at_ms",d.scheduledAtMillis)
             .apply()
     }
@@ -140,7 +144,7 @@ fun PremiumCreateHubScreen(
     var spoiler by remember { mutableStateOf(savedDraft.spoiler) }
     var closeFriendsOnly by remember { mutableStateOf(savedDraft.closeFriendsOnly) }
     var allowComments by remember { mutableStateOf(savedDraft.allowComments) }
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedUri by remember { mutableStateOf(savedDraft.attachmentUri?.let(Uri::parse)) }
 
     var channelName by remember { mutableStateOf(savedDraft.channelName) }
     var channelSlug by remember { mutableStateOf(savedDraft.channelSlug) }
@@ -178,7 +182,17 @@ fun PremiumCreateHubScreen(
 
     val picker=rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
-    ) { uri -> if(uri!=null) selectedUri=uri }
+    ) { uri ->
+        if(uri!=null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            selectedUri=uri
+        }
+    }
 
     BackHandler(enabled=!publishing) { onBack() }
 
@@ -197,6 +211,7 @@ fun PremiumCreateHubScreen(
         poll3=pollOptions.getOrElse(2){""},
         mediaBackendId=taggedMedia?.backendId,
         mediaTitle=taggedMedia?.title,
+        attachmentUri=selectedUri?.toString(),
         scheduledAtMillis=scheduledAtMillis ?: 0L
     )
 
@@ -213,6 +228,7 @@ fun PremiumCreateHubScreen(
         pollOptions.toList(),
         taggedMedia?.backendId,
         taggedMedia?.title,
+        selectedUri?.toString(),
         scheduledAtMillis
     ) {
         delay(700)
@@ -229,6 +245,7 @@ fun PremiumCreateHubScreen(
             visibility!="public" ||
             pollOptions.any(String::isNotBlank) ||
             taggedMedia!=null ||
+            selectedUri!=null ||
             scheduledAtMillis!=null
         if(hasMeaningfulDraft) drafts.write(snapshot) else drafts.clear()
     }
