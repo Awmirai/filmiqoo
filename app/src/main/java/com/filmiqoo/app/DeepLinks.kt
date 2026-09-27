@@ -31,6 +31,10 @@ object FilmiqooDeepLinks {
         Uri.Builder().scheme("filmiqoo").authority("reel")
             .appendPath(reelId).build().toString()
 
+    fun post(postId:String):String =
+        Uri.Builder().scheme("filmiqoo").authority("post")
+            .appendPath(postId).build().toString()
+
     fun collection(collectionId:String):String =
         Uri.Builder().scheme("filmiqoo").authority("collection")
             .appendPath(collectionId).build().toString()
