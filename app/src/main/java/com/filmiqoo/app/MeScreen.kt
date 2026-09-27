@@ -51,6 +51,8 @@ fun MeScreen(
     onPlay:(PlaybackTarget)->Unit,
     onClips:()->Unit,
     onCommunity:()->Unit,
+    onOpenPost:(String)->Unit,
+    onOpenClip:(String)->Unit,
     onDownloads:()->Unit,
     onLibrary:()->Unit,
     onSocialSaves:()->Unit,
@@ -152,6 +154,7 @@ fun MeScreen(
                             items(s.posts.take(20),key={it.id}) { post ->
                                 MePostCard(
                                     post=post,
+                                    onOpen={onOpenPost(post.id)},
                                     onMedia={
                                         post.media?.asMediaItem()?.let(onMedia)
                                     }
@@ -179,7 +182,7 @@ fun MeScreen(
                                 ) {
                                     items(s.clips,key={it.id}) { clip ->
                                         MeClipCard(clip) {
-                                            clip.media?.asMediaItem()?.let(onMedia) ?: onClips()
+                                            onOpenClip(clip.id)
                                         }
                                     }
                                 }
@@ -582,6 +585,7 @@ private fun MeTabs(
 @Composable
 private fun MePostCard(
     post:SocialPost,
+    onOpen:()->Unit,
     onMedia:()->Unit
 ) {
     Surface(
@@ -590,6 +594,7 @@ private fun MePostCard(
         border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
         modifier=Modifier.fillMaxWidth()
             .padding(horizontal=16.dp,vertical=5.dp)
+            .clickable { onOpen() }
     ) {
         Column(Modifier.padding(15.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
