@@ -2,11 +2,18 @@ package com.filmiqoo.app
 
 import org.json.JSONObject
 
+data class PulseMoment(
+    val positionMs:Long,
+    val reactions:Long,
+    val emoji:String
+)
+
 data class PulseState(
     val watchingNow: Long,
     val reactions: Map<String,Long>,
     val recent: Long,
-    val live: Boolean
+    val live: Boolean,
+    val moments:List<PulseMoment> = emptyList()
 )
 
 data class PulseTrendItem(
@@ -81,11 +88,29 @@ class PulseRepository(
                 put(emoji,reactionsObject.optLong(emoji))
             }
         }
+        val momentsArray=root.optJSONArray("moments")
+        val moments=buildList {
+            if(momentsArray!=null) {
+                for(i in 0 until momentsArray.length()) {
+                    val x=momentsArray.optJSONObject(i) ?: continue
+                    val positionMs=x.optLong("positionMs")
+                    if(positionMs<=0L) continue
+                    add(
+                        PulseMoment(
+                            positionMs=positionMs,
+                            reactions=x.optLong("reactions"),
+                            emoji=x.optString("emoji").ifBlank { "🔥" }
+                        )
+                    )
+                }
+            }
+        }
         return PulseState(
             watchingNow=root.optLong("watchingNow"),
             reactions=reactions,
             recent=root.optLong("recent"),
-            live=root.optBoolean("live")
+            live=root.optBoolean("live"),
+            moments=moments
         )
     }
 }
