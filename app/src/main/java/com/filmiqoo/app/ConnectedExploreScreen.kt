@@ -59,10 +59,9 @@ private sealed interface ReelLoad {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ConnectedExploreScreen(
+fun ClipsScreen(
     social: SocialRepository,
     backend: BackendRepository,
-    repository: TmdbRepository,
     store: LocalStore,
     loggedIn: Boolean,
     initialReelId: String? = null,
@@ -70,7 +69,6 @@ fun ConnectedExploreScreen(
     onInitialReelConsumed: () -> Unit = {},
     onVisibleReelChanged: (String) -> Unit = {},
     onMedia: (MediaItem) -> Unit,
-    onChat: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
     onRequireAuth: () -> Unit
 ) {
