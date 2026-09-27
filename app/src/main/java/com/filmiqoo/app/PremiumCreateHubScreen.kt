@@ -120,6 +120,8 @@ fun PremiumCreateHubScreen(
     repository:TmdbRepository,
     loggedIn:Boolean,
     onRequireAuth:()->Unit,
+    onOpenClub:()->Unit,
+    onOpenClips:()->Unit,
     onBack:()->Unit
 ) {
     val context=LocalContext.current
@@ -831,16 +833,31 @@ fun PremiumCreateHubScreen(
         Snackbar(
             modifier=Modifier.padding(16.dp),
             action={TextButton(onClick={draftSaved=false}){Text("باشه")}}
-        ) { Text("Draft ذخیره شد.") }
+        ) { Text("پیش‌نویس ذخیره شد.") }
     }
 
     success?.let { message ->
+        val destinationLabel=if(kind==CreateKind.REEL)"دیدن کلیپ‌ها" else "رفتن به کلاب"
         AlertDialog(
             onDismissRequest={success=null},
             icon={Icon(Icons.Default.CheckCircle,null,tint=FqGreen)},
-            title={Text("منتشر شد")},
+            title={Text("انجام شد")},
             text={Text(message)},
-            confirmButton={TextButton(onClick={success=null}){Text("باشه")}}
+            confirmButton={
+                TextButton(
+                    onClick={
+                        success=null
+                        if(kind==CreateKind.REEL) onOpenClips() else onOpenClub()
+                    }
+                ) {
+                    Text(destinationLabel)
+                }
+            },
+            dismissButton={
+                TextButton(onClick={success=null}) {
+                    Text("ادامه ساخت")
+                }
+            }
         )
     }
 }
