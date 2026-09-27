@@ -80,10 +80,15 @@ fun MeScreen(
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val creatorRepo=remember { CreatorChannelRepository(backend) }
+    val social=remember { SocialRepository(backend) }
     var refresh by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<MeLoad>(MeLoad.Loading) }
     var tab by remember { mutableStateOf(MeTab.ACTIVITY) }
     var showMore by remember { mutableStateOf(false) }
+    var deletePostFor by remember { mutableStateOf<SocialPost?>(null) }
+    var deleteClipFor by remember { mutableStateOf<ReelFeedItem?>(null) }
+    var deleteBusy by remember { mutableStateOf(false) }
+    var contentMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(refresh) {
         state=MeLoad.Loading
@@ -161,7 +166,8 @@ fun MeScreen(
                                     onOpen={onOpenPost(post.id)},
                                     onMedia={
                                         post.media?.asMediaItem()?.let(onMedia)
-                                    }
+                                    },
+                                    onMore={deletePostFor=post}
                                 )
                             }
                         }
@@ -185,9 +191,11 @@ fun MeScreen(
                                     horizontalArrangement=Arrangement.spacedBy(10.dp)
                                 ) {
                                     items(s.clips,key={it.id}) { clip ->
-                                        MeClipCard(clip) {
-                                            onOpenClip(clip.id)
-                                        }
+                                        MeClipCard(
+                                            clip=clip,
+                                            onClick={onOpenClip(clip.id)},
+                                            onMore={deleteClipFor=clip}
+                                        )
                                     }
                                 }
                             }
@@ -286,6 +294,125 @@ fun MeScreen(
                             }
                         }
                     )
+                }
+            }
+
+            deletePostFor?.let { post ->
+                AlertDialog(
+                    onDismissRequest={
+                        if(!deleteBusy) deletePostFor=null
+                    },
+                    icon={
+                        Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)
+                    },
+                    title={Text("حذف Post؟")},
+                    text={Text("این Post از Club و پروفایل تو حذف می‌شه.")},
+                    confirmButton={
+                        Button(
+                            onClick={
+                                if(!deleteBusy) {
+                                    deleteBusy=true
+                                    scope.launch {
+                                        runCatching {
+                                            social.removePost(post.id)
+                                        }.onSuccess { removed ->
+                                            if(removed) {
+                                                state=s.copy(
+                                                    posts=s.posts.filterNot { it.id==post.id }
+                                                )
+                                                deletePostFor=null
+                                                contentMessage="Post حذف شد."
+                                            }
+                                        }.onFailure {
+                                            contentMessage=it.message ?: "حذف Post ناموفق بود."
+                                        }
+                                        deleteBusy=false
+                                    }
+                                }
+                            },
+                            enabled=!deleteBusy,
+                            colors=ButtonDefaults.buttonColors(
+                                containerColor=FqDanger,
+                                contentColor=Color.White
+                            )
+                        ) {
+                            Text("حذف")
+                        }
+                    },
+                    dismissButton={
+                        TextButton(
+                            onClick={deletePostFor=null},
+                            enabled=!deleteBusy
+                        ) {
+                            Text("انصراف")
+                        }
+                    }
+                )
+            }
+
+            deleteClipFor?.let { clip ->
+                AlertDialog(
+                    onDismissRequest={
+                        if(!deleteBusy) deleteClipFor=null
+                    },
+                    icon={
+                        Icon(Icons.Default.DeleteOutline,null,tint=FqDanger)
+                    },
+                    title={Text("حذف Clip؟")},
+                    text={Text("این Clip از Clips و پروفایل تو حذف می‌شه.")},
+                    confirmButton={
+                        Button(
+                            onClick={
+                                if(!deleteBusy) {
+                                    deleteBusy=true
+                                    scope.launch {
+                                        runCatching {
+                                            social.removeReel(clip.id)
+                                        }.onSuccess { removed ->
+                                            if(removed) {
+                                                state=s.copy(
+                                                    clips=s.clips.filterNot { it.id==clip.id }
+                                                )
+                                                deleteClipFor=null
+                                                contentMessage="Clip حذف شد."
+                                            }
+                                        }.onFailure {
+                                            contentMessage=it.message ?: "حذف Clip ناموفق بود."
+                                        }
+                                        deleteBusy=false
+                                    }
+                                }
+                            },
+                            enabled=!deleteBusy,
+                            colors=ButtonDefaults.buttonColors(
+                                containerColor=FqDanger,
+                                contentColor=Color.White
+                            )
+                        ) {
+                            Text("حذف")
+                        }
+                    },
+                    dismissButton={
+                        TextButton(
+                            onClick={deleteClipFor=null},
+                            enabled=!deleteBusy
+                        ) {
+                            Text("انصراف")
+                        }
+                    }
+                )
+            }
+
+            contentMessage?.let { message ->
+                Snackbar(
+                    modifier=Modifier.padding(16.dp),
+                    action={
+                        TextButton(onClick={contentMessage=null}) {
+                            Text("باشه")
+                        }
+                    }
+                ) {
+                    Text(message)
                 }
             }
         }
@@ -609,7 +736,8 @@ private fun MeTabs(
 private fun MePostCard(
     post:SocialPost,
     onOpen:()->Unit,
-    onMedia:()->Unit
+    onMedia:()->Unit,
+    onMore:()->Unit
 ) {
     Surface(
         color=FqSurface,
@@ -664,6 +792,17 @@ private fun MePostCard(
                     color=FqMuted,
                     fontSize=10.sp
                 )
+                IconButton(
+                    onClick=onMore,
+                    modifier=Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreHoriz,
+                        contentDescription="مدیریت Post",
+                        tint=FqMuted,
+                        modifier=Modifier.size(18.dp)
+                    )
+                }
             }
 
             if(post.body.isNotBlank()) {
@@ -721,7 +860,8 @@ private fun MePostCard(
 @Composable
 private fun MeClipCard(
     clip:ReelFeedItem,
-    onClick:()->Unit
+    onClick:()->Unit,
+    onMore:()->Unit
 ) {
     Surface(
         color=FqSurface,
@@ -742,6 +882,24 @@ private fun MeClipCard(
                     )
                 )
             )
+            Surface(
+                color=Color.Black.copy(alpha=.52f),
+                contentColor=Color.White,
+                shape=CircleShape,
+                modifier=Modifier.align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(34.dp)
+                    .clickable { onMore() }
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(
+                        Icons.Default.MoreHoriz,
+                        contentDescription="مدیریت Clip",
+                        modifier=Modifier.size(18.dp)
+                    )
+                }
+            }
+
             Surface(
                 color=Color.Black.copy(alpha=.45f),
                 shape=CircleShape,
