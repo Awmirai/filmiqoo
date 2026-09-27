@@ -81,6 +81,9 @@ fun ClubScreen(
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
     var moreFor by remember { mutableStateOf<SocialPost?>(null) }
     var safetyFor by remember { mutableStateOf<SocialPost?>(null) }
+    var deleteFor by remember { mutableStateOf<SocialPost?>(null) }
+    var deleteBusy by remember { mutableStateOf(false) }
+    var currentUserId by remember(loggedIn) { mutableStateOf<String?>(null) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var unreadMessages by remember { mutableLongStateOf(0L) }
 
@@ -91,11 +94,15 @@ fun ClubScreen(
     }
 
     LaunchedEffect(loggedIn,refresh,badgeRefreshKey) {
-        unreadMessages=if(loggedIn) {
-            runCatching {
+        if(loggedIn) {
+            currentUserId=runCatching { backend.me().id }.getOrNull()
+            unreadMessages=runCatching {
                 messagingRepo.inbox().sumOf { it.unread }
             }.getOrDefault(0L)
-        } else 0L
+        } else {
+            currentUserId=null
+            unreadMessages=0L
+        }
     }
 
     LaunchedEffect(tab,refresh,loggedIn,initialPostId) {
@@ -291,6 +298,7 @@ fun ClubScreen(
     }
 
     moreFor?.let { post ->
+        val ownPost=currentUserId!=null && currentUserId==post.author.id
         ModalBottomSheet(
             onDismissRequest={moreFor=null},
             containerColor=FqSurface,
@@ -302,36 +310,26 @@ fun ClubScreen(
                     .padding(bottom=26.dp)
             ) {
                 Text(
-                    "گزینه‌های Post",
+                    if(ownPost)"مدیریت Post" else "گزینه‌های Post",
                     fontSize=18.sp,
                     fontWeight=FontWeight.Black,
                     modifier=Modifier.padding(bottom=8.dp)
                 )
-                ClubMoreAction(
-                    icon=Icons.Default.DoNotDisturbOn,
-                    title="علاقه ندارم",
-                    subtitle="این Post و محتوای مشابه کمتر نمایش داده می‌شن."
-                ) {
-                    moreFor=null
-                    if(!loggedIn) {
-                        onRequireAuth()
-                    } else {
-                        scope.launch {
-                            runCatching {
-                                social.feedback("post",post.id,"not_interested")
-                            }.onSuccess {
-                                feed=feed.filterNot { it.id==post.id }
-                                feedbackMessage="این نوع محتوا کمتر نمایش داده می‌شه."
-                            }.onFailure { error=it.message }
-                        }
-                    }
-                }
 
-                post.media?.id?.takeIf(String::isNotBlank)?.let { mediaId ->
+                if(ownPost) {
                     ClubMoreAction(
-                        icon=Icons.Default.MovieFilter,
-                        title="کمتر از این عنوان",
-                        subtitle="Postهای مرتبط با این فیلم یا سریال کمتر نمایش داده می‌شن."
+                        icon=Icons.Default.DeleteOutline,
+                        title="حذف Post",
+                        subtitle="این Post از Club و پروفایل تو حذف می‌شه."
+                    ) {
+                        moreFor=null
+                        deleteFor=post
+                    }
+                } else {
+                    ClubMoreAction(
+                        icon=Icons.Default.DoNotDisturbOn,
+                        title="علاقه ندارم",
+                        subtitle="این Post و محتوای مشابه کمتر نمایش داده می‌شن."
                     ) {
                         moreFor=null
                         if(!loggedIn) {
@@ -339,26 +337,117 @@ fun ClubScreen(
                         } else {
                             scope.launch {
                                 runCatching {
-                                    social.feedback("media",mediaId,"not_interested")
+                                    social.feedback("post",post.id,"not_interested")
                                 }.onSuccess {
-                                    feed=feed.filterNot { it.media?.id==mediaId }
-                                    feedbackMessage="محتوای این عنوان کمتر نمایش داده می‌شه."
+                                    feed=feed.filterNot { it.id==post.id }
+                                    feedbackMessage="این نوع محتوا کمتر نمایش داده می‌شه."
                                 }.onFailure { error=it.message }
                             }
                         }
                     }
-                }
 
-                ClubMoreAction(
-                    icon=Icons.Default.Shield,
-                    title="ایمنی و گزارش",
-                    subtitle="Report، Mute یا Block کردن این حساب"
-                ) {
-                    moreFor=null
-                    if(!loggedIn) onRequireAuth() else safetyFor=post
+                    post.media?.id?.takeIf(String::isNotBlank)?.let { mediaId ->
+                        ClubMoreAction(
+                            icon=Icons.Default.MovieFilter,
+                            title="کمتر از این عنوان",
+                            subtitle="Postهای مرتبط با این فیلم یا سریال کمتر نمایش داده می‌شن."
+                        ) {
+                            moreFor=null
+                            if(!loggedIn) {
+                                onRequireAuth()
+                            } else {
+                                scope.launch {
+                                    runCatching {
+                                        social.feedback("media",mediaId,"not_interested")
+                                    }.onSuccess {
+                                        feed=feed.filterNot { it.media?.id==mediaId }
+                                        feedbackMessage="محتوای این عنوان کمتر نمایش داده می‌شه."
+                                    }.onFailure { error=it.message }
+                                }
+                            }
+                        }
+                    }
+
+                    ClubMoreAction(
+                        icon=Icons.Default.Shield,
+                        title="ایمنی و گزارش",
+                        subtitle="Report، Mute یا Block کردن این حساب"
+                    ) {
+                        moreFor=null
+                        if(!loggedIn) onRequireAuth() else safetyFor=post
+                    }
                 }
             }
         }
+    }
+
+    deleteFor?.let { post ->
+        AlertDialog(
+            onDismissRequest={
+                if(!deleteBusy) deleteFor=null
+            },
+            icon={
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    null,
+                    tint=FqDanger
+                )
+            },
+            title={Text("حذف Post؟")},
+            text={
+                Text(
+                    "این Post دیگه در Club و پروفایل تو نمایش داده نمی‌شه."
+                )
+            },
+            confirmButton={
+                Button(
+                    onClick={
+                        if(!deleteBusy) {
+                            deleteBusy=true
+                            scope.launch {
+                                runCatching {
+                                    social.removePost(post.id)
+                                }.onSuccess { removed ->
+                                    if(removed) {
+                                        feed=feed.filterNot { it.id==post.id }
+                                        if(initialPostId==post.id) {
+                                            onClearFocusedPost()
+                                        }
+                                        feedbackMessage="Post حذف شد."
+                                        deleteFor=null
+                                    }
+                                }.onFailure {
+                                    feedbackMessage=it.message ?: "حذف Post ناموفق بود."
+                                }
+                                deleteBusy=false
+                            }
+                        }
+                    },
+                    enabled=!deleteBusy,
+                    colors=ButtonDefaults.buttonColors(
+                        containerColor=FqDanger,
+                        contentColor=Color.White
+                    )
+                ) {
+                    if(deleteBusy) {
+                        CircularProgressIndicator(
+                            strokeWidth=2.dp,
+                            modifier=Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text("حذف")
+                }
+            },
+            dismissButton={
+                TextButton(
+                    onClick={deleteFor=null},
+                    enabled=!deleteBusy
+                ) {
+                    Text("انصراف")
+                }
+            }
+        )
     }
 
     safetyFor?.let { post ->
