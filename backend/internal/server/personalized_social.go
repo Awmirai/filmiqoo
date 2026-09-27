@@ -19,6 +19,36 @@ func (s *Server) personalizedFeed(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles pr ON pr.user_id=p.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
 		 WHERE p.status='published'
+		   AND (
+		     (
+		       p.channel_id IS NULL
+		       AND (
+		         pr.private_account=false
+		         OR p.author_user_id=$1
+		         OR EXISTS(
+		           SELECT 1 FROM user_follows privacy_follow
+		            WHERE privacy_follow.follower_user_id=$1
+		              AND privacy_follow.followed_user_id=p.author_user_id
+		         )
+		       )
+		     )
+		     OR
+		     (
+		       p.channel_id IS NOT NULL
+		       AND EXISTS(
+		         SELECT 1 FROM channels privacy_channel
+		          WHERE privacy_channel.id=p.channel_id
+		            AND (
+		              privacy_channel.visibility='public'
+		              OR EXISTS(
+		                SELECT 1 FROM channel_members privacy_member
+		                 WHERE privacy_member.channel_id=p.channel_id
+		                   AND privacy_member.user_id=$1
+		              )
+		            )
+		       )
+		     )
+		   )
 		   AND NOT EXISTS (
 		     SELECT 1 FROM blocks b
 		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=p.author_user_id)
@@ -153,6 +183,36 @@ func (s *Server) personalizedReels(w http.ResponseWriter,r *http.Request) {
 		  LEFT JOIN media_titles mt ON mt.id=rl.media_title_id
 		  LEFT JOIN playback_quality pq ON pq.reel_id=rl.id
 		 WHERE rl.status='published'
+		   AND (
+		     (
+		       rl.channel_id IS NULL
+		       AND (
+		         p.private_account=false
+		         OR rl.creator_user_id=$1
+		         OR EXISTS(
+		           SELECT 1 FROM user_follows privacy_follow
+		            WHERE privacy_follow.follower_user_id=$1
+		              AND privacy_follow.followed_user_id=rl.creator_user_id
+		         )
+		       )
+		     )
+		     OR
+		     (
+		       rl.channel_id IS NOT NULL
+		       AND EXISTS(
+		         SELECT 1 FROM channels privacy_channel
+		          WHERE privacy_channel.id=rl.channel_id
+		            AND (
+		              privacy_channel.visibility='public'
+		              OR EXISTS(
+		                SELECT 1 FROM channel_members privacy_member
+		                 WHERE privacy_member.channel_id=rl.channel_id
+		                   AND privacy_member.user_id=$1
+		              )
+		            )
+		       )
+		     )
+		   )
 		   AND NOT EXISTS (
 		     SELECT 1 FROM blocks b
 		      WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=rl.creator_user_id)
@@ -288,6 +348,36 @@ func (s *Server) personalizedStories(w http.ResponseWriter,r *http.Request) {
 		  JOIN profiles p ON p.user_id=st.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=st.media_title_id
 		 WHERE st.expires_at>now()
+		   AND (
+		     (
+		       st.channel_id IS NULL
+		       AND (
+		         p.private_account=false
+		         OR st.author_user_id=$1
+		         OR EXISTS(
+		           SELECT 1 FROM user_follows privacy_follow
+		            WHERE privacy_follow.follower_user_id=$1
+		              AND privacy_follow.followed_user_id=st.author_user_id
+		         )
+		       )
+		     )
+		     OR
+		     (
+		       st.channel_id IS NOT NULL
+		       AND EXISTS(
+		         SELECT 1 FROM channels privacy_channel
+		          WHERE privacy_channel.id=st.channel_id
+		            AND (
+		              privacy_channel.visibility='public'
+		              OR EXISTS(
+		                SELECT 1 FROM channel_members privacy_member
+		                 WHERE privacy_member.channel_id=st.channel_id
+		                   AND privacy_member.user_id=$1
+		              )
+		            )
+		       )
+		     )
+		   )
 		   AND (
 		     st.close_friends_only=false
 		     OR st.author_user_id=$1
