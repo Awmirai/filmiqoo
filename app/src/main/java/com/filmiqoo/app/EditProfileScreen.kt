@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,20 +38,22 @@ fun EditProfileScreen(
     val scope=rememberCoroutineScope()
 
     var profile by remember { mutableStateOf<AccountProfile?>(null) }
-    var username by remember { mutableStateOf("") }
-    var displayName by remember { mutableStateOf("") }
-    var bio by remember { mutableStateOf("") }
-    var avatarUrl by remember { mutableStateOf("") }
-    var coverUrl by remember { mutableStateOf("") }
-    var privateAccount by remember { mutableStateOf(false) }
+    var username by rememberSaveable { mutableStateOf("") }
+    var displayName by rememberSaveable { mutableStateOf("") }
+    var bio by rememberSaveable { mutableStateOf("") }
+    var avatarUrl by rememberSaveable { mutableStateOf("") }
+    var coverUrl by rememberSaveable { mutableStateOf("") }
+    var privateAccount by rememberSaveable { mutableStateOf(false) }
+    var formInitialized by rememberSaveable { mutableStateOf(false) }
 
-    var avatarUri by remember { mutableStateOf<Uri?>(null) }
-    var coverUri by remember { mutableStateOf<Uri?>(null) }
+    var avatarUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var coverUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var stage by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var confirmDiscard by remember { mutableStateOf(false) }
 
     val avatarPicker=rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -60,18 +63,34 @@ fun EditProfileScreen(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> if(uri!=null) coverUri=uri }
 
-    BackHandler(enabled=!saving) { onBack() }
+    val hasUnsavedChanges=profile?.let { original ->
+        username!=original.username ||
+            displayName!=original.displayName ||
+            bio!=original.bio ||
+            privateAccount!=original.privateAccount ||
+            avatarUri!=null ||
+            coverUri!=null
+    } ?: false
+
+    fun requestBack() {
+        if(hasUnsavedChanges && !saving) confirmDiscard=true else onBack()
+    }
+
+    BackHandler(enabled=!saving) { requestBack() }
 
     LaunchedEffect(Unit) {
         runCatching { backend.me() }
             .onSuccess {
                 profile=it
-                username=it.username
-                displayName=it.displayName
-                bio=it.bio
-                avatarUrl=it.avatarUrl
-                coverUrl=it.coverUrl
-                privateAccount=it.privateAccount
+                if(!formInitialized) {
+                    username=it.username
+                    displayName=it.displayName
+                    bio=it.bio
+                    avatarUrl=it.avatarUrl
+                    coverUrl=it.coverUrl
+                    privateAccount=it.privateAccount
+                    formInitialized=true
+                }
             }
             .onFailure { error=it.message }
         loading=false
@@ -87,7 +106,7 @@ fun EditProfileScreen(
             Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=6.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
-            IconButton(onClick=onBack,enabled=!saving) {
+            IconButton(onClick={requestBack()},enabled=!saving) {
                 Icon(Icons.Default.ArrowBack,null)
             }
             Column(Modifier.weight(1f)) {
@@ -105,11 +124,11 @@ fun EditProfileScreen(
                             var newCover=coverUrl
 
                             avatarUri?.let {
-                                stage="در حال آپلود Avatar..."
+                                stage="در حال آپلود عکس پروفایل..."
                                 newAvatar=backend.uploadMedia(context,it,"image").mediaUrl
                             }
                             coverUri?.let {
-                                stage="در حال آپلود Cover..."
+                                stage="در حال آپلود تصویر کاور..."
                                 newCover=backend.uploadMedia(context,it,"image").mediaUrl
                             }
 
@@ -186,7 +205,7 @@ fun EditProfileScreen(
                     ) {
                         Icon(Icons.Default.PhotoCamera,null,modifier=Modifier.size(17.dp))
                         Spacer(Modifier.width(5.dp))
-                        Text("Cover",fontSize=11.sp)
+                        Text("کاور",fontSize=11.sp)
                     }
 
                     Box(
@@ -245,7 +264,7 @@ fun EditProfileScreen(
                                 c.isLetterOrDigit() || c=='_' || c=='.'
                             }.take(24)
                         },
-                        label={Text("Username")},
+                        label={Text("نام کاربری")},
                         prefix={Text("@")},
                         leadingIcon={Icon(Icons.Default.AlternateEmail,null)},
                         singleLine=true,
@@ -256,7 +275,7 @@ fun EditProfileScreen(
                     OutlinedTextField(
                         value=bio,
                         onValueChange={bio=it.take(300)},
-                        label={Text("Bio")},
+                        label={Text("معرفی کوتاه")},
                         minLines=3,
                         maxLines=5,
                         supportingText={
@@ -271,7 +290,7 @@ fun EditProfileScreen(
             item {
                 PremiumSectionHeader(
                     "حریم خصوصی",
-                    "کنترل نمایش پروفایل و درخواست Follow",
+                    "کنترل نمایش پروفایل و درخواست‌های دنبال‌کردن",
                     Icons.Default.Security
                 )
             }
@@ -295,7 +314,7 @@ fun EditProfileScreen(
                         Column(Modifier.weight(1f)) {
                             Text("حساب خصوصی",fontSize=12.sp,fontWeight=FontWeight.Bold)
                             Text(
-                                "Followerهای جدید باید تأیید شوند.",
+                                "دنبال‌کننده‌های جدید باید تأیید شوند.",
                                 color=FqMuted,fontSize=11.sp
                             )
                         }
@@ -322,14 +341,14 @@ fun EditProfileScreen(
                         modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp)
                     ) {
                         Column(Modifier.padding(14.dp)) {
-                            ProfileInfoRow("Email",p.email)
+                            ProfileInfoRow("ایمیل",p.email)
                             ProfileInfoRow(
-                                "Verification",
-                                if(p.verified)"Verified Creator" else "Standard account"
+                                "وضعیت حساب",
+                                if(p.verified)"سازنده تأییدشده" else "حساب استاندارد"
                             )
                             ProfileInfoRow(
-                                "Followers",
-                                p.followers.toString()+" / Following "+p.following
+                                "دنبال‌کننده‌ها",
+                                p.followers.toString()+" • دنبال‌شده‌ها "+p.following
                             )
                         }
                     }
@@ -370,6 +389,30 @@ fun EditProfileScreen(
                 }
             }
         }
+    }
+
+    if(confirmDiscard) {
+        AlertDialog(
+            onDismissRequest={confirmDiscard=false},
+            icon={Icon(Icons.Default.WarningAmber,null,tint=FqGold)},
+            title={Text("تغییرات ذخیره نشده")},
+            text={Text("اگر خارج بشی، تغییراتی که هنوز ذخیره نکردی از بین می‌رن.")},
+            confirmButton={
+                TextButton(
+                    onClick={
+                        confirmDiscard=false
+                        onBack()
+                    }
+                ) {
+                    Text("خروج بدون ذخیره",color=FqDanger)
+                }
+            },
+            dismissButton={
+                TextButton(onClick={confirmDiscard=false}) {
+                    Text("ادامه ویرایش")
+                }
+            }
+        )
     }
 }
 
