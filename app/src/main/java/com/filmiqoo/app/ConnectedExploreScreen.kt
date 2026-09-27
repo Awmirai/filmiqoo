@@ -753,6 +753,7 @@ private fun ReelCommentsSheet(
     var items by remember(reel.id) { mutableStateOf<List<SocialComment>>(emptyList()) }
     var text by remember { mutableStateOf("") }
     var spoiler by remember { mutableStateOf(false) }
+    var replyTo by remember { mutableStateOf<SocialComment?>(null) }
     var loading by remember { mutableStateOf(true) }
 
     fun reload() {
@@ -786,7 +787,11 @@ private fun ReelCommentsSheet(
                 items(items.size,key={items[it].id}) { index ->
                     val c=items[index]
                     var reveal by remember(c.id) { mutableStateOf(!c.spoiler) }
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Top) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .padding(start=if(c.parentCommentId!=null)26.dp else 0.dp),
+                        verticalAlignment=Alignment.Top
+                    ) {
                         RemoteImage(c.author.avatarUrl.takeIf(String::isNotBlank),Modifier.size(34.dp).clip(CircleShape))
                         Spacer(Modifier.width(7.dp))
                         Column(Modifier.weight(1f)) {
@@ -798,39 +803,117 @@ private fun ReelCommentsSheet(
                                     modifier=Modifier.padding(top=4.dp).clickable { reveal=true }
                                 )
                             } else {
-                                Text(c.body,fontSize=12.sp,lineHeight=17.sp,modifier=Modifier.padding(top=3.dp))
+                                Text(
+                                    c.body,
+                                    fontSize=12.sp,
+                                    lineHeight=17.sp,
+                                    modifier=Modifier.padding(top=3.dp)
+                                )
+                            }
+                            TextButton(
+                                onClick={
+                                    if(loggedIn) replyTo=c
+                                    else onRequireAuth()
+                                },
+                                contentPadding=PaddingValues(
+                                    horizontal=0.dp,
+                                    vertical=2.dp
+                                )
+                            ) {
+                                Text("پاسخ",color=FqMuted,fontSize=9.sp)
                             }
                         }
                     }
                 }
             }
 
-            Row(Modifier.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                FilterChip(selected=spoiler,onClick={spoiler=!spoiler},label={Text("Spoiler",fontSize=11.sp)})
-                Spacer(Modifier.width(6.dp))
-                OutlinedTextField(
-                    value=text,onValueChange={text=it},
-                    placeholder={Text("نظر بنویس...")},
-                    shape=RoundedCornerShape(20.dp),
-                    modifier=Modifier.weight(1f),
-                    maxLines=3
-                )
-                IconButton(onClick={
-                    if(!loggedIn) onRequireAuth()
-                    else if(text.isNotBlank()) {
-                        val body=text.trim()
-                        text=""
-                        scope.launch {
-                            runCatching { social.addReelComment(reel.id,body,spoiler) }
-                                .onSuccess {
+            Column(Modifier.padding(vertical=8.dp)) {
+                replyTo?.let { target ->
+                    Surface(
+                        color=FqSurface2,
+                        shape=RoundedCornerShape(12.dp),
+                        modifier=Modifier.fillMaxWidth().padding(bottom=7.dp)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=10.dp,vertical=7.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Reply,
+                                null,
+                                tint=FqGold,
+                                modifier=Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "پاسخ به "+target.author.displayName,
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold,
+                                modifier=Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick={replyTo=null},
+                                modifier=Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    null,
+                                    tint=FqMuted,
+                                    modifier=Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    FilterChip(
+                        selected=spoiler,
+                        onClick={spoiler=!spoiler},
+                        label={Text("Spoiler",fontSize=11.sp)}
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedTextField(
+                        value=text,
+                        onValueChange={text=it},
+                        placeholder={
+                            Text(
+                                if(replyTo!=null)"پاسخت رو بنویس..."
+                                else "نظر بنویس..."
+                            )
+                        },
+                        shape=RoundedCornerShape(20.dp),
+                        modifier=Modifier.weight(1f),
+                        maxLines=3
+                    )
+                    IconButton(onClick={
+                        if(!loggedIn) onRequireAuth()
+                        else if(text.isNotBlank()) {
+                            val body=text.trim()
+                            text=""
+                            scope.launch {
+                                runCatching {
+                                    social.addReelComment(
+                                        reelId=reel.id,
+                                        body=body,
+                                        spoiler=spoiler,
+                                        parentCommentId=replyTo?.id
+                                    )
+                                }.onSuccess {
                                     spoiler=false
+                                    replyTo=null
                                     onCommentAdded()
                                     reload()
                                 }
+                            }
                         }
+                    }) {
+                        Icon(
+                            Icons.Default.Send,
+                            null,
+                            tint=if(text.isBlank())FqMuted else FqGold
+                        )
                     }
-                }) {
-                    Icon(Icons.Default.Send,null,tint=if(text.isBlank())FqMuted else FqGold)
                 }
             }
         }
