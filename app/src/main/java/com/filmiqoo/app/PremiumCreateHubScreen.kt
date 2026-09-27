@@ -43,12 +43,12 @@ private enum class CreateKind(
     val label:String,
     val subtitle:String
 ) {
-    STORY("Story","عکس، ویدیو یا متن ۲۴ ساعته"),
-    REEL("Clip","ویدیوی کوتاه برای Club"),
-    POST("Post","پست Club"),
-    REVIEW("Review","نقد فیلم یا سریال"),
-    POLL("Poll","نظرسنجی واقعی"),
-    CHANNEL("Channel","ساخت فضای عمومی در Club")
+    STORY("استوری","عکس، ویدیو یا متن ۲۴ ساعته"),
+    REEL("کلیپ","ویدیوی کوتاه برای کلاب"),
+    POST("پست","پست در کلاب"),
+    REVIEW("ریویو","نقد فیلم یا سریال"),
+    POLL("نظرسنجی","نظرسنجی واقعی"),
+    CHANNEL("کانال","ساخت فضای عمومی در کلاب")
 }
 
 private data class CreateDraft(
@@ -227,7 +227,7 @@ fun PremiumCreateHubScreen(
                     }
                     Column(Modifier.weight(1f)) {
                         Text("ساخت محتوا",fontSize=23.sp,fontWeight=FontWeight.Black)
-                        Text("یک چیز خوب برای Club بساز",color=FqMuted,fontSize=11.sp)
+                        Text("یک چیز خوب برای کلاب بساز",color=FqMuted,fontSize=11.sp)
                     }
                     TextButton(
                         onClick={
@@ -237,7 +237,7 @@ fun PremiumCreateHubScreen(
                     ) {
                         Icon(Icons.Default.Drafts,null,modifier=Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Draft",fontSize=11.sp)
+                        Text("پیش‌نویس",fontSize=11.sp)
                     }
                 }
             }
