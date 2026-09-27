@@ -1,8 +1,15 @@
 package com.filmiqoo.app
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -17,8 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -230,6 +240,7 @@ private fun RealReelsPager(
                 player=if(isCurrent)player else null,
                 revealed=revealed[reel.id] == true || !reel.spoiler,
                 liked=liked[reel.id] ?: reel.likedByMe,
+                canInteract=loggedIn,
                 saved=saved[reel.id] ?: reel.savedByMe,
                 followed=followed[reel.author.id] ?: reel.followingAuthor,
                 followPending=followPending[reel.author.id] ?: reel.followPending,
@@ -463,6 +474,7 @@ private fun ReelVideoPage(
     player: ExoPlayer?,
     revealed: Boolean,
     liked: Boolean,
+    canInteract: Boolean,
     saved: Boolean,
     followed: Boolean,
     followPending: Boolean,
@@ -477,6 +489,16 @@ private fun ReelVideoPage(
     onShare: () -> Unit,
     onMore: () -> Unit
 ) {
+    val haptic=LocalHapticFeedback.current
+    var heartBurst by remember(reel.id) { mutableStateOf(false) }
+
+    LaunchedEffect(heartBurst) {
+        if(heartBurst) {
+            delay(430)
+            heartBurst=false
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         val background=reel.coverUrl.ifBlank {
             reel.media?.backdropUrl ?: reel.media?.posterUrl.orEmpty()
@@ -501,9 +523,7 @@ private fun ReelVideoPage(
                     }
                 },
                 update={it.player=player},
-                modifier=Modifier.fillMaxSize().clickable {
-                    if(player.isPlaying) player.pause() else player.play()
-                }
+                modifier=Modifier.fillMaxSize()
             )
         }
 
@@ -519,6 +539,55 @@ private fun ReelVideoPage(
                 )
             )
         )
+
+        if(!reel.spoiler || revealed) {
+            Box(
+                Modifier.fillMaxSize()
+                    .pointerInput(reel.id,liked,canInteract,player) {
+                        detectTapGestures(
+                            onTap={
+                                if(active && player!=null) {
+                                    if(player.isPlaying) player.pause()
+                                    else player.play()
+                                }
+                            },
+                            onDoubleTap={
+                                if(canInteract) {
+                                    haptic.performHapticFeedback(
+                                        HapticFeedbackType.TextHandleMove
+                                    )
+                                    if(!liked) onLike()
+                                    heartBurst=true
+                                } else {
+                                    onLike()
+                                }
+                            }
+                        )
+                    }
+            )
+        }
+
+        AnimatedVisibility(
+            visible=heartBurst,
+            enter=fadeIn(tween(70))+
+                scaleIn(
+                    initialScale=.38f,
+                    animationSpec=tween(160)
+                ),
+            exit=fadeOut(tween(180))+
+                scaleOut(
+                    targetScale=1.35f,
+                    animationSpec=tween(200)
+                ),
+            modifier=Modifier.align(Alignment.Center)
+        ) {
+            Icon(
+                Icons.Default.Favorite,
+                null,
+                tint=Color.White,
+                modifier=Modifier.size(92.dp)
+            )
+        }
 
         if(reel.spoiler && !revealed) {
             Box(
