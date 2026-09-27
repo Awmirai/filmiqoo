@@ -113,6 +113,10 @@ fun ClubScreen(
                         following=emptyList()
                     } else {
                         following=friendRepo.feed()
+                        if(creators.isEmpty()) {
+                            creators=runCatching { social.channels() }
+                                .getOrDefault(emptyList())
+                        }
                     }
                 }
                 ClubTab.ROOMS -> rooms=social.rooms()
@@ -167,6 +171,7 @@ fun ClubScreen(
                         onRequireAuth=onRequireAuth,
                         onComments={commentsFor=it},
                         onFeedChange={feed=it},
+                        onCreatorsChange={creators=it},
                         onRefresh={refresh++}
                     )
                 }
@@ -181,9 +186,13 @@ fun ClubScreen(
                     } else {
                         ClubFollowingFeed(
                             items=following,
+                            suggestions=creators,
+                            social=social,
+                            onSuggestionsChange={creators=it},
                             onMedia=onMedia,
                             onCreator=onCreator,
                             onOpenClip=onOpenClip,
+                            onRequireAuth=onRequireAuth,
                             onRefresh={refresh++}
                         )
                     }
@@ -346,6 +355,7 @@ private fun ClubForYou(
     onRequireAuth:()->Unit,
     onComments:(SocialPost)->Unit,
     onFeedChange:(List<SocialPost>)->Unit,
+    onCreatorsChange:(List<SocialChannel>)->Unit,
     onRefresh:()->Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -441,7 +451,28 @@ private fun ClubForYou(
             item {
                 ClubCreatorsRow(
                     channels=creators.take(10),
-                    onCreator=onCreator
+                    social=social,
+                    loggedIn=loggedIn,
+                    onRequireAuth=onRequireAuth,
+                    onCreator=onCreator,
+                    onFollowChanged={id,following->
+                        onCreatorsChange(
+                            creators.map { channel ->
+                                if(channel.id!=id) channel
+                                else {
+                                    val delta=when {
+                                        following && !channel.followingByMe -> 1L
+                                        !following && channel.followingByMe -> -1L
+                                        else -> 0L
+                                    }
+                                    channel.copy(
+                                        followingByMe=following,
+                                        followers=(channel.followers+delta).coerceAtLeast(0)
+                                    )
+                                }
+                            }
+                        )
+                    }
                 )
             }
         }
@@ -850,8 +881,15 @@ private fun ClubClipsRow(
 @Composable
 private fun ClubCreatorsRow(
     channels:List<SocialChannel>,
-    onCreator:(Creator)->Unit
+    social:SocialRepository,
+    loggedIn:Boolean,
+    onRequireAuth:()->Unit,
+    onCreator:(Creator)->Unit,
+    onFollowChanged:(String,Boolean)->Unit
 ) {
+    val scope=rememberCoroutineScope()
+    val busy=remember { mutableStateMapOf<String,Boolean>() }
+
     LazyRow(
         contentPadding=PaddingValues(horizontal=16.dp),
         horizontalArrangement=Arrangement.spacedBy(9.dp)
@@ -861,57 +899,106 @@ private fun ClubCreatorsRow(
                 color=FqSurface,
                 shape=RoundedCornerShape(18.dp),
                 border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
-                modifier=Modifier.width(176.dp)
-                    .clickable {
-                        onCreator(
-                            Creator(
-                                name=channel.name,
-                                handle="@"+channel.slug,
-                                followers=channel.followers.toString(),
-                                bio=channel.bio,
-                                verified=channel.verified,
-                                id=channel.id,
-                                entityType="channel",
-                                avatarUrl=channel.avatarUrl,
-                                coverUrl=channel.coverUrl
-                            )
-                        )
-                    }
+                modifier=Modifier.width(188.dp)
             ) {
-                Row(
-                    Modifier.padding(11.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    RemoteImage(
-                        channel.avatarUrl.takeIf(String::isNotBlank),
-                        Modifier.size(42.dp).clip(CircleShape),
-                        ContentScale.Crop
-                    )
-                    Spacer(Modifier.width(9.dp))
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment=Alignment.CenterVertically) {
-                            Text(
-                                channel.name,
-                                fontSize=11.sp,
-                                fontWeight=FontWeight.Bold,
-                                maxLines=1,
-                                overflow=TextOverflow.Ellipsis
-                            )
-                            if(channel.verified) {
-                                Spacer(Modifier.width(3.dp))
-                                Icon(
-                                    Icons.Default.Verified,
-                                    null,
-                                    tint=Color(0xFF4AB7FF),
-                                    modifier=Modifier.size(12.dp)
+                Column(Modifier.padding(11.dp)) {
+                    Row(
+                        verticalAlignment=Alignment.CenterVertically,
+                        modifier=Modifier.fillMaxWidth()
+                            .clickable {
+                                onCreator(
+                                    Creator(
+                                        name=channel.name,
+                                        handle="@"+channel.slug,
+                                        followers=channel.followers.toString(),
+                                        bio=channel.bio,
+                                        verified=channel.verified,
+                                        id=channel.id,
+                                        entityType="channel",
+                                        avatarUrl=channel.avatarUrl,
+                                        coverUrl=channel.coverUrl
+                                    )
                                 )
                             }
+                    ) {
+                        RemoteImage(
+                            channel.avatarUrl.takeIf(String::isNotBlank),
+                            Modifier.size(42.dp).clip(CircleShape),
+                            ContentScale.Crop
+                        )
+                        Spacer(Modifier.width(9.dp))
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                Text(
+                                    channel.name,
+                                    fontSize=11.sp,
+                                    fontWeight=FontWeight.Bold,
+                                    maxLines=1,
+                                    overflow=TextOverflow.Ellipsis
+                                )
+                                if(channel.verified) {
+                                    Spacer(Modifier.width(3.dp))
+                                    Icon(
+                                        Icons.Default.Verified,
+                                        null,
+                                        tint=Color(0xFF4AB7FF),
+                                        modifier=Modifier.size(12.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                compactClubCount(channel.followers)+" دنبال‌کننده",
+                                color=FqMuted,
+                                fontSize=8.sp,
+                                modifier=Modifier.padding(top=3.dp)
+                            )
                         }
+                    }
+
+                    Button(
+                        onClick={
+                            if(!loggedIn) {
+                                onRequireAuth()
+                            } else if(busy[channel.id]!=true) {
+                                val previous=channel.followingByMe
+                                onFollowChanged(channel.id,!previous)
+                                busy[channel.id]=true
+                                scope.launch {
+                                    runCatching {
+                                        social.toggleChannelFollow(channel.id)
+                                    }.onSuccess { actual ->
+                                        onFollowChanged(channel.id,actual)
+                                    }.onFailure {
+                                        onFollowChanged(channel.id,previous)
+                                    }
+                                    busy.remove(channel.id)
+                                }
+                            }
+                        },
+                        enabled=busy[channel.id]!=true,
+                        colors=ButtonDefaults.buttonColors(
+                            containerColor=if(channel.followingByMe)
+                                FqSurface2 else Color.White,
+                            contentColor=if(channel.followingByMe)
+                                Color.White else Color.Black
+                        ),
+                        shape=RoundedCornerShape(12.dp),
+                        contentPadding=PaddingValues(horizontal=10.dp,vertical=7.dp),
+                        modifier=Modifier.fillMaxWidth().padding(top=9.dp)
+                    ) {
+                        Icon(
+                            if(channel.followingByMe)
+                                Icons.Default.Check
+                            else
+                                Icons.Default.Add,
+                            null,
+                            modifier=Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
                         Text(
-                            compactClubCount(channel.followers)+" دنبال‌کننده",
-                            color=FqMuted,
-                            fontSize=8.sp,
-                            modifier=Modifier.padding(top=3.dp)
+                            if(channel.followingByMe)"دنبال می‌کنی" else "دنبال کردن",
+                            fontSize=9.sp,
+                            fontWeight=FontWeight.Bold
                         )
                     }
                 }
@@ -1289,19 +1376,77 @@ private fun ClubAction(
 @Composable
 private fun ClubFollowingFeed(
     items:List<FriendActivityItem>,
+    suggestions:List<SocialChannel>,
+    social:SocialRepository,
+    onSuggestionsChange:(List<SocialChannel>)->Unit,
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
     onOpenClip:(String)->Unit,
+    onRequireAuth:()->Unit,
     onRefresh:()->Unit
 ) {
     if(items.isEmpty()) {
-        ClubEmptyState(
-            icon=Icons.Default.PeopleOutline,
-            title="اینجا هنوز آرومه",
-            body="وقتی آدم‌های بیشتری رو Follow کنی، فعالیت واقعی‌شون اینجا میاد.",
-            action="تازه‌سازی",
-            onAction=onRefresh
-        )
+        if(suggestions.isEmpty()) {
+            ClubEmptyState(
+                icon=Icons.Default.PeopleOutline,
+                title="فیدت رو بساز",
+                body="چند نفر یا Channel رو Follow کن؛ فعالیت واقعی‌شون اینجا میاد.",
+                action="تازه‌سازی",
+                onAction=onRefresh
+            )
+        } else {
+            Column(
+                Modifier.fillMaxSize()
+                    .padding(top=18.dp)
+            ) {
+                Text(
+                    "فیدت رو بساز",
+                    fontSize=22.sp,
+                    fontWeight=FontWeight.Black,
+                    modifier=Modifier.padding(horizontal=16.dp)
+                )
+                Text(
+                    "چند Channel رو انتخاب کن تا Following از همون اول به سلیقه‌ت نزدیک بشه.",
+                    color=FqMuted,
+                    fontSize=11.sp,
+                    lineHeight=18.sp,
+                    modifier=Modifier.padding(horizontal=16.dp,vertical=6.dp)
+                )
+                ClubCreatorsRow(
+                    channels=suggestions.take(10),
+                    social=social,
+                    loggedIn=true,
+                    onRequireAuth=onRequireAuth,
+                    onCreator=onCreator,
+                    onFollowChanged={id,following->
+                        onSuggestionsChange(
+                            suggestions.map { channel ->
+                                if(channel.id!=id) channel
+                                else {
+                                    val delta=when {
+                                        following && !channel.followingByMe -> 1L
+                                        !following && channel.followingByMe -> -1L
+                                        else -> 0L
+                                    }
+                                    channel.copy(
+                                        followingByMe=following,
+                                        followers=(channel.followers+delta).coerceAtLeast(0)
+                                    )
+                                }
+                            }
+                        )
+                    }
+                )
+                TextButton(
+                    onClick=onRefresh,
+                    modifier=Modifier.padding(horizontal=8.dp,vertical=6.dp)
+                ) {
+                    Icon(Icons.Default.Refresh,null,modifier=Modifier.size(16.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("به‌روزرسانی Following")
+                }
+            }
+        }
         return
     }
 
