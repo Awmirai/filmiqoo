@@ -584,10 +584,7 @@ private fun ClubForYou(
                                 runCatching { social.sharePost(post.id,"system") }
                             }
                         }
-                        val destination=post.media?.id
-                            ?.takeIf(String::isNotBlank)
-                            ?.let(FilmiqooDeepLinks::title)
-                            ?: FilmiqooDeepLinks.creator(post.author.id)
+                        val destination=FilmiqooDeepLinks.post(post.id)
                         FilmiqooDeepLinks.share(
                             context,
                             buildString {
