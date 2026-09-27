@@ -108,21 +108,6 @@ func (s *Server) storyAuthorIfAccessible(
     storyID string,
     viewerID string,
 ) (string,bool) {
-    var authorID string
-    err:=s.db.QueryRow(ctx,`
-        SELECT st.author_user_id::text
-          FROM stories st
-         WHERE st.id=$1
-           AND st.expires_at>now()
-           AND (
-             st.author_user_id=$2
-             OR st.close_friends_only=false
-             OR EXISTS (
-               SELECT 1 FROM close_friends cf
-                WHERE cf.owner_user_id=st.author_user_id
-                  AND cf.friend_user_id=$2
-             )
-           )
-    `,storyID,viewerID).Scan(&authorID)
-    return authorID,err==nil
+    authorID,allowed,exists,err:=s.storyAccess(ctx,viewerID,storyID)
+    return authorID,err==nil && exists && allowed
 }
