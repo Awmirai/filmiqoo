@@ -17,8 +17,9 @@ var pulseEmojiAllowed = map[string]bool{
 }
 
 type pulseReactionRequest struct {
-	Emoji      string `json:"emoji"`
-	PositionMS int64  `json:"positionMs"`
+	Emoji          string `json:"emoji"`
+	PositionMS     int64  `json:"positionMs"`
+	MediaVersionID string `json:"mediaVersionId"`
 }
 
 func (s *Server) mediaPulse(w http.ResponseWriter, r *http.Request) {
@@ -28,14 +29,32 @@ func (s *Server) mediaPulse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var exists bool
-	if err := s.db.QueryRow(
+	var mediaKind string
+	if err:=s.db.QueryRow(
 		r.Context(),
-		"SELECT EXISTS(SELECT 1 FROM media_titles WHERE id=$1)",
+		"SELECT kind FROM media_titles WHERE id=$1",
 		mediaID,
-	).Scan(&exists); err != nil || !exists {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "media title not found"})
+	).Scan(&mediaKind); err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"media title not found"})
 		return
+	}
+
+	mediaVersionID:=strings.TrimSpace(r.URL.Query().Get("mediaVersionId"))
+	var episodeID *string
+	if mediaVersionID!="" {
+		if err:=s.db.QueryRow(r.Context(),`
+			SELECT e.id::text
+			  FROM media_versions mv
+			  LEFT JOIN episodes e ON e.id=mv.episode_id
+			  LEFT JOIN seasons sn ON sn.id=e.season_id
+			 WHERE mv.id=$1
+			   AND COALESCE(mv.media_title_id,sn.media_title_id)=$2
+		`,mediaVersionID,mediaID).Scan(&episodeID); err!=nil {
+			writeJSON(w,http.StatusBadRequest,map[string]string{
+				"error":"media version does not belong to this title",
+			})
+			return
+		}
 	}
 
 	var watchingNow int64
@@ -83,6 +102,16 @@ func (s *Server) mediaPulse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	moments:=make([]map[string]any,0)
+	momentScope:=" AND episode_id IS NULL"
+	momentArgs:=[]any{mediaID}
+	if mediaKind!="movie" {
+		if episodeID==nil {
+			momentScope=" AND false"
+		} else {
+			momentScope=" AND episode_id=$2"
+			momentArgs=append(momentArgs,*episodeID)
+		}
+	}
 	momentRows,momentErr:=s.db.Query(r.Context(),`
 		WITH buckets AS (
 			SELECT
@@ -95,6 +124,7 @@ func (s *Server) mediaPulse(w http.ResponseWriter, r *http.Request) {
 				COUNT(*) FILTER (WHERE emoji='👀') AS eyes
 			  FROM media_pulse_reactions
 			 WHERE media_title_id=$1
+	`+momentScope+`
 			   AND position_ms>0
 			   AND created_at>now()-interval '30 days'
 			 GROUP BY (position_ms/15000)*15000
@@ -111,7 +141,7 @@ func (s *Server) mediaPulse(w http.ResponseWriter, r *http.Request) {
 		  FROM buckets
 		 ORDER BY reactions DESC,position_ms ASC
 		 LIMIT 5
-	`,mediaID)
+	`,momentArgs...)
 	if momentErr==nil {
 		defer momentRows.Close()
 		for momentRows.Next() {
@@ -163,13 +193,32 @@ func (s *Server) reactMediaPulse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body.MediaVersionID=strings.TrimSpace(body.MediaVersionID)
+
+	var reactionEpisodeID *string
+	if body.MediaVersionID!="" {
+		if err:=s.db.QueryRow(r.Context(),`
+			SELECT e.id::text
+			  FROM media_versions mv
+			  LEFT JOIN episodes e ON e.id=mv.episode_id
+			  LEFT JOIN seasons sn ON sn.id=e.season_id
+			 WHERE mv.id=$1
+			   AND COALESCE(mv.media_title_id,sn.media_title_id)=$2
+		`,body.MediaVersionID,mediaID).Scan(&reactionEpisodeID); err!=nil {
+			writeJSON(w,http.StatusBadRequest,map[string]string{
+				"error":"media version does not belong to this title",
+			})
+			return
+		}
+	}
+
 	var exists bool
-	if err := s.db.QueryRow(
+	if err:=s.db.QueryRow(
 		r.Context(),
 		"SELECT EXISTS(SELECT 1 FROM media_titles WHERE id=$1)",
 		mediaID,
-	).Scan(&exists); err != nil || !exists {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "media title not found"})
+	).Scan(&exists); err!=nil || !exists {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"media title not found"})
 		return
 	}
 
@@ -193,14 +242,19 @@ func (s *Server) reactMediaPulse(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := s.db.Exec(r.Context(), `
 		INSERT INTO media_pulse_reactions (
-			user_id,media_title_id,emoji,position_ms
-		) VALUES ($1,$2,$3,$4)
-	`, userID, mediaID, body.Emoji, body.PositionMS); err != nil {
+			user_id,media_title_id,episode_id,emoji,position_ms
+		) VALUES ($1,$2,$3,$4,$5)
+	`, userID, mediaID, reactionEpisodeID, body.Emoji, body.PositionMS); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	s.mediaPulse(w, r)
+	if body.MediaVersionID!="" {
+		query:=r.URL.Query()
+		query.Set("mediaVersionId",body.MediaVersionID)
+		r.URL.RawQuery=query.Encode()
+	}
+	s.mediaPulse(w,r)
 }
 
 
