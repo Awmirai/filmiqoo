@@ -565,13 +565,18 @@ class CreatorChannelRepository(
     ):List<SocialPost> {
         if(!backend.session.isLoggedIn || posts.isEmpty()) return posts
 
-        val ids=posts.take(100).joinToString(",") { it.id }
-        if(ids.isBlank()) return posts
+        val ids=posts.take(100).map { it.id }.filter(String::isNotBlank)
+        if(ids.isEmpty()) return posts
 
         val root=runCatching {
-            backend.getJson(
-                "/v1/social/posts/viewer-states?ids="+
-                    java.net.URLEncoder.encode(ids,"UTF-8"),
+            backend.postJson(
+                "/v1/social/posts/viewer-states",
+                JSONObject().put(
+                    "ids",
+                    org.json.JSONArray().apply {
+                        ids.forEach(::put)
+                    }
+                ),
                 authorized=true
             )
         }.getOrNull() ?: return posts
