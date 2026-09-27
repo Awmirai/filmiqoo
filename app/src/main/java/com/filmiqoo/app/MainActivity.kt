@@ -925,10 +925,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)},
                             badgeRefreshKey=socialBadgeRefresh
                         )
-                        1 -> ConnectedExploreScreen(
+                        1 -> ClipsScreen(
                             social=social,
                             backend=backend,
-                            repository=repository,
                             store=store,
                             loggedIn=backend.session.isLoggedIn,
                             initialReelId=deepLinkReelId,
@@ -936,7 +935,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onInitialReelConsumed={deepLinkReelId=null},
                             onVisibleReelChanged={clipResumeReelId=it},
                             onMedia={overlay=OverlayRoute.Detail(it)},
-                            onChat=openMediaRoom,
                             onCreator={overlay=OverlayRoute.CreatorPage(it)},
                             onRequireAuth={overlay=OverlayRoute.Auth}
                         )
