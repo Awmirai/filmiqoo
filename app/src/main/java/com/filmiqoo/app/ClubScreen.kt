@@ -55,6 +55,7 @@ fun ClubScreen(
     onOpenPost:(String)->Unit,
     onOpenRoom:(SocialRoom)->Unit,
     onStory:(List<SocialStory>,Int)->Unit,
+    onSearch:()->Unit={},
     onInbox:()->Unit,
     onCreate:()->Unit,
     onRequireAuth:()->Unit,
@@ -183,6 +184,7 @@ fun ClubScreen(
                 selected=tab,
                 unreadMessages=unreadMessages,
                 onSelected={tabName=it.name},
+                onSearch=onSearch,
                 onInbox=onInbox,
                 onCreate={
                     if(loggedIn) onCreate() else onRequireAuth()
@@ -658,6 +660,7 @@ private fun ClubHeader(
     selected:ClubTab,
     unreadMessages:Long,
     onSelected:(ClubTab)->Unit,
+    onSearch:()->Unit,
     onInbox:()->Unit,
     onCreate:()->Unit
 ) {
@@ -696,6 +699,13 @@ private fun ClubHeader(
                     modifier=Modifier.padding(top=2.dp)
                 )
             }
+
+            FqIconButton(
+                icon=Icons.Default.Search,
+                contentDescription="جستجو در Filmiqoo",
+                onClick=onSearch
+            )
+            Spacer(Modifier.width(5.dp))
 
             Box {
                 FqIconButton(
