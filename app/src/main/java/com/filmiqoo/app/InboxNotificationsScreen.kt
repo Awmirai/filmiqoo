@@ -578,6 +578,7 @@ fun ConnectedNotificationsScreen(
     onOpenMedia: (MediaItem) -> Unit,
     onOpenCollection: (String) -> Unit,
     onOpenWatchParty: (String) -> Unit,
+    onOpenLive: (String) -> Unit,
     onFollowRequests: () -> Unit
 ) {
     val repo=remember { MessagingRepository(backend) }
@@ -744,6 +745,8 @@ fun ConnectedNotificationsScreen(
                                     onOpenCollection(item.entityId)
                                 item.entityType=="watch_party" && !item.entityId.isNullOrBlank() ->
                                     onOpenWatchParty(item.entityId)
+                                item.entityType=="live" && !item.entityId.isNullOrBlank() ->
+                                    onOpenLive(item.entityId)
                                 item.entityType=="room" && !item.entityId.isNullOrBlank() ->
                                     onOpenRoom(item.entityId,item.actor?.displayName ?: "پیام")
                                 item.entityType=="reel" && !item.entityId.isNullOrBlank() ->
@@ -860,6 +863,7 @@ private fun notificationMatchesFilter(
         type.startsWith("post_") ||
         type.startsWith("reel_") ||
         type.startsWith("review_") ||
+        type.startsWith("live_") ||
         type=="comment_like" ||
         type=="collection_update"
     NotificationFilter.MESSAGES ->
@@ -889,6 +893,7 @@ private fun notificationIcon(type:String)=when(type) {
     "comment_like" -> Icons.Default.Favorite
     "dm_message" -> Icons.Default.MarkChatUnread
     "room_message" -> Icons.Default.Forum
+    "live_scheduled","live_started" -> Icons.Default.LiveTv
     "release_ready" -> Icons.Default.NewReleases
     "new_episode" -> Icons.Default.LiveTv
     "episode_stream_ready" -> Icons.Default.PlayCircle
@@ -916,6 +921,8 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "comment_like" -> "لایک کامنت"
     "dm_message" -> "پیام خصوصی"
     "room_message" -> "پیام گروه"
+    "live_scheduled" -> "رویداد زنده زمان‌بندی‌شده"
+    "live_started" -> "پخش زنده شروع شد"
     "release_ready" -> "انتشار"
     "new_episode" -> "قسمت جدید"
     "episode_stream_ready" -> "آماده تماشا"
