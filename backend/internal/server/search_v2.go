@@ -81,7 +81,15 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		 WHERE p.private_account=false
 		   AND ($1='' OR p.username::text ILIKE $2 ESCAPE E'\\' OR p.display_name ILIKE $2 ESCAPE E'\\' OR p.bio ILIKE $2 ESCAPE E'\\')
 		 ORDER BY
-		   CASE WHEN $1<>'' AND lower(p.username::text)=lower($1) THEN 0 ELSE 1 END,
+		   CASE
+		     WHEN $1='' THEN 5
+		     WHEN lower(p.username::text)=lower($1) THEN 0
+		     WHEN lower(p.display_name)=lower($1) THEN 1
+		     WHEN lower(p.username::text) LIKE lower($1)||'%' THEN 2
+		     WHEN lower(p.display_name) LIKE lower($1)||'%' THEN 3
+		     ELSE 4
+		   END,
+		   p.verified DESC,
 		   p.follower_count DESC,
 		   p.updated_at DESC
 		 LIMIT 20
@@ -112,7 +120,15 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		 WHERE visibility='public'
 		   AND ($1='' OR slug::text ILIKE $2 ESCAPE E'\\' OR name ILIKE $2 ESCAPE E'\\' OR bio ILIKE $2 ESCAPE E'\\')
 		 ORDER BY
-		   CASE WHEN $1<>'' AND lower(slug::text)=lower($1) THEN 0 ELSE 1 END,
+		   CASE
+		     WHEN $1='' THEN 5
+		     WHEN lower(slug::text)=lower($1) THEN 0
+		     WHEN lower(name)=lower($1) THEN 1
+		     WHEN lower(slug::text) LIKE lower($1)||'%' THEN 2
+		     WHEN lower(name) LIKE lower($1)||'%' THEN 3
+		     ELSE 4
+		   END,
+		   verified DESC,
 		   follower_count DESC,
 		   created_at DESC
 		 LIMIT 20
@@ -136,7 +152,7 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 	reels:=make([]map[string]any,0)
 	reelRows,err:=s.db.Query(r.Context(),`
 		SELECT r.id::text,r.caption,r.playback_url,r.cover_url,r.duration_ms,
-		       r.like_count,r.comment_count,r.view_count,r.spoiler,
+		       r.like_count,r.comment_count,r.save_count,r.share_count,r.view_count,r.spoiler,
 		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
 		       mt.id::text,mt.title,mt.poster_url
 		  FROM reels r
@@ -144,7 +160,17 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		  LEFT JOIN media_titles mt ON mt.id=r.media_title_id
 		 WHERE r.status='published'
 		   AND ($1='' OR r.caption ILIKE $2 ESCAPE E'\\' OR p.username::text ILIKE $2 ESCAPE E'\\' OR p.display_name ILIKE $2 ESCAPE E'\\' OR mt.title ILIKE $2 ESCAPE E'\\')
-		 ORDER BY r.view_count DESC,r.published_at DESC NULLS LAST
+		 ORDER BY
+		   CASE
+		     WHEN $1='' THEN 5
+		     WHEN lower(COALESCE(mt.title,''))=lower($1) THEN 0
+		     WHEN lower(p.username::text)=lower($1) THEN 1
+		     WHEN lower(p.display_name)=lower($1) THEN 2
+		     WHEN lower(r.caption) LIKE lower($1)||'%' THEN 3
+		     ELSE 4
+		   END,
+		   (r.save_count*5 + r.share_count*6 + r.comment_count*4 + r.like_count*2 + r.view_count/25) DESC,
+		   r.published_at DESC NULLS LAST
 		 LIMIT 20
 	`,query,pattern)
 	if err==nil {
@@ -152,16 +178,17 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		for reelRows.Next() {
 			var id,caption,playback,cover,userID,username,displayName,avatar string
 			var duration int
-			var likes,comments,views int64
+			var likes,comments,saves,shares,views int64
 			var spoiler,verified bool
 			var mediaID,title,poster *string
 			if err:=reelRows.Scan(
-				&id,&caption,&playback,&cover,&duration,&likes,&comments,&views,&spoiler,
+				&id,&caption,&playback,&cover,&duration,&likes,&comments,&saves,&shares,&views,&spoiler,
 				&userID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster,
 			); err!=nil { continue }
 			reels=append(reels,map[string]any{
 				"id":id,"caption":caption,"playbackUrl":playback,"coverUrl":cover,
-				"durationMs":duration,"likes":likes,"comments":comments,"views":views,"spoiler":spoiler,
+				"durationMs":duration,"likes":likes,"comments":comments,"saves":saves,
+				"shares":shares,"views":views,"spoiler":spoiler,
 				"author":map[string]any{
 					"id":userID,"username":username,"displayName":displayName,
 					"avatarUrl":avatar,"verified":verified,
@@ -171,11 +198,73 @@ func (s *Server) universalSearch(w http.ResponseWriter,r *http.Request) {
 		}
 	}
 
+	posts:=make([]map[string]any,0)
+	postRows,err:=s.db.Query(r.Context(),`
+		SELECT ps.id::text,ps.post_type,ps.body,ps.spoiler,
+		       ps.like_count,ps.comment_count,ps.save_count,ps.share_count,ps.published_at,
+		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
+		       mt.id::text,mt.title,mt.poster_url
+		  FROM posts ps
+		  JOIN profiles p ON p.user_id=ps.author_user_id
+		  LEFT JOIN channels ch ON ch.id=ps.channel_id
+		  LEFT JOIN media_titles mt ON mt.id=ps.media_title_id
+		 WHERE ps.status='published'
+		   AND p.private_account=false
+		   AND (ps.channel_id IS NULL OR ch.visibility='public')
+		   AND (
+		     $1='' OR
+		     ps.body ILIKE $2 ESCAPE E'\\' OR
+		     p.username::text ILIKE $2 ESCAPE E'\\' OR
+		     p.display_name ILIKE $2 ESCAPE E'\\' OR
+		     mt.title ILIKE $2 ESCAPE E'\\'
+		   )
+		 ORDER BY
+		   CASE
+		     WHEN $1='' THEN 5
+		     WHEN lower(p.username::text)=lower($1) THEN 0
+		     WHEN lower(p.display_name)=lower($1) THEN 1
+		     WHEN lower(COALESCE(mt.title,''))=lower($1) THEN 2
+		     WHEN lower(ps.body) LIKE lower($1)||'%' THEN 3
+		     ELSE 4
+		   END,
+		   (ps.save_count*5 + ps.share_count*6 + ps.comment_count*4 + ps.like_count*2) DESC,
+		   ps.published_at DESC NULLS LAST
+		 LIMIT 24
+	`,query,pattern)
+	if err==nil {
+		defer postRows.Close()
+		for postRows.Next() {
+			var id,typ,body,userID,username,displayName,avatar string
+			var spoiler,verified bool
+			var likes,comments,saves,shares int64
+			var published *time.Time
+			var mediaID,title,poster *string
+			if err:=postRows.Scan(
+				&id,&typ,&body,&spoiler,&likes,&comments,&saves,&shares,&published,
+				&userID,&username,&displayName,&avatar,&verified,
+				&mediaID,&title,&poster,
+			); err!=nil { continue }
+			posts=append(posts,map[string]any{
+				"id":id,"type":typ,"body":body,"spoiler":spoiler,
+				"likes":likes,"comments":comments,"saves":saves,"shares":shares,
+				"publishedAt":published,
+				"author":map[string]any{
+					"id":userID,"username":username,"displayName":displayName,
+					"avatarUrl":avatar,"verified":verified,
+				},
+				"media":map[string]any{
+					"id":mediaID,"title":title,"posterUrl":poster,
+				},
+			})
+		}
+	}
+
 	payload:=map[string]any{
 		"query":query,
 		"media":media,
 		"users":users,
 		"channels":channels,
+		"posts":posts,
 		"reels":reels,
 	}
 	if s.redis!=nil {
