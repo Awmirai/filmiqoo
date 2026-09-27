@@ -803,12 +803,14 @@ private fun CreatorPostsList(
         return
     }
 
+    val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val liked=remember { mutableStateMapOf<String,Boolean>() }
     val saved=remember { mutableStateMapOf<String,Boolean>() }
     val likeDelta=remember { mutableStateMapOf<String,Long>() }
     val saveDelta=remember { mutableStateMapOf<String,Long>() }
     val commentDelta=remember { mutableStateMapOf<String,Long>() }
+    val shareCount=remember { mutableStateMapOf<String,Long>() }
     val likeBusy=remember { mutableStateMapOf<String,Boolean>() }
     val saveBusy=remember { mutableStateMapOf<String,Boolean>() }
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
@@ -824,6 +826,7 @@ private fun CreatorPostsList(
             val likes=(post.likes+(likeDelta[post.id] ?: 0L)).coerceAtLeast(0L)
             val saves=(post.saves+(saveDelta[post.id] ?: 0L)).coerceAtLeast(0L)
             val comments=(post.comments+(commentDelta[post.id] ?: 0L)).coerceAtLeast(0L)
+            val shares=shareCount[post.id] ?: post.shares
 
             Surface(
                 color=FqSurface,
@@ -995,6 +998,41 @@ private fun CreatorPostsList(
                             color=FqMuted,
                             fontSize=9.sp
                         )
+
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick={
+                                FilmiqooDeepLinks.share(
+                                    context,
+                                    buildString {
+                                        append(post.author.displayName)
+                                        if(post.body.isNotBlank()) {
+                                            append("\n")
+                                            append(post.body.take(400))
+                                        }
+                                    },
+                                    FilmiqooDeepLinks.post(post.id)
+                                )
+                                if(loggedIn) {
+                                    scope.launch {
+                                        runCatching {
+                                            social.sharePost(post.id,"system")
+                                        }.onSuccess { count ->
+                                            shareCount[post.id]=count
+                                        }
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.IosShare,null,tint=FqMuted)
+                        }
+                        if(shares>0) {
+                            Text(
+                                compactCreatorCount(shares),
+                                color=FqMuted,
+                                fontSize=9.sp
+                            )
+                        }
 
                         Spacer(Modifier.weight(1f))
                         if(saves>0) {
