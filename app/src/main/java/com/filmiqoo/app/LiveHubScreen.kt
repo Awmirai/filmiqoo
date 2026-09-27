@@ -44,6 +44,7 @@ private enum class LiveHubFilter { ALL, LIVE, UPCOMING, MINE }
 fun LiveHubScreen(
     backend:BackendRepository,
     repository:TmdbRepository,
+    initialEventId:String?=null,
     onBack:()->Unit,
     onOpenRoom:(String,String)->Unit,
     onMedia:(MediaItem)->Unit,
@@ -55,7 +56,7 @@ fun LiveHubScreen(
     var loading by remember { mutableStateOf(true) }
     var events by remember { mutableStateOf<List<LiveEvent>>(emptyList()) }
     var myEventIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedId by rememberSaveable(initialEventId) { mutableStateOf(initialEventId) }
     var selected by remember { mutableStateOf<LiveEvent?>(null) }
     var myUserId by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
