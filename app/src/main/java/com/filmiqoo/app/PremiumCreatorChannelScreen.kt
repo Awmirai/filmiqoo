@@ -62,6 +62,7 @@ fun PremiumCreatorChannelScreen(
     onOpenRoom: (SocialRoom) -> Unit,
     onStory: (List<SocialStory>, Int) -> Unit,
     onOpenClip: (String) -> Unit,
+    onOpenPost: (String) -> Unit,
     onStartDm: (String, String) -> Unit,
     onManageChannel: (String, String) -> Unit,
     onReputation: (String) -> Unit,
@@ -240,7 +241,8 @@ fun PremiumCreatorChannelScreen(
                             social=social,
                             loggedIn=backend.session.isLoggedIn,
                             onRequireAuth=onRequireAuth,
-                            onMedia=onMedia
+                            onMedia=onMedia,
+                            onOpenPost=onOpenPost
                         )
                     }
                     else -> CreatorAbout(
@@ -335,7 +337,8 @@ fun PremiumCreatorChannelScreen(
                             social=social,
                             loggedIn=backend.session.isLoggedIn,
                             onRequireAuth=onRequireAuth,
-                            onMedia=onMedia
+                            onMedia=onMedia,
+                            onOpenPost=onOpenPost
                         )
                     }
                     2 -> if(channelLocked) {
@@ -1023,7 +1026,8 @@ private fun CreatorPostsList(
     social: SocialRepository,
     loggedIn: Boolean,
     onRequireAuth: () -> Unit,
-    onMedia: (MediaItem) -> Unit
+    onMedia: (MediaItem) -> Unit,
+    onOpenPost: (String) -> Unit
 ) {
     if(posts.isEmpty()) {
         PremiumEmptyState(
@@ -1064,6 +1068,7 @@ private fun CreatorPostsList(
                 shape=RoundedCornerShape(20.dp),
                 border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
                 modifier=Modifier.fillMaxWidth()
+                    .clickable { onOpenPost(post.id) }
             ) {
                 Column(Modifier.padding(14.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
