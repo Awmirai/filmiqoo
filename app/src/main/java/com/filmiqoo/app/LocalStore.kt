@@ -23,4 +23,11 @@ class LocalStore(context: Context) {
     }
 
     fun count(bucket: String): Int = prefs.getStringSet(bucket, emptySet())?.size ?: 0
+
+    fun getBoolean(key:String,default:Boolean=false):Boolean =
+        prefs.getBoolean(key,default)
+
+    fun putBoolean(key:String,value:Boolean) {
+        prefs.edit().putBoolean(key,value).apply()
+    }
 }
