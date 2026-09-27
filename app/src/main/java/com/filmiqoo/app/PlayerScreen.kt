@@ -1237,6 +1237,7 @@ fun FilmiqooPlayerScreen(
                 ?.let { mediaId ->
                     PlayerPulseBar(
                         state=pulseState,
+                        currentPositionMs=positionMs,
                         busy=pulseBusy,
                         onReact={ emoji ->
                             if(!pulseBusy) {
@@ -1276,7 +1277,9 @@ fun FilmiqooPlayerScreen(
                 durationMs=durationMs,
                 fraction=seekFraction,
                 speed=playbackSpeed,
-                hotMoments=pulseState?.moments.orEmpty(),
+                hotMoments=pulseState?.moments
+                    .orEmpty()
+                    .filter { it.positionMs<=positionMs },
                 onHotMoment={ moment ->
                     seekActive(moment.positionMs)
                     playerSettingsMessage=
@@ -3551,6 +3554,7 @@ private fun chooseDataSaverVariant(
 @Composable
 private fun PlayerPulseBar(
     state:PulseState?,
+    currentPositionMs:Long,
     busy:Boolean,
     onReact:(String)->Unit,
     onJumpToMoment:(PulseMoment)->Unit,
@@ -3570,7 +3574,9 @@ private fun PlayerPulseBar(
             Modifier.padding(horizontal=8.dp,vertical=7.dp),
             verticalArrangement=Arrangement.spacedBy(5.dp)
         ) {
-            val hottest=state?.moments?.firstOrNull()
+            val hottest=state?.moments
+                ?.filter { it.positionMs<=currentPositionMs }
+                ?.maxByOrNull { it.reactions }
             if((state?.watchingNow ?: 0L)>0L || hottest!=null) {
                 Row(
                     verticalAlignment=Alignment.CenterVertically,
