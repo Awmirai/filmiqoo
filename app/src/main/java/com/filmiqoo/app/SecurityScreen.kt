@@ -73,6 +73,13 @@ fun SecurityScreen(
         }
     }
 
+    val orderedSessions=remember(sessions) {
+        sessions.sortedWith(
+            compareByDescending<AccountSession> { it.current }
+                .thenByDescending { it.lastUsedAt }
+        )
+    }
+
     BackHandler { onBack() }
 
     LaunchedEffect(refresh) {
@@ -92,7 +99,7 @@ fun SecurityScreen(
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
                 Text("امنیت و دستگاه‌ها",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text("Sessionهای فعال حساب Filmiqoo",color=FqMuted,fontSize=11.sp)
+                Text(orderedSessions.size.toString()+" دستگاه/نشست فعال",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
@@ -122,9 +129,9 @@ fun SecurityScreen(
                     Icon(Icons.Default.Security,null,tint=FqGold)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("کنترل Sessionها",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text("کنترل نشست‌ها",fontSize=12.sp,fontWeight=FontWeight.Bold)
                         Text(
-                            "اگر دستگاه ناشناسی دیدی، Session اون دستگاه رو قطع کن.",
+                            "اگر دستگاه ناشناسی دیدی، نشست اون دستگاه رو قطع کن.",
                             color=FqMuted,
                             fontSize=11.sp,
                             lineHeight=14.sp
@@ -134,7 +141,7 @@ fun SecurityScreen(
 
                 OutlinedButton(
                     onClick={confirmOthers=true},
-                    enabled=sessions.any {!it.current},
+                    enabled=orderedSessions.any {!it.current},
                     colors=ButtonDefaults.outlinedButtonColors(contentColor=FqDanger),
                     modifier=Modifier.fillMaxWidth().padding(top=12.dp)
                 ) {
@@ -209,7 +216,7 @@ fun SecurityScreen(
         if(!loading && sessions.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.Devices,
-                "Session فعالی پیدا نشد",
+                "نشست فعالی پیدا نشد",
                 "بعد از ورود، دستگاه‌های فعال اینجا نمایش داده می‌شن."
             )
         } else {
@@ -218,7 +225,7 @@ fun SecurityScreen(
                 verticalArrangement=Arrangement.spacedBy(8.dp),
                 modifier=Modifier.weight(1f)
             ) {
-                items(sessions,key={it.id}) { session ->
+                items(orderedSessions,key={it.id}) { session ->
                     SecuritySessionCard(
                         session=session,
                         onRevoke={revokeTarget=session}
@@ -232,11 +239,11 @@ fun SecurityScreen(
         AlertDialog(
             onDismissRequest={revokeTarget=null},
             icon={Icon(Icons.Default.PhonelinkErase,null,tint=FqDanger)},
-            title={Text(if(target.current)"خروج از این دستگاه؟" else "قطع این Session؟")},
+            title={Text(if(target.current)"خروج از این دستگاه؟" else "قطع این نشست؟")},
             text={
                 Text(
                     if(target.current)
-                        "با قطع Session فعلی باید دوباره وارد حساب شوی."
+                        "با قطع نشست فعلی باید دوباره وارد حساب شوی."
                     else
                         "دسترسی «"+target.deviceName+"» فوراً قطع می‌شود."
                 )
@@ -251,13 +258,13 @@ fun SecurityScreen(
                                     backend.session.clear()
                                     onCurrentSessionRevoked()
                                 } else {
-                                    actionMessage="Session قطع شد."
+                                    actionMessage="نشست قطع شد."
                                     refresh++
                                 }
                             }
                             .onFailure { error=it.message }
                     }
-                }) { Text("قطع Session",color=FqDanger) }
+                }) { Text("قطع نشست",color=FqDanger) }
             },
             dismissButton={TextButton(onClick={revokeTarget=null}){Text("لغو")}}
         )
@@ -354,14 +361,14 @@ fun SecurityScreen(
             onDismissRequest={confirmOthers=false},
             icon={Icon(Icons.Default.DevicesOther,null,tint=FqGold)},
             title={Text("خروج از دستگاه‌های دیگر؟")},
-            text={Text("Session فعلی باقی می‌مونه و تمام Sessionهای فعال دیگر Revoke می‌شن.")},
+            text={Text("نشست فعلی باقی می‌مونه و تمام نشست‌های فعال دیگر قطع می‌شن.")},
             confirmButton={
                 TextButton(onClick={
                     confirmOthers=false
                     scope.launch {
                         runCatching { repo.revokeOthers() }
                             .onSuccess {
-                                actionMessage=it.toString()+" Session قطع شد."
+                                actionMessage=it.toString()+" نشست قطع شد."
                                 refresh++
                             }
                             .onFailure { error=it.message }
