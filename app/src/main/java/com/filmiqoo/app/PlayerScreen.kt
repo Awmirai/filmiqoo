@@ -2516,9 +2516,9 @@ private fun PlayerSettingsSheet(
                                 Icon(Icons.Default.DataSaverOn,null,tint=FqGold)
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    Text("Data Saver فعال",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                                    Text("صرفه‌جویی داده فعاله",fontSize=11.sp,fontWeight=FontWeight.Bold)
                                     Text(
-                                        "روی شبکه Metered کیفیت سبک‌تر به‌صورت خودکار انتخاب شده؛ هر زمان خواستی دستی عوضش کن.",
+                                        "روی اینترنت محدود، کیفیت سبک‌تر خودکار انتخاب شده؛ هر زمان خواستی دستی عوضش کن.",
                                         color=FqMuted,
                                         fontSize=11.sp,
                                         lineHeight=13.sp
@@ -2545,7 +2545,7 @@ private fun PlayerSettingsSheet(
 
                 PlayerSettingsTab.AUDIO -> {
                     if(audioTracks.isEmpty()) {
-                        PlayerSettingsEmpty("Track صوتی قابل انتخاب دیگری شناسایی نشد.")
+                        PlayerSettingsEmpty("صدای قابل انتخاب دیگری برای این فایل پیدا نشد.")
                     } else {
                         audioTracks.forEach { choice ->
                             PlayerSettingsRow(
@@ -2585,7 +2585,7 @@ private fun PlayerSettingsSheet(
                         PlayerSettingsRow(
                             icon=Icons.Default.Attachment,
                             title=label,
-                            subtitle="External subtitle فعال • لمس برای حذف",
+                            subtitle="زیرنویس خارجی فعاله • برای حذف لمس کن",
                             selected=true,
                             onClick=onClearExternalSubtitle
                         )
@@ -2690,8 +2690,8 @@ private fun PlayerSettingsSheet(
                         items(
                             listOf(
                                 "none" to "بدون حاشیه",
-                                "outline" to "Outline",
-                                "shadow" to "Shadow"
+                                "outline" to "دورخط",
+                                "shadow" to "سایه"
                             )
                         ) { item ->
                             PremiumChip(
@@ -2716,9 +2716,9 @@ private fun PlayerSettingsSheet(
                     ) {
                         items(
                             listOf(
-                                "fit" to "Fit",
-                                "fill" to "Fill",
-                                "zoom" to "Zoom"
+                                "fit" to "جاگذاری",
+                                "fill" to "پر کردن",
+                                "zoom" to "زوم"
                             )
                         ) { item ->
                             PremiumChip(
@@ -2825,7 +2825,7 @@ private fun PlayerSettingsSheet(
 
                 PlayerSettingsTab.ADVANCED -> {
                     Text(
-                        "A‑B Repeat",
+                        "تکرار بازه A‑B",
                         color=FqMuted,
                         fontSize=11.sp,
                         modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp)
@@ -2856,7 +2856,7 @@ private fun PlayerSettingsSheet(
                     if(abStartMs!=null || abEndMs!=null) {
                         PlayerSettingsRow(
                             icon=Icons.Default.Repeat,
-                            title=if(abStartMs!=null && abEndMs!=null)"A‑B Repeat فعال" else "A‑B Repeat آماده",
+                            title=if(abStartMs!=null && abEndMs!=null)"تکرار A‑B فعاله" else "تکرار A‑B آماده‌ست",
                             subtitle=listOfNotNull(
                                 abStartMs?.let { "A "+formatPlayerTime(it) },
                                 abEndMs?.let { "B "+formatPlayerTime(it) }
@@ -2876,9 +2876,9 @@ private fun PlayerSettingsSheet(
                         verticalAlignment=Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Playback Diagnostics",fontSize=11.sp)
+                            Text("اطلاعات فنی پخش",fontSize=11.sp)
                             Text(
-                                "Resolution، Codec، Bitrate، Buffer و Network را روی تصویر نشان بده.",
+                                "رزولوشن، کدک، بیت‌ریت، بافر و وضعیت شبکه رو روی تصویر نشون بده.",
                                 color=FqMuted,
                                 fontSize=11.sp,
                                 modifier=Modifier.padding(top=3.dp)
@@ -2902,9 +2902,9 @@ private fun PlayerSettingsSheet(
                     ) {
                         items(
                             listOf(
-                                "auto" to "Auto",
-                                "landscape" to "Landscape",
-                                "portrait" to "Portrait"
+                                "auto" to "خودکار",
+                                "landscape" to "افقی",
+                                "portrait" to "عمودی"
                             )
                         ) { item ->
                             PremiumChip(
