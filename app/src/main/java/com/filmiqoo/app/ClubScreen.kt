@@ -92,9 +92,10 @@ fun ClubScreen(
     LaunchedEffect(networkOnline) {
         if(!networkOnline) {
             hadOffline=true
-        } else if(hadOffline && error!=null) {
+        } else if(hadOffline) {
+            val shouldRetry=error!=null
             hadOffline=false
-            refresh++
+            if(shouldRetry) refresh++
         }
     }
 
