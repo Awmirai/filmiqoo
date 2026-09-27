@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,7 +38,9 @@ fun DiscoverHubScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var data by remember { mutableStateOf(HomeBundle()) }
     var creators by remember { mutableStateOf<List<SocialChannel>>(emptyList()) }
-    var filter by remember { mutableStateOf(DiscoverFilter.ALL) }
+    var filterName by rememberSaveable { mutableStateOf(DiscoverFilter.ALL.name) }
+    val filter=runCatching { DiscoverFilter.valueOf(filterName) }
+        .getOrDefault(DiscoverFilter.ALL)
     var refresh by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(refresh) {
@@ -45,7 +48,7 @@ fun DiscoverHubScreen(
         error=null
         runCatching { repository.home() }
             .onSuccess { data=it }
-            .onFailure { error=it.message ?: "Discover در دسترس نیست" }
+            .onFailure { error=it.message ?: "بخش کشف در دسترس نیست" }
         creators=runCatching { social.channels() }.getOrDefault(emptyList())
         loading=false
     }
@@ -83,7 +86,7 @@ fun DiscoverHubScreen(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Discover",
+                            "کشف",
                             fontSize=30.sp,
                             fontWeight=FontWeight.Black,
                             letterSpacing=(-0.5).sp
@@ -143,7 +146,7 @@ fun DiscoverHubScreen(
                             color=if(active)Color.White else FqSurface,
                             contentColor=if(active)Color.Black else FqMuted,
                             shape=RoundedCornerShape(14.dp),
-                            modifier=Modifier.clickable { filter=item.first }
+                            modifier=Modifier.clickable { filterName=item.first.name }
                         ) {
                             Text(
                                 item.second,
@@ -204,7 +207,7 @@ fun DiscoverHubScreen(
             }
         }
 
-        if(data.popularMovies.isNotEmpty()) {
+        if(filter!=DiscoverFilter.SERIES && data.popularMovies.isNotEmpty()) {
             item { DiscoverTitle("فیلم‌ها","انتخاب‌های قوی برای امشب") }
             item {
                 DiscoverPosterRow(
@@ -215,7 +218,7 @@ fun DiscoverHubScreen(
             }
         }
 
-        if(data.popularTv.isNotEmpty()) {
+        if(filter!=DiscoverFilter.MOVIES && data.popularTv.isNotEmpty()) {
             item { DiscoverTitle("سریال‌ها","چیزهایی که ارزش ادامه دادن دارن") }
             item {
                 DiscoverPosterRow(
@@ -229,8 +232,8 @@ fun DiscoverHubScreen(
         if(creators.isNotEmpty()) {
             item {
                 DiscoverTitle(
-                    "Creatorهای پیشنهادی",
-                    "آدم‌ها و رسانه‌هایی که محتوای خوبی می‌سازن"
+                    "سازنده‌های پیشنهادی",
+                    "آدم‌ها و کانال‌هایی که محتوای خوبی می‌سازن"
                 )
             }
             item {
