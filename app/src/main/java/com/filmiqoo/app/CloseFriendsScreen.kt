@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,7 +33,7 @@ fun CloseFriendsScreen(
     val scope=rememberCoroutineScope()
 
     var refresh by remember { mutableIntStateOf(0) }
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var people by remember { mutableStateOf<List<CloseFriendCandidate>>(emptyList()) }
@@ -65,9 +66,9 @@ fun CloseFriendsScreen(
         ) {
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
-                Text("Close Friends",fontSize=22.sp,fontWeight=FontWeight.Black)
+                Text("دوستان نزدیک",fontSize=22.sp,fontWeight=FontWeight.Black)
                 Text(
-                    people.count{it.closeFriend}.toString()+" نفر • فقط برای Storyهای خصوصی",
+                    people.count{it.closeFriend}.toString()+" نفر • مخصوص استوری‌های خصوصی",
                     color=FqGold,
                     fontSize=11.sp
                 )
@@ -84,7 +85,7 @@ fun CloseFriendsScreen(
                 Icon(Icons.Default.Star,null,tint=FqGreen)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "فقط افرادی که Follow می‌کنی می‌تونن وارد Close Friends بشن. خود لیست برای بقیه نمایش داده نمی‌شه.",
+                    "فقط افرادی که دنبال می‌کنی می‌تونن وارد دوستان نزدیک بشن. خود این لیست برای بقیه نمایش داده نمی‌شه.",
                     color=Color.White.copy(alpha=.78f),
                     fontSize=11.sp,
                     lineHeight=14.sp
@@ -95,7 +96,7 @@ fun CloseFriendsScreen(
         OutlinedTextField(
             value=query,
             onValueChange={query=it},
-            placeholder={Text("جستجو بین Following...")},
+            placeholder={Text("جستجو بین دنبال‌شده‌ها...")},
             leadingIcon={Icon(Icons.Default.Search,null)},
             singleLine=true,
             shape=RoundedCornerShape(17.dp),
@@ -118,8 +119,8 @@ fun CloseFriendsScreen(
         if(!loading && people.isEmpty()) {
             PremiumEmptyState(
                 icon=Icons.Default.GroupAdd,
-                title="هنوز کسی رو Follow نکردی",
-                body="اول Creator یا کاربرهای موردعلاقه‌ات رو Follow کن؛ بعد می‌تونی از اینجا به Close Friends اضافه‌شون کنی."
+                title="هنوز کسی رو دنبال نکردی",
+                body="اول سازنده یا کاربرهای موردعلاقه‌ات رو دنبال کن؛ بعد می‌تونی از اینجا به دوستان نزدیک اضافه‌شون کنی."
             )
         } else if(!loading && filtered.isEmpty()) {
             PremiumEmptyState(
@@ -211,7 +212,7 @@ fun CloseFriendsScreen(
                                     )
                                     Spacer(Modifier.width(4.dp))
                                     Text(
-                                        if(person.closeFriend)"Close Friend" else "افزودن",
+                                        if(person.closeFriend)"دوست نزدیک" else "افزودن",
                                         fontSize=11.sp
                                     )
                                 }
