@@ -57,6 +57,7 @@ fun LibraryScreen(
     var sceneBookmarks by remember { mutableStateOf<List<SceneBookmark>>(emptyList()) }
     var activeCollection by remember { mutableStateOf<MediaCollectionDetail?>(null) }
     var showCreate by remember { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler(enabled=activeCollection!=null || showBack) {
         if(activeCollection!=null) activeCollection=null else onBack()
@@ -123,6 +124,40 @@ fun LibraryScreen(
         return
     }
 
+    val normalizedQuery=query.trim()
+    val filteredFavorites=remember(favorites,normalizedQuery) {
+        if(normalizedQuery.isBlank()) favorites
+        else favorites.filter { media ->
+            media.title.contains(normalizedQuery,ignoreCase=true) ||
+                media.originalTitle.contains(normalizedQuery,ignoreCase=true) ||
+                media.overview.contains(normalizedQuery,ignoreCase=true)
+        }
+    }
+    val filteredWatchlist=remember(watchlist,normalizedQuery) {
+        if(normalizedQuery.isBlank()) watchlist
+        else watchlist.filter { media ->
+            media.title.contains(normalizedQuery,ignoreCase=true) ||
+                media.originalTitle.contains(normalizedQuery,ignoreCase=true) ||
+                media.overview.contains(normalizedQuery,ignoreCase=true)
+        }
+    }
+    val filteredCollections=remember(collections,normalizedQuery) {
+        if(normalizedQuery.isBlank()) collections
+        else collections.filter { collection ->
+            collection.name.contains(normalizedQuery,ignoreCase=true) ||
+                collection.description.contains(normalizedQuery,ignoreCase=true)
+        }
+    }
+    val filteredScenes=remember(sceneBookmarks,normalizedQuery) {
+        if(normalizedQuery.isBlank()) sceneBookmarks
+        else sceneBookmarks.filter { scene ->
+            scene.title.contains(normalizedQuery,ignoreCase=true) ||
+                scene.subtitle.contains(normalizedQuery,ignoreCase=true) ||
+                scene.note.contains(normalizedQuery,ignoreCase=true) ||
+                scene.tag.contains(normalizedQuery,ignoreCase=true)
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(FqBg)) {
         LibraryHeader(
             favoriteCount=favorites.size,
@@ -137,6 +172,11 @@ fun LibraryScreen(
         LibraryQuickAccess(
             onDownloads=onDownloads,
             onHistory=onHistory
+        )
+
+        LibrarySearchField(
+            query=query,
+            onQuery={query=it}
         )
 
         TabRow(
@@ -175,19 +215,31 @@ fun LibraryScreen(
 
         when(tab) {
             LibraryTab.FAVORITES -> LibraryMediaGrid(
-                items=favorites,
+                items=filteredFavorites,
                 repository=repository,
-                emptyTitle="هنوز چیزی به علاقه‌مندی‌ها اضافه نکردی",
-                emptyBody="از صفحه فیلم یا سریال، قلب رو بزن تا اینجا نگهش داری.",
+                emptyTitle=if(normalizedQuery.isBlank())
+                    "هنوز چیزی به علاقه‌مندی‌ها اضافه نکردی"
+                else
+                    "در علاقه‌مندی‌ها پیدا نشد",
+                emptyBody=if(normalizedQuery.isBlank())
+                    "از صفحه فیلم یا سریال، قلب رو بزن تا اینجا نگهش داری."
+                else
+                    "عبارت جستجو رو تغییر بده یا پاکش کن.",
                 emptyIcon=Icons.Default.FavoriteBorder,
                 onMedia=onMedia
             )
 
             LibraryTab.WATCHLIST -> LibraryMediaGrid(
-                items=watchlist,
+                items=filteredWatchlist,
                 repository=repository,
-                emptyTitle="لیست «بعداً می‌بینم» خالیه",
-                emptyBody="فیلم‌ها و سریال‌هایی که برای بعد نگه می‌داری اینجا جمع می‌شن.",
+                emptyTitle=if(normalizedQuery.isBlank())
+                    "لیست «بعداً می‌بینم» خالیه"
+                else
+                    "در «بعداً می‌بینم» پیدا نشد",
+                emptyBody=if(normalizedQuery.isBlank())
+                    "فیلم‌ها و سریال‌هایی که برای بعد نگه می‌داری اینجا جمع می‌شن."
+                else
+                    "عبارت جستجو رو تغییر بده یا پاکش کن.",
                 emptyIcon=Icons.Default.BookmarkBorder,
                 onMedia=onMedia
             )
@@ -213,20 +265,28 @@ fun LibraryScreen(
                         }
                     }
 
-                    if(!loading && collections.isEmpty()) {
-                        PremiumEmptyState(
-                            icon=Icons.Default.CollectionsBookmark,
-                            title="هنوز لیست شخصی نداری",
-                            body="مثلاً «فیلم‌های آخر هفته»، «بهترین‌های ۲۰۲۶» یا «انیمه‌های محبوب» بساز.",
-                            action="ساخت لیست",
-                            onAction={showCreate=true}
-                        )
+                    if(!loading && filteredCollections.isEmpty()) {
+                        if(normalizedQuery.isBlank()) {
+                            PremiumEmptyState(
+                                icon=Icons.Default.CollectionsBookmark,
+                                title="هنوز لیست شخصی نداری",
+                                body="مثلاً «فیلم‌های آخر هفته»، «بهترین‌های ۲۰۲۶» یا «انیمه‌های محبوب» بساز.",
+                                action="ساخت لیست",
+                                onAction={showCreate=true}
+                            )
+                        } else {
+                            PremiumEmptyState(
+                                icon=Icons.Default.SearchOff,
+                                title="لیستی پیدا نشد",
+                                body="عبارت جستجو رو تغییر بده یا پاکش کن."
+                            )
+                        }
                     } else {
                         LazyColumn(
                             contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),
                             verticalArrangement=Arrangement.spacedBy(8.dp)
                         ) {
-                            items(collections,key={it.id}) { collection ->
+                            items(filteredCollections,key={it.id}) { collection ->
                                 CollectionCard(
                                     collection=collection,
                                     onClick={
@@ -246,7 +306,7 @@ fun LibraryScreen(
             }
 
             LibraryTab.SCENES -> SceneBookmarksLibrary(
-                items=sceneBookmarks,
+                items=filteredScenes,
                 onPlay=onPlay,
                 onDelete={bookmark->
                     scope.launch {
@@ -332,6 +392,46 @@ private fun LibraryHeader(
             }
         }
     }
+}
+
+@Composable
+private fun LibrarySearchField(
+    query:String,
+    onQuery:(String)->Unit
+) {
+    OutlinedTextField(
+        value=query,
+        onValueChange=onQuery,
+        singleLine=true,
+        placeholder={Text("جستجو در کتابخانه...")},
+        leadingIcon={
+            Icon(
+                Icons.Default.Search,
+                contentDescription=null,
+                modifier=Modifier.size(18.dp)
+            )
+        },
+        trailingIcon={
+            if(query.isNotBlank()) {
+                IconButton(onClick={onQuery("")}) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription="پاک کردن جستجو",
+                        modifier=Modifier.size(18.dp)
+                    )
+                }
+            }
+        },
+        shape=RoundedCornerShape(16.dp),
+        colors=OutlinedTextFieldDefaults.colors(
+            focusedBorderColor=FqGold.copy(alpha=.6f),
+            unfocusedBorderColor=FqBorder,
+            focusedContainerColor=FqSurface,
+            unfocusedContainerColor=FqSurface
+        ),
+        modifier=Modifier.fillMaxWidth()
+            .padding(horizontal=12.dp,bottom=4.dp)
+    )
 }
 
 @Composable
