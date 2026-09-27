@@ -3081,8 +3081,8 @@ private fun DialogueSearchSheet(
     onDismiss: () -> Unit
 ) {
     val repo=remember { DialogueSearchRepository(backend) }
-    var query by remember { mutableStateOf("") }
-    var language by remember { mutableStateOf("") }
+    var query by rememberSaveable(mediaVersionId) { mutableStateOf("") }
+    var language by rememberSaveable(mediaVersionId) { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var results by remember { mutableStateOf<List<DialogueCue>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -3167,12 +3167,12 @@ private fun DialogueSearchSheet(
                     listOf(
                         "" to "همه",
                         "fa" to "فارسی",
-                        "en" to "English",
-                        "de" to "Deutsch",
-                        "ar" to "العربية",
-                        "tr" to "Türkçe",
-                        "ko" to "한국어",
-                        "ja" to "日本語"
+                        "en" to "انگلیسی",
+                        "de" to "آلمانی",
+                        "ar" to "عربی",
+                        "tr" to "ترکی",
+                        "ko" to "کره‌ای",
+                        "ja" to "ژاپنی"
                     )
                 ) { item ->
                     FilterChip(
@@ -3228,6 +3228,7 @@ private fun DialogueSearchSheet(
                                 shape=RoundedCornerShape(15.dp),
                                 modifier=Modifier.fillMaxWidth().clickable {
                                     onSeekTo(cue.startMs)
+                                    onDismiss()
                                 }
                             ) {
                                 Row(
