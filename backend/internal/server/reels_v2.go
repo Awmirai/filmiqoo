@@ -46,6 +46,32 @@ func (s *Server) reelViewerState(w http.ResponseWriter,r *http.Request) {
 	})
 }
 
+func (s *Server) removeReel(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	reelID:=chi.URLParam(r,"id")
+
+	var removedID string
+	err:=s.db.QueryRow(r.Context(),`
+		UPDATE reels
+		   SET status='removed'
+		 WHERE id=$1
+		   AND creator_user_id=$2
+		   AND status<>'removed'
+		RETURNING id::text
+	`,reelID,userID).Scan(&removedID)
+	if err!=nil {
+		writeJSON(w,http.StatusNotFound,map[string]string{
+			"error":"clip not found or not owned by user",
+		})
+		return
+	}
+
+	writeJSON(w,http.StatusOK,map[string]any{
+		"id":removedID,
+		"removed":true,
+	})
+}
+
 func (s *Server) toggleReelLike(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	reelID:=chi.URLParam(r,"id")
