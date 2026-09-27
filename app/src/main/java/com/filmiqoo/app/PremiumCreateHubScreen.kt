@@ -482,15 +482,23 @@ fun PremiumCreateHubScreen(
                             label={
                                 Text(
                                     when(kind) {
-                                        CreateKind.REVIEW -> "متن Review"
-                                        CreateKind.POLL -> "سؤال Poll"
-                                        CreateKind.STORY -> "متن / Caption"
-                                        else -> "Caption"
+                                        CreateKind.REVIEW -> "متن ریویو"
+                                        CreateKind.POLL -> "سؤال نظرسنجی"
+                                        CreateKind.STORY -> "متن استوری"
+                                        CreateKind.REEL -> "کپشن کلیپ"
+                                        else -> "متن پست"
                                     }
                                 )
                             },
                             minLines=3,
                             maxLines=8,
+                            supportingText={
+                                Text(
+                                    caption.length.toString()+"/5000",
+                                    color=if(caption.length>4700)FqDanger else FqMuted,
+                                    fontSize=11.sp
+                                )
+                            },
                             shape=RoundedCornerShape(15.dp),
                             modifier=Modifier.fillMaxWidth().padding(top=12.dp)
                         )
