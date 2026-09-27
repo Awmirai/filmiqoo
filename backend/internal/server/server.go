@@ -185,6 +185,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			)
 			r.Post("/catalog/{id}/pulse/react", s.reactMediaPulse)
 			r.Post("/social/reels", s.createReel)
+			r.Get("/social/reels/{id}/viewer", s.viewerReelDetail)
 			r.Get("/social/reels/{id}/viewer-state", s.reelViewerState)
 			r.Post("/social/reels/{id}/like", s.toggleReelLike)
 			r.Post("/social/reels/{id}/save", s.toggleReelSave)
@@ -196,6 +197,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/social/reels/saved", s.savedReels)
 			r.Post("/social/posts/viewer-states", s.postViewerStates)
 			r.Get("/social/posts/viewer-states", s.postViewerStates)
+			r.Get("/social/posts/{id}/viewer", s.viewerPostDetail)
 			r.Get("/social/posts/{id}/viewer-state", s.postViewerState)
 			r.Post("/social/posts/{id}/like", s.togglePostLike)
 			r.Post("/social/posts/{id}/save", s.togglePostSave)
@@ -562,8 +564,14 @@ func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
 		       mt.year,mt.rating
 		  FROM reels r
 		  JOIN profiles p ON p.user_id=r.creator_user_id
+		  LEFT JOIN channels ch ON ch.id=r.channel_id
 		  LEFT JOIN media_titles mt ON mt.id=r.media_title_id
 		 WHERE r.status='published'
+		   AND (
+		     (r.channel_id IS NULL AND p.private_account=false)
+		     OR
+		     (r.channel_id IS NOT NULL AND ch.visibility='public')
+		   )
 		 ORDER BY r.published_at DESC NULLS LAST,r.created_at DESC
 		 LIMIT 50
 	`)
