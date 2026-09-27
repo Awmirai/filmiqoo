@@ -70,6 +70,7 @@ fun ClipsScreen(
     onVisibleReelChanged: (String) -> Unit = {},
     onMedia: (MediaItem) -> Unit,
     onCreator: (Creator) -> Unit,
+    onSearch: () -> Unit = {},
     onRequireAuth: () -> Unit
 ) {
     val context=LocalContext.current
@@ -150,6 +151,7 @@ fun ClipsScreen(
                     loggedIn=loggedIn,
                     onMedia=onMedia,
                     onCreator=onCreator,
+                    onSearch=onSearch,
                     onRequireAuth=onRequireAuth,
                     onVisibleReelChanged=onVisibleReelChanged,
                     onClipRemoved={ removedId ->
@@ -203,6 +205,7 @@ private fun RealReelsPager(
     loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit,
     onCreator:(Creator)->Unit,
+    onSearch:()->Unit,
     onRequireAuth:()->Unit,
     onVisibleReelChanged:(String)->Unit,
     onClipRemoved:(String)->Unit,
@@ -526,6 +529,29 @@ private fun RealReelsPager(
                     "  •  برای تو",
                     color=Color.White.copy(alpha=.65f),
                     fontSize=10.sp
+                )
+            }
+        }
+
+        Surface(
+            color=Color.Black.copy(alpha=.48f),
+            contentColor=Color.White,
+            shape=CircleShape,
+            border=androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Color.White.copy(alpha=.10f)
+            ),
+            modifier=Modifier.align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(top=8.dp,start=10.dp)
+                .size(44.dp)
+                .clickable { onSearch() }
+        ) {
+            Box(contentAlignment=Alignment.Center) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription="جستجو در Filmiqoo",
+                    modifier=Modifier.size(21.dp)
                 )
             }
         }
