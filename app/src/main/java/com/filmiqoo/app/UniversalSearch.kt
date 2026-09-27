@@ -66,6 +66,7 @@ data class UniversalSearchResult(
     val media: List<MediaItem>,
     val users: List<SearchUser>,
     val channels: List<SearchChannel>,
+    val posts: List<SocialPost>,
     val reels: List<SearchReel>
 )
 
@@ -131,6 +132,47 @@ class UniversalSearchRepository(
             }
         }
 
+        val posts=buildList {
+            val arr=root.optJSONArray("posts")
+            if(arr!=null) for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val authorObj=x.optJSONObject("author") ?: JSONObject()
+                val mediaObj=x.optJSONObject("media")
+                add(
+                    SocialPost(
+                        id=x.optString("id"),
+                        type=x.optString("type","post"),
+                        body=x.optString("body"),
+                        spoiler=x.optBoolean("spoiler"),
+                        likes=x.optLong("likes"),
+                        comments=x.optLong("comments"),
+                        saves=x.optLong("saves"),
+                        shares=x.optLong("shares"),
+                        publishedAt=x.optString("publishedAt").takeIf(String::isNotBlank),
+                        author=SocialAuthor(
+                            id=authorObj.optString("id"),
+                            username=authorObj.optString("username"),
+                            displayName=authorObj.optString("displayName"),
+                            avatarUrl=authorObj.optString("avatarUrl"),
+                            verified=authorObj.optBoolean("verified")
+                        ),
+                        media=mediaObj
+                            ?.takeIf {
+                                it.optString("id").isNotBlank() ||
+                                    it.optString("title").isNotBlank()
+                            }
+                            ?.let {
+                                SocialMediaRef(
+                                    id=it.optString("id").takeIf(String::isNotBlank),
+                                    title=it.optString("title").takeIf(String::isNotBlank),
+                                    posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank)
+                                )
+                            }
+                    )
+                )
+            }
+        }
+
         val reels=buildList {
             val arr=root.optJSONArray("reels")
             if(arr!=null) for(i in 0 until arr.length()) {
@@ -155,7 +197,13 @@ class UniversalSearchRepository(
 
         if(query.isNotBlank()) saveHistory(query)
 
-        return UniversalSearchResult(media,users,channels,reels)
+        return UniversalSearchResult(
+            media=media,
+            users=users,
+            channels=channels,
+            posts=posts,
+            reels=reels
+        )
     }
 
     fun history(): List<String> {
