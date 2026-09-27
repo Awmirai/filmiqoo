@@ -108,6 +108,16 @@ class SettingsRepository(
 
     fun local(): AppSettings=local.read()
 
+    fun saveLocal(settings:AppSettings):AppSettings {
+        val before=local.read()
+        local.write(settings)
+        OfflineDownloadManager.setWifiOnly(context,settings.wifiOnlyDownloads)
+        if(downloadPolicyChanged(before,settings)) {
+            OfflineDownloadManager.refreshPolicy(context)
+        }
+        return settings
+    }
+
     suspend fun load(): AppSettings {
         val before=local.read()
         val o=backend.getJson("/v1/settings",authorized=true)
