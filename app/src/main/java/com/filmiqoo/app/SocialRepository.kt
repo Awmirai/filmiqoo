@@ -132,7 +132,8 @@ data class SocialChannel(
     val avatarUrl: String,
     val coverUrl: String,
     val followers: Long,
-    val verified: Boolean
+    val verified: Boolean,
+    val followingByMe:Boolean=false
 )
 
 data class SocialComment(
@@ -636,7 +637,7 @@ class SocialRepository(
     suspend fun channels(): List<SocialChannel> {
         val root=backend.getJson("/v1/social/channels",authorized=false)
         val arr=root.optJSONArray("items") ?: return emptyList()
-        return buildList {
+        val base=buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
                 add(
@@ -652,6 +653,34 @@ class SocialRepository(
                     )
                 )
             }
+        }
+        if(!backend.session.isLoggedIn || base.isEmpty()) return base
+
+        val ids=base.take(100).joinToString(",") { it.id }
+        val rootState=runCatching {
+            backend.getJson(
+                "/v1/social/channels/viewer-states?ids="+
+                    java.net.URLEncoder.encode(ids,"UTF-8"),
+                authorized=true
+            )
+        }.getOrNull() ?: return base
+
+        val states=mutableMapOf<String,Boolean>()
+        val stateArr=rootState.optJSONArray("items")
+        if(stateArr!=null) {
+            for(i in 0 until stateArr.length()) {
+                val x=stateArr.optJSONObject(i) ?: continue
+                val id=x.optString("id")
+                if(id.isNotBlank()) {
+                    states[id]=x.optBoolean("followingByMe")
+                }
+            }
+        }
+
+        return base.map { channel ->
+            channel.copy(
+                followingByMe=states[channel.id] == true
+            )
         }
     }
 
