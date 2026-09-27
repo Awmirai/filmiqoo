@@ -386,6 +386,8 @@ private fun LiveEventDetailScreen(
     var localEvent by remember(event.id,event.state,event.playbackUrl) { mutableStateOf(event) }
     var joined by remember(event.id) { mutableStateOf(false) }
     var showSource by remember { mutableStateOf(false) }
+    var hostActionBusy by remember { mutableStateOf(false) }
+    var confirmHostAction by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(event.id,loggedIn) {
         if(loggedIn) {
@@ -564,37 +566,28 @@ private fun LiveEventDetailScreen(
                 if(isHost) {
                     OutlinedButton(
                         onClick={
-                            when(localEvent.state) {
-                                "scheduled" -> {
-                                    if(localEvent.playbackUrl.isBlank()) showSource=true
-                                    else scope.launch {
-                                        runCatching {
-                                            live.updateState(localEvent.id,"live",localEvent.playbackUrl)
-                                            live.detail(localEvent.id)
-                                        }.onSuccess {
-                                            localEvent=it
-                                            onUpdated(it)
-                                        }.onFailure { onError(it.message ?: "شروع پخش زنده ناموفق بود") }
-                                    }
-                                }
-                                "live" -> scope.launch {
-                                    runCatching {
-                                        live.updateState(localEvent.id,"ended")
-                                        live.detail(localEvent.id)
-                                    }.onSuccess {
-                                        localEvent=it
-                                        onUpdated(it)
-                                    }.onFailure { onError(it.message ?: "پایان پخش زنده ناموفق بود") }
-                                }
+                            confirmHostAction=when(localEvent.state) {
+                                "scheduled" -> "start"
+                                "live" -> "end"
+                                else -> null
                             }
                         },
                         modifier=Modifier.weight(1f),
-                        enabled=localEvent.state=="scheduled" || localEvent.state=="live"
+                        enabled=!hostActionBusy &&
+                            (localEvent.state=="scheduled" || localEvent.state=="live")
                     ) {
-                        Icon(
-                            if(localEvent.state=="live")Icons.Default.StopCircle else Icons.Default.PlayCircle,
-                            null
-                        )
+                        if(hostActionBusy) {
+                            CircularProgressIndicator(
+                                strokeWidth=2.dp,
+                                modifier=Modifier.size(18.dp)
+                            )
+                        } else {
+                            Icon(
+                                if(localEvent.state=="live")Icons.Default.StopCircle
+                                else Icons.Default.PlayCircle,
+                                null
+                            )
+                        }
                         Spacer(Modifier.width(5.dp))
                         Text(if(localEvent.state=="live")"پایان پخش" else "شروع پخش")
                     }
@@ -624,12 +617,85 @@ private fun LiveEventDetailScreen(
         }
     }
 
+    if(confirmHostAction!=null) {
+        val starting=confirmHostAction=="start"
+        AlertDialog(
+            onDismissRequest={
+                if(!hostActionBusy) confirmHostAction=null
+            },
+            icon={
+                Icon(
+                    if(starting)Icons.Default.PlayCircle else Icons.Default.StopCircle,
+                    null,
+                    tint=if(starting)FqGold else FqDanger
+                )
+            },
+            title={
+                Text(if(starting)"پخش شروع شود؟" else "پخش پایان یابد؟")
+            },
+            text={
+                Text(
+                    if(starting)
+                        "رویداد برای بیننده‌ها زنده می‌شود و شمارش بیننده شروع خواهد شد."
+                    else
+                        "رویداد پایان می‌یابد و بیننده‌ها دیگر نمی‌توانند به پخش زنده برگردند."
+                )
+            },
+            confirmButton={
+                TextButton(
+                    enabled=!hostActionBusy,
+                    onClick={
+                        confirmHostAction=null
+                        if(starting && localEvent.playbackUrl.isBlank()) {
+                            showSource=true
+                        } else {
+                            hostActionBusy=true
+                            scope.launch {
+                                runCatching {
+                                    live.updateState(
+                                        localEvent.id,
+                                        if(starting)"live" else "ended",
+                                        if(starting)localEvent.playbackUrl else null
+                                    )
+                                    live.detail(localEvent.id)
+                                }.onSuccess {
+                                    localEvent=it
+                                    onUpdated(it)
+                                }.onFailure {
+                                    onError(
+                                        it.message ?: if(starting)
+                                            "شروع پخش زنده ناموفق بود"
+                                        else
+                                            "پایان پخش زنده ناموفق بود"
+                                    )
+                                }
+                                hostActionBusy=false
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        if(starting)"شروع پخش" else "پایان پخش",
+                        color=if(starting)FqGold else FqDanger
+                    )
+                }
+            },
+            dismissButton={
+                TextButton(
+                    enabled=!hostActionBusy,
+                    onClick={confirmHostAction=null}
+                ) { Text("لغو") }
+            }
+        )
+    }
+
     if(showSource) {
         LiveSourceDialog(
             initial=localEvent.playbackUrl,
             onDismiss={showSource=false},
             onStart={url->
                 showSource=false
+                hostActionBusy=true
                 scope.launch {
                     runCatching {
                         live.updateState(localEvent.id,"live",url)
@@ -637,7 +703,8 @@ private fun LiveEventDetailScreen(
                     }.onSuccess {
                         localEvent=it
                         onUpdated(it)
-                    }.onFailure { onError(it.message ?: "شروع Live ناموفق بود") }
+                    }.onFailure { onError(it.message ?: "شروع پخش زنده ناموفق بود") }
+                    hostActionBusy=false
                 }
             }
         )
@@ -905,7 +972,7 @@ private fun LiveSourceDialog(
     onDismiss:()->Unit,
     onStart:(String)->Unit
 ) {
-    var url by remember { mutableStateOf(initial) }
+    var url by rememberSaveable(initial) { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest=onDismiss,
         icon={Icon(Icons.Default.LiveTv,null,tint=FqDanger)},
