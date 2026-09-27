@@ -921,6 +921,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                 deepLinkReelId=clipId
                                 tab=1
                             },
+                            onOpenPost={ postId ->
+                                deepLinkPostId=postId
+                                tab=2
+                            },
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onInbox={overlay=OverlayRoute.Inbox},
