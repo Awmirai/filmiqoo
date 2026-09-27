@@ -409,7 +409,8 @@ private fun CreatorProfileLoadingState() {
             Column(
                 Modifier.align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal=18.dp,bottom=12.dp)
+                    .padding(horizontal=18.dp)
+                    .padding(bottom=12.dp)
             ) {
                 Row(verticalAlignment=Alignment.Bottom) {
                     Box(
