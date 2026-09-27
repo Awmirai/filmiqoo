@@ -818,6 +818,13 @@ class SocialRepository(
         }
     }
 
+    suspend fun removePost(id:String):Boolean =
+        backend.postJson(
+            "/v1/social/posts/"+id+"/remove",
+            JSONObject(),
+            authorized=true
+        ).optBoolean("removed")
+
     suspend fun togglePostLike(id: String): Boolean =
         backend.postJson("/v1/social/posts/"+id+"/like",JSONObject(),authorized=true)
             .optBoolean("liked")
