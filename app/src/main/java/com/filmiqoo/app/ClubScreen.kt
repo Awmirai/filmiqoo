@@ -229,7 +229,6 @@ fun ClubScreen(
                         onStory=onStory,
                         onMedia=onMedia,
                         onCreator=onCreator,
-                        onOpenClip=onOpenClip,
                         onOpenRoom=onOpenRoom,
                         onRequireAuth=onRequireAuth,
                         onComments={commentsFor=it},
@@ -733,9 +732,9 @@ private fun ClubHeader(
             horizontalArrangement=Arrangement.spacedBy(4.dp)
         ) {
             listOf(
-                ClubTab.FOR_YOU to "برای تو",
-                ClubTab.FOLLOWING to "دنبال‌شده‌ها",
-                ClubTab.ROOMS to "روم‌ها"
+                ClubTab.FOR_YOU to "فید",
+                ClubTab.FOLLOWING to "دنبال می‌کنی",
+                ClubTab.ROOMS to "گفت‌وگوها"
             ).forEach { (tab,label) ->
                 val active=selected==tab
                 val bg by animateColorAsState(
@@ -791,7 +790,6 @@ private fun ClubForYou(
     onStory:(List<SocialStory>,Int)->Unit,
     onMedia:(MediaItem)->Unit,
     onCreator:(Creator)->Unit,
-    onOpenClip:(String)->Unit,
     onOpenRoom:(SocialRoom)->Unit,
     onRequireAuth:()->Unit,
     onComments:(SocialPost)->Unit,
@@ -819,7 +817,7 @@ private fun ClubForYou(
         ClubEmptyState(
             icon=Icons.Default.MovieFilter,
             title="Club تازه داره شکل می‌گیره",
-            body="وقتی اولین Post، Clip یا Room واقعی ساخته بشه، اینجا ظاهر می‌شه.",
+            body="وقتی اولین Post، Story یا گفت‌وگوی واقعی ساخته بشه، اینجا ظاهر می‌شه.",
             action="تازه‌سازی",
             onAction=onRefresh
         )
