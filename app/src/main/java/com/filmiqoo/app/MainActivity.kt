@@ -930,7 +930,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onInbox={overlay=OverlayRoute.Inbox},
                             onCreate={overlay=OverlayRoute.Create},
                             onRequireAuth={overlay=OverlayRoute.Auth},
-                            initialPostId=deepLinkPostId
+                            initialPostId=deepLinkPostId,
+                            onClearFocusedPost={deepLinkPostId=null}
                         )
                         3 -> LibraryScreen(
                             backend=backend,
