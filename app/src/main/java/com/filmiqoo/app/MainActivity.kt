@@ -618,6 +618,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     target=route.target,
                     backend=backend,
                     onBack=closeOverlay,
+                    onRequireAuth={pushOverlay(OverlayRoute.Auth)},
                     onDiscussion={ mediaId ->
                         appScope.launch {
                             runCatching { social.roomForMedia(mediaId) }
