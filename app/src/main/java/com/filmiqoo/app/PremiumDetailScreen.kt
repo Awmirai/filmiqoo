@@ -2400,62 +2400,49 @@ private fun FilmiqooPulseCard(
                 }
             }
 
-            state?.moments?.take(3)?.takeIf { it.isNotEmpty() }?.let { moments ->
-                Text(
-                    "لحظه‌های داغ",
-                    color=Color.White.copy(alpha=.84f),
-                    fontSize=10.sp,
-                    fontWeight=FontWeight.Bold,
-                    modifier=Modifier.padding(top=13.dp,bottom=7.dp)
-                )
-                LazyRow(
-                    horizontalArrangement=Arrangement.spacedBy(7.dp)
+            state?.moments?.takeIf { it.isNotEmpty() }?.let { moments ->
+                Surface(
+                    color=FqGold.copy(alpha=.08f),
+                    shape=RoundedCornerShape(14.dp),
+                    border=androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        FqGold.copy(alpha=.14f)
+                    ),
+                    modifier=Modifier.fillMaxWidth().padding(top=12.dp)
                 ) {
-                    items(moments,key={it.positionMs}) { moment ->
-                        Surface(
-                            color=FqGold.copy(alpha=.10f),
-                            contentColor=FqGold,
-                            shape=RoundedCornerShape(13.dp),
-                            border=androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                FqGold.copy(alpha=.18f)
+                    Row(
+                        Modifier.padding(horizontal=11.dp,vertical=9.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Text(
+                            moments.take(3).joinToString("") { it.emoji },
+                            fontSize=13.sp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                moments.size.toString()+" لحظه داغ ثبت شده",
+                                color=Color.White.copy(alpha=.88f),
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold
                             )
-                        ) {
-                            Row(
-                                Modifier.padding(horizontal=9.dp,vertical=7.dp),
-                                verticalAlignment=Alignment.CenterVertically
-                            ) {
-                                Text(moment.emoji,fontSize=13.sp)
-                                Spacer(Modifier.width(5.dp))
-                                Text(
-                                    formatPulseMoment(moment.positionMs),
-                                    fontSize=9.sp,
-                                    fontWeight=FontWeight.Bold
-                                )
-                                Spacer(Modifier.width(5.dp))
-                                Text(
-                                    compactPulseCount(moment.reactions),
-                                    color=FqMuted,
-                                    fontSize=8.sp
-                                )
-                            }
+                            Text(
+                                "زمان دقیق بعد از رسیدن به هر لحظه داخل Player آشکار می‌شه",
+                                color=FqMuted,
+                                fontSize=8.sp,
+                                modifier=Modifier.padding(top=2.dp)
+                            )
                         }
+                        Icon(
+                            Icons.Default.VisibilityOff,
+                            null,
+                            tint=FqGold.copy(alpha=.72f),
+                            modifier=Modifier.size(16.dp)
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-private fun formatPulseMoment(positionMs:Long):String {
-    val totalSeconds=(positionMs.coerceAtLeast(0L)/1000L)
-    val hours=totalSeconds/3600L
-    val minutes=(totalSeconds%3600L)/60L
-    val seconds=totalSeconds%60L
-    return if(hours>0L) {
-        String.format(Locale.US,"%d:%02d:%02d",hours,minutes,seconds)
-    } else {
-        String.format(Locale.US,"%02d:%02d",minutes,seconds)
     }
 }
 
