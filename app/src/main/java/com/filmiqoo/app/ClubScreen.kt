@@ -6,7 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -60,6 +62,9 @@ fun ClubScreen(
     val messagingRepo=remember { MessagingRepository(backend) }
 
     var tab by remember { mutableStateOf(ClubTab.FOR_YOU) }
+    val forYouListState=rememberLazyListState()
+    val followingListState=rememberLazyListState()
+    val roomsListState=rememberLazyListState()
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -184,6 +189,7 @@ fun ClubScreen(
             } else when(tab) {
                 ClubTab.FOR_YOU -> {
                     ClubForYou(
+                        listState=forYouListState,
                         pulse=pulse,
                         stories=stories,
                         clips=clips,
@@ -241,6 +247,7 @@ fun ClubScreen(
                         )
                     } else {
                         ClubFollowingFeed(
+                            listState=followingListState,
                             items=following,
                             suggestions=creators,
                             social=social,
@@ -257,6 +264,7 @@ fun ClubScreen(
 
                 ClubTab.ROOMS -> {
                     ClubRooms(
+                        listState=roomsListState,
                         rooms=rooms,
                         onOpenRoom=onOpenRoom,
                         onMedia=onMedia,
@@ -662,6 +670,7 @@ private fun ClubHeader(
 
 @Composable
 private fun ClubForYou(
+    listState:LazyListState,
     pulse:List<PulseTrendItem>,
     stories:List<SocialStory>,
     clips:List<ReelFeedItem>,
@@ -710,6 +719,7 @@ private fun ClubForYou(
     }
 
     LazyColumn(
+        state=listState,
         contentPadding=PaddingValues(bottom=28.dp),
         verticalArrangement=Arrangement.spacedBy(0.dp)
     ) {
@@ -1781,6 +1791,7 @@ private fun ClubAction(
 
 @Composable
 private fun ClubFollowingFeed(
+    listState:LazyListState,
     items:List<FriendActivityItem>,
     suggestions:List<SocialChannel>,
     social:SocialRepository,
@@ -2061,6 +2072,7 @@ private fun ClubFollowingFeed(
 
 @Composable
 private fun ClubRooms(
+    listState:LazyListState,
     rooms:List<SocialRoom>,
     onOpenRoom:(SocialRoom)->Unit,
     onMedia:(MediaItem)->Unit,
@@ -2089,6 +2101,7 @@ private fun ClubRooms(
     }
 
     LazyColumn(
+        state=listState,
         contentPadding=PaddingValues(horizontal=12.dp,vertical=12.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)
     ) {
