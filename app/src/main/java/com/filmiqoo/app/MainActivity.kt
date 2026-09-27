@@ -1015,6 +1015,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             },
                             onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
+                            onSearch={showSearch=true},
                             onInbox={overlay=OverlayRoute.Inbox},
                             onCreate={overlay=OverlayRoute.Create},
                             onRequireAuth={overlay=OverlayRoute.Auth},
