@@ -217,7 +217,7 @@ fun ViewerProfilesScreen(
                 IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                 Column(Modifier.weight(1f)) {
                     Text("چه کسی تماشا می‌کند؟",fontSize=22.sp,fontWeight=FontWeight.Black)
-                    Text("History، Continue و Library برای هر پروفایل جداست.",color=FqMuted,fontSize=11.sp)
+                    Text("تاریخچه، ادامه تماشا و کتابخانه برای هر پروفایل جداست.",color=FqMuted,fontSize=11.sp)
                 }
                 if(profiles.size<5) {
                     IconButton(onClick={creating=true}) {
@@ -463,7 +463,7 @@ private fun ViewerProfileCard(
                         shape=RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            "KIDS",
+                            "کودک",
                             color=Color(0xFF63D6FF),
                             fontSize=6.sp,
                             fontWeight=FontWeight.Black,
@@ -558,8 +558,8 @@ private fun ViewerProfileEditorDialog(
                     Icon(Icons.Default.ChildCare,null,tint=if(kids)Color(0xFF63D6FF) else FqMuted)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Kids Mode",fontSize=12.sp,fontWeight=FontWeight.Bold)
-                        Text("Social و Create در این حالت مخفی می‌شن.",color=FqMuted,fontSize=11.sp)
+                        Text("حالت کودک",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text("کلاب، کلیپ‌ها و ساخت محتوا در این حالت مخفی می‌شن.",color=FqMuted,fontSize=11.sp)
                     }
                     Switch(
                         checked=kids,
@@ -598,7 +598,7 @@ private fun ViewerProfileEditorDialog(
                     Modifier.fillMaxWidth().padding(top=8.dp),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
-                    Text("Auto‑next",fontSize=11.sp,modifier=Modifier.weight(1f))
+                    Text("پخش خودکار قسمت بعد",fontSize=11.sp,modifier=Modifier.weight(1f))
                     Switch(checked=autoplay,onCheckedChange={autoplay=it})
                 }
 
@@ -661,7 +661,7 @@ private fun ViewerProfileEditorDialog(
             onDismissRequest={confirmDelete=false},
             icon={Icon(Icons.Default.DeleteForever,null,tint=FqDanger)},
             title={Text("حذف این پروفایل؟")},
-            text={Text("History، Favorites و Watchlist مخصوص این Viewer Profile هم حذف می‌شن.")},
+            text={Text("تاریخچه، علاقه‌مندی‌ها و «بعداً می‌بینم» مخصوص این پروفایل هم حذف می‌شن.")},
             confirmButton={
                 TextButton(onClick={
                     confirmDelete=false
