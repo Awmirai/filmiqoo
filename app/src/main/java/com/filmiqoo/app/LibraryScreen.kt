@@ -683,7 +683,7 @@ private fun CollectionCard(
                         collection.itemCount.toString()+" عنوان • "+
                             when(collection.visibility) {
                                 "public" -> "عمومی"
-                                "unlisted" -> "Unlisted"
+                                "unlisted" -> "فهرست‌نشده"
                                 else -> "خصوصی"
                             },
                         color=FqMuted,
@@ -758,8 +758,8 @@ private fun CollectionDetailScreen(
         if(detail.items.isEmpty()) {
             PremiumEmptyState(
                 Icons.Default.PlaylistAdd,
-                "Collection خالیه",
-                "از صفحه هر فیلم یا سریال می‌تونی مستقیم به این Collection اضافه‌اش کنی."
+                "این لیست خالیه",
+                "از صفحه هر فیلم یا سریال می‌تونی مستقیم به این لیست اضافه‌اش کنی."
             )
         } else {
             LazyColumn(
@@ -814,8 +814,8 @@ private fun CollectionDetailScreen(
         AlertDialog(
             onDismissRequest={confirmDelete=false},
             icon={Icon(Icons.Default.DeleteForever,null,tint=FqDanger)},
-            title={Text("حذف Collection؟")},
-            text={Text("خود Collection حذف می‌شه؛ فیلم‌ها و سریال‌ها از Library اصلی حذف نمی‌شن.")},
+            title={Text("حذف لیست؟")},
+            text={Text("خود لیست حذف می‌شه؛ فیلم‌ها و سریال‌ها از کتابخانه اصلی حذف نمی‌شن.")},
             confirmButton={
                 TextButton(onClick={
                     confirmDelete=false
@@ -834,14 +834,14 @@ private fun CreateCollectionDialog(
     onDismiss:()->Unit,
     onCreate:(String,String,String,String)->Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var emoji by remember { mutableStateOf("🎬") }
-    var visibility by remember { mutableStateOf("private") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var emoji by rememberSaveable { mutableStateOf("🎬") }
+    var visibility by rememberSaveable { mutableStateOf("private") }
 
     AlertDialog(
         onDismissRequest=onDismiss,
-        title={Text("Collection جدید")},
+        title={Text("لیست جدید")},
         text={
             Column {
                 OutlinedTextField(
@@ -862,7 +862,7 @@ private fun CreateCollectionDialog(
                 OutlinedTextField(
                     value=emoji,
                     onValueChange={emoji=it.take(8)},
-                    label={Text("Emoji")},
+                    label={Text("ایموجی")},
                     singleLine=true,
                     modifier=Modifier.fillMaxWidth().padding(top=8.dp)
                 )
@@ -930,7 +930,7 @@ fun CollectionPickerSheet(
                 verticalAlignment=Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("افزودن به Collection",fontSize=18.sp,fontWeight=FontWeight.Bold)
+                    Text("افزودن به لیست",fontSize=18.sp,fontWeight=FontWeight.Bold)
                     Text(media.title,color=FqMuted,fontSize=11.sp)
                 }
                 IconButton(onClick={showCreate=true}) {
@@ -943,9 +943,9 @@ fun CollectionPickerSheet(
             } else if(collections.isEmpty()) {
                 PremiumEmptyState(
                     Icons.Default.CollectionsBookmark,
-                    "Collection نداری",
-                    "اول یک Collection بساز.",
-                    "ساخت Collection"
+                    "هنوز لیستی نداری",
+                    "اول یک لیست بساز.",
+                    "ساخت لیست"
                 ){showCreate=true}
             } else {
                 LazyColumn(
@@ -960,7 +960,7 @@ fun CollectionPickerSheet(
                             modifier=Modifier.fillMaxWidth().clickable {
                                 val mediaId=media.backendId
                                 if(mediaId.isNullOrBlank()) {
-                                    onMessage("این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست.")
+                                    onMessage("این عنوان هنوز به کاتالوگ Filmiqoo متصل نیست.")
                                 } else {
                                     scope.launch {
                                         runCatching {
@@ -1009,7 +1009,7 @@ fun CollectionPickerSheet(
                         collections=listOf(it)+collections
                         showCreate=false
                     }.onFailure {
-                        onMessage(it.message ?: "خطا در ساخت Collection")
+                        onMessage(it.message ?: "خطا در ساخت لیست")
                     }
                 }
             }
@@ -1027,8 +1027,8 @@ private fun SceneBookmarksLibrary(
     if(items.isEmpty()) {
         PremiumEmptyState(
             icon=Icons.Default.Bookmarks,
-            title="Scene Bookmark نداری",
-            body="وسط پخش روی Bookmark بزن تا هر صحنه را خصوصی با زمان دقیق ذخیره کنی."
+            title="نشانه صحنه‌ای نداری",
+            body="وسط پخش روی «نشانه‌گذاری صحنه» بزن تا هر لحظه را خصوصی با زمان دقیق ذخیره کنی."
         )
         return
     }
