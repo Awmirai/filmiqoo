@@ -22,8 +22,14 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 		       mt.id::text,mt.title,mt.poster_url
 		  FROM posts p
 		  JOIN profiles pr ON pr.user_id=p.author_user_id
+		  LEFT JOIN channels ch ON ch.id=p.channel_id
 		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
 		 WHERE p.status='published'
+		   AND (
+		     (p.channel_id IS NULL AND pr.private_account=false)
+		     OR
+		     (p.channel_id IS NOT NULL AND ch.visibility='public')
+		   )
 		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
 		 LIMIT $1
 	`,limit)
@@ -53,6 +59,32 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) postDetail(w http.ResponseWriter,r *http.Request) {
 	postID:=chi.URLParam(r,"id")
+	allowed,exists,err:=s.canViewPost(r.Context(),"",postID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists || !allowed {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"post not found"})
+		return
+	}
+	s.postDetailByID(w,r,postID)
+}
+
+func (s *Server) viewerPostDetail(w http.ResponseWriter,r *http.Request) {
+	postID:=chi.URLParam(r,"id")
+	userID:=userIDFromContext(r.Context())
+	allowed,exists,err:=s.canViewPost(r.Context(),userID,postID)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if !exists || !allowed {
+		writeJSON(w,http.StatusNotFound,map[string]string{"error":"post not found"})
+		return
+	}
+	s.postDetailByID(w,r,postID)
+}
+
+func (s *Server) postDetailByID(
+	w http.ResponseWriter,
+	r *http.Request,
+	postID string,
+) {
 	var id,postType,body,authorID,username,displayName,avatar string
 	var spoiler,verified bool
 	var likes,comments,saves,shares int64
@@ -760,8 +792,15 @@ func (s *Server) stories(w http.ResponseWriter,r *http.Request) {
 		       mt.backdrop_url,mt.year,mt.rating
 		  FROM stories st
 		  JOIN profiles p ON p.user_id=st.author_user_id
+		  LEFT JOIN channels ch ON ch.id=st.channel_id
 		  LEFT JOIN media_titles mt ON mt.id=st.media_title_id
-		 WHERE st.expires_at>now() AND st.close_friends_only=false
+		 WHERE st.expires_at>now()
+		   AND st.close_friends_only=false
+		   AND (
+		     (st.channel_id IS NULL AND p.private_account=false)
+		     OR
+		     (st.channel_id IS NOT NULL AND ch.visibility='public')
+		   )
 		 ORDER BY st.created_at DESC
 		 LIMIT 100
 	`)
