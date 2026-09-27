@@ -160,17 +160,17 @@ func (s *Server) toggleReviewLike(w http.ResponseWriter,r *http.Request) {
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
     if !exists {
-        var authorID string
+        var authorID,mediaTitleID string
         if scanErr:=tx.QueryRow(
             r.Context(),
-            "SELECT user_id::text FROM media_reviews WHERE id=$1",
+            "SELECT user_id::text,media_title_id::text FROM media_reviews WHERE id=$1",
             reviewID,
-        ).Scan(&authorID); scanErr==nil && authorID!=userID {
+        ).Scan(&authorID,&mediaTitleID); scanErr==nil && authorID!=userID {
             _,_=tx.Exec(r.Context(),`
                 INSERT INTO notifications (
                     user_id,actor_user_id,notification_type,entity_type,entity_id,title
                 )
-                SELECT $1,$2,'review_like','review',$3,'پسند جدید روی Review'
+                SELECT $1,$2,'review_like','media',$3,'پسند جدید روی Review'
                 WHERE NOT EXISTS (
                     SELECT 1 FROM notifications
                      WHERE user_id=$1
@@ -179,7 +179,7 @@ func (s *Server) toggleReviewLike(w http.ResponseWriter,r *http.Request) {
                        AND entity_id=$3
                        AND created_at>now()-interval '12 hours'
                 )
-            `,authorID,userID,reviewID)
+            `,authorID,userID,mediaTitleID)
         }
     }
 
