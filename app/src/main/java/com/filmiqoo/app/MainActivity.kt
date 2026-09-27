@@ -941,6 +941,14 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onClips={tab=1},
                                     onCommunity={tab=2},
+                                    onOpenPost={ postId ->
+                                        deepLinkPostId=postId
+                                        tab=2
+                                    },
+                                    onOpenClip={ clipId ->
+                                        deepLinkReelId=clipId
+                                        tab=1
+                                    },
                                     onDownloads={overlay=OverlayRoute.Downloads},
                                     onLibrary={overlay=OverlayRoute.Library},
                                     onSocialSaves={overlay=OverlayRoute.SocialSaves},
