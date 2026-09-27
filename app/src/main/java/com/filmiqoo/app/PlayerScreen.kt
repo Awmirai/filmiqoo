@@ -187,12 +187,17 @@ fun FilmiqooPlayerScreen(
             }
     }
 
-    LaunchedEffect(currentTarget.mediaTitleId) {
+    LaunchedEffect(currentTarget.mediaTitleId,currentVersionId) {
         val mediaId=currentTarget.mediaTitleId
         pulseState=if(mediaId.isNullOrBlank() || currentTarget.localUri!=null) {
             null
         } else {
-            runCatching { pulseRepository.load(mediaId) }.getOrNull()
+            runCatching {
+                pulseRepository.load(
+                    mediaId=mediaId,
+                    mediaVersionId=currentVersionId
+                )
+            }.getOrNull()
         }
     }
 
@@ -1247,7 +1252,8 @@ fun FilmiqooPlayerScreen(
                                         pulseRepository.react(
                                             mediaId=mediaId,
                                             emoji=emoji,
-                                            positionMs=activePositionMs()
+                                            positionMs=activePositionMs(),
+                                            mediaVersionId=currentVersionId
                                         )
                                     }.onSuccess {
                                         pulseState=it
