@@ -35,6 +35,8 @@ fun SeriesCalendarScreen(
 ) {
     val alerts=remember { SeriesAlertsRepository(backend) }
     var days by rememberSaveable { mutableIntStateOf(60) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var readyOnly by rememberSaveable { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -49,6 +51,19 @@ fun SeriesCalendarScreen(
             .onSuccess { items=it }
             .onFailure { error=it.message ?: "خطا در دریافت تقویم سریال‌ها" }
         loading=false
+    }
+
+    val visible=remember(items,query,readyOnly) {
+        val q=query.trim()
+        items.filter { item ->
+            val matchesReady=!readyOnly || item.streamReady
+            val matchesQuery=q.isBlank() ||
+                item.media.title.contains(q,ignoreCase=true) ||
+                item.media.originalTitle.contains(q,ignoreCase=true) ||
+                item.episodeName.contains(q,ignoreCase=true) ||
+                item.episodeLabel.contains(q,ignoreCase=true)
+            matchesReady && matchesQuery
+        }
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
@@ -91,6 +106,54 @@ fun SeriesCalendarScreen(
                         )
                     }
                 }
+
+                OutlinedTextField(
+                    value=query,
+                    onValueChange={query=it},
+                    singleLine=true,
+                    placeholder={Text("جستجو بین سریال‌ها و قسمت‌ها...")},
+                    leadingIcon={Icon(Icons.Default.Search,null,modifier=Modifier.size(18.dp))},
+                    trailingIcon={
+                        if(query.isNotBlank()) {
+                            IconButton(onClick={query=""}) {
+                                Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    shape=RoundedCornerShape(16.dp),
+                    colors=OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor=FqGold.copy(alpha=.6f),
+                        unfocusedBorderColor=FqBorder,
+                        focusedContainerColor=FqSurface,
+                        unfocusedContainerColor=FqSurface
+                    ),
+                    modifier=Modifier.fillMaxWidth()
+                        .padding(horizontal=14.dp,vertical=8.dp)
+                )
+
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal=14.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    FilterChip(
+                        selected=readyOnly,
+                        onClick={readyOnly=!readyOnly},
+                        leadingIcon={
+                            Icon(
+                                Icons.Default.PlayCircle,
+                                null,
+                                modifier=Modifier.size(15.dp)
+                            )
+                        },
+                        label={Text("فقط آماده تماشا",fontSize=10.sp)}
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        visible.size.toString()+" قسمت",
+                        color=FqMuted,
+                        fontSize=10.sp
+                    )
+                }
             }
         }
 
@@ -107,14 +170,18 @@ fun SeriesCalendarScreen(
             )
         }
 
-        if(!loading && items.isEmpty()) {
+        if(!loading && visible.isEmpty()) {
+            val filtering=query.isNotBlank() || readyOnly
             PremiumEmptyState(
-                icon=Icons.Default.EventAvailable,
-                title="تقویم هنوز خالیه",
-                body="از صفحه سریال‌ها دکمه «دنبال‌کردن سریال» رو بزن تا قسمت‌های آینده اینجا بیاد."
+                icon=if(filtering)Icons.Default.SearchOff else Icons.Default.EventAvailable,
+                title=if(filtering)"قسمتی پیدا نشد" else "تقویم هنوز خالیه",
+                body=if(filtering)
+                    "جستجو یا فیلتر آماده‌تماشا رو تغییر بده."
+                else
+                    "از صفحه سریال‌ها دکمه «دنبال‌کردن سریال» رو بزن تا قسمت‌های آینده اینجا بیاد."
             )
         } else {
-            val grouped=items.groupBy { it.airDate }.toSortedMap()
+            val grouped=visible.groupBy { it.airDate }.toSortedMap()
             LazyColumn(
                 contentPadding=PaddingValues(horizontal=12.dp,vertical=10.dp),
                 verticalArrangement=Arrangement.spacedBy(9.dp),
