@@ -114,6 +114,8 @@ object FilmiqooPush {
             "release","series","availability","media" -> "filmiqoo://title/$entityId"
             "watch_party","party" -> "filmiqoo://party/$entityId"
             "reel" -> "filmiqoo://reel/$entityId"
+            "post" -> "filmiqoo://post/$entityId"
+            "user" -> "filmiqoo://creator/$entityId"
             "channel" -> "filmiqoo://channel/$entityId"
             "collection" -> "filmiqoo://collection/$entityId"
             else -> null
