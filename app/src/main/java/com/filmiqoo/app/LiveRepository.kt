@@ -30,6 +30,11 @@ class LiveRepository(
         return parseList(root)
     }
 
+    suspend fun myEvents():List<LiveEvent> {
+        val root=backend.getJson("/v1/me/live-events",authorized=true)
+        return parseList(root)
+    }
+
     suspend fun detail(id:String):LiveEvent =
         parseEvent(backend.getJson("/v1/live-events/"+id,authorized=false))
 
