@@ -39,11 +39,55 @@ fun LibraryScreen(
     onPlay: (PlaybackTarget) -> Unit,
     onDownloads: () -> Unit = {},
     onHistory: () -> Unit = {},
+    onRequireAuth: () -> Unit = {},
     showBack: Boolean = true
 ) {
     val lib=remember { LibraryRepository(backend) }
     val sceneRepo=remember { SceneBookmarksRepository(backend) }
     val scope=rememberCoroutineScope()
+
+    if(!backend.session.isLoggedIn) {
+        BackHandler(enabled=showBack) { onBack() }
+        Column(Modifier.fillMaxSize().background(FqBg)) {
+            Box(
+                Modifier.fillMaxWidth().height(190.dp).background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF182033),Color(0xFF251C09),FqBg)
+                    )
+                )
+            ) {
+                if(showBack) {
+                    IconButton(
+                        onClick=onBack,
+                        modifier=Modifier.padding(8.dp)
+                    ) {
+                        Icon(Icons.Default.ArrowBack,null)
+                    }
+                }
+                Column(
+                    Modifier.align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(18.dp)
+                ) {
+                    Text("کتابخانه من",fontSize=27.sp,fontWeight=FontWeight.Black)
+                    Text(
+                        "ذخیره‌ها، دانلودها، تاریخچه و لیست‌های شخصی",
+                        color=FqMuted,
+                        fontSize=11.sp,
+                        modifier=Modifier.padding(top=3.dp)
+                    )
+                }
+            }
+            PremiumEmptyState(
+                icon=Icons.Default.Lock,
+                title="برای دیدن کتابخانه وارد شو",
+                body="بعد از ورود، علاقه‌مندی‌ها، «بعداً می‌بینم»، دانلودهای آفلاین، تاریخچه و لیست‌های شخصی‌ات اینجا همگام می‌شن.",
+                action="ورود به حساب",
+                onAction=onRequireAuth
+            )
+        }
+        return
+    }
 
     var tabName by rememberSaveable { mutableStateOf(LibraryTab.FAVORITES.name) }
     val tab=runCatching { LibraryTab.valueOf(tabName) }
