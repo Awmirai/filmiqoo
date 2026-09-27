@@ -1,0 +1,46 @@
+name: Server Source Audit
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/server-source-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Configure SSH key
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+      - name: Read production source state
+        shell: bash
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=12 -o StrictHostKeyChecking=accept-new -p 22 root@203.161.44.251 '
+            set -eu
+            cd /opt/filmiqoo/repo
+            echo "SERVER_BRANCH=$(git branch --show-current)"
+            echo "SERVER_HEAD=$(git rev-parse HEAD)"
+            echo "SERVER_STATUS_BEGIN"
+            git status --short
+            echo "SERVER_STATUS_END"
+            echo "SERVER_DIFF_STAT_BEGIN"
+            git diff --stat
+            git diff --cached --stat
+            echo "SERVER_DIFF_STAT_END"
+            echo "SERVER_RECENT_COMMITS_BEGIN"
+            git log -n 12 --pretty=format:"%H|%ad|%s" --date=iso-strict
+            echo
+            echo "SERVER_RECENT_COMMITS_END"
+          '
