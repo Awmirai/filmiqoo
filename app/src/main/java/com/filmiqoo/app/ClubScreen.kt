@@ -1,5 +1,6 @@
 package com.filmiqoo.app
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -140,7 +141,19 @@ fun ClubScreen(
                 }
             )
 
-            if(loading) {
+            val initialLoading=loading && when(tab) {
+                ClubTab.FOR_YOU ->
+                    pulse.isEmpty() &&
+                    stories.isEmpty() &&
+                    clips.isEmpty() &&
+                    feed.isEmpty() &&
+                    rooms.isEmpty() &&
+                    creators.isEmpty()
+                ClubTab.FOLLOWING -> loggedIn && following.isEmpty()
+                ClubTab.ROOMS -> rooms.isEmpty()
+            }
+
+            if(loading && !initialLoading) {
                 LinearProgressIndicator(
                     modifier=Modifier.fillMaxWidth().height(2.dp),
                     color=FqGold,
@@ -152,7 +165,9 @@ fun ClubScreen(
                 ClubInlineError(it) { refresh++ }
             }
 
-            when(tab) {
+            if(initialLoading) {
+                ClubLoadingState()
+            } else when(tab) {
                 ClubTab.FOR_YOU -> {
                     ClubForYou(
                         pulse=pulse,
@@ -223,6 +238,116 @@ fun ClubScreen(
             },
             onDismiss={commentsFor=null}
         )
+    }
+}
+
+@Composable
+private fun ClubLoadingState() {
+    val transition=rememberInfiniteTransition(label="clubSkeleton")
+    val alpha by transition.animateFloat(
+        initialValue=.34f,
+        targetValue=.72f,
+        animationSpec=infiniteRepeatable(
+            animation=tween(850),
+            repeatMode=RepeatMode.Reverse
+        ),
+        label="clubSkeletonAlpha"
+    )
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding=PaddingValues(horizontal=16.dp,vertical=12.dp),
+        verticalArrangement=Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            LazyRow(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                items(5) {
+                    Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier.size(58.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.20f))
+                        )
+                        Spacer(Modifier.height(7.dp))
+                        Box(
+                            Modifier.width(44.dp)
+                                .height(7.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.12f))
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            Box(
+                Modifier.width(150.dp)
+                    .height(14.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha=alpha*.18f))
+            )
+        }
+        items(3) {
+            Surface(
+                color=Color.White.copy(alpha=alpha*.055f),
+                shape=RoundedCornerShape(22.dp),
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=alpha*.07f)
+                ),
+                modifier=Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(15.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha=alpha*.16f))
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Box(
+                                Modifier.width(120.dp)
+                                    .height(9.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha=alpha*.16f))
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Box(
+                                Modifier.width(76.dp)
+                                    .height(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha=alpha*.10f))
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .height(10.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha=alpha*.12f))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        Modifier.fillMaxWidth(.72f)
+                            .height(10.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha=alpha*.09f))
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Row(horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                        repeat(3) {
+                            Box(
+                                Modifier.width(44.dp)
+                                    .height(24.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha=alpha*.09f))
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
