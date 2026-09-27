@@ -5,6 +5,8 @@ import android.net.Uri
 import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
+import java.time.Instant
+import java.time.Duration
 
 data class SocialAuthor(
     val id: String,
@@ -143,6 +145,51 @@ data class SocialComment(
     val createdAt: String,
     val author: SocialAuthor
 )
+
+fun threadedSocialComments(items:List<SocialComment>):List<SocialComment> {
+    if(items.size<2) return items
+    val byParent=items.groupBy { it.parentCommentId }
+    val known=items.associateBy { it.id }
+    val visited=mutableSetOf<String>()
+    val result=ArrayList<SocialComment>(items.size)
+
+    fun append(item:SocialComment) {
+        if(!visited.add(item.id)) return
+        result.add(item)
+        byParent[item.id]
+            .orEmpty()
+            .sortedBy { it.createdAt }
+            .forEach(::append)
+    }
+
+    items.asSequence()
+        .filter {
+            it.parentCommentId==null ||
+                known[it.parentCommentId]==null
+        }
+        .sortedBy { it.createdAt }
+        .forEach(::append)
+
+    items.asSequence()
+        .filterNot { visited.contains(it.id) }
+        .sortedBy { it.createdAt }
+        .forEach(::append)
+
+    return result
+}
+
+fun socialRelativeTime(value:String):String {
+    val instant=runCatching { Instant.parse(value) }.getOrNull() ?: return ""
+    val minutes=Duration.between(instant,Instant.now()).toMinutes().coerceAtLeast(0)
+    return when {
+        minutes<1 -> "الان"
+        minutes<60 -> minutes.toString()+"د"
+        minutes<1_440 -> (minutes/60).toString()+"س"
+        minutes<10_080 -> (minutes/1_440).toString()+"روز"
+        minutes<43_200 -> (minutes/10_080).toString()+"هفته"
+        else -> (minutes/43_200).toString()+"ماه"
+    }
+}
 
 data class SocialRoom(
     val id: String,
