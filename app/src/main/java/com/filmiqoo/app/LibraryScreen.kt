@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +43,9 @@ fun LibraryScreen(
     val sceneRepo=remember { SceneBookmarksRepository(backend) }
     val scope=rememberCoroutineScope()
 
-    var tab by remember { mutableStateOf(LibraryTab.FAVORITES) }
+    var tabName by rememberSaveable { mutableStateOf(LibraryTab.FAVORITES.name) }
+    val tab=runCatching { LibraryTab.valueOf(tabName) }
+        .getOrDefault(LibraryTab.FAVORITES)
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -135,14 +138,14 @@ fun LibraryScreen(
             contentColor=FqGold
         ) {
             listOf(
-                LibraryTab.FAVORITES to "موردعلاقه‌ها",
-                LibraryTab.WATCHLIST to "Watchlist",
-                LibraryTab.COLLECTIONS to "Collectionها",
-                LibraryTab.SCENES to "Sceneها"
+                LibraryTab.FAVORITES to "علاقه‌مندی‌ها",
+                LibraryTab.WATCHLIST to "بعداً می‌بینم",
+                LibraryTab.COLLECTIONS to "لیست‌ها",
+                LibraryTab.SCENES to "لحظه‌ها"
             ).forEach { item ->
                 Tab(
                     selected=tab==item.first,
-                    onClick={tab=item.first},
+                    onClick={tabName=item.first.name},
                     text={Text(item.second,fontSize=11.sp)}
                 )
             }
@@ -167,8 +170,8 @@ fun LibraryScreen(
             LibraryTab.FAVORITES -> LibraryMediaGrid(
                 items=favorites,
                 repository=repository,
-                emptyTitle="موردعلاقه‌ای نداری",
-                emptyBody="از صفحه فیلم یا سریال، Heart رو بزن تا اینجا ذخیره بشه.",
+                emptyTitle="هنوز چیزی به علاقه‌مندی‌ها اضافه نکردی",
+                emptyBody="از صفحه فیلم یا سریال، قلب رو بزن تا اینجا نگهش داری.",
                 emptyIcon=Icons.Default.FavoriteBorder,
                 onMedia=onMedia
             )
@@ -176,8 +179,8 @@ fun LibraryScreen(
             LibraryTab.WATCHLIST -> LibraryMediaGrid(
                 items=watchlist,
                 repository=repository,
-                emptyTitle="Watchlist خالیه",
-                emptyBody="عنوان‌هایی که می‌خوای بعداً ببینی رو به Watchlist اضافه کن.",
+                emptyTitle="لیست «بعداً می‌بینم» خالیه",
+                emptyBody="فیلم‌ها و سریال‌هایی که برای بعد نگه می‌داری اینجا جمع می‌شن.",
                 emptyIcon=Icons.Default.BookmarkBorder,
                 onMedia=onMedia
             )
@@ -189,8 +192,8 @@ fun LibraryScreen(
                         verticalAlignment=Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Collectionهای شخصی",fontSize=14.sp,fontWeight=FontWeight.Bold)
-                            Text("لیست‌های اختصاصی خودت رو بساز.",color=FqMuted,fontSize=11.sp)
+                            Text("لیست‌های شخصی",fontSize=14.sp,fontWeight=FontWeight.Bold)
+                            Text("مجموعه‌های اختصاصی برای هر حال‌وهوا یا موضوع بساز.",color=FqMuted,fontSize=11.sp)
                         }
                         Button(
                             onClick={showCreate=true},
@@ -206,9 +209,9 @@ fun LibraryScreen(
                     if(!loading && collections.isEmpty()) {
                         PremiumEmptyState(
                             icon=Icons.Default.CollectionsBookmark,
-                            title="هنوز Collection نداری",
-                            body="مثلاً «فیلم‌های آخر هفته»، «بهترین‌های 2026» یا «Anime Favorites» بساز.",
-                            action="ساخت Collection",
+                            title="هنوز لیست شخصی نداری",
+                            body="مثلاً «فیلم‌های آخر هفته»، «بهترین‌های ۲۰۲۶» یا «انیمه‌های محبوب» بساز.",
+                            action="ساخت لیست",
                             onAction={showCreate=true}
                         )
                     } else {
@@ -307,18 +310,18 @@ private fun LibraryHeader(
                 Icon(Icons.Default.VideoLibrary,null,tint=FqGold,modifier=Modifier.size(34.dp))
                 Spacer(Modifier.width(9.dp))
                 Column {
-                    Text("Library من",fontSize=27.sp,fontWeight=FontWeight.Black)
-                    Text("همه چیزهایی که برای خودت نگه داشتی",color=FqMuted,fontSize=11.sp)
+                    Text("کتابخانه من",fontSize=27.sp,fontWeight=FontWeight.Black)
+                    Text("هر چیزی که ذخیره کردی، برای بعد گذاشتی یا نشانه زدی",color=FqMuted,fontSize=11.sp)
                 }
             }
             Row(
                 Modifier.fillMaxWidth().padding(top=14.dp),
                 horizontalArrangement=Arrangement.spacedBy(8.dp)
             ) {
-                PremiumStat(favoriteCount.toString(),"Favorite",Modifier.weight(1f))
-                PremiumStat(watchlistCount.toString(),"Watchlist",Modifier.weight(1f))
-                PremiumStat(collectionCount.toString(),"Collection",Modifier.weight(1f))
-                PremiumStat(sceneCount.toString(),"Scene",Modifier.weight(1f))
+                PremiumStat(favoriteCount.toString(),"علاقه‌مندی",Modifier.weight(1f))
+                PremiumStat(watchlistCount.toString(),"بعداً",Modifier.weight(1f))
+                PremiumStat(collectionCount.toString(),"لیست",Modifier.weight(1f))
+                PremiumStat(sceneCount.toString(),"لحظه",Modifier.weight(1f))
             }
         }
     }
