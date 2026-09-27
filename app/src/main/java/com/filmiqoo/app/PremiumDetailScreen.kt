@@ -1588,7 +1588,7 @@ private fun PremiumSeriesPanel(
             EpisodeCard(
                 title=title,
                 mediaTitleId=mediaTitleId,
-                seasonNumber=season.number,
+                seasonNumber=season?.number ?: 0,
                 episode=ep,
                 nextSeasonNumber=next?.first,
                 nextEpisode=next?.second,
