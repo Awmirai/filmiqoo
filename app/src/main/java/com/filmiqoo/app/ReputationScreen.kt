@@ -38,7 +38,7 @@ fun ReputationScreen(
         error=null
         runCatching { repo.load(userId) }
             .onSuccess { reputation=it }
-            .onFailure { error=it.message ?: "خطا در دریافت Reputation" }
+            .onFailure { error=it.message ?: "خطا در دریافت اعتبار کاربری" }
         loading=false
     }
 
@@ -49,7 +49,7 @@ fun ReputationScreen(
         ) {
             IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
             Column(Modifier.weight(1f)) {
-                Text("Reputation و Badgeها",fontSize=21.sp,fontWeight=FontWeight.Black)
+                Text("اعتبار و نشان‌ها",fontSize=21.sp,fontWeight=FontWeight.Black)
                 Text("بر اساس فعالیت واقعی و عمومی در Filmiqoo",color=FqMuted,fontSize=11.sp)
             }
             IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
@@ -78,8 +78,8 @@ fun ReputationScreen(
 
                 item {
                     PremiumSectionHeader(
-                        title="اثرگذاری Community",
-                        subtitle="آمار عمومی؛ Watch history خصوصی در این امتیاز استفاده نمی‌شود",
+                        title="اثرگذاری در جامعه",
+                        subtitle="فقط فعالیت عمومی حساب می‌شود؛ تاریخچه تماشای خصوصی وارد امتیاز نمی‌شود",
                         icon=Icons.Default.Insights
                     )
                 }
@@ -93,8 +93,8 @@ fun ReputationScreen(
 
                 item {
                     PremiumSectionHeader(
-                        title="Badgeهای دریافت‌شده",
-                        subtitle=earned.size.toString()+" Badge",
+                        title="نشان‌های دریافت‌شده",
+                        subtitle=earned.size.toString()+" نشان",
                         icon=Icons.Default.MilitaryTech
                     )
                 }
@@ -107,7 +107,7 @@ fun ReputationScreen(
                             modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp)
                         ) {
                             Text(
-                                "هنوز Badge دریافت نشده؛ با Review، Collection و مشارکت عمومی قابل دریافت‌اند.",
+                                "هنوز نشانی دریافت نشده؛ با ریویو، لیست‌سازی و مشارکت عمومی می‌تونی نشان بگیری.",
                                 color=FqMuted,
                                 fontSize=11.sp,
                                 lineHeight=14.sp,
@@ -181,7 +181,7 @@ private fun ReputationHero(rep:UserReputation) {
                     }
                     Text("@"+rep.username,color=FqMuted,fontSize=11.sp)
                     Text(
-                        "Level "+rep.level+" • "+compactReputation(rep.score)+" XP",
+                        "سطح "+rep.level+" • "+compactReputation(rep.score)+" امتیاز",
                         color=FqGold,
                         fontSize=11.sp,
                         fontWeight=FontWeight.Bold,
@@ -203,7 +203,7 @@ private fun ReputationHero(rep:UserReputation) {
                     modifier=Modifier.fillMaxWidth().padding(top=17.dp).height(6.dp)
                 )
                 Text(
-                    (rep.nextLevelScore-rep.score).coerceAtLeast(0).toString()+" XP تا Level بعد",
+                    (rep.nextLevelScore-rep.score).coerceAtLeast(0).toString()+" امتیاز تا سطح بعد",
                     color=FqMuted,
                     fontSize=11.sp,
                     modifier=Modifier.padding(top=5.dp)
@@ -220,14 +220,14 @@ private fun ReputationStatsGrid(stats:ReputationStats) {
         verticalArrangement=Arrangement.spacedBy(8.dp)
     ) {
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            ReputationStat("Review",stats.reviews,Icons.Default.RateReview,Modifier.weight(1f))
-            ReputationStat("Review Like",stats.reviewLikes,Icons.Default.ThumbUp,Modifier.weight(1f))
-            ReputationStat("Post + Reel",stats.posts+stats.reels,Icons.Default.DynamicFeed,Modifier.weight(1f))
+            ReputationStat("ریویو",stats.reviews,Icons.Default.RateReview,Modifier.weight(1f))
+            ReputationStat("لایک ریویو",stats.reviewLikes,Icons.Default.ThumbUp,Modifier.weight(1f))
+            ReputationStat("پست + کلیپ",stats.posts+stats.reels,Icons.Default.DynamicFeed,Modifier.weight(1f))
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            ReputationStat("Engagement",stats.engagement,Icons.Default.Favorite,Modifier.weight(1f))
-            ReputationStat("Collection",stats.publicCollections,Icons.Default.CollectionsBookmark,Modifier.weight(1f))
-            ReputationStat("Follower لیست",stats.collectionFollowers,Icons.Default.Groups,Modifier.weight(1f))
+            ReputationStat("تعامل",stats.engagement,Icons.Default.Favorite,Modifier.weight(1f))
+            ReputationStat("لیست عمومی",stats.publicCollections,Icons.Default.CollectionsBookmark,Modifier.weight(1f))
+            ReputationStat("دنبال‌کننده لیست",stats.collectionFollowers,Icons.Default.Groups,Modifier.weight(1f))
         }
 
         if(stats.topGenre.isNotBlank()) {
@@ -240,7 +240,7 @@ private fun ReputationStatsGrid(stats:ReputationStats) {
                     Icon(Icons.Default.LocalMovies,null,tint=FqGold)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("ژانر پرتکرار در Reviewها",fontSize=11.sp,color=FqMuted)
+                        Text("ژانر پرتکرار در ریویوها",fontSize=11.sp,color=FqMuted)
                         Text(
                             stats.topGenre,
                             fontSize=11.sp,
@@ -249,7 +249,7 @@ private fun ReputationStatsGrid(stats:ReputationStats) {
                         )
                     }
                     Text(
-                        stats.topGenreReviews.toString()+" Review",
+                        stats.topGenreReviews.toString()+" ریویو",
                         color=FqGold,
                         fontSize=11.sp
                     )
