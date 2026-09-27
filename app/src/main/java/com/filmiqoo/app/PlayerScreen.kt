@@ -78,6 +78,7 @@ fun FilmiqooPlayerScreen(
     onDiscussion: (String) -> Unit = {}
 ) {
     val context=LocalContext.current
+    val networkOnline=rememberNetworkOnline()
     val activity=context as? Activity
     val audioManager=remember {
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -188,18 +189,33 @@ fun FilmiqooPlayerScreen(
             }
     }
 
-    LaunchedEffect(currentTarget.mediaTitleId,currentVersionId) {
+    LaunchedEffect(
+        currentTarget.mediaTitleId,
+        currentVersionId,
+        isPlaying,
+        networkOnline
+    ) {
         val mediaId=currentTarget.mediaTitleId
-        pulseState=if(mediaId.isNullOrBlank() || currentTarget.localUri!=null) {
-            null
-        } else {
-            runCatching {
-                pulseRepository.load(
-                    mediaId=mediaId,
-                    mediaVersionId=currentVersionId
-                )
-            }.getOrNull()
+        if(mediaId.isNullOrBlank() || currentTarget.localUri!=null) {
+            pulseState=null
+            return@LaunchedEffect
         }
+
+        do {
+            if(networkOnline) {
+                runCatching {
+                    pulseRepository.load(
+                        mediaId=mediaId,
+                        mediaVersionId=currentVersionId
+                    )
+                }.onSuccess {
+                    pulseState=it
+                }
+            }
+
+            if(!isPlaying || !networkOnline) break
+            delay(15_000)
+        } while(true)
     }
 
     fun activePositionMs():Long =
