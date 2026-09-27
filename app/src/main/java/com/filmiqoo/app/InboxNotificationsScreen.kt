@@ -588,6 +588,7 @@ fun ConnectedNotificationsScreen(
     var unread by remember { mutableLongStateOf(0L) }
     var items by remember { mutableStateOf<List<FilmiqooNotification>>(emptyList()) }
     var filterName by rememberSaveable { mutableStateOf(NotificationFilter.ALL.name) }
+    var unreadOnlyNotifications by rememberSaveable { mutableStateOf(false) }
     val filter=runCatching { NotificationFilter.valueOf(filterName) }
         .getOrDefault(NotificationFilter.ALL)
 
@@ -662,10 +663,28 @@ fun ConnectedNotificationsScreen(
                     label={Text("انتشارها",fontSize=10.sp)}
                 )
             }
+            item {
+                FilterChip(
+                    selected=unreadOnlyNotifications,
+                    onClick={unreadOnlyNotifications=!unreadOnlyNotifications},
+                    leadingIcon={
+                        Icon(
+                            if(unreadOnlyNotifications)Icons.Default.MarkEmailRead
+                            else Icons.Default.MarkEmailUnread,
+                            null,
+                            modifier=Modifier.size(15.dp)
+                        )
+                    },
+                    label={Text("خوانده‌نشده",fontSize=10.sp)}
+                )
+            }
         }
 
-        val visibleItems=remember(items,filter) {
-            items.filter { notificationMatchesFilter(it.type,filter) }
+        val visibleItems=remember(items,filter,unreadOnlyNotifications) {
+            items.filter {
+                notificationMatchesFilter(it.type,filter) &&
+                    (!unreadOnlyNotifications || !it.read)
+            }
         }
 
         if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
@@ -675,22 +694,31 @@ fun ConnectedNotificationsScreen(
 
         if(!loading && visibleItems.isEmpty()) {
             PremiumEmptyState(
-                Icons.Default.NotificationsNone,
-                when(filter) {
-                    NotificationFilter.ALL -> "اعلانی نداری"
-                    NotificationFilter.SOCIAL -> "اعلان اجتماعی نداری"
-                    NotificationFilter.MESSAGES -> "اعلان پیام نداری"
-                    NotificationFilter.RELEASES -> "اعلان انتشار نداری"
+                if(unreadOnlyNotifications)Icons.Default.MarkEmailRead
+                else Icons.Default.NotificationsNone,
+                if(unreadOnlyNotifications) {
+                    "اعلان خوانده‌نشده‌ای نیست"
+                } else {
+                    when(filter) {
+                        NotificationFilter.ALL -> "اعلانی نداری"
+                        NotificationFilter.SOCIAL -> "اعلان اجتماعی نداری"
+                        NotificationFilter.MESSAGES -> "اعلان پیام نداری"
+                        NotificationFilter.RELEASES -> "اعلان انتشار نداری"
+                    }
                 },
-                when(filter) {
-                    NotificationFilter.ALL ->
-                        "لایک، کامنت، دنبال‌کردن، استوری و پیام‌های جدید اینجا نمایش داده می‌شن."
-                    NotificationFilter.SOCIAL ->
-                        "تعامل‌های کلاب، کلیپ‌ها، ریویوها و دنبال‌کردن‌ها اینجا میاد."
-                    NotificationFilter.MESSAGES ->
-                        "پیام خصوصی، گفتگو و دعوت‌های تماشای گروهی اینجا میاد."
-                    NotificationFilter.RELEASES ->
-                        "قسمت جدید، آماده‌شدن پخش و کیفیت‌های تازه اینجا میاد."
+                if(unreadOnlyNotifications) {
+                    "همه اعلان‌های این فیلتر رو دیدی."
+                } else {
+                    when(filter) {
+                        NotificationFilter.ALL ->
+                            "لایک، کامنت، دنبال‌کردن، استوری و پیام‌های جدید اینجا نمایش داده می‌شن."
+                        NotificationFilter.SOCIAL ->
+                            "تعامل‌های کلاب، کلیپ‌ها، ریویوها و دنبال‌کردن‌ها اینجا میاد."
+                        NotificationFilter.MESSAGES ->
+                            "پیام خصوصی، گفتگو و دعوت‌های تماشای گروهی اینجا میاد."
+                        NotificationFilter.RELEASES ->
+                            "قسمت جدید، آماده‌شدن پخش و کیفیت‌های تازه اینجا میاد."
+                    }
                 }
             )
         } else {
