@@ -704,12 +704,24 @@ class SocialRepository(
         }
     }
 
-    suspend fun addComment(postId: String, body: String, spoiler: Boolean=false): String =
-        backend.postJson(
+    suspend fun addComment(
+        postId:String,
+        body:String,
+        spoiler:Boolean=false,
+        parentCommentId:String?=null
+    ):String {
+        val payload=JSONObject()
+            .put("body",body)
+            .put("spoiler",spoiler)
+        if(!parentCommentId.isNullOrBlank()) {
+            payload.put("parentCommentId",parentCommentId)
+        }
+        return backend.postJson(
             "/v1/social/posts/"+postId+"/comments",
-            JSONObject().put("body",body).put("spoiler",spoiler),
+            payload,
             authorized=true
         ).getString("id")
+    }
 
     suspend fun createChannel(
         name: String,
@@ -1327,12 +1339,24 @@ class SocialRepository(
         }
     }
 
-    suspend fun addReelComment(reelId: String, body: String, spoiler: Boolean=false): String =
-        backend.postJson(
+    suspend fun addReelComment(
+        reelId:String,
+        body:String,
+        spoiler:Boolean=false,
+        parentCommentId:String?=null
+    ):String {
+        val payload=JSONObject()
+            .put("body",body)
+            .put("spoiler",spoiler)
+        if(!parentCommentId.isNullOrBlank()) {
+            payload.put("parentCommentId",parentCommentId)
+        }
+        return backend.postJson(
             "/v1/social/reels/"+reelId+"/comments",
-            JSONObject().put("body",body).put("spoiler",spoiler),
+            payload,
             authorized=true
         ).getString("id")
+    }
 
 
     private fun parseRoomMessages(root:JSONObject):List<RoomMessageItem> {
