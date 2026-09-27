@@ -51,7 +51,7 @@ fun PremiumSearchScreen(
     val context=LocalContext.current
     val searchRepo=remember { UniversalSearchRepository(context.applicationContext,backend) }
 
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var state by remember { mutableStateOf<UniversalSearchLoad>(UniversalSearchLoad.Loading) }
     var history by remember { mutableStateOf(searchRepo.history()) }
     var tabName by rememberSaveable { mutableStateOf(SearchTab.ALL.name) }
@@ -189,7 +189,7 @@ private fun SearchHeader(
                     fontWeight=FontWeight.Black
                 )
                 Text(
-                    "فیلم، سریال، آدم‌ها، Post و Clips",
+                    "فیلم، سریال، آدم‌ها، پست و کلیپ",
                     color=FqMuted,
                     style=MaterialTheme.typography.bodySmall,
                     modifier=Modifier.padding(top=2.dp)
@@ -248,8 +248,8 @@ private fun SearchTabs(
         if(result.media.isNotEmpty()) add(SearchTab.MEDIA to "فیلم و سریال")
         if(result.users.isNotEmpty()) add(SearchTab.USERS to "آدم‌ها")
         if(result.channels.isNotEmpty()) add(SearchTab.CHANNELS to "کانال‌ها")
-        if(result.posts.isNotEmpty()) add(SearchTab.POSTS to "Postها")
-        if(result.reels.isNotEmpty()) add(SearchTab.REELS to "Clips")
+        if(result.posts.isNotEmpty()) add(SearchTab.POSTS to "پست‌ها")
+        if(result.reels.isNotEmpty()) add(SearchTab.REELS to "کلیپ‌ها")
     }
     LazyRow(
         contentPadding=PaddingValues(
@@ -331,13 +331,13 @@ private fun SearchAllContent(
         PremiumEmptyState(
             icon=if(query.isBlank())Icons.Default.Explore else Icons.Default.SearchOff,
             title=when {
-                query.isBlank() -> "Discover هنوز خالیه"
+                query.isBlank() -> "بخش کشف هنوز خالیه"
                 selectedTab==SearchTab.ALL -> "چیزی پیدا نشد"
                 else -> "در این دسته نتیجه‌ای نیست"
             },
             body=when {
                 query.isBlank() ->
-                    "با اضافه‌شدن محتوا و Creatorها، پیشنهادهای ترند اینجا ظاهر می‌شن."
+                    "با اضافه‌شدن محتوا و سازنده‌ها، پیشنهادهای ترند اینجا ظاهر می‌شن."
                 selectedTab==SearchTab.ALL ->
                     "عبارت دیگه‌ای امتحان کن یا اسم اصلی فیلم رو بنویس."
                 else ->
@@ -397,7 +397,7 @@ private fun SearchAllContent(
 
         if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.POSTS) && result.posts.isNotEmpty()) {
             item {
-                SearchSectionTitle("Postها",result.posts.size)
+                SearchSectionTitle("پست‌ها",result.posts.size)
             }
             items(result.posts.take(6),key={it.id}) { post ->
                 SearchPostCard(
@@ -421,7 +421,7 @@ private fun SearchAllContent(
 
         if((selectedTab==SearchTab.ALL || selectedTab==SearchTab.REELS) && result.reels.isNotEmpty()) {
             item {
-                SearchSectionTitle("Clips",result.reels.size)
+                SearchSectionTitle("کلیپ‌ها",result.reels.size)
             }
             item {
                 LazyRow(
@@ -502,9 +502,9 @@ private fun SearchPostCard(
                 ) {
                     Text(
                         when(post.type.lowercase()) {
-                            "review" -> "Review"
-                            "poll" -> "Poll"
-                            else -> "Post"
+                            "review" -> "ریویو"
+                            "poll" -> "نظرسنجی"
+                            else -> "پست"
                         },
                         color=if(post.type.equals("review",true))FqGold else FqMuted,
                         fontSize=8.sp,
@@ -527,7 +527,7 @@ private fun SearchPostCard(
                     )
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        "Spoiler Shield • برای دیدن Post بازش کن",
+                        "اسپویلر مخفی شده • برای دیدن پست بازش کن",
                         color=FqDanger,
                         fontSize=9.sp,
                         fontWeight=FontWeight.Bold
@@ -612,7 +612,7 @@ private fun SearchPosterCard(
                     modifier=Modifier.align(Alignment.TopStart).padding(6.dp)
                 ) {
                     Text(
-                        media.quality.ifBlank{"PLAY"},
+                        media.quality.ifBlank{"پخش"},
                         fontSize=6.sp,
                         fontWeight=FontWeight.Black,
                         modifier=Modifier.padding(horizontal=5.dp,vertical=3.dp)
@@ -730,7 +730,7 @@ private fun ReelSearchGrid(
     onCreator: (Creator) -> Unit
 ) {
     if(reels.isEmpty()) {
-        PremiumEmptyState(Icons.Default.VideoLibrary,"Clip پیدا نشد","Caption، سازنده یا اسم فیلم رو جستجو کن.")
+        PremiumEmptyState(Icons.Default.VideoLibrary,"کلیپی پیدا نشد","کپشن، سازنده یا اسم فیلم رو جستجو کن.")
         return
     }
 
