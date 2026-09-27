@@ -679,6 +679,7 @@ private fun notificationMatchesFilter(
         type.startsWith("post_") ||
         type.startsWith("reel_") ||
         type.startsWith("review_") ||
+        type=="comment_like" ||
         type=="collection_update"
     NotificationFilter.MESSAGES ->
         type in setOf(
@@ -704,6 +705,7 @@ private fun notificationIcon(type:String)=when(type) {
     "reel_like" -> Icons.Default.Favorite
     "reel_comment" -> Icons.Default.ChatBubble
     "review_like" -> Icons.Default.Star
+    "comment_like" -> Icons.Default.Favorite
     "dm_message" -> Icons.Default.MarkChatUnread
     "room_message" -> Icons.Default.Forum
     "release_ready" -> Icons.Default.NewReleases
@@ -730,6 +732,7 @@ private fun notificationTypeLabel(type:String)=when(type) {
     "reel_like" -> "Clip Like"
     "reel_comment" -> "Clip Comment"
     "review_like" -> "Review Like"
+    "comment_like" -> "Comment Like"
     "dm_message" -> "پیام خصوصی"
     "room_message" -> "پیام گروه"
     "release_ready" -> "انتشار"
