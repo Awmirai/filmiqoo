@@ -84,6 +84,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var tab by remember { mutableIntStateOf(0) }
     val bottomTabStateHolder=rememberSaveableStateHolder()
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
+    var returnOverlay by remember { mutableStateOf<OverlayRoute?>(null) }
     var showSearch by remember { mutableStateOf(false) }
     var activeViewer by remember { mutableStateOf(viewerStore.active()) }
     var viewerReady by remember { mutableStateOf(!authenticated) }
@@ -326,7 +327,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     }
 
     val closeOverlay:()->Unit = {
-        overlay=null
+        val parent=returnOverlay
+        if(parent!=null) {
+            overlay=parent
+            returnOverlay=null
+        } else {
+            overlay=null
+        }
         showSearch=false
         socialBadgeRefresh++
         Unit
@@ -370,8 +377,17 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         }
     }
 
-    BackHandler(enabled = overlay != null || showSearch) {
-        closeOverlay()
+    BackHandler(
+        enabled=overlay!=null || showSearch || returnOverlay!=null
+    ) {
+        if(overlay==null && !showSearch && returnOverlay!=null) {
+            overlay=returnOverlay
+            returnOverlay=null
+            deepLinkReelId=null
+            deepLinkPostId=null
+        } else {
+            closeOverlay()
+        }
     }
 
     if(showNotificationPrimer) {
@@ -688,15 +704,26 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     backend=backend,
                     social=social,
                     onBack=closeOverlay,
-                    onMedia={overlay=OverlayRoute.Detail(it)},
-                    onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
-                    onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
+                    onMedia={
+                        returnOverlay=route
+                        overlay=OverlayRoute.Detail(it)
+                    },
+                    onOpenRoom={
+                        returnOverlay=route
+                        overlay=OverlayRoute.Room(it.id,it.name)
+                    },
+                    onStory={stories,index->
+                        returnOverlay=route
+                        overlay=OverlayRoute.SocialStories(stories,index)
+                    },
                     onOpenClip={ clipId ->
+                        returnOverlay=route
                         overlay=null
                         deepLinkReelId=clipId
                         tab=1
                     },
                     onOpenPost={ postId ->
+                        returnOverlay=route
                         overlay=null
                         deepLinkPostId=postId
                         tab=2
@@ -708,15 +735,20 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             appScope.launch {
                                 runCatching { messaging.ensureDm(userId) }
                                     .onSuccess { dm->
+                                        returnOverlay=route
                                         overlay=OverlayRoute.Room(dm.id,dm.title.ifBlank { title })
                                     }
                             }
                         }
                     },
                     onManageChannel={channelId,name->
+                        returnOverlay=route
                         overlay=OverlayRoute.ChannelManage(channelId,name)
                     },
-                    onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
+                    onReputation={userId->
+                        returnOverlay=route
+                        overlay=OverlayRoute.Reputation(userId)
+                    },
                     onRequireAuth={overlay=OverlayRoute.Auth}
                 )
                 is OverlayRoute.ChannelManage -> ChannelManageScreen(
@@ -894,6 +926,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         selected=tab,
                         kidsMode=activeViewer?.kidsMode==true,
                         onSelected={ index ->
+                            returnOverlay=null
                             tab=index
                             if(index!=1) deepLinkReelId=null
                             if(index!=2) deepLinkPostId=null
