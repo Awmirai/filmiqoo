@@ -65,6 +65,8 @@ fun ClubScreen(
     var error by remember { mutableStateOf<String?>(null) }
 
     var feed by remember { mutableStateOf<List<SocialPost>>(emptyList()) }
+    var feedNextCursor by remember { mutableStateOf<String?>(null) }
+    var feedLoadingMore by remember { mutableStateOf(false) }
     var stories by remember { mutableStateOf<List<SocialStory>>(emptyList()) }
     var clips by remember { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
     var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
@@ -101,7 +103,9 @@ fun ClubScreen(
                     pulse=runCatching { pulseRepo.trending() }.getOrDefault(emptyList())
                     val results=listOf(
                         runCatching {
-                            val base=social.feed()
+                            val page=social.feedPage()
+                            feedNextCursor=page.nextCursor
+                            val base=page.items
                             feed=if(initialPostId.isNullOrBlank()) {
                                 base
                             } else {
@@ -199,6 +203,30 @@ fun ClubScreen(
                         onFeedChange={feed=it},
                         onCreatorsChange={creators=it},
                         onRefresh={refresh++},
+                        feedNextCursor=feedNextCursor,
+                        feedLoadingMore=feedLoadingMore,
+                        onLoadMore={
+                            val cursor=feedNextCursor
+                            if(
+                                !feedLoadingMore &&
+                                !cursor.isNullOrBlank() &&
+                                initialPostId.isNullOrBlank()
+                            ) {
+                                feedLoadingMore=true
+                                scope.launch {
+                                    runCatching {
+                                        social.feedPage(cursor=cursor)
+                                    }.onSuccess { page ->
+                                        feed=(feed+page.items)
+                                            .distinctBy { it.id }
+                                        feedNextCursor=page.nextCursor
+                                    }.onFailure {
+                                        error=it.message
+                                    }
+                                    feedLoadingMore=false
+                                }
+                            }
+                        },
                         focusedPostId=initialPostId,
                         onClearFocusedPost=onClearFocusedPost
                     )
@@ -653,6 +681,9 @@ private fun ClubForYou(
     onFeedChange:(List<SocialPost>)->Unit,
     onCreatorsChange:(List<SocialChannel>)->Unit,
     onRefresh:()->Unit,
+    feedNextCursor:String?,
+    feedLoadingMore:Boolean,
+    onLoadMore:()->Unit,
     focusedPostId:String?,
     onClearFocusedPost:()->Unit
 ) {
@@ -967,6 +998,35 @@ private fun ClubForYou(
                         )
                     }
                 )
+            }
+
+            if(!focusMode && !feedNextCursor.isNullOrBlank()) {
+                item(key="feed-load-more-"+feedNextCursor) {
+                    LaunchedEffect(feedNextCursor) {
+                        onLoadMore()
+                    }
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .padding(vertical=18.dp),
+                        horizontalArrangement=Arrangement.Center,
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        if(feedLoadingMore) {
+                            CircularProgressIndicator(
+                                strokeWidth=2.dp,
+                                color=Color.White,
+                                modifier=Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(
+                            if(feedLoadingMore)"در حال آوردن پست‌های بعدی..."
+                            else "ادامه فید",
+                            color=FqMuted,
+                            fontSize=10.sp
+                        )
+                    }
+                }
             }
         }
     }
