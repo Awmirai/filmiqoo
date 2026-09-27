@@ -502,13 +502,18 @@ class CreatorChannelRepository(
                             avatarUrl=authorObj.optString("avatarUrl"),
                             verified=authorObj.optBoolean("verified")
                         ),
-                        media=mediaObj?.let {
-                            SocialMediaRef(
-                                id=it.optString("id").takeIf(String::isNotBlank),
-                                title=it.optString("title").takeIf(String::isNotBlank),
-                                posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank)
-                            )
-                        }
+                        media=mediaObj
+                            ?.takeIf {
+                                it.optString("id").isNotBlank() ||
+                                    it.optString("title").isNotBlank()
+                            }
+                            ?.let {
+                                SocialMediaRef(
+                                    id=it.optString("id").takeIf(String::isNotBlank),
+                                    title=it.optString("title").takeIf(String::isNotBlank),
+                                    posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank)
+                                )
+                            }
                     )
                 )
             }
