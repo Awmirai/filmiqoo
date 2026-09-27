@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +63,7 @@ fun ClubScreen(
     val messagingRepo=remember { MessagingRepository(backend) }
     val networkOnline=rememberNetworkOnline()
 
-    var tab by remember { mutableStateOf(ClubTab.FOR_YOU) }
+    var tab by rememberSaveable { mutableStateOf(ClubTab.FOR_YOU) }
     val forYouListState=rememberLazyListState()
     val followingListState=rememberLazyListState()
     val roomsListState=rememberLazyListState()
