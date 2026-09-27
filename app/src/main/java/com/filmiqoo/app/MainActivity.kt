@@ -575,7 +575,24 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 is OverlayRoute.Player -> FilmiqooPlayerScreen(
                     target=route.target,
                     backend=backend,
-                    onBack=closeOverlay
+                    onBack=closeOverlay,
+                    onDiscussion={ mediaId ->
+                        appScope.launch {
+                            runCatching { social.roomForMedia(mediaId) }
+                                .onSuccess { room ->
+                                    if(room!=null) {
+                                        overlay=OverlayRoute.Room(room.id,room.name)
+                                    } else {
+                                        overlay=null
+                                        tab=2
+                                    }
+                                }
+                                .onFailure {
+                                    overlay=null
+                                    tab=2
+                                }
+                        }
+                    }
                 )
                 OverlayRoute.Downloads -> DownloadsScreen(
                     backend=backend,
