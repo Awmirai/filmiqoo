@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +41,7 @@ fun ReleaseCenterScreen(
     var releases by remember { mutableStateOf<List<ReleaseCenterItem>>(emptyList()) }
     var reminderKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var reminderBusy by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var filter by remember { mutableIntStateOf(0) }
+    var filter by rememberSaveable { mutableIntStateOf(0) }
 
     BackHandler { onBack() }
 
@@ -92,8 +93,8 @@ fun ReleaseCenterScreen(
                 ) {
                     IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
                     Column(Modifier.weight(1f)) {
-                        Text("Release Center",fontSize=21.sp,fontWeight=FontWeight.Black)
-                        Text("تقویم انتشار فیلم و سریال",color=Color.White.copy(alpha=.65f),fontSize=11.sp)
+                        Text("مرکز انتشار",fontSize=21.sp,fontWeight=FontWeight.Black)
+                        Text("زمان انتشار فیلم‌ها، سریال‌ها و قسمت‌های تازه",color=Color.White.copy(alpha=.65f),fontSize=11.sp)
                     }
                     IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
                 }
@@ -185,7 +186,7 @@ fun ReleaseCenterScreen(
                                         )
                                     }
                                     Spacer(Modifier.width(5.dp))
-                                    Text(if(reminded)"یادم هست" else "یادم بنداز")
+                                    Text(if(reminded)"یادآوری فعاله" else "یادم بنداز")
                                 }
                             }
                         }
@@ -225,8 +226,8 @@ fun ReleaseCenterScreen(
             item {
                 PremiumEmptyState(
                     Icons.Default.EventBusy,
-                    "انتشاری پیدا نشد",
-                    "Release Center از TMDB Backend تغذیه می‌شود؛ اتصال سرور را بررسی کن."
+                    "در این فیلتر چیزی پیدا نشد",
+                    "فیلتر دیگه‌ای رو انتخاب کن یا بعداً دوباره انتشارهای تازه رو بررسی کن."
                 )
             }
         } else {
