@@ -1736,24 +1736,84 @@ fun ClubCommentsSheet(
                                         modifier=Modifier.padding(top=2.dp)
                                     )
                                 }
-                                TextButton(
-                                    onClick={
-                                        if(loggedIn) {
-                                            replyTo=comment
-                                        } else {
-                                            onRequireAuth()
-                                        }
-                                    },
-                                    contentPadding=PaddingValues(
-                                        horizontal=0.dp,
-                                        vertical=2.dp
-                                    )
+                                Row(
+                                    verticalAlignment=Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        "پاسخ",
-                                        color=FqMuted,
-                                        fontSize=9.sp
-                                    )
+                                    TextButton(
+                                        onClick={
+                                            if(loggedIn) {
+                                                replyTo=comment
+                                            } else {
+                                                onRequireAuth()
+                                            }
+                                        },
+                                        contentPadding=PaddingValues(
+                                            horizontal=0.dp,
+                                            vertical=2.dp
+                                        )
+                                    ) {
+                                        Text(
+                                            "پاسخ",
+                                            color=FqMuted,
+                                            fontSize=9.sp
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick={
+                                            if(!loggedIn) {
+                                                onRequireAuth()
+                                            } else {
+                                                val before=comment.likedByMe
+                                                val optimistic=!before
+                                                comments=comments.map {
+                                                    if(it.id==comment.id) {
+                                                        it.copy(
+                                                            likedByMe=optimistic,
+                                                            likes=(
+                                                                it.likes+
+                                                                    if(optimistic)1 else -1
+                                                            ).coerceAtLeast(0)
+                                                        )
+                                                    } else it
+                                                }
+                                                scope.launch {
+                                                    runCatching {
+                                                        social.toggleCommentLike(comment.id)
+                                                    }.onSuccess { result ->
+                                                        comments=comments.map {
+                                                            if(it.id==comment.id) {
+                                                                it.copy(
+                                                                    likedByMe=result.first,
+                                                                    likes=result.second
+                                                                )
+                                                            } else it
+                                                        }
+                                                    }.onFailure {
+                                                        reload()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier=Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            if(comment.likedByMe)
+                                                Icons.Default.Favorite
+                                            else
+                                                Icons.Default.FavoriteBorder,
+                                            null,
+                                            tint=if(comment.likedByMe)FqDanger else FqMuted,
+                                            modifier=Modifier.size(14.dp)
+                                        )
+                                    }
+                                    if(comment.likes>0) {
+                                        Text(
+                                            compactClubCount(comment.likes),
+                                            color=if(comment.likedByMe)FqDanger else FqMuted,
+                                            fontSize=8.sp
+                                        )
+                                    }
                                 }
                             }
                         }
