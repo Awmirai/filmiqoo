@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,21 +82,21 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
     var previewMode by remember { mutableStateOf(false) }
     var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     val bottomTabStateHolder=rememberSaveableStateHolder()
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
     val overlayBackStack=remember { mutableStateListOf<OverlayRoute>() }
-    var showSearch by remember { mutableStateOf(false) }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
     var activeViewer by remember { mutableStateOf(viewerStore.active()) }
     var viewerReady by remember { mutableStateOf(!authenticated) }
-    var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
-    var deepLinkReelId by remember { mutableStateOf<String?>(null) }
-    var clipResumeReelId by remember { mutableStateOf<String?>(null) }
-    var deepLinkPostId by remember { mutableStateOf<String?>(null) }
+    var deepLinkHandled by rememberSaveable(initialDeepLink) { mutableStateOf(false) }
+    var deepLinkReelId by rememberSaveable { mutableStateOf<String?>(null) }
+    var clipResumeReelId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deepLinkPostId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
-    var showNotificationPrimer by remember { mutableStateOf(false) }
-    var socialBadgeRefresh by remember { mutableIntStateOf(0) }
+    var showNotificationPrimer by rememberSaveable { mutableStateOf(false) }
+    var socialBadgeRefresh by rememberSaveable { mutableIntStateOf(0) }
 
     DisposableEffect(backend,context) {
         val prefs=context.applicationContext.getSharedPreferences(
