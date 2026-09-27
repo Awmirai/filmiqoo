@@ -93,9 +93,22 @@ fun PremiumCreatorChannelScreen(
                 val management=if(backend.session.isLoggedIn) {
                     runCatching { repo.manageOverview(creator.id) }.getOrNull()
                 } else null
+                val rawPosts=repo.channelPosts(creator.id)
+                val postStates=if(backend.session.isLoggedIn) {
+                    runCatching {
+                        social.postViewerStates(rawPosts.map { it.id })
+                    }.getOrDefault(emptyMap())
+                } else emptyMap()
+                val hydratedPosts=rawPosts.map { post ->
+                    val viewer=postStates[post.id]
+                    if(viewer==null) post else post.copy(
+                        likedByMe=viewer.first,
+                        savedByMe=viewer.second
+                    )
+                }
                 CreatorEntityState.Channel(
                     profile=repo.channelProfile(creator.id),
-                    posts=repo.channelPosts(creator.id),
+                    posts=hydratedPosts,
                     reels=repo.channelReels(creator.id),
                     stories=repo.channelStories(creator.id),
                     members=repo.channelMembers(creator.id),
@@ -103,9 +116,22 @@ fun PremiumCreatorChannelScreen(
                     management=management
                 )
             } else {
+                val rawPosts=repo.userPosts(creator.id)
+                val postStates=if(backend.session.isLoggedIn) {
+                    runCatching {
+                        social.postViewerStates(rawPosts.map { it.id })
+                    }.getOrDefault(emptyMap())
+                } else emptyMap()
+                val hydratedPosts=rawPosts.map { post ->
+                    val viewer=postStates[post.id]
+                    if(viewer==null) post else post.copy(
+                        likedByMe=viewer.first,
+                        savedByMe=viewer.second
+                    )
+                }
                 CreatorEntityState.User(
                     profile=repo.userProfile(creator.id),
-                    posts=repo.userPosts(creator.id),
+                    posts=hydratedPosts,
                     reels=repo.userReels(creator.id),
                     relationship=if(backend.session.isLoggedIn) {
                         runCatching { social.userRelationship(creator.id) }.getOrNull()
