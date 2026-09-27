@@ -333,7 +333,7 @@ fun PremiumCreatorChannelScreen(
                             followed=followed
                         )
                     } else {
-                        CreatorReelsGrid(s.reels,onOpenClip,onMedia)
+                        CreatorReelsGrid(s.reels,clipsGridState,onOpenClip,onMedia)
                     }
                     1 -> if(channelLocked) {
                         PrivateChannelLockedState(
