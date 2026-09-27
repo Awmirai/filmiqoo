@@ -203,6 +203,27 @@ func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
 		"publishedAt":publishedAt,
 	})
 }
+func (s *Server) postViewerState(w http.ResponseWriter,r *http.Request) {
+	userID:=userIDFromContext(r.Context())
+	postID:=chi.URLParam(r,"id")
+	var liked,saved bool
+	err:=s.db.QueryRow(r.Context(),`
+		SELECT EXISTS(
+		         SELECT 1 FROM post_reactions
+		          WHERE post_id=$1 AND user_id=$2
+		       ),
+		       EXISTS(
+		         SELECT 1 FROM post_saves
+		          WHERE post_id=$1 AND user_id=$2
+		       )
+	`,postID,userID).Scan(&liked,&saved)
+	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	writeJSON(w,http.StatusOK,map[string]any{
+		"likedByMe":liked,
+		"savedByMe":saved,
+	})
+}
+
 func (s *Server) togglePostLike(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	postID:=chi.URLParam(r,"id")
