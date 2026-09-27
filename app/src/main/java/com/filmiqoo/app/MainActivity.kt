@@ -83,6 +83,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var viewerReady by remember { mutableStateOf(!authenticated) }
     var deepLinkHandled by remember(initialDeepLink) { mutableStateOf(false) }
     var deepLinkReelId by remember { mutableStateOf<String?>(null) }
+    var deepLinkPostId by remember { mutableStateOf<String?>(null) }
     var pendingHandoff by remember { mutableStateOf<PendingPlaybackHandoff?>(null) }
     var handoffActionBusy by remember { mutableStateOf(false) }
 
@@ -201,7 +202,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             val id=uri.pathSegments.firstOrNull().orEmpty()
             val kidsMode=activeViewer?.kidsMode==true
             val socialHost=host in setOf(
-                "creator","channel","collection","party","room","room-invite","reel"
+                "creator","channel","collection","party","room","room-invite","reel","post"
             )
 
             if(kidsMode && socialHost) {
@@ -309,6 +310,14 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         showSearch=false
                         deepLinkReelId=id
                         tab=1
+                    }
+
+                    "post" -> {
+                        require(id.isNotBlank())
+                        overlay=null
+                        showSearch=false
+                        deepLinkPostId=id
+                        tab=2
                     }
 
                     else -> Unit
@@ -769,6 +778,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         deepLinkReelId=clipId
                         tab=1
                     },
+                    onOpenPost={ postId ->
+                        overlay=null
+                        deepLinkPostId=postId
+                        tab=2
+                    },
                     onOpenMedia={overlay=OverlayRoute.Detail(it)},
                     onOpenCollection={overlay=OverlayRoute.SocialCollections(it)},
                     onOpenWatchParty={overlay=OverlayRoute.WatchParty(partyId=it)},
@@ -783,6 +797,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         kidsMode=activeViewer?.kidsMode==true,
                         onSelected={ index ->
                             tab=index
+                            if(index!=1) deepLinkReelId=null
+                            if(index!=2) deepLinkPostId=null
                         }
                     )
                 }
@@ -834,7 +850,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onStory={stories,index->overlay=OverlayRoute.SocialStories(stories,index)},
                             onInbox={overlay=OverlayRoute.Inbox},
                             onCreate={overlay=OverlayRoute.Create},
-                            onRequireAuth={overlay=OverlayRoute.Auth}
+                            onRequireAuth={overlay=OverlayRoute.Auth},
+                            initialPostId=deepLinkPostId
                         )
                         3 -> LibraryScreen(
                             backend=backend,
