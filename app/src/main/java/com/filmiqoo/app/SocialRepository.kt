@@ -139,6 +139,7 @@ data class SocialComment(
     val body: String,
     val spoiler: Boolean,
     val likes: Long,
+    val likedByMe:Boolean=false,
     val createdAt: String,
     val author: SocialAuthor
 )
@@ -713,10 +714,34 @@ class SocialRepository(
         ).optLong("shares")
 
 
+    suspend fun commentViewerStates(
+        ids:List<String>
+    ):Map<String,Boolean> {
+        if(ids.isEmpty() || !backend.session.isLoggedIn) return emptyMap()
+        val root=backend.postJson(
+            "/v1/social/comments/viewer-states",
+            JSONObject().put(
+                "ids",
+                JSONArray().apply {
+                    ids.distinct().take(200).forEach(::put)
+                }
+            ),
+            authorized=true
+        )
+        val arr=root.optJSONArray("items") ?: return emptyMap()
+        return buildMap {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val id=x.optString("id")
+                if(id.isNotBlank()) put(id,x.optBoolean("likedByMe"))
+            }
+        }
+    }
+
     suspend fun comments(postId: String): List<SocialComment> {
         val root=backend.getJson("/v1/social/posts/"+postId+"/comments",authorized=false)
         val arr=root.optJSONArray("items") ?: return emptyList()
-        return buildList {
+        val base=buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
                 add(
@@ -732,6 +757,20 @@ class SocialRepository(
                 )
             }
         }
+        val viewer=runCatching {
+            commentViewerStates(base.map { it.id })
+        }.getOrDefault(emptyMap())
+        return if(viewer.isEmpty()) base
+        else base.map { it.copy(likedByMe=viewer[it.id] == true) }
+    }
+
+    suspend fun toggleCommentLike(id:String):Pair<Boolean,Long> {
+        val o=backend.postJson(
+            "/v1/social/comments/"+id+"/like",
+            JSONObject(),
+            authorized=true
+        )
+        return o.optBoolean("liked") to o.optLong("likes")
     }
 
     suspend fun addComment(
@@ -1351,7 +1390,7 @@ class SocialRepository(
     suspend fun reelComments(reelId: String): List<SocialComment> {
         val root=backend.getJson("/v1/social/reels/"+reelId+"/comments",authorized=false)
         val arr=root.optJSONArray("items") ?: return emptyList()
-        return buildList {
+        val base=buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
                 add(
@@ -1367,6 +1406,11 @@ class SocialRepository(
                 )
             }
         }
+        val viewer=runCatching {
+            commentViewerStates(base.map { it.id })
+        }.getOrDefault(emptyMap())
+        return if(viewer.isEmpty()) base
+        else base.map { it.copy(likedByMe=viewer[it.id] == true) }
     }
 
     suspend fun addReelComment(
