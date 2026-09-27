@@ -158,7 +158,14 @@ class CreatorChannelRepository(
     }
 
     suspend fun userPosts(id: String): List<SocialPost> =
-        parsePosts(backend.getJson("/v1/social/users/"+id+"/posts",authorized=false))
+        enrichPostViewerState(
+            parsePosts(
+                backend.getJson(
+                    "/v1/social/users/"+id+"/posts",
+                    authorized=false
+                )
+            )
+        )
 
     suspend fun userReels(id: String): List<ReelFeedItem> =
         parseReels(backend.getJson("/v1/social/users/"+id+"/reels",authorized=false))
@@ -182,7 +189,14 @@ class CreatorChannelRepository(
     }
 
     suspend fun channelPosts(id: String): List<SocialPost> =
-        parsePosts(backend.getJson("/v1/social/channels/"+id+"/posts",authorized=false))
+        enrichPostViewerState(
+            parsePosts(
+                backend.getJson(
+                    "/v1/social/channels/"+id+"/posts",
+                    authorized=false
+                )
+            )
+        )
 
     suspend fun channelReels(id: String): List<ReelFeedItem> =
         parseReels(backend.getJson("/v1/social/channels/"+id+"/reels",authorized=false))
@@ -475,6 +489,46 @@ class CreatorChannelRepository(
             channels=a.optLong("channels"),
             channelFollowers=a.optLong("channelFollowers")
         )
+    }
+
+    private suspend fun enrichPostViewerState(
+        posts:List<SocialPost>
+    ):List<SocialPost> {
+        if(!backend.session.isLoggedIn || posts.isEmpty()) return posts
+
+        val ids=posts.take(100).joinToString(",") { it.id }
+        if(ids.isBlank()) return posts
+
+        val root=runCatching {
+            backend.getJson(
+                "/v1/social/posts/viewer-states?ids="+
+                    java.net.URLEncoder.encode(ids,"UTF-8"),
+                authorized=true
+            )
+        }.getOrNull() ?: return posts
+
+        val states=mutableMapOf<String,Pair<Boolean,Boolean>>()
+        val arr=root.optJSONArray("items")
+        if(arr!=null) {
+            for(i in 0 until arr.length()) {
+                val x=arr.optJSONObject(i) ?: continue
+                val id=x.optString("id")
+                if(id.isNotBlank()) {
+                    states[id]=
+                        x.optBoolean("likedByMe") to
+                        x.optBoolean("savedByMe")
+                }
+            }
+        }
+
+        return posts.map { post ->
+            val state=states[post.id]
+            if(state==null) post
+            else post.copy(
+                likedByMe=state.first,
+                savedByMe=state.second
+            )
+        }
     }
 
     private fun parsePosts(root: JSONObject): List<SocialPost> {
