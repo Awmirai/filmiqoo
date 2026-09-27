@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -79,6 +82,10 @@ fun PremiumCreatorChannelScreen(
     var followPending by remember(creator.id) { mutableStateOf(false) }
     var followBusy by remember { mutableStateOf(false) }
     var tab by rememberSaveable(creator.id,creator.entityType) { mutableIntStateOf(0) }
+    val clipsGridState=rememberLazyGridState()
+    val postsListState=rememberLazyListState()
+    val roomsListState=rememberLazyListState()
+    val aboutListState=rememberLazyListState()
     var safetyTargetType by remember { mutableStateOf<String?>(null) }
     var safetyTargetId by remember { mutableStateOf<String?>(null) }
     var safetyUserId by remember { mutableStateOf<String?>(null) }
@@ -226,7 +233,7 @@ fun PremiumCreatorChannelScreen(
                             onFollow=followAction
                         )
                     } else {
-                        CreatorReelsGrid(s.reels,onOpenClip,onMedia)
+                        CreatorReelsGrid(s.reels,clipsGridState,onOpenClip,onMedia)
                     }
                     1 -> if(privateLocked) {
                         PrivateProfileLockedState(
@@ -242,7 +249,8 @@ fun PremiumCreatorChannelScreen(
                             loggedIn=backend.session.isLoggedIn,
                             onRequireAuth=onRequireAuth,
                             onMedia=onMedia,
-                            onOpenPost=onOpenPost
+                            onOpenPost=onOpenPost,
+                            listState=postsListState
                         )
                     }
                     else -> CreatorAbout(
@@ -251,7 +259,8 @@ fun PremiumCreatorChannelScreen(
                         privacy=if(p.privateAccount)"خصوصی" else "عمومی",
                         members=emptyList(),
                         rooms=emptyList(),
-                        onOpenRoom=onOpenRoom
+                        onOpenRoom=onOpenRoom,
+                        listState=aboutListState
                     )
                 }
             }
@@ -338,7 +347,8 @@ fun PremiumCreatorChannelScreen(
                             loggedIn=backend.session.isLoggedIn,
                             onRequireAuth=onRequireAuth,
                             onMedia=onMedia,
-                            onOpenPost=onOpenPost
+                            onOpenPost=onOpenPost,
+                            listState=postsListState
                         )
                     }
                     2 -> if(channelLocked) {
@@ -347,7 +357,7 @@ fun PremiumCreatorChannelScreen(
                             followed=followed
                         )
                     } else {
-                        ChannelRoomsList(s.rooms,onOpenRoom)
+                        ChannelRoomsList(s.rooms,roomsListState,onOpenRoom)
                     }
                     else -> CreatorAbout(
                         bio=p.bio,
@@ -355,7 +365,8 @@ fun PremiumCreatorChannelScreen(
                         privacy=p.visibility,
                         members=if(channelLocked) emptyList() else s.members,
                         rooms=if(channelLocked) emptyList() else s.rooms,
-                        onOpenRoom=onOpenRoom
+                        onOpenRoom=onOpenRoom,
+                        listState=aboutListState
                     )
                 }
             }
@@ -976,6 +987,7 @@ private fun PrivateProfileLockedState(
 @Composable
 private fun CreatorReelsGrid(
     reels: List<ReelFeedItem>,
+    state: LazyGridState,
     onOpenClip: (String) -> Unit,
     onMedia: (MediaItem) -> Unit
 ) {
@@ -985,6 +997,7 @@ private fun CreatorReelsGrid(
     }
 
     LazyVerticalGrid(
+        state=state,
         columns=GridCells.Fixed(3),
         contentPadding=PaddingValues(4.dp),
         horizontalArrangement=Arrangement.spacedBy(3.dp),
@@ -1027,7 +1040,8 @@ private fun CreatorPostsList(
     loggedIn: Boolean,
     onRequireAuth: () -> Unit,
     onMedia: (MediaItem) -> Unit,
-    onOpenPost: (String) -> Unit
+    onOpenPost: (String) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState
 ) {
     if(posts.isEmpty()) {
         PremiumEmptyState(
@@ -1051,6 +1065,7 @@ private fun CreatorPostsList(
     var commentsFor by remember { mutableStateOf<SocialPost?>(null) }
 
     LazyColumn(
+        state=listState,
         contentPadding=PaddingValues(12.dp),
         verticalArrangement=Arrangement.spacedBy(9.dp)
     ) {
@@ -1384,7 +1399,11 @@ private fun ChannelMembersList(members: List<ChannelMember>) {
         return
     }
 
-    LazyColumn(contentPadding=PaddingValues(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        state=listState,
+        contentPadding=PaddingValues(12.dp),
+        verticalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
         items(members,key={it.id}) { member ->
             Surface(color=FqSurface,shape=RoundedCornerShape(17.dp),modifier=Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -1425,6 +1444,7 @@ private fun ChannelMembersList(members: List<ChannelMember>) {
 @Composable
 private fun ChannelRoomsList(
     rooms: List<SocialRoom>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     onOpenRoom: (SocialRoom) -> Unit
 ) {
     if(rooms.isEmpty()) {
@@ -1467,9 +1487,14 @@ private fun CreatorAbout(
     privacy: String,
     members: List<ChannelMember>,
     rooms: List<SocialRoom>,
-    onOpenRoom: (SocialRoom) -> Unit
+    onOpenRoom: (SocialRoom) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState
 ) {
-    LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+    LazyColumn(
+        state=listState,
+        contentPadding=PaddingValues(16.dp),
+        verticalArrangement=Arrangement.spacedBy(10.dp)
+    ) {
         item {
             Surface(color=FqSurface,shape=RoundedCornerShape(20.dp),modifier=Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(15.dp)) {
