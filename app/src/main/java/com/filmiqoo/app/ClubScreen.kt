@@ -45,7 +45,8 @@ fun ClubScreen(
     onInbox:()->Unit,
     onCreate:()->Unit,
     onRequireAuth:()->Unit,
-    initialPostId:String?=null
+    initialPostId:String?=null,
+    onClearFocusedPost:()->Unit={}
 ) {
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
@@ -188,7 +189,9 @@ fun ClubScreen(
                         onComments={commentsFor=it},
                         onFeedChange={feed=it},
                         onCreatorsChange={creators=it},
-                        onRefresh={refresh++}
+                        onRefresh={refresh++},
+                        focusedPostId=initialPostId,
+                        onClearFocusedPost=onClearFocusedPost
                     )
                 }
 
@@ -483,10 +486,13 @@ private fun ClubForYou(
     onComments:(SocialPost)->Unit,
     onFeedChange:(List<SocialPost>)->Unit,
     onCreatorsChange:(List<SocialChannel>)->Unit,
-    onRefresh:()->Unit
+    onRefresh:()->Unit,
+    focusedPostId:String?,
+    onClearFocusedPost:()->Unit
 ) {
     val scope=rememberCoroutineScope()
     val context=LocalContext.current
+    val focusMode=!focusedPostId.isNullOrBlank()
 
     if(
         pulse.isEmpty() &&
@@ -510,7 +516,7 @@ private fun ClubForYou(
         contentPadding=PaddingValues(bottom=28.dp),
         verticalArrangement=Arrangement.spacedBy(0.dp)
     ) {
-        if(stories.isNotEmpty()) {
+        if(!focusMode && stories.isNotEmpty()) {
             item {
                 ClubStories(
                     stories=stories,
@@ -519,7 +525,7 @@ private fun ClubForYou(
             }
         }
 
-        if(pulse.isNotEmpty()) {
+        if(!focusMode && pulse.isNotEmpty()) {
             item {
                 ClubSectionTitle(
                     title="الان زنده",
@@ -538,7 +544,7 @@ private fun ClubForYou(
             }
         }
 
-        if(rooms.isNotEmpty()) {
+        if(!focusMode && rooms.isNotEmpty()) {
             item {
                 ClubSectionTitle(
                     title="Roomهای Club",
@@ -553,7 +559,7 @@ private fun ClubForYou(
             }
         }
 
-        if(clips.isNotEmpty()) {
+        if(!focusMode && clips.isNotEmpty()) {
             item {
                 ClubSectionTitle(
                     title="Clips",
@@ -568,7 +574,7 @@ private fun ClubForYou(
             }
         }
 
-        if(creators.isNotEmpty()) {
+        if(!focusMode && creators.isNotEmpty()) {
             item {
                 ClubSectionTitle(
                     title="آدم‌ها و رسانه‌ها",
@@ -606,10 +612,35 @@ private fun ClubForYou(
 
         if(feed.isNotEmpty()) {
             item {
-                ClubSectionTitle(
-                    title="برای تو",
-                    subtitle="Review، نظر و پیشنهاد؛ بدون شلوغ‌کاری"
-                )
+                if(focusMode) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal=16.dp,vertical=12.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "پست به‌اشتراک‌گذاشته‌شده",
+                                fontSize=15.sp,
+                                fontWeight=FontWeight.Black
+                            )
+                            Text(
+                                "مقصد لینک مستقیم",
+                                color=FqMuted,
+                                fontSize=9.sp,
+                                modifier=Modifier.padding(top=2.dp)
+                            )
+                        }
+                        TextButton(onClick=onClearFocusedPost) {
+                            Text("بازگشت به Club")
+                        }
+                    }
+                } else {
+                    ClubSectionTitle(
+                        title="برای تو",
+                        subtitle="Review، نظر و پیشنهاد؛ بدون شلوغ‌کاری"
+                    )
+                }
             }
             items(feed,key={it.id}) { post ->
                 ClubPostCard(
