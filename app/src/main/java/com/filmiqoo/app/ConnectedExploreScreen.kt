@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1136,10 +1137,11 @@ private fun ReelCommentsSheet(
 ) {
     val scope=rememberCoroutineScope()
     var items by remember(reel.id) { mutableStateOf<List<SocialComment>>(emptyList()) }
-    var text by remember { mutableStateOf("") }
-    var spoiler by remember { mutableStateOf(false) }
+    var text by rememberSaveable(reel.id) { mutableStateOf("") }
+    var spoiler by rememberSaveable(reel.id) { mutableStateOf(false) }
     var replyTo by remember { mutableStateOf<SocialComment?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var commentLikeBusy by remember { mutableStateOf<Set<String>>(emptySet()) }
     val displayComments=remember(items) {
         threadedSocialComments(items)
     }
@@ -1206,7 +1208,7 @@ private fun ReelCommentsSheet(
                             }
                             if(c.spoiler && !reveal) {
                                 Text(
-                                    "⚠ Spoiler Shield • نمایش",
+                                    "⚠ اسپویلر مخفی شده • نمایش",
                                     color=FqDanger,fontSize=11.sp,
                                     modifier=Modifier.padding(top=4.dp).clickable { reveal=true }
                                 )
@@ -1236,9 +1238,10 @@ private fun ReelCommentsSheet(
                                     onClick={
                                         if(!loggedIn) {
                                             onRequireAuth()
-                                        } else {
+                                        } else if(c.id !in commentLikeBusy) {
                                             val before=c.likedByMe
                                             val optimistic=!before
+                                            commentLikeBusy=commentLikeBusy+c.id
                                             items=items.map {
                                                 if(it.id==c.id) {
                                                     it.copy(
@@ -1265,6 +1268,7 @@ private fun ReelCommentsSheet(
                                                 }.onFailure {
                                                     reload()
                                                 }
+                                                commentLikeBusy=commentLikeBusy-c.id
                                             }
                                         }
                                     },
@@ -1336,16 +1340,23 @@ private fun ReelCommentsSheet(
                     FilterChip(
                         selected=spoiler,
                         onClick={spoiler=!spoiler},
-                        label={Text("Spoiler",fontSize=11.sp)}
+                        label={Text("اسپویلر",fontSize=11.sp)}
                     )
                     Spacer(Modifier.width(6.dp))
                     OutlinedTextField(
                         value=text,
-                        onValueChange={text=it},
+                        onValueChange={text=it.take(2000)},
                         placeholder={
                             Text(
                                 if(replyTo!=null)"پاسخت رو بنویس..."
                                 else "نظر بنویس..."
+                            )
+                        },
+                        supportingText={
+                            Text(
+                                text.length.toString()+"/2000",
+                                color=if(text.length>1850)FqDanger else FqMuted,
+                                fontSize=9.sp
                             )
                         },
                         shape=RoundedCornerShape(20.dp),
