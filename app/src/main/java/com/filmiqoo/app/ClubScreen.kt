@@ -1641,6 +1641,7 @@ fun ClubCommentsSheet(
     var loading by remember { mutableStateOf(true) }
     var text by remember { mutableStateOf("") }
     var spoiler by remember { mutableStateOf(false) }
+    var replyTo by remember { mutableStateOf<SocialComment?>(null) }
     var sending by remember { mutableStateOf(false) }
 
     fun reload() {
@@ -1698,6 +1699,10 @@ fun ClubCommentsSheet(
                 ) {
                     items(comments,key={it.id}) { comment ->
                         Row(
+                            modifier=Modifier.fillMaxWidth()
+                                .padding(
+                                    start=if(comment.parentCommentId!=null)26.dp else 0.dp
+                                ),
                             verticalAlignment=Alignment.Top
                         ) {
                             RemoteImage(
@@ -1731,6 +1736,25 @@ fun ClubCommentsSheet(
                                         modifier=Modifier.padding(top=2.dp)
                                     )
                                 }
+                                TextButton(
+                                    onClick={
+                                        if(loggedIn) {
+                                            replyTo=comment
+                                        } else {
+                                            onRequireAuth()
+                                        }
+                                    },
+                                    contentPadding=PaddingValues(
+                                        horizontal=0.dp,
+                                        vertical=2.dp
+                                    )
+                                ) {
+                                    Text(
+                                        "پاسخ",
+                                        color=FqMuted,
+                                        fontSize=9.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -1740,6 +1764,44 @@ fun ClubCommentsSheet(
             Column(
                 Modifier.fillMaxWidth().padding(top=14.dp,bottom=10.dp)
             ) {
+                replyTo?.let { target ->
+                    Surface(
+                        color=FqSurface2,
+                        shape=RoundedCornerShape(12.dp),
+                        modifier=Modifier.fillMaxWidth().padding(bottom=7.dp)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=10.dp,vertical=7.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Reply,
+                                null,
+                                tint=FqGold,
+                                modifier=Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "پاسخ به "+target.author.displayName,
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold,
+                                modifier=Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick={replyTo=null},
+                                modifier=Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    null,
+                                    tint=FqMuted,
+                                    modifier=Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 FilterChip(
                     selected=spoiler,
                     onClick={spoiler=!spoiler},
@@ -1759,7 +1821,12 @@ fun ClubCommentsSheet(
                     OutlinedTextField(
                         value=text,
                         onValueChange={text=it},
-                        placeholder={Text("نظرت رو بنویس...")},
+                        placeholder={
+                            Text(
+                                if(replyTo!=null)"پاسخت رو بنویس..."
+                                else "نظرت رو بنویس..."
+                            )
+                        },
                         singleLine=false,
                         maxLines=4,
                         shape=RoundedCornerShape(18.dp),
@@ -1779,11 +1846,13 @@ fun ClubCommentsSheet(
                                             social.addComment(
                                                 postId=post.id,
                                                 body=clean,
-                                                spoiler=spoiler
+                                                spoiler=spoiler,
+                                                parentCommentId=replyTo?.id
                                             )
                                         }.onSuccess {
                                             text=""
                                             spoiler=false
+                                            replyTo=null
                                             onCommentAdded()
                                             reload()
                                         }
