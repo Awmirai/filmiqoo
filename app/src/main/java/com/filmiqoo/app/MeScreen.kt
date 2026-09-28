@@ -160,8 +160,8 @@ fun MeScreen(
                                 MeEmptyCard(
                                     icon=Icons.Default.RateReview,
                                     title="هنوز چیزی منتشر نکردی",
-                                    body="Review، نظر و پیشنهادهای تو اینجا تبدیل به هویت سینمایی‌ات می‌شن.",
-                                    action="برو به Club",
+                                    body="ریویو، نظر و پیشنهادهای تو اینجا هویت سینمایی‌ات رو می‌سازن.",
+                                    action="برو به Pulse",
                                     onAction=onCommunity
                                 )
                             }
@@ -184,9 +184,9 @@ fun MeScreen(
                             item {
                                 MeEmptyCard(
                                     icon=Icons.Default.SmartDisplay,
-                                    title="هنوز Clip نداری",
-                                    body="کلیپ‌های کوتاهت اینجا یک ویترین تمیز و شخصی می‌سازن.",
-                                    action="دیدن Clips",
+                                    title="هنوز کلیپی نداری",
+                                    body="کلیپ‌های مرتبط با فیلم و سریالت اینجا یک ویترین شخصی می‌سازن.",
+                                    action="دیدن کلیپ‌ها",
                                     onAction=onClips
                                 )
                             }
@@ -1069,7 +1069,7 @@ private fun MeLibraryActions(
             )
             MeTool(
                 Icons.Default.VideoLibrary,
-                "همه Library",
+                "کتابخانه",
                 Modifier.weight(1f),
                 onLibrary
             )
@@ -1168,12 +1168,12 @@ private fun MeMoreSheet(
         )
 
         MeSheetSectionTitle("اجتماعی")
-        MeSheetRow(Icons.Default.Analytics,"Creator Studio",onCreatorStudio)
+        MeSheetRow(Icons.Default.Analytics,"استودیوی سازنده",onCreatorStudio)
         MeSheetRow(Icons.Default.CollectionsBookmark,"ذخیره‌های اجتماعی",onSocialSaves)
-        MeSheetRow(Icons.Default.PersonAddAlt1,"درخواست‌های Follow",onFollowRequests)
-        MeSheetRow(Icons.Default.Star,"Close Friends",onCloseFriends)
-        MeSheetRow(Icons.Default.MilitaryTech,"Reputation و Badgeها",onReputation)
-        MeSheetRow(Icons.Default.CollectionsBookmark,"Club Lists",onSocialCollections)
+        MeSheetRow(Icons.Default.PersonAddAlt1,"درخواست‌های دنبال‌کردن",onFollowRequests)
+        MeSheetRow(Icons.Default.Star,"دوستان نزدیک",onCloseFriends)
+        MeSheetRow(Icons.Default.MilitaryTech,"اعتبار و نشان‌ها",onReputation)
+        MeSheetRow(Icons.Default.CollectionsBookmark,"لیست‌های Pulse",onSocialCollections)
 
         MeSheetSectionTitle("تماشا و خانواده")
         MeSheetRow(Icons.Default.SwitchAccount,"پروفایل‌های تماشا",onViewerProfiles)
