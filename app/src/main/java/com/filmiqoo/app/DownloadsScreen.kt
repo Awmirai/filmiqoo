@@ -407,7 +407,7 @@ private fun DownloadsHero(
     Box(
         Modifier.fillMaxWidth().height(250.dp).background(
             Brush.verticalGradient(
-                listOf(Color(0xFF111827),Color(0xFF17140B),FqBg)
+                listOf(Color(0xFF250609),Color(0xFF120708),FqBg)
             )
         )
     ) {
@@ -443,9 +443,9 @@ private fun DownloadsHero(
                 .fillMaxWidth()
                 .padding(start=18.dp,end=18.dp,bottom=20.dp)
         ) {
-            Text("دانلودها",fontSize=28.sp,fontWeight=FontWeight.Black)
+            Text("دانلودهای آفلاین",fontSize=30.sp,fontWeight=FontWeight.Black)
             Text(
-                "فیلم و سریال‌هات رو برای تماشای بدون اینترنت آماده نگه دار.",
+                "تماشای بدون اینترنت، با همان تجربه Filmiqoo.",
                 color=FqMuted,
                 fontSize=12.sp,
                 modifier=Modifier.padding(top=4.dp)
