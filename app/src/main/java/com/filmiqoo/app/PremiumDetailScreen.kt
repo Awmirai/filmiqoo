@@ -132,9 +132,9 @@ fun PremiumDetailScreen(
 
             val tabs=remember(d.media.type) {
                 if(d.media.type==MediaType.TV) {
-                    listOf("معرفی","قسمت‌ها","بازیگران","کلاب","اطلاعات")
+                    listOf("معرفی","قسمت‌ها","بازیگران","Pulse","اطلاعات")
                 } else {
-                    listOf("معرفی","بازیگران","کلاب","اطلاعات")
+                    listOf("معرفی","بازیگران","Pulse","اطلاعات")
                 }
             }
             var tab by rememberSaveable(d.media.key) { mutableIntStateOf(0) }
