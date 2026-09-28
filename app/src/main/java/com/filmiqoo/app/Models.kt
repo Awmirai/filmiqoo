@@ -102,6 +102,7 @@ sealed interface OverlayRoute {
         val inviteCode: String? = null
     ) : OverlayRoute
     data class Player(val target: PlaybackTarget) : OverlayRoute
+    data class Clips(val initialReelId:String?=null) : OverlayRoute
     data class Room(val roomId: String, val title: String) : OverlayRoute
     data object Downloads : OverlayRoute
     data object Library : OverlayRoute
