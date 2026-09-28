@@ -1,0 +1,639 @@
+package com.filmiqoo.app
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
+@Composable
+fun CinePulseScreen(
+    social:SocialRepository,
+    backend:BackendRepository,
+    repository:TmdbRepository,
+    loggedIn:Boolean,
+    onMedia:(MediaItem)->Unit,
+    onOpenPost:(String)->Unit,
+    onOpenClip:(String)->Unit,
+    onOpenRoom:(SocialRoom)->Unit,
+    onCreator:(Creator)->Unit,
+    onSearch:()->Unit,
+    onInbox:()->Unit,
+    onCreate:()->Unit,
+    onRequireAuth:()->Unit
+) {
+    val pulseRepo=remember { PulseRepository(backend) }
+    val friendRepo=remember { FriendActivityRepository(backend) }
+    var loading by remember { mutableStateOf(true) }
+    var refresh by remember { mutableIntStateOf(0) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var trending by remember { mutableStateOf<List<PulseTrendItem>>(emptyList()) }
+    var watching by remember { mutableStateOf<List<FriendWatchingNow>>(emptyList()) }
+    var posts by remember { mutableStateOf<List<SocialPost>>(emptyList()) }
+    var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
+    var clips by remember { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
+
+    LaunchedEffect(refresh,loggedIn) {
+        loading=true
+        error=null
+        runCatching {
+            coroutineScope {
+                val trendingReq=async { runCatching { pulseRepo.trending() }.getOrDefault(emptyList()) }
+                val postsReq=async {
+                    runCatching { social.feedPage(limit=24).items }
+                        .getOrDefault(emptyList())
+                        .filter { it.media!=null }
+                }
+                val roomsReq=async {
+                    runCatching { social.rooms() }
+                        .getOrDefault(emptyList())
+                        .filter { it.media!=null || it.topic.isNotBlank() }
+                }
+                val clipsReq=async {
+                    runCatching { social.reelsPage(limit=18).items }
+                        .getOrDefault(emptyList())
+                        .filter { it.media!=null }
+                }
+                val watchingReq=async {
+                    if(loggedIn) {
+                        runCatching { friendRepo.followingWatching() }.getOrDefault(emptyList())
+                    } else emptyList()
+                }
+
+                trending=trendingReq.await()
+                posts=postsReq.await()
+                rooms=roomsReq.await()
+                clips=clipsReq.await()
+                watching=watchingReq.await()
+            }
+        }.onFailure {
+            error=it.message ?: "Pulse در دسترس نیست"
+        }
+        loading=false
+    }
+
+    LazyColumn(
+        modifier=Modifier.fillMaxSize().background(FqBg),
+        contentPadding=PaddingValues(bottom=28.dp)
+    ) {
+        item {
+            PulseHeader(
+                onSearch=onSearch,
+                onInbox=onInbox,
+                onCreate={
+                    if(loggedIn) onCreate() else onRequireAuth()
+                }
+            )
+        }
+
+        if(loading) {
+            item {
+                LinearProgressIndicator(
+                    color=FqGold,
+                    trackColor=Color.Transparent,
+                    modifier=Modifier.fillMaxWidth().height(2.dp)
+                )
+            }
+        }
+
+        error?.let { message ->
+            item {
+                Surface(
+                    color=FqDanger.copy(alpha=.08f),
+                    shape=RoundedCornerShape(16.dp),
+                    modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp)
+                ) {
+                    Row(
+                        Modifier.padding(12.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CloudOff,null,tint=FqDanger)
+                        Spacer(Modifier.width(8.dp))
+                        Text(message,color=FqDanger,fontSize=10.sp,modifier=Modifier.weight(1f))
+                        TextButton(onClick={refresh++}) { Text("دوباره") }
+                    }
+                }
+            }
+        }
+
+        if(loggedIn && watching.isNotEmpty()) {
+            item {
+                PulseSectionTitle(
+                    title="الان چی می‌بینن",
+                    subtitle="فعالیت زنده آدم‌هایی که دنبال می‌کنی",
+                    icon=Icons.Default.Visibility
+                )
+            }
+            item {
+                PulseWatchingRail(watching,repository,onMedia)
+            }
+        }
+
+        if(trending.isNotEmpty()) {
+            item {
+                PulseSectionTitle(
+                    title="نبض داغ",
+                    subtitle="عنوان‌هایی که همین حالا بیشترین تماشا و واکنش رو دارن",
+                    icon=Icons.Default.Whatshot
+                )
+            }
+            item {
+                PulseTrendRail(trending,repository,onMedia)
+            }
+        }
+
+        if(posts.isNotEmpty()) {
+            item {
+                PulseSectionTitle(
+                    title="نظرهای داغ",
+                    subtitle="نقد کوتاه و بحث درباره عنوان‌های مشخص",
+                    icon=Icons.Default.RateReview
+                )
+            }
+            items(posts.take(10),key={it.id}) { post ->
+                PulsePostCard(
+                    post=post,
+                    repository=repository,
+                    onMedia=onMedia,
+                    onOpenPost=onOpenPost,
+                    onCreator=onCreator
+                )
+            }
+        }
+
+        if(rooms.isNotEmpty()) {
+            item {
+                PulseSectionTitle(
+                    title="بحث‌های باز",
+                    subtitle="اتاق‌هایی که می‌تونی همین الان واردشون بشی",
+                    icon=Icons.Default.Forum
+                )
+            }
+            item {
+                PulseRoomRail(rooms,onOpenRoom)
+            }
+        }
+
+        if(clips.isNotEmpty()) {
+            item {
+                PulseSectionTitle(
+                    title="کلیپ‌های مرتبط",
+                    subtitle="کلیپ فقط وقتی معنا داره که به یک فیلم یا سریال وصل باشه",
+                    icon=Icons.Default.SmartDisplay
+                )
+            }
+            item {
+                PulseClipRail(
+                    items=clips,
+                    repository=repository,
+                    onOpenClip=onOpenClip
+                )
+            }
+        }
+
+        if(!loading && trending.isEmpty() && posts.isEmpty() && rooms.isEmpty() && clips.isEmpty()) {
+            item {
+                PremiumEmptyState(
+                    icon=Icons.Default.MovieFilter,
+                    title="Pulse هنوز ساکته",
+                    body="وقتی تماشا، واکنش، نقد و بحث درباره فیلم‌ها شروع بشه، همه‌ش اینجا جمع می‌شه.",
+                    action=if(loggedIn)"اولین نظر رو بساز" else "ورود به حساب",
+                    onAction=if(loggedIn) onCreate else onRequireAuth
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulseHeader(
+    onSearch:()->Unit,
+    onInbox:()->Unit,
+    onCreate:()->Unit
+) {
+    Box(
+        Modifier.fillMaxWidth().background(
+            Brush.verticalGradient(
+                listOf(Color(0xFF160406),FqBg)
+            )
+        )
+    ) {
+        Column(
+            Modifier.fillMaxWidth().statusBarsPadding()
+                .padding(horizontal=16.dp,vertical=14.dp)
+        ) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(44.dp).background(FqGold,CircleShape),
+                    contentAlignment=Alignment.Center
+                ) {
+                    Icon(Icons.Default.Whatshot,null,tint=Color.White)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Pulse",fontSize=28.sp,fontWeight=FontWeight.Black)
+                    Text(
+                        "فیلم‌بازها همین الان چه حسی دارن؟",
+                        color=FqMuted,
+                        fontSize=10.sp
+                    )
+                }
+                FqIconButton(Icons.Default.Search,"جستجو",onSearch)
+                FqIconButton(Icons.Default.MarkChatUnread,"پیام‌ها",onInbox)
+            }
+
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(18.dp),
+                border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.07f)),
+                modifier=Modifier.fillMaxWidth().padding(top=14.dp)
+                    .clickable(onClick=onCreate)
+            ) {
+                Row(
+                    Modifier.padding(13.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(38.dp).background(FqGold.copy(alpha=.12f),CircleShape),
+                        contentAlignment=Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Add,null,tint=FqGold)
+                    }
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("درباره چیزی که دیدی حرف بزن",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                        Text("نقد، نظر، واکنش، نظرسنجی یا کلیپ",color=FqMuted,fontSize=8.sp)
+                    }
+                    Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulseSectionTitle(
+    title:String,
+    subtitle:String,
+    icon:androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=24.dp,bottom=10.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(34.dp).background(FqGold.copy(alpha=.12f),RoundedCornerShape(11.dp)),
+            contentAlignment=Alignment.Center
+        ) {
+            Icon(icon,null,tint=FqGold,modifier=Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title,fontSize=17.sp,fontWeight=FontWeight.Black)
+            Text(subtitle,color=FqMuted,fontSize=9.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun PulseWatchingRail(
+    items:List<FriendWatchingNow>,
+    repository:TmdbRepository,
+    onMedia:(MediaItem)->Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp),
+        horizontalArrangement=Arrangement.spacedBy(10.dp)
+    ) {
+        items(items.take(12),key={it.user.id+":"+it.media.key}) { item ->
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(20.dp),
+                border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.07f)),
+                modifier=Modifier.width(230.dp).clickable { onMedia(item.media) }
+            ) {
+                Column {
+                    Box(Modifier.fillMaxWidth().height(125.dp)) {
+                        RemoteImage(
+                            repository.backdrop(item.media.backdropPath ?: item.media.posterPath),
+                            Modifier.fillMaxSize(),
+                            ContentScale.Crop
+                        )
+                        Box(
+                            Modifier.fillMaxSize().background(
+                                Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.8f)))
+                            )
+                        )
+                        Surface(
+                            color=FqGold,
+                            shape=RoundedCornerShape(9.dp),
+                            modifier=Modifier.align(Alignment.TopStart).padding(8.dp)
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal=7.dp,vertical=4.dp),
+                                verticalAlignment=Alignment.CenterVertically
+                            ) {
+                                Box(Modifier.size(6.dp).background(Color.White,CircleShape))
+                                Spacer(Modifier.width(5.dp))
+                                Text("در حال تماشا",color=Color.White,fontSize=7.sp,fontWeight=FontWeight.Black)
+                            }
+                        }
+                        Row(
+                            Modifier.align(Alignment.BottomStart).padding(9.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            RemoteImage(item.user.avatarUrl.takeIf(String::isNotBlank),Modifier.size(30.dp).clip(CircleShape))
+                            Spacer(Modifier.width(7.dp))
+                            Text(item.user.displayName,color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,maxLines=1)
+                        }
+                    }
+                    Column(Modifier.padding(11.dp)) {
+                        Text(item.media.title,fontSize=11.sp,fontWeight=FontWeight.Black,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(item.episodeLabel.ifBlank{"فیلم"},color=FqMuted,fontSize=8.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulseTrendRail(
+    items:List<PulseTrendItem>,
+    repository:TmdbRepository,
+    onMedia:(MediaItem)->Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp),
+        horizontalArrangement=Arrangement.spacedBy(10.dp)
+    ) {
+        items(items.take(12),key={it.media.key}) { item ->
+            Box(
+                Modifier.width(250.dp).height(145.dp)
+                    .clip(RoundedCornerShape(21.dp))
+                    .clickable { onMedia(item.media) }
+            ) {
+                RemoteImage(
+                    repository.backdrop(item.media.backdropPath ?: item.media.posterPath),
+                    Modifier.fillMaxSize(),
+                    ContentScale.Crop
+                )
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.86f)))
+                    )
+                )
+                Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+                    Text(item.media.title,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Black,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Row(Modifier.padding(top=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Icon(Icons.Default.Visibility,null,tint=FqGold,modifier=Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(item.watchingNow.toString()+" نفر",color=Color.White.copy(alpha=.78f),fontSize=8.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Icon(Icons.Default.Favorite,null,tint=FqGold,modifier=Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(item.reactions.toString()+" واکنش",color=Color.White.copy(alpha=.78f),fontSize=8.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulsePostCard(
+    post:SocialPost,
+    repository:TmdbRepository,
+    onMedia:(MediaItem)->Unit,
+    onOpenPost:(String)->Unit,
+    onCreator:(Creator)->Unit
+) {
+    var revealed by remember(post.id) { mutableStateOf(!post.spoiler) }
+    val media=post.media?.asMediaItem()
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(22.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.07f)),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=5.dp)
+            .clickable { onOpenPost(post.id) }
+    ) {
+        Column {
+            media?.let {
+                Box(
+                    Modifier.fillMaxWidth().height(170.dp).clickable { onMedia(it) }
+                ) {
+                    RemoteImage(
+                        repository.backdrop(it.backdropPath ?: it.posterPath),
+                        Modifier.fillMaxSize(),
+                        ContentScale.Crop
+                    )
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.82f)))
+                        )
+                    )
+                    Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+                        Text(it.title,color=Color.White,fontSize=15.sp,fontWeight=FontWeight.Black,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(
+                            if(post.type=="review")"ریویو" else "بحث",
+                            color=FqGoldSoft,
+                            fontSize=8.sp,
+                            fontWeight=FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            Column(Modifier.padding(13.dp)) {
+                Row(
+                    verticalAlignment=Alignment.CenterVertically,
+                    modifier=Modifier.clickable {
+                        onCreator(
+                            Creator(
+                                name=post.author.displayName,
+                                handle="@"+post.author.username,
+                                followers="",
+                                bio="فیلم‌باز در Filmiqoo",
+                                verified=post.author.verified,
+                                id=post.author.id,
+                                entityType="user",
+                                avatarUrl=post.author.avatarUrl
+                            )
+                        )
+                    }
+                ) {
+                    RemoteImage(post.author.avatarUrl.takeIf(String::isNotBlank),Modifier.size(34.dp).clip(CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(post.author.displayName,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                        Text("@"+post.author.username,color=FqMuted,fontSize=7.sp)
+                    }
+                    post.publishedAt?.let {
+                        Text(socialRelativeTime(it),color=FqMuted,fontSize=7.sp)
+                    }
+                }
+
+                if(post.spoiler && !revealed) {
+                    Surface(
+                        color=FqDanger.copy(alpha=.08f),
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+                            .clickable { revealed=true }
+                    ) {
+                        Row(
+                            Modifier.padding(12.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(17.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("اسپویلر مخفی شده • برای نمایش لمس کن",color=FqDanger,fontSize=9.sp)
+                        }
+                    }
+                } else if(post.body.isNotBlank()) {
+                    Text(
+                        post.body,
+                        fontSize=11.sp,
+                        lineHeight=18.sp,
+                        maxLines=5,
+                        overflow=TextOverflow.Ellipsis,
+                        modifier=Modifier.padding(top=10.dp)
+                    )
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().padding(top=9.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.FavoriteBorder,null,tint=FqMuted,modifier=Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(post.likes.toString(),color=FqMuted,fontSize=8.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Icon(Icons.Default.ChatBubbleOutline,null,tint=FqMuted,modifier=Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(post.comments.toString(),color=FqMuted,fontSize=8.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("باز کردن بحث",color=FqGold,fontSize=8.sp,fontWeight=FontWeight.Bold)
+                    Icon(Icons.Default.ChevronLeft,null,tint=FqGold,modifier=Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulseRoomRail(
+    rooms:List<SocialRoom>,
+    onOpenRoom:(SocialRoom)->Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp),
+        horizontalArrangement=Arrangement.spacedBy(10.dp)
+    ) {
+        items(rooms.take(12),key={it.id}) { room ->
+            Surface(
+                color=FqSurface,
+                shape=RoundedCornerShape(20.dp),
+                border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.07f)),
+                modifier=Modifier.width(220.dp).clickable { onOpenRoom(room) }
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(38.dp).background(FqGold.copy(alpha=.12f),CircleShape),
+                            contentAlignment=Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Forum,null,tint=FqGold,modifier=Modifier.size(18.dp))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(room.name,fontSize=11.sp,fontWeight=FontWeight.Black,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(room.members.toString()+" عضو",color=FqMuted,fontSize=7.sp)
+                        }
+                    }
+                    Text(
+                        room.media?.title ?: room.topic,
+                        color=FqMuted,
+                        fontSize=9.sp,
+                        maxLines=2,
+                        overflow=TextOverflow.Ellipsis,
+                        modifier=Modifier.padding(top=10.dp)
+                    )
+                    Text("ورود به بحث",color=FqGold,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulseClipRail(
+    items:List<ReelFeedItem>,
+    repository:TmdbRepository,
+    onOpenClip:(String)->Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp),
+        horizontalArrangement=Arrangement.spacedBy(10.dp)
+    ) {
+        items(items.take(14),key={it.id}) { clip ->
+            val media=clip.media?.asMediaItem()
+            Box(
+                Modifier.width(145.dp).height(235.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onOpenClip(clip.id) }
+            ) {
+                RemoteImage(
+                    clip.coverUrl.takeIf(String::isNotBlank) ?: media?.posterPath,
+                    Modifier.fillMaxSize(),
+                    ContentScale.Crop
+                )
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.86f)))
+                    )
+                )
+                Box(
+                    Modifier.size(42.dp).align(Alignment.Center)
+                        .background(Color.White.copy(alpha=.9f),CircleShape),
+                    contentAlignment=Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
+                }
+                Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+                    Text(
+                        media?.title ?: "کلیپ",
+                        color=Color.White,
+                        fontSize=10.sp,
+                        fontWeight=FontWeight.Black,
+                        maxLines=1,
+                        overflow=TextOverflow.Ellipsis
+                    )
+                    Text(
+                        clip.author.displayName,
+                        color=Color.White.copy(alpha=.7f),
+                        fontSize=7.sp,
+                        maxLines=1
+                    )
+                }
+            }
+        }
+    }
+}
