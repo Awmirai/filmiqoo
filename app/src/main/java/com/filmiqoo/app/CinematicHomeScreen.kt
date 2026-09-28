@@ -570,7 +570,7 @@ private fun CinematicHeroPage(
                     shape=RoundedCornerShape(14.dp),
                     modifier=Modifier.heightIn(min=50.dp)
                 ) {
-                    Icon(Icons.Default.InfoOutline,null)
+                    Icon(Icons.Default.Info,null)
                     Spacer(Modifier.width(5.dp))
                     Text("اطلاعات")
                 }
