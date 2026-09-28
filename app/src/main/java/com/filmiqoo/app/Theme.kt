@@ -16,19 +16,19 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val FqBg = Color(0xFF050608)
-val FqSurface = Color(0xFF0D1015)
-val FqSurface2 = Color(0xFF151A22)
-val FqSurface3 = Color(0xFF202733)
-val FqSurface4 = Color(0xFF2B3442)
-val FqGold = Color(0xFFFFC233)
-val FqGoldSoft = Color(0xFFFFDA7A)
+val FqBg = Color(0xFF050505)
+val FqSurface = Color(0xFF101010)
+val FqSurface2 = Color(0xFF181818)
+val FqSurface3 = Color(0xFF222222)
+val FqSurface4 = Color(0xFF2B2B2B)
+val FqGold = Color(0xFFE50914)
+val FqGoldSoft = Color(0xFFFF5660)
 val FqText = Color(0xFFF7F8FA)
 val FqMuted = Color(0xFFADB5C2)
 val FqMutedStrong = Color(0xFFC8CDD5)
-val FqDanger = Color(0xFFFF5D6C)
-val FqGreen = Color(0xFF4FD487)
-val FqBlue = Color(0xFF6EB4FF)
+val FqDanger = Color(0xFFFF4757)
+val FqGreen = Color(0xFF47D18C)
+val FqBlue = Color(0xFF5CA8FF)
 val FqPurple = Color(0xFFA98BFF)
 
 @Composable
@@ -132,8 +132,8 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
 
     val colors=darkColorScheme(
         primary=FqGold,
-        onPrimary=Color(0xFF171000),
-        primaryContainer=Color(0xFF342900),
+        onPrimary=Color.White,
+        primaryContainer=Color(0xFF4A070B),
         onPrimaryContainer=FqGoldSoft,
         secondary=FqBlue,
         onSecondary=Color(0xFF001D35),
