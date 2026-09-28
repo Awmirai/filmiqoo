@@ -3618,41 +3618,56 @@ private fun PlayerPulseBar(
         modifier=modifier
     ) {
         if(!expanded) {
-            Row(
-                Modifier.clickable { expanded=true }
-                    .padding(horizontal=10.dp,vertical=8.dp),
-                verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.spacedBy(7.dp)
-            ) {
+            val hasLiveContext=hottest!=null || watching>0L
+            if(hasLiveContext) {
+                Row(
+                    Modifier.clickable { expanded=true }
+                        .padding(horizontal=10.dp,vertical=8.dp),
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(7.dp)
+                ) {
+                    Box(
+                        Modifier.size(26.dp)
+                            .background(FqGold.copy(alpha=.16f),CircleShape),
+                        contentAlignment=Alignment.Center
+                    ) {
+                        Text(hottest?.emoji ?: "●",fontSize=13.sp)
+                    }
+                    Column {
+                        Text(
+                            when {
+                                hottest!=null -> "لحظه داغ • "+formatPlayerTime(hottest.positionMs)
+                                else -> watching.toString()+" نفر همزمان در حال تماشا"
+                            },
+                            fontSize=9.sp,
+                            fontWeight=FontWeight.Bold
+                        )
+                        Text(
+                            "واکنش‌ها و بحث همین عنوان",
+                            color=Color.White.copy(alpha=.55f),
+                            fontSize=7.sp
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ExpandLess,
+                        null,
+                        tint=Color.White.copy(alpha=.62f),
+                        modifier=Modifier.size(16.dp)
+                    )
+                }
+            } else {
                 Box(
-                    Modifier.size(26.dp)
-                        .background(FqGold.copy(alpha=.16f),CircleShape),
+                    Modifier.size(42.dp)
+                        .clickable { expanded=true },
                     contentAlignment=Alignment.Center
                 ) {
-                    Text(hottest?.emoji ?: "🔥",fontSize=13.sp)
-                }
-                Column {
-                    Text(
-                        when {
-                            hottest!=null -> "لحظه داغ • "+formatPlayerTime(hottest.positionMs)
-                            watching>0L -> watching.toString()+" نفر همزمان در حال تماشا"
-                            else -> "Pulse"
-                        },
-                        fontSize=9.sp,
-                        fontWeight=FontWeight.Bold
-                    )
-                    Text(
-                        "برای واکنش و گفتگو لمس کن",
-                        color=Color.White.copy(alpha=.55f),
-                        fontSize=7.sp
+                    Icon(
+                        Icons.Default.Whatshot,
+                        contentDescription="واکنش و بحث",
+                        tint=Color.White.copy(alpha=.78f),
+                        modifier=Modifier.size(20.dp)
                     )
                 }
-                Icon(
-                    Icons.Default.ExpandLess,
-                    null,
-                    tint=Color.White.copy(alpha=.62f),
-                    modifier=Modifier.size(16.dp)
-                )
             }
         } else {
             Column(
@@ -3672,7 +3687,7 @@ private fun PlayerPulseBar(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                watching.toString()+" در حال تماشا",
+                                watching.toString()+" نفر همزمان",
                                 color=Color.White.copy(alpha=.74f),
                                 fontSize=9.sp,
                                 fontWeight=FontWeight.Bold
@@ -3753,7 +3768,7 @@ private fun PlayerPulseBar(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                "گفتگو",
+                                "بحث این عنوان",
                                 fontSize=9.sp,
                                 fontWeight=FontWeight.Bold
                             )
