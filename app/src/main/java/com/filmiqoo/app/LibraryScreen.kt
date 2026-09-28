@@ -438,12 +438,12 @@ private fun LibraryHeader(
                 .padding(bottom=18.dp)
         ) {
             Text(
-                "کتابخانه",
+                "کتابخانه من",
                 fontSize=30.sp,
                 fontWeight=FontWeight.Black
             )
             Text(
-                "همه چیزهایی که برای تماشای خودت نگه داشتی",
+                "برای بعد، دانلود آفلاین، تاریخچه و چیزهایی که دوست داشتی",
                 color=FqMuted,
                 fontSize=10.sp,
                 modifier=Modifier.padding(top=2.dp)
@@ -536,15 +536,15 @@ private fun LibraryQuickAccess(
     ) {
         LibraryQuickCard(
             icon=Icons.Default.DownloadForOffline,
-            title="دانلودها",
-            subtitle="صف دانلود و تماشای آفلاین",
+            title="دانلود آفلاین",
+            subtitle="بدون اینترنت تماشا کن",
             modifier=Modifier.weight(1f),
             onClick=onDownloads
         )
         LibraryQuickCard(
             icon=Icons.Default.History,
-            title="تماشای من",
-            subtitle="ادامه تماشا و تاریخچه",
+            title="ادامه و تاریخچه",
+            subtitle="برگرد به چیزی که داشتی می‌دیدی",
             modifier=Modifier.weight(1f),
             onClick=onHistory
         )
