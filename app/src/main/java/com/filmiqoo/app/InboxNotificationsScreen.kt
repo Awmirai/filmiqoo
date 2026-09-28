@@ -608,28 +608,60 @@ fun ConnectedNotificationsScreen(
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=7.dp),
-            verticalAlignment=Alignment.CenterVertically
+        Box(
+            Modifier.fillMaxWidth().height(170.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF220609),Color(0xFF100708),FqBg)
+                    )
+                )
         ) {
-            IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
-            Column(Modifier.weight(1f)) {
-                Text("اعلان‌ها",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text(
-                    if(unread>0)compactInboxCount(unread)+" خوانده‌نشده" else "همه‌چی دیده شده",
-                    color=if(unread>0)FqGold else FqMuted,
-                    fontSize=11.sp
+            Row(
+                Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal=10.dp,vertical=8.dp),
+                verticalAlignment=Alignment.CenterVertically
+            ) {
+                FqIconButton(
+                    icon=Icons.Default.ArrowBack,
+                    contentDescription="بازگشت",
+                    onClick=onBack
+                )
+                Spacer(Modifier.weight(1f))
+                if(unread>0) {
+                    TextButton(onClick={
+                        scope.launch {
+                            runCatching { repo.markAllNotificationsRead() }
+                                .onSuccess { refresh++ }
+                        }
+                    }) {
+                        Text("خواندن همه",fontSize=10.sp)
+                    }
+                }
+                FqIconButton(
+                    icon=Icons.Default.Refresh,
+                    contentDescription="تازه‌سازی",
+                    onClick={refresh++}
                 )
             }
-            if(unread>0) {
-                TextButton(onClick={
-                    scope.launch {
-                        runCatching { repo.markAllNotificationsRead() }
-                            .onSuccess { refresh++ }
-                    }
-                }) { Text("خواندن همه",fontSize=11.sp) }
+
+            Column(
+                Modifier.align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal=18.dp)
+                    .padding(bottom=18.dp)
+            ) {
+                Text("اعلان‌ها",fontSize=30.sp,fontWeight=FontWeight.Black)
+                Text(
+                    if(unread>0)
+                        compactInboxCount(unread)+" اعلان خوانده‌نشده"
+                    else
+                        "چیزی از دست ندادی",
+                    color=if(unread>0)FqGoldSoft else FqMuted,
+                    fontSize=10.sp,
+                    modifier=Modifier.padding(top=3.dp)
+                )
             }
-            IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
         }
 
         LazyRow(
@@ -647,7 +679,7 @@ fun ConnectedNotificationsScreen(
                 FilterChip(
                     selected=filter==NotificationFilter.SOCIAL,
                     onClick={filterName=NotificationFilter.SOCIAL.name},
-                    label={Text("اجتماعی",fontSize=10.sp)}
+                    label={Text("نبض",fontSize=10.sp)}
                 )
             }
             item {
@@ -702,7 +734,7 @@ fun ConnectedNotificationsScreen(
                 } else {
                     when(filter) {
                         NotificationFilter.ALL -> "اعلانی نداری"
-                        NotificationFilter.SOCIAL -> "اعلان اجتماعی نداری"
+                        NotificationFilter.SOCIAL -> "اعلان نبض نداری"
                         NotificationFilter.MESSAGES -> "اعلان پیام نداری"
                         NotificationFilter.RELEASES -> "اعلان انتشار نداری"
                     }
@@ -714,7 +746,7 @@ fun ConnectedNotificationsScreen(
                         NotificationFilter.ALL ->
                             "لایک، کامنت، دنبال‌کردن، استوری و پیام‌های جدید اینجا نمایش داده می‌شن."
                         NotificationFilter.SOCIAL ->
-                            "تعامل‌های کلاب، کلیپ‌ها، ریویوها و دنبال‌کردن‌ها اینجا میاد."
+                            "نقدها، کلیپ‌ها، واکنش‌ها و دنبال‌کردن‌های Pulse اینجا میاد."
                         NotificationFilter.MESSAGES ->
                             "پیام خصوصی، گفتگو و دعوت‌های تماشای گروهی اینجا میاد."
                         NotificationFilter.RELEASES ->
