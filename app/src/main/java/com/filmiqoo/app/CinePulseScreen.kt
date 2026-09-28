@@ -312,7 +312,7 @@ fun CinePulseScreen(
                         CinePulseMode.ROOMS -> "گفتگوی بازی نیست"
                         CinePulseMode.CLIPS -> "کلیپ مرتبطی نیست"
                     },
-                    body="Pulse فقط محتوایی رو نشون می‌ده که مستقیم به فیلم، سریال یا قسمت مشخص وصل باشه.",
+                    body="نبض فقط محتوایی رو نشون می‌ده که مستقیم به فیلم، سریال یا قسمت مشخص وصل باشه.",
                     action=if(loggedIn)"محتوا بساز" else "ورود به حساب",
                     onAction=if(loggedIn) onCreate else onRequireAuth
                 )
