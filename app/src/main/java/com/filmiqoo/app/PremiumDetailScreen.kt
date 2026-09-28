@@ -370,8 +370,8 @@ fun PremiumDetailScreen(
                     if(versions.size>1) {
                         item {
                             PremiumSectionHeader(
-                                title="نسخه‌های قابل پخش",
-                                subtitle="کیفیت موردنظرت رو انتخاب کن",
+                                title="کیفیت پخش",
+                                subtitle="نسخه‌ای که با اینترنت و دستگاهت بهتره انتخاب کن",
                                 icon=Icons.Default.HighQuality
                             )
                         }
@@ -964,6 +964,86 @@ private fun PremiumDetailActions(
                     icon=Icons.Default.CollectionsBookmark,
                     label="افزودن به لیست",
                     onClick=onCollections
+                )
+            }
+        }
+
+        Surface(
+            color=Color.Transparent,
+            modifier=Modifier.fillMaxWidth().padding(top=14.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement=Arrangement.spacedBy(9.dp)
+            ) {
+                DetailExperienceAction(
+                    icon=Icons.Default.Groups,
+                    title="تماشای گروهی",
+                    subtitle="همزمان ببین و واکنش بده",
+                    onClick=onWatchParty,
+                    modifier=Modifier.weight(1f)
+                )
+                DetailExperienceAction(
+                    icon=Icons.Default.Forum,
+                    title="بحث این عنوان",
+                    subtitle="بدون گم‌شدن بین پست‌های نامرتبط",
+                    onClick=onChat,
+                    modifier=Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailExperienceAction(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    subtitle:String,
+    onClick:()->Unit,
+    modifier:Modifier=Modifier
+) {
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha=.07f)
+        ),
+        modifier=modifier.clickable(onClick=onClick)
+    ) {
+        Row(
+            Modifier.padding(horizontal=12.dp,vertical=12.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(38.dp)
+                    .background(FqGold.copy(alpha=.12f),CircleShape),
+                contentAlignment=Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription=null,
+                    tint=FqGold,
+                    modifier=Modifier.size(19.dp)
+                )
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    fontSize=10.sp,
+                    fontWeight=FontWeight.Black,
+                    maxLines=1
+                )
+                Text(
+                    subtitle,
+                    color=FqMuted,
+                    fontSize=7.sp,
+                    lineHeight=10.sp,
+                    maxLines=2,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=2.dp)
                 )
             }
         }
