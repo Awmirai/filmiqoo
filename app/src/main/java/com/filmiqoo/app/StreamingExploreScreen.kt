@@ -239,6 +239,7 @@ fun StreamingExploreScreen(
 
                 item {
                     ExploreMoodGrid(
+                        onHollywood={laneName=ExploreLane.HOLLYWOOD.name},
                         onIranian={laneName=ExploreLane.IRANIAN.name},
                         onKorean={laneName=ExploreLane.KOREAN.name},
                         onAnime={laneName=ExploreLane.ANIME.name},
@@ -360,6 +361,7 @@ private fun ExploreLaneHeader(
 
 @Composable
 private fun ExploreMoodGrid(
+    onHollywood:()->Unit,
     onIranian:()->Unit,
     onKorean:()->Unit,
     onAnime:()->Unit,
@@ -376,7 +378,7 @@ private fun ExploreMoodGrid(
                 "هالیوود",
                 "فیلم‌های محبوب",
                 Icons.Default.LocalMovies,
-                { laneName=ExploreLane.HOLLYWOOD.name },
+                onHollywood,
                 Modifier.weight(1f)
             )
             ExploreMoodCard("ایرانی","فیلم و سریال فارسی",Icons.Default.Movie,onIranian,Modifier.weight(1f))
@@ -388,13 +390,13 @@ private fun ExploreMoodGrid(
             ExploreMoodCard("کره‌ای","K-Drama و بیشتر",Icons.Default.LiveTv,onKorean,Modifier.weight(1f))
             ExploreMoodCard("انیمه","ژاپن و آسیا",Icons.Default.Animation,onAnime,Modifier.weight(1f))
         }
-        Row(
-            Modifier.fillMaxWidth().padding(top=9.dp),
-            horizontalArrangement=Arrangement.spacedBy(9.dp)
-        ) {
-            ExploreMoodCard("هندی","بالیوود",Icons.Default.Theaters,onBollywood,Modifier.weight(1f))
-            Spacer(Modifier.weight(1f))
-        }
+        ExploreMoodCard(
+            "هندی",
+            "بالیوود و سینمای هند",
+            Icons.Default.Theaters,
+            onBollywood,
+            Modifier.fillMaxWidth().padding(top=9.dp)
+        )
     }
 }
 
