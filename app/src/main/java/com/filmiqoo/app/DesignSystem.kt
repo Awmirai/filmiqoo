@@ -143,7 +143,7 @@ fun FilmiqooBrandMark(
         Icon(
             Icons.Default.PlayArrow,
             contentDescription=null,
-            tint=Color(0xFF151000),
+            tint=Color.White,
             modifier=Modifier.size(size*.68f)
         )
     }
@@ -158,7 +158,7 @@ fun FqIconButton(
     accent:Boolean=false
 ) {
     val background=if(accent) FqGold else Color.Transparent
-    val foreground=if(accent) Color(0xFF171000) else FqText
+    val foreground=if(accent) Color.White else FqText
     Surface(
         color=background,
         contentColor=foreground,
@@ -260,7 +260,7 @@ fun PremiumChip(
         label="chipBackground"
     )
     val foreground by animateColorAsState(
-        if(active) Color(0xFF171000) else FqText,
+        if(active) Color.White else FqText,
         label="chipForeground"
     )
     val elevation by animateDpAsState(
@@ -411,7 +411,7 @@ fun FqPrimaryButton(
         onClick=onClick,
         colors=ButtonDefaults.buttonColors(
             containerColor=FqGold,
-            contentColor=Color(0xFF171000),
+            contentColor=Color.White,
             disabledContainerColor=FqSurface3,
             disabledContentColor=FqMuted
         ),
@@ -421,7 +421,7 @@ fun FqPrimaryButton(
     ) {
         if(loading) {
             CircularProgressIndicator(
-                color=Color(0xFF171000),
+                color=Color.White,
                 strokeWidth=2.dp,
                 modifier=Modifier.size(19.dp)
             )
