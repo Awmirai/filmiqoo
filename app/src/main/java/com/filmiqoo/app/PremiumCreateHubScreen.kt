@@ -597,10 +597,7 @@ fun PremiumCreateHubScreen(
                                     )
                                     Text(
                                         if(taggedMedia==null)
-                                            if(kind==CreateKind.STORY)
-                                                "اختیاری برای استوری"
-                                            else
-                                                "برای این نوع محتوا اجباریه"
+                                            "یک فیلم یا سریال انتخاب کن؛ محتوای Pulse بدون عنوان منتشر نمی‌شه"
                                         else
                                             "این محتوا به این عنوان وصل می‌شه",
                                         color=FqMuted,
