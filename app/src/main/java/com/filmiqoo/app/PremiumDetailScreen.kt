@@ -676,7 +676,7 @@ private fun PremiumDetailHero(
     onTrailer: () -> Unit,
     onShare: () -> Unit
 ) {
-    Box(Modifier.fillMaxWidth().height(470.dp)) {
+    Box(Modifier.fillMaxWidth().height(570.dp)) {
         RemoteImage(
             repository.backdrop(detail.media.backdropPath ?: detail.media.posterPath),
             Modifier.fillMaxSize(),
@@ -685,131 +685,169 @@ private fun PremiumDetailHero(
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha=.25f),
-                        Color.Transparent,
-                        Color.Black.copy(alpha=.5f),
-                        FqBg
-                    )
+                    0f to Color.Black.copy(alpha=.18f),
+                    .45f to Color.Black.copy(alpha=.14f),
+                    .72f to Color.Black.copy(alpha=.58f),
+                    1f to FqBg
+                )
+            )
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.horizontalGradient(
+                    0f to Color.Black.copy(alpha=.76f),
+                    .62f to Color.Transparent,
+                    1f to Color.Black.copy(alpha=.08f)
                 )
             )
         )
 
         Row(
-            Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=8.dp),
+            Modifier.fillMaxWidth().statusBarsPadding()
+                .padding(horizontal=12.dp,vertical=8.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
-            FilledTonalIconButton(
-                onClick=onBack,
-                colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=Color.Black.copy(alpha=.52f))
-            ) { Icon(Icons.Default.ArrowBack,null) }
+            Surface(
+                color=Color.Black.copy(alpha=.42f),
+                contentColor=Color.White,
+                shape=CircleShape,
+                border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.10f)),
+                modifier=Modifier.size(44.dp).clickable(onClick=onBack)
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(Icons.Default.ArrowBack,null)
+                }
+            }
             Spacer(Modifier.weight(1f))
-            FilledTonalIconButton(
-                onClick=onShare,
-                colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=Color.Black.copy(alpha=.52f))
-            ) { Icon(Icons.Default.Share,null) }
+            Surface(
+                color=Color.Black.copy(alpha=.42f),
+                contentColor=Color.White,
+                shape=CircleShape,
+                border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.10f)),
+                modifier=Modifier.size(44.dp).clickable(onClick=onShare)
+            ) {
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(Icons.Default.Share,null)
+                }
+            }
         }
 
         Column(
-            Modifier.align(Alignment.BottomStart).padding(start=18.dp,end=18.dp,bottom=18.dp)
+            Modifier.align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal=18.dp)
+                .padding(bottom=28.dp)
         ) {
-            Row(verticalAlignment=Alignment.Bottom) {
-                RemoteImage(
-                    repository.poster(detail.media.posterPath),
-                    Modifier.width(106.dp).height(154.dp).clip(RoundedCornerShape(17.dp)),
-                    ContentScale.Crop
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                        if(detail.media.vote>0) {
-                            DetailMetaPill(Icons.Default.Star,"IMDb "+formatVote(detail.media.vote))
-                        }
-                        selectedVersion?.quality?.takeIf(String::isNotBlank)?.let {
-                            DetailMetaPill(Icons.Default.HighQuality,it)
-                        }
-                        selectedVersion?.hdr?.takeIf(String::isNotBlank)?.let {
-                            DetailMetaPill(Icons.Default.HdrOn,it)
-                        }
-                    }
-
-                    Text(
-                        detail.media.title,
-                        fontSize=28.sp,
-                        fontWeight=FontWeight.Black,
-                        maxLines=2,
-                        overflow=TextOverflow.Ellipsis,
-                        modifier=Modifier.padding(top=9.dp)
-                    )
-
-                    if(detail.media.originalTitle.isNotBlank() &&
-                        detail.media.originalTitle!=detail.media.title) {
-                        Text(
-                            detail.media.originalTitle,
-                            color=Color.White.copy(alpha=.6f),
-                            fontSize=12.sp,
-                            maxLines=1,
-                            overflow=TextOverflow.Ellipsis,
-                            modifier=Modifier.padding(top=2.dp)
-                        )
-                    }
-
-                    val meta=listOf(
-                        detail.media.year,
-                        detail.runtime.takeIf { it>0 }?.let { it.toString()+" دقیقه" }.orEmpty(),
-                        if(detail.media.type==MediaType.MOVIE)"فیلم" else "سریال",
-                        detail.status
-                    ).filter(String::isNotBlank).joinToString(" • ")
-                    Text(
-                        meta,
-                        color=FqMuted,
-                        fontSize=11.sp,
-                        modifier=Modifier.padding(top=6.dp)
-                    )
-                }
-            }
-
-            if(detail.genres.isNotEmpty()) {
-                LazyRow(
-                    horizontalArrangement=Arrangement.spacedBy(6.dp),
-                    modifier=Modifier.padding(top=12.dp)
+            Row(
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
+                Surface(
+                    color=FqGold,
+                    contentColor=Color.White,
+                    shape=RoundedCornerShape(8.dp)
                 ) {
-                    items(detail.genres.take(5)) { genre ->
-                        Surface(
-                            color=Color.White.copy(alpha=.08f),
-                            shape=RoundedCornerShape(999.dp)
-                        ) {
-                            Text(
-                                genre,
-                                fontSize=11.sp,
-                                modifier=Modifier.padding(horizontal=10.dp,vertical=5.dp)
-                            )
-                        }
-                    }
+                    Text(
+                        if(detail.media.type==MediaType.MOVIE)"فیلم" else "سریال",
+                        fontSize=8.sp,
+                        fontWeight=FontWeight.Black,
+                        modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
+                    )
+                }
+                if(detail.media.vote>0) {
+                    DetailMetaPill(Icons.Default.Star,"IMDb "+formatVote(detail.media.vote))
+                }
+                selectedVersion?.quality?.takeIf(String::isNotBlank)?.let {
+                    DetailMetaPill(Icons.Default.HighQuality,it)
+                }
+                selectedVersion?.hdr?.takeIf(String::isNotBlank)?.let {
+                    DetailMetaPill(Icons.Default.HdrOn,it)
                 }
             }
 
-            Row(Modifier.padding(top=14.dp),verticalAlignment=Alignment.CenterVertically) {
+            Text(
+                detail.media.title,
+                color=Color.White,
+                fontSize=32.sp,
+                lineHeight=38.sp,
+                fontWeight=FontWeight.Black,
+                maxLines=2,
+                overflow=TextOverflow.Ellipsis,
+                modifier=Modifier.padding(top=12.dp)
+            )
+
+            if(detail.media.originalTitle.isNotBlank() &&
+                detail.media.originalTitle!=detail.media.title) {
+                Text(
+                    detail.media.originalTitle,
+                    color=Color.White.copy(alpha=.58f),
+                    fontSize=11.sp,
+                    maxLines=1,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=2.dp)
+                )
+            }
+
+            val meta=listOf(
+                detail.media.year,
+                detail.runtime.takeIf { it>0 }?.let { it.toString()+" دقیقه" }.orEmpty(),
+                detail.genres.take(2).joinToString(" • ")
+            ).filter(String::isNotBlank).joinToString(" • ")
+            if(meta.isNotBlank()) {
+                Text(
+                    meta,
+                    color=Color.White.copy(alpha=.72f),
+                    fontSize=10.sp,
+                    modifier=Modifier.padding(top=8.dp)
+                )
+            }
+
+            if(detail.media.overview.isNotBlank()) {
+                Text(
+                    detail.media.overview,
+                    color=Color.White.copy(alpha=.80f),
+                    fontSize=11.sp,
+                    lineHeight=18.sp,
+                    maxLines=3,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=10.dp).fillMaxWidth(.92f)
+                )
+            }
+
+            Row(
+                Modifier.fillMaxWidth().padding(top=18.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(9.dp)
+            ) {
                 Button(
                     onClick=onPlay,
                     enabled=canPlay,
-                    colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                    colors=ButtonDefaults.buttonColors(
+                        containerColor=Color.White,
+                        contentColor=Color.Black,
+                        disabledContainerColor=Color.White.copy(alpha=.16f),
+                        disabledContentColor=Color.White.copy(alpha=.55f)
+                    ),
                     shape=RoundedCornerShape(14.dp),
-                    modifier=Modifier.weight(1f)
+                    modifier=Modifier.height(50.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
+                    Icon(Icons.Default.PlayArrow,null)
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        if(canPlay)"تماشا" else "نسخه پخش موجود نیست",
-                        color=Color.Black,
-                        fontWeight=FontWeight.Bold
+                        if(canPlay)"تماشا" else "فعلاً قابل پخش نیست",
+                        fontWeight=FontWeight.Black
                     )
                 }
+
                 if(detail.trailerKey!=null) {
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick=onTrailer,
-                        shape=RoundedCornerShape(14.dp)
+                        colors=ButtonDefaults.filledTonalButtonColors(
+                            containerColor=Color.Black.copy(alpha=.48f),
+                            contentColor=Color.White
+                        ),
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.height(50.dp)
                     ) {
                         Icon(Icons.Default.OndemandVideo,null)
                         Spacer(Modifier.width(5.dp))
@@ -947,47 +985,44 @@ private fun ActionTile(
     enabled: Boolean=true,
     onClick: () -> Unit
 ) {
-    Surface(
-        color=if(active)FqGold.copy(alpha=.13f) else FqSurface,
-        shape=RoundedCornerShape(18.dp),
-        border=androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if(active) FqGold.copy(alpha=.28f) else FqBorder
-        ),
-        modifier=Modifier.width(116.dp)
-            .heightIn(min=68.dp)
-            .clickable(enabled=enabled && !loading) { onClick() }
+    Column(
+        Modifier.width(88.dp)
+            .clickable(enabled=enabled && !loading,onClick=onClick),
+        horizontalAlignment=Alignment.CenterHorizontally
     ) {
-        Column(
-            Modifier.padding(horizontal=10.dp,vertical=11.dp),
-            horizontalAlignment=Alignment.CenterHorizontally
+        Surface(
+            color=if(active)FqGold else FqSurface2,
+            contentColor=if(active)Color.White else if(enabled)Color.White else FqMuted,
+            shape=CircleShape,
+            border=androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if(active)FqGold else Color.White.copy(alpha=.07f)
+            ),
+            modifier=Modifier.size(48.dp)
         ) {
-            if(loading) {
-                CircularProgressIndicator(
-                    color=FqGold,
-                    strokeWidth=2.dp,
-                    modifier=Modifier.size(21.dp)
-                )
-            } else {
-                Icon(
-                    icon,
-                    null,
-                    tint=if(active)FqGold else if(enabled)Color.White else FqMuted,
-                    modifier=Modifier.size(22.dp)
-                )
+            Box(contentAlignment=Alignment.Center) {
+                if(loading) {
+                    CircularProgressIndicator(
+                        color=if(active)Color.White else FqGold,
+                        strokeWidth=2.dp,
+                        modifier=Modifier.size(19.dp)
+                    )
+                } else {
+                    Icon(icon,null,modifier=Modifier.size(20.dp))
+                }
             }
-            Text(
-                label,
-                color=if(enabled)Color.White else FqMuted,
-                style=MaterialTheme.typography.labelSmall,
-                fontWeight=FontWeight.SemiBold,
-                maxLines=1,
-                modifier=Modifier.padding(top=5.dp)
-            )
         }
+        Text(
+            label,
+            color=if(enabled)FqMutedStrong else FqMuted,
+            fontSize=8.sp,
+            maxLines=2,
+            lineHeight=11.sp,
+            textAlign=androidx.compose.ui.text.style.TextAlign.Center,
+            modifier=Modifier.padding(top=6.dp)
+        )
     }
 }
-
 @Composable
 private fun VersionSelector(
     versions: List<PlatformVersion>,
