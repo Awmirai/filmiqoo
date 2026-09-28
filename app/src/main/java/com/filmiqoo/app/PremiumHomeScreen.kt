@@ -115,7 +115,7 @@ fun PremiumHomeScreen(
     when(val s=state) {
         PremiumHomeLoad.Loading -> LoadingPage("در حال چیدن صفحه شخصی تو...")
         is PremiumHomeLoad.Error -> ErrorPage(s.message) { reload++ }
-        is PremiumHomeLoad.Ready -> PremiumHomeContent(
+        is PremiumHomeLoad.Ready -> CinematicHomeContent(
             data=s.data,
             continueItems=continueItems,
             personalized=personalized,
@@ -126,12 +126,10 @@ fun PremiumHomeScreen(
             kidsMode=kidsMode,
             onMedia=onMedia,
             onPlay=onPlay,
-            onStory=onStory,
             onSearch=onSearch,
             onNotifications=onNotifications,
             onReleases=onReleases,
-            onClips=onClips,
-            onClub=onClub,
+            onPulse=onClub,
             onWatchParty=onWatchParty,
             onRefresh={reload++}
         )
