@@ -997,7 +997,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onStory={m,i->overlay=OverlayRoute.Story(m,i)},
                             onSearch={
                                 if(activeViewer?.kidsMode!=true) {
-                                    showSearch=true
+                                    showSearch=false
+                                    tab=1
                                 }
                             },
                             onNotifications=openNotifications,
