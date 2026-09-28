@@ -3600,38 +3600,79 @@ private fun PlayerPulseBar(
     onDiscussion:()->Unit,
     modifier:Modifier=Modifier
 ) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     val reactions=listOf("🔥","😱","😂","❤️","👀")
+    val hottest=state?.moments
+        ?.filter { it.positionMs<=currentPositionMs }
+        ?.maxByOrNull { it.reactions }
+    val watching=state?.watchingNow ?: 0L
+
     Surface(
-        color=Color.Black.copy(alpha=.58f),
-        shape=RoundedCornerShape(20.dp),
+        color=Color.Black.copy(alpha=.56f),
+        contentColor=Color.White,
+        shape=RoundedCornerShape(18.dp),
         border=androidx.compose.foundation.BorderStroke(
             1.dp,
             Color.White.copy(alpha=.10f)
         ),
         modifier=modifier
     ) {
-        Column(
-            Modifier.padding(horizontal=8.dp,vertical=7.dp),
-            verticalArrangement=Arrangement.spacedBy(5.dp)
-        ) {
-            val hottest=state?.moments
-                ?.filter { it.positionMs<=currentPositionMs }
-                ?.maxByOrNull { it.reactions }
-            if((state?.watchingNow ?: 0L)>0L || hottest!=null) {
+        if(!expanded) {
+            Row(
+                Modifier.clickable { expanded=true }
+                    .padding(horizontal=10.dp,vertical=8.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
+                Box(
+                    Modifier.size(26.dp)
+                        .background(FqGold.copy(alpha=.16f),CircleShape),
+                    contentAlignment=Alignment.Center
+                ) {
+                    Text(hottest?.emoji ?: "🔥",fontSize=13.sp)
+                }
+                Column {
+                    Text(
+                        when {
+                            hottest!=null -> "لحظه داغ • "+formatPlayerTime(hottest.positionMs)
+                            watching>0L -> watching.toString()+" نفر همزمان در حال تماشا"
+                            else -> "Pulse"
+                        },
+                        fontSize=9.sp,
+                        fontWeight=FontWeight.Bold
+                    )
+                    Text(
+                        "برای واکنش و گفتگو لمس کن",
+                        color=Color.White.copy(alpha=.55f),
+                        fontSize=7.sp
+                    )
+                }
+                Icon(
+                    Icons.Default.ExpandLess,
+                    null,
+                    tint=Color.White.copy(alpha=.62f),
+                    modifier=Modifier.size(16.dp)
+                )
+            }
+        } else {
+            Column(
+                Modifier.padding(horizontal=9.dp,vertical=8.dp),
+                verticalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
                 Row(
                     verticalAlignment=Alignment.CenterVertically,
                     horizontalArrangement=Arrangement.spacedBy(7.dp)
                 ) {
-                    if((state?.watchingNow ?: 0L)>0L) {
+                    if(watching>0L) {
                         Row(verticalAlignment=Alignment.CenterVertically) {
                             Box(
                                 Modifier.size(7.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFFF5D6C))
+                                    .background(FqGold)
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                (state?.watchingNow ?: 0L).toString()+" در حال تماشا",
+                                watching.toString()+" در حال تماشا",
                                 color=Color.White.copy(alpha=.74f),
                                 fontSize=9.sp,
                                 fontWeight=FontWeight.Bold
@@ -3642,7 +3683,7 @@ private fun PlayerPulseBar(
                     hottest?.let { moment ->
                         Surface(
                             color=FqGold.copy(alpha=.16f),
-                            contentColor=FqGold,
+                            contentColor=FqGoldSoft,
                             shape=RoundedCornerShape(10.dp),
                             modifier=Modifier.clickable {
                                 onJumpToMoment(moment)
@@ -3655,18 +3696,42 @@ private fun PlayerPulseBar(
                                 Text(moment.emoji,fontSize=12.sp)
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    "لحظه داغ "+formatPlayerTime(moment.positionMs),
+                                    formatPlayerTime(moment.positionMs),
                                     fontSize=9.sp,
                                     fontWeight=FontWeight.Bold
                                 )
-                                if(moment.reactions>1L) {
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        "• "+moment.reactions,
-                                        color=Color.White.copy(alpha=.60f),
-                                        fontSize=8.sp
-                                    )
-                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    IconButton(
+                        onClick={expanded=false},
+                        modifier=Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ExpandMore,
+                            null,
+                            tint=Color.White.copy(alpha=.66f),
+                            modifier=Modifier.size(17.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(5.dp)
+                ) {
+                    reactions.forEach { emoji ->
+                        Surface(
+                            color=Color.White.copy(alpha=.07f),
+                            shape=CircleShape,
+                            modifier=Modifier.size(36.dp)
+                                .clickable(enabled=!busy) { onReact(emoji) }
+                        ) {
+                            Box(contentAlignment=Alignment.Center) {
+                                Text(emoji,fontSize=16.sp)
                             }
                         }
                     }
@@ -3674,42 +3739,24 @@ private fun PlayerPulseBar(
                     Surface(
                         color=Color.White.copy(alpha=.08f),
                         contentColor=Color.White,
-                        shape=RoundedCornerShape(10.dp),
+                        shape=RoundedCornerShape(11.dp),
                         modifier=Modifier.clickable { onDiscussion() }
                     ) {
                         Row(
-                            Modifier.padding(horizontal=8.dp,vertical=5.dp),
+                            Modifier.padding(horizontal=10.dp,vertical=8.dp),
                             verticalAlignment=Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Default.Forum,
                                 null,
-                                modifier=Modifier.size(13.dp)
+                                modifier=Modifier.size(14.dp)
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(5.dp))
                             Text(
-                                "گفت‌وگو",
+                                "گفتگو",
                                 fontSize=9.sp,
                                 fontWeight=FontWeight.Bold
                             )
-                        }
-                    }
-                }
-            }
-
-            Row(
-                verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.spacedBy(4.dp)
-            ) {
-                reactions.forEach { emoji ->
-                    Surface(
-                        color=Color.White.copy(alpha=.07f),
-                        shape=CircleShape,
-                        modifier=Modifier.size(36.dp)
-                            .clickable(enabled=!busy) { onReact(emoji) }
-                    ) {
-                        Box(contentAlignment=Alignment.Center) {
-                            Text(emoji,fontSize=16.sp)
                         }
                     }
                 }
