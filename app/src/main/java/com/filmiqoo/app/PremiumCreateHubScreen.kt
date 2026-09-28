@@ -45,11 +45,11 @@ private enum class CreateKind(
     val subtitle:String
 ) {
     STORY("استوری","عکس، ویدیو یا متن ۲۴ ساعته"),
-    REEL("کلیپ","ویدیوی کوتاه برای کلاب"),
-    POST("پست","پست در کلاب"),
-    REVIEW("ریویو","نقد فیلم یا سریال"),
-    POLL("نظرسنجی","نظرسنجی واقعی"),
-    CHANNEL("کانال","ساخت فضای عمومی در کلاب")
+    REEL("کلیپ","ویدیوی کوتاه مرتبط با یک عنوان"),
+    POST("بحث","نظر یا موضوع گفتگو درباره یک عنوان"),
+    REVIEW("ریویو","نقد یک فیلم یا سریال"),
+    POLL("نظرسنجی","سؤال درباره یک فیلم یا سریال"),
+    CHANNEL("کانال","ساخت فضای عمومی برای فیلم‌بازها")
 }
 
 private data class CreateDraft(
@@ -251,11 +251,13 @@ fun PremiumCreateHubScreen(
     }
 
     val canPublish=when(kind) {
-        CreateKind.REEL -> selectedUri!=null
+        CreateKind.REEL -> selectedUri!=null && taggedMedia?.backendId!=null
         CreateKind.STORY -> selectedUri!=null || caption.isNotBlank()
-        CreateKind.POST,CreateKind.REVIEW -> caption.trim().isNotBlank()
+        CreateKind.POST,CreateKind.REVIEW ->
+            caption.trim().isNotBlank() && taggedMedia?.backendId!=null
         CreateKind.POLL ->
             caption.trim().isNotBlank() &&
+                taggedMedia?.backendId!=null &&
                 pollOptions.map(String::trim).filter(String::isNotBlank).distinct().size>=2
         CreateKind.CHANNEL ->
             channelName.trim().length in 2..80 &&
@@ -281,7 +283,7 @@ fun PremiumCreateHubScreen(
                     }
                     Column(Modifier.weight(1f)) {
                         Text("ساخت محتوا",fontSize=23.sp,fontWeight=FontWeight.Black)
-                        Text("یک چیز خوب برای کلاب بساز",color=FqMuted,fontSize=11.sp)
+                        Text("چیزی بساز که به تماشای فیلم و سریال کمک کنه",color=FqMuted,fontSize=11.sp)
                     }
                     TextButton(
                         onClick={
@@ -587,15 +589,18 @@ fun PremiumCreateHubScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(
-                                        taggedMedia?.title ?: "تگ فیلم یا سریال",
+                                        taggedMedia?.title ?: "انتخاب فیلم یا سریال",
                                         fontSize=11.sp,
                                         fontWeight=FontWeight.Bold
                                     )
                                     Text(
                                         if(taggedMedia==null)
-                                            "اختیاری • محتوا رو به کاتالوگ وصل کن"
+                                            if(kind==CreateKind.STORY)
+                                                "اختیاری برای استوری"
+                                            else
+                                                "برای این نوع محتوا اجباریه"
                                         else
-                                            "متصل به کاتالوگ Filmiqoo",
+                                            "این محتوا به این عنوان وصل می‌شه",
                                         color=FqMuted,
                                         fontSize=11.sp
                                     )
@@ -862,7 +867,7 @@ fun PremiumCreateHubScreen(
                 shape=RoundedCornerShape(15.dp),
                 modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp)
             ) {
-                Icon(Icons.Default.Publish,null,tint=Color.Black)
+                Icon(Icons.Default.Publish,null,tint=Color.White)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     when(kind) {
@@ -872,7 +877,7 @@ fun PremiumCreateHubScreen(
                         CreateKind.CHANNEL -> "ساخت کانال"
                         else -> if(scheduledAtMillis!=null)"زمان‌بندی انتشار" else "انتشار"
                     },
-                    color=Color.Black,
+                    color=Color.White,
                     fontWeight=FontWeight.Bold
                 )
             }
@@ -916,12 +921,12 @@ fun PremiumCreateHubScreen(
         val destinationLabel=when {
             successScheduled -> "دیدن زمان‌بندی‌ها"
             kind==CreateKind.REEL -> "دیدن کلیپ‌ها"
-            else -> "رفتن به کلاب"
+            else -> "رفتن به Pulse"
         }
         AlertDialog(
             onDismissRequest={success=null},
             icon={Icon(Icons.Default.CheckCircle,null,tint=FqGreen)},
-            title={Text("انجام شد")},
+            title={Text("منتشر شد")},
             text={Text(message)},
             confirmButton={
                 TextButton(
