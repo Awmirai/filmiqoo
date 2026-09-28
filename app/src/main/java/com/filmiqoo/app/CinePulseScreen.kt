@@ -248,8 +248,11 @@ fun CinePulseScreen(
                             icon=Icons.Default.Forum
                         )
                     }
-                    item {
-                        PulseRoomRail(rooms,onOpenRoom)
+                    items(rooms.take(30),key={it.id}) { room ->
+                        PulseRoomCard(
+                            room=room,
+                            onOpenRoom=onOpenRoom
+                        )
                     }
                 }
             }
@@ -263,12 +266,25 @@ fun CinePulseScreen(
                             icon=Icons.Default.SmartDisplay
                         )
                     }
-                    item {
-                        PulseClipRail(
-                            items=clips,
-                            repository=repository,
-                            onOpenClip=onOpenClip
-                        )
+                    items(
+                        clips.take(30).chunked(2),
+                        key={ row -> row.joinToString(":") { it.id } }
+                    ) { row ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .padding(horizontal=16.dp,vertical=5.dp),
+                            horizontalArrangement=Arrangement.spacedBy(10.dp)
+                        ) {
+                            row.forEach { clip ->
+                                PulseClipCard(
+                                    clip=clip,
+                                    repository=repository,
+                                    onOpenClip=onOpenClip,
+                                    modifier=Modifier.weight(1f)
+                                )
+                            }
+                            if(row.size==1) Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -662,101 +678,151 @@ private fun PulsePostCard(
 }
 
 @Composable
-private fun PulseRoomRail(
-    rooms:List<SocialRoom>,
+private fun PulseRoomCard(
+    room:SocialRoom,
     onOpenRoom:(SocialRoom)->Unit
 ) {
-    LazyRow(
-        contentPadding=PaddingValues(horizontal=16.dp),
-        horizontalArrangement=Arrangement.spacedBy(10.dp)
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(20.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha=.07f)
+        ),
+        modifier=Modifier.fillMaxWidth()
+            .padding(horizontal=16.dp,vertical=5.dp)
+            .clickable { onOpenRoom(room) }
     ) {
-        items(rooms.take(12),key={it.id}) { room ->
-            Surface(
-                color=FqSurface,
-                shape=RoundedCornerShape(20.dp),
-                border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.07f)),
-                modifier=Modifier.width(220.dp).clickable { onOpenRoom(room) }
+        Row(
+            Modifier.padding(14.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(48.dp)
+                    .background(FqGold.copy(alpha=.12f),RoundedCornerShape(15.dp)),
+                contentAlignment=Alignment.Center
             ) {
-                Column(Modifier.padding(14.dp)) {
-                    Row(verticalAlignment=Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(38.dp).background(FqGold.copy(alpha=.12f),CircleShape),
-                            contentAlignment=Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Forum,null,tint=FqGold,modifier=Modifier.size(18.dp))
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(room.name,fontSize=11.sp,fontWeight=FontWeight.Black,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text(room.members.toString()+" عضو",color=FqMuted,fontSize=7.sp)
-                        }
-                    }
-                    Text(
-                        room.media?.title ?: room.topic,
-                        color=FqMuted,
-                        fontSize=9.sp,
-                        maxLines=2,
-                        overflow=TextOverflow.Ellipsis,
-                        modifier=Modifier.padding(top=10.dp)
-                    )
-                    Text("ورود به بحث",color=FqGold,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=10.dp))
-                }
+                Icon(
+                    Icons.Default.Forum,
+                    null,
+                    tint=FqGold,
+                    modifier=Modifier.size(21.dp)
+                )
             }
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    room.media?.title ?: room.name,
+                    fontSize=12.sp,
+                    fontWeight=FontWeight.Black,
+                    maxLines=1,
+                    overflow=TextOverflow.Ellipsis
+                )
+                Text(
+                    if(room.media!=null) room.name else room.topic,
+                    color=FqMuted,
+                    fontSize=9.sp,
+                    maxLines=2,
+                    overflow=TextOverflow.Ellipsis,
+                    modifier=Modifier.padding(top=2.dp)
+                )
+                Text(
+                    room.members.toString()+" نفر در گفتگو",
+                    color=FqGoldSoft,
+                    fontSize=8.sp,
+                    fontWeight=FontWeight.Bold,
+                    modifier=Modifier.padding(top=5.dp)
+                )
+            }
+            Icon(
+                Icons.Default.ChevronLeft,
+                null,
+                tint=FqMuted,
+                modifier=Modifier.size(19.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun PulseClipRail(
-    items:List<ReelFeedItem>,
+private fun PulseClipCard(
+    clip:ReelFeedItem,
     repository:TmdbRepository,
-    onOpenClip:(String)->Unit
+    onOpenClip:(String)->Unit,
+    modifier:Modifier=Modifier
 ) {
-    LazyRow(
-        contentPadding=PaddingValues(horizontal=16.dp),
-        horizontalArrangement=Arrangement.spacedBy(10.dp)
+    val media=clip.media?.asMediaItem()
+    Column(
+        modifier.clip(RoundedCornerShape(20.dp))
+            .background(FqSurface)
+            .clickable { onOpenClip(clip.id) }
     ) {
-        items(items.take(14),key={it.id}) { clip ->
-            val media=clip.media?.asMediaItem()
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(.67f)
+        ) {
+            RemoteImage(
+                clip.coverUrl.takeIf(String::isNotBlank)
+                    ?: media?.posterPath,
+                Modifier.fillMaxSize(),
+                ContentScale.Crop
+            )
             Box(
-                Modifier.width(145.dp).height(235.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onOpenClip(clip.id) }
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha=.86f)
+                        )
+                    )
+                )
+            )
+            Surface(
+                color=Color.White.copy(alpha=.92f),
+                contentColor=Color.Black,
+                shape=CircleShape,
+                modifier=Modifier.size(42.dp)
+                    .align(Alignment.Center)
             ) {
-                RemoteImage(
-                    clip.coverUrl.takeIf(String::isNotBlank) ?: media?.posterPath,
-                    Modifier.fillMaxSize(),
-                    ContentScale.Crop
-                )
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.86f)))
-                    )
-                )
-                Box(
-                    Modifier.size(42.dp).align(Alignment.Center)
-                        .background(Color.White.copy(alpha=.9f),CircleShape),
-                    contentAlignment=Alignment.Center
-                ) {
-                    Icon(Icons.Default.PlayArrow,null,tint=Color.Black)
+                Box(contentAlignment=Alignment.Center) {
+                    Icon(Icons.Default.PlayArrow,null)
                 }
-                Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+            }
+            media?.title?.let { title ->
+                Surface(
+                    color=Color.Black.copy(alpha=.64f),
+                    shape=RoundedCornerShape(9.dp),
+                    modifier=Modifier.align(Alignment.BottomStart)
+                        .padding(8.dp)
+                ) {
                     Text(
-                        media?.title ?: "کلیپ",
+                        title,
                         color=Color.White,
-                        fontSize=10.sp,
-                        fontWeight=FontWeight.Black,
+                        fontSize=8.sp,
+                        fontWeight=FontWeight.Bold,
                         maxLines=1,
-                        overflow=TextOverflow.Ellipsis
-                    )
-                    Text(
-                        clip.author.displayName,
-                        color=Color.White.copy(alpha=.7f),
-                        fontSize=7.sp,
-                        maxLines=1
+                        overflow=TextOverflow.Ellipsis,
+                        modifier=Modifier.widthIn(max=120.dp)
+                            .padding(horizontal=7.dp,vertical=5.dp)
                     )
                 }
             }
+        }
+        Column(Modifier.padding(horizontal=10.dp,vertical=9.dp)) {
+            Text(
+                clip.caption.ifBlank { "کلیپ درباره "+(media?.title ?: "این عنوان") },
+                fontSize=9.sp,
+                lineHeight=13.sp,
+                maxLines=2,
+                overflow=TextOverflow.Ellipsis
+            )
+            Text(
+                "@"+clip.author.username,
+                color=FqMuted,
+                fontSize=7.sp,
+                maxLines=1,
+                overflow=TextOverflow.Ellipsis,
+                modifier=Modifier.padding(top=4.dp)
+            )
         }
     }
 }
