@@ -127,13 +127,15 @@ class WatchPartyRepository(
         mediaTitleId: String,
         title: String,
         visibility: String="public",
-        scheduledAt: String?=null
+        scheduledAt: String?=null,
+        episodeId: String?=null
     ): WatchPartyCreateResult {
         val body=JSONObject()
             .put("mediaTitleId",mediaTitleId)
             .put("title",title)
             .put("visibility",visibility)
         if(!scheduledAt.isNullOrBlank()) body.put("scheduledAt",scheduledAt)
+        if(!episodeId.isNullOrBlank()) body.put("episodeId",episodeId)
 
         val root=backend.postJson(
             "/v1/watch-parties",

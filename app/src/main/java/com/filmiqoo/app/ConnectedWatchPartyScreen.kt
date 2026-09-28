@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -76,6 +77,14 @@ fun ConnectedWatchPartyScreen(
     var joinRequestPending by remember { mutableStateOf(false) }
     var lobbyBusy by remember { mutableStateOf(false) }
     var realtimeConnected by remember { mutableStateOf(false) }
+    var resolvedStartMedia by remember(media?.key) {
+        mutableStateOf(media?.takeIf { !it.backendId.isNullOrBlank() })
+    }
+    var startPlatformDetail by remember(media?.key) { mutableStateOf<PlatformDetail?>(null) }
+    var resolvingStartMedia by remember(media?.key) {
+        mutableStateOf(media!=null && media.backendId.isNullOrBlank())
+    }
+    var selectedEpisodeId by rememberSaveable(media?.key) { mutableStateOf<String?>(null) }
 
     val player=remember {
         ExoPlayer.Builder(context).build().apply {
@@ -163,6 +172,41 @@ fun ConnectedWatchPartyScreen(
     }
 
     BackHandler { onBack() }
+
+    LaunchedEffect(media?.key,partyId) {
+        if(partyId!=null) return@LaunchedEffect
+        val source=media
+        if(source==null) {
+            resolvingStartMedia=false
+            resolvedStartMedia=null
+            startPlatformDetail=null
+            selectedEpisodeId=null
+            return@LaunchedEffect
+        }
+
+        resolvingStartMedia=true
+        val resolved=runCatching { repository.resolveCatalogMedia(source) }.getOrNull()
+        resolvedStartMedia=resolved
+        startPlatformDetail=null
+        selectedEpisodeId=null
+
+        val backendId=resolved?.backendId
+        if(!backendId.isNullOrBlank()) {
+            val detail=runCatching { backend.detail(backendId) }.getOrNull()
+            startPlatformDetail=detail
+            if(detail!=null) {
+                resolvedStartMedia=detail.asMediaItem()
+                if(resolved?.type==MediaType.TV) {
+                    selectedEpisodeId=detail.seasons
+                        .asSequence()
+                        .flatMap { it.episodes.asSequence() }
+                        .firstOrNull { it.streamReady && !it.mediaVersionId.isNullOrBlank() }
+                        ?.id
+                }
+            }
+        }
+        resolvingStartMedia=false
+    }
 
     LaunchedEffect(Unit) {
         if(backend.session.isLoggedIn) {
@@ -281,28 +325,64 @@ fun ConnectedWatchPartyScreen(
     }
 
     if(partyId==null) {
+        val playableEpisodes=startPlatformDetail
+            ?.seasons
+            .orEmpty()
+            .flatMap { season->
+                season.episodes
+                    .filter { it.streamReady && !it.mediaVersionId.isNullOrBlank() }
+                    .map { episode->
+                        WatchPartyEpisodeOption(
+                            id=episode.id,
+                            season=season.number,
+                            episode=episode.number,
+                            name=episode.name,
+                            quality=episode.quality
+                        )
+                    }
+            }
+        val resolved=resolvedStartMedia
+        val catalogConnected=!resolved?.backendId.isNullOrBlank()
+        val startPlayable=when(resolved?.type) {
+            MediaType.MOVIE -> resolved.streamReady && !resolved.mediaVersionId.isNullOrBlank()
+            MediaType.TV -> selectedEpisodeId!=null
+            null -> false
+        }
+
         WatchPartyStartScreen(
             media=media,
             repository=repository,
             loggedIn=backend.session.isLoggedIn,
             creating=creating,
+            resolvingCatalog=resolvingStartMedia,
+            catalogConnected=catalogConnected,
+            playable=startPlayable,
+            episodes=playableEpisodes,
+            selectedEpisodeId=selectedEpisodeId,
             error=error,
             onBack=onBack,
-            onStart={visibility,scheduledAt->
-                val backendId=media?.backendId
+            onEpisodeSelected={selectedEpisodeId=it},
+            onStart={visibility,scheduledAt,episodeId->
+                val backendId=resolved?.backendId
                 if(!backend.session.isLoggedIn) {
                     onRequireAuth()
                 } else if(backendId.isNullOrBlank()) {
-                    error="این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست."
+                    error="این عنوان در Catalog پخش Filmiqoo موجود نیست."
+                } else if(!startPlayable) {
+                    error=if(resolved.type==MediaType.TV)
+                        "برای این سریال هنوز قسمت قابل پخش آماده نیست."
+                    else
+                        "نسخه قابل پخش این فیلم هنوز آماده نشده."
                 } else {
                     creating=true
                     scope.launch {
                         runCatching {
                             partyRepo.create(
                                 mediaTitleId=backendId,
-                                title="Watch Party • "+media.title,
+                                title="Watch Party • "+resolved.title,
                                 visibility=visibility,
-                                scheduledAt=scheduledAt
+                                scheduledAt=scheduledAt,
+                                episodeId=episodeId
                             )
                         }.onSuccess { created->
                             partyId=created.id
@@ -610,15 +690,29 @@ fun ConnectedWatchPartyScreen(
     }
 }
 
+data class WatchPartyEpisodeOption(
+    val id:String,
+    val season:Int,
+    val episode:Int,
+    val name:String,
+    val quality:String?
+)
+
 @Composable
 private fun WatchPartyStartScreen(
     media: MediaItem?,
     repository: TmdbRepository,
     loggedIn: Boolean,
     creating: Boolean,
+    resolvingCatalog: Boolean,
+    catalogConnected: Boolean,
+    playable: Boolean,
+    episodes: List<WatchPartyEpisodeOption>,
+    selectedEpisodeId: String?,
     error: String?,
     onBack: () -> Unit,
-    onStart: (String,String?) -> Unit
+    onEpisodeSelected: (String) -> Unit,
+    onStart: (String,String?,String?) -> Unit
 ) {
     var visibility by remember { mutableStateOf("public") }
     var schedule by remember { mutableStateOf("now") }
@@ -727,6 +821,93 @@ private fun WatchPartyStartScreen(
                 modifier=Modifier.fillMaxWidth().padding(top=16.dp)
             ) {
                 Column(Modifier.padding(14.dp)) {
+                    Surface(
+                        color=when {
+                            resolvingCatalog -> FqGold.copy(alpha=.10f)
+                            catalogConnected && playable -> FqGreen.copy(alpha=.10f)
+                            else -> FqDanger.copy(alpha=.10f)
+                        },
+                        shape=RoundedCornerShape(14.dp),
+                        modifier=Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=10.dp,vertical=9.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            if(resolvingCatalog) {
+                                CircularProgressIndicator(
+                                    color=FqGold,
+                                    strokeWidth=2.dp,
+                                    modifier=Modifier.size(17.dp)
+                                )
+                            } else {
+                                Icon(
+                                    if(catalogConnected && playable)Icons.Default.CheckCircle
+                                    else Icons.Default.CloudOff,
+                                    null,
+                                    tint=if(catalogConnected && playable)FqGreen else FqDanger,
+                                    modifier=Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(7.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    when {
+                                        resolvingCatalog -> "در حال اتصال به Catalog…"
+                                        catalogConnected && playable -> "آماده برای Watch Party"
+                                        !catalogConnected -> "این عنوان هنوز در Catalog پخش نیست"
+                                        else -> "نسخه قابل پخش هنوز آماده نیست"
+                                    },
+                                    fontSize=9.sp,
+                                    fontWeight=FontWeight.Black
+                                )
+                                Text(
+                                    when {
+                                        resolvingCatalog -> "نسخه واقعی Filmiqoo را پیدا می‌کنیم."
+                                        catalogConnected && playable -> "پخش و Sync به نسخه واقعی سرور متصل است."
+                                        !catalogConnected -> "فقط عناوین دارای فایل واقعی می‌توانند Party بسازند."
+                                        else -> "بعد از آماده شدن فایل پخش، Party فعال می‌شود."
+                                    },
+                                    color=FqMuted,
+                                    fontSize=7.sp,
+                                    modifier=Modifier.padding(top=2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if(episodes.isNotEmpty()) {
+                        Text(
+                            "قسمت برای Watch Party",
+                            fontSize=11.sp,
+                            fontWeight=FontWeight.Black,
+                            modifier=Modifier.padding(top=12.dp)
+                        )
+                        LazyRow(
+                            modifier=Modifier.fillMaxWidth().padding(top=7.dp),
+                            horizontalArrangement=Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(episodes,key={it.id}) { option->
+                                FilterChip(
+                                    selected=selectedEpisodeId==option.id,
+                                    onClick={onEpisodeSelected(option.id)},
+                                    label={
+                                        Text(
+                                            "ف"+option.season+" • ق"+option.episode+
+                                                option.quality?.takeIf(String::isNotBlank)?.let{" • "+it}.orEmpty(),
+                                            fontSize=8.sp
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color=FqSurface3,
+                        modifier=Modifier.padding(vertical=13.dp)
+                    )
+
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("چه کسانی وارد شوند؟",fontSize=12.sp,fontWeight=FontWeight.Black)
@@ -809,8 +990,8 @@ private fun WatchPartyStartScreen(
                     }
 
                     Button(
-                        onClick={onStart(visibility,scheduledAt)},
-                        enabled=!creating && media!=null,
+                        onClick={onStart(visibility,scheduledAt,selectedEpisodeId)},
+                        enabled=!creating && !resolvingCatalog && media!=null && catalogConnected && playable,
                         colors=ButtonDefaults.buttonColors(containerColor=FqGold),
                         shape=RoundedCornerShape(16.dp),
                         contentPadding=PaddingValues(vertical=13.dp),

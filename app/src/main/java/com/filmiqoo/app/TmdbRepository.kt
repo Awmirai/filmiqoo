@@ -217,6 +217,46 @@ class TmdbRepository(private val context: Context) {
         ).filter { it.type == MediaType.MOVIE || it.type == MediaType.TV }
     }
 
+    suspend fun resolveCatalogMedia(media: MediaItem): MediaItem? {
+        if(!media.backendId.isNullOrBlank()) {
+            return runCatching {
+                backend.detail(media.backendId).asMediaItem()
+            }.getOrDefault(media)
+        }
+        if(media.id<=0) return null
+
+        val homeMatch=runCatching {
+            backend.catalogHome().firstOrNull {
+                it.id==media.id && it.type==media.type && !it.backendId.isNullOrBlank()
+            }
+        }.getOrNull()
+        if(homeMatch!=null) {
+            return runCatching {
+                backend.detail(homeMatch.backendId!!).asMediaItem()
+            }.getOrDefault(homeMatch)
+        }
+
+        val searchRepo=UniversalSearchRepository(context.applicationContext,backend)
+        val queries=listOf(media.title,media.originalTitle)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+
+        for(query in queries) {
+            val match=runCatching {
+                searchRepo.search(query).media.firstOrNull {
+                    it.id==media.id && it.type==media.type && !it.backendId.isNullOrBlank()
+                }
+            }.getOrNull()
+            if(match!=null) {
+                return runCatching {
+                    backend.detail(match.backendId!!).asMediaItem()
+                }.getOrDefault(match)
+            }
+        }
+        return null
+    }
+
     suspend fun search(query: String): List<MediaItem> {
         if (query.isBlank()) return emptyList()
         val platform = runCatching { backend.catalogHome() }
