@@ -231,7 +231,8 @@ private fun WatchHistoryHeader(
         Column(
             Modifier.align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(horizontal=18.dp,bottom=18.dp)
+                .padding(horizontal=18.dp)
+                .padding(bottom=18.dp)
         ) {
             Text(
                 "تماشای من",
