@@ -252,7 +252,9 @@ fun PremiumCreateHubScreen(
 
     val canPublish=when(kind) {
         CreateKind.REEL -> selectedUri!=null && taggedMedia?.backendId!=null
-        CreateKind.STORY -> selectedUri!=null || caption.isNotBlank()
+        CreateKind.STORY ->
+            (selectedUri!=null || caption.isNotBlank()) &&
+                taggedMedia?.backendId!=null
         CreateKind.POST,CreateKind.REVIEW ->
             caption.trim().isNotBlank() && taggedMedia?.backendId!=null
         CreateKind.POLL ->
