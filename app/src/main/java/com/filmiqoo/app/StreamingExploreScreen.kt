@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 private enum class ExploreCatalogFilter { ALL, MOVIES, SERIES }
-private enum class ExploreLane { NONE, IRANIAN, KOREAN, ANIME, BOLLYWOOD }
+private enum class ExploreLane { NONE, HOLLYWOOD, IRANIAN, KOREAN, ANIME, BOLLYWOOD }
 
 @Composable
 fun StreamingExploreScreen(
@@ -82,6 +82,7 @@ fun StreamingExploreScreen(
     val laneItems=remember(home,lane,filter) {
         val base=when(lane) {
             ExploreLane.NONE -> emptyList()
+            ExploreLane.HOLLYWOOD -> home.popularMovies
             ExploreLane.IRANIAN -> home.iranian
             ExploreLane.KOREAN -> home.korean
             ExploreLane.ANIME -> home.anime
@@ -322,6 +323,7 @@ private fun ExploreLaneHeader(
     onBack:()->Unit
 ) {
     val (title,subtitle)=when(lane) {
+        ExploreLane.HOLLYWOOD -> "هالیوود" to "فیلم‌های محبوب و جریان اصلی"
         ExploreLane.IRANIAN -> "سینمای ایران" to "فیلم و سریال فارسی‌زبان"
         ExploreLane.KOREAN -> "کره‌ای" to "K-Drama، فیلم و سریال کره‌ای"
         ExploreLane.ANIME -> "انیمه" to "انیمه‌های محبوب و تازه"
@@ -370,15 +372,28 @@ private fun ExploreMoodGrid(
             Modifier.fillMaxWidth().padding(top=12.dp),
             horizontalArrangement=Arrangement.spacedBy(9.dp)
         ) {
+            ExploreMoodCard(
+                "هالیوود",
+                "فیلم‌های محبوب",
+                Icons.Default.LocalMovies,
+                { laneName=ExploreLane.HOLLYWOOD.name },
+                Modifier.weight(1f)
+            )
             ExploreMoodCard("ایرانی","فیلم و سریال فارسی",Icons.Default.Movie,onIranian,Modifier.weight(1f))
-            ExploreMoodCard("کره‌ای","K-Drama و بیشتر",Icons.Default.LiveTv,onKorean,Modifier.weight(1f))
         }
         Row(
             Modifier.fillMaxWidth().padding(top=9.dp),
             horizontalArrangement=Arrangement.spacedBy(9.dp)
         ) {
+            ExploreMoodCard("کره‌ای","K-Drama و بیشتر",Icons.Default.LiveTv,onKorean,Modifier.weight(1f))
             ExploreMoodCard("انیمه","ژاپن و آسیا",Icons.Default.Animation,onAnime,Modifier.weight(1f))
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top=9.dp),
+            horizontalArrangement=Arrangement.spacedBy(9.dp)
+        ) {
             ExploreMoodCard("هندی","بالیوود",Icons.Default.Theaters,onBollywood,Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
         }
     }
 }
