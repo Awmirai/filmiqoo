@@ -293,6 +293,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/watch-parties/{id}/direct-invites", s.watchPartyDirectInvites)
 			r.Post("/watch-parties/{id}/invite-user/{userID}", s.inviteUserToWatchParty)
 			r.Post("/watch-parties/{id}/invite-response", s.respondWatchPartyInvite)
+			r.Get("/realtime/watch-parties/{id}", s.watchPartyRealtime)
 			r.Post("/live-events", s.createLiveEvent)
 			r.Get("/me/live-events", s.myLiveEvents)
 			r.Get("/live-events/{id}/viewer", s.viewerLiveEventDetail)

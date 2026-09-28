@@ -31,6 +31,8 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.WebSocket
+import org.json.JSONObject
 import kotlin.math.abs
 
 @Composable
@@ -47,6 +49,7 @@ fun ConnectedWatchPartyScreen(
     val context=androidx.compose.ui.platform.LocalContext.current
     val scope=rememberCoroutineScope()
     val partyRepo=remember { WatchPartyRepository(backend) }
+    val realtime=remember(backend) { WatchPartyRealtimeClient(backend.session) }
     val listState=rememberLazyListState()
 
     var partyId by rememberSaveable(initialPartyId) { mutableStateOf(initialPartyId) }
@@ -71,6 +74,7 @@ fun ConnectedWatchPartyScreen(
     var privateJoinRequired by remember { mutableStateOf(false) }
     var joinRequestPending by remember { mutableStateOf(false) }
     var lobbyBusy by remember { mutableStateOf(false) }
+    var realtimeConnected by remember { mutableStateOf(false) }
 
     val player=remember {
         ExoPlayer.Builder(context).build().apply {
@@ -81,6 +85,80 @@ fun ConnectedWatchPartyScreen(
 
     DisposableEffect(Unit) {
         onDispose { player.release() }
+    }
+
+    DisposableEffect(partyId,lobby?.myRole,privateJoinRequired) {
+        val id=partyId
+        var socket:WebSocket?=null
+        if(
+            id!=null &&
+            backend.session.isLoggedIn &&
+            lobby!=null &&
+            !privateJoinRequired
+        ) {
+            socket=realtime.connect(
+                partyId=id,
+                onConnected={
+                    scope.launch { realtimeConnected=true }
+                },
+                onEvent={raw->
+                    scope.launch {
+                        val event=runCatching { JSONObject(raw) }.getOrNull() ?: return@launch
+                        when(event.optString("type")) {
+                            "watchparty.state" -> {
+                                val position=event.optLong("positionMs")
+                                val playing=event.optBoolean("isPlaying")
+                                val state=event.optString("state").ifBlank { "live" }
+                                party=party?.copy(
+                                    positionMs=position,
+                                    isPlaying=playing,
+                                    state=state
+                                )
+                                val hostControl=
+                                    party?.host?.id==meId || lobby?.myRole=="cohost"
+                                if(!hostControl) {
+                                    val drift=abs(player.currentPosition-position)
+                                    if(drift>1200) player.seekTo(position)
+                                    if(playing && !player.isPlaying) player.play()
+                                    if(!playing && player.isPlaying) player.pause()
+                                }
+                            }
+                            "watchparty.reaction" -> {
+                                reactions=runCatching {
+                                    partyRepo.reactions(id)
+                                }.getOrDefault(reactions)
+                            }
+                            "watchparty.queue.play" -> {
+                                runCatching { partyRepo.detail(id) }
+                                    .onSuccess { fresh->
+                                        party=fresh
+                                        val version=fresh.media.mediaVersionId
+                                        if(!version.isNullOrBlank() && loadedVersion!=version) {
+                                            runCatching { backend.playbackUrl(version) }
+                                                .onSuccess { url->
+                                                    loadedVersion=version
+                                                    player.setMediaItem(ExoMediaItem.fromUri(url))
+                                                    player.prepare()
+                                                    player.seekTo(fresh.positionMs)
+                                                    if(fresh.isPlaying) player.play() else player.pause()
+                                                }
+                                        }
+                                    }
+                            }
+                        }
+                    }
+                },
+                onDisconnected={
+                    scope.launch { realtimeConnected=false }
+                }
+            )
+        } else {
+            realtimeConnected=false
+        }
+        onDispose {
+            socket?.close(1000,"watch party screen closed")
+            realtimeConnected=false
+        }
     }
 
     BackHandler { onBack() }
@@ -163,7 +241,7 @@ fun ConnectedWatchPartyScreen(
                         }
                 }
             }
-            delay(2000)
+            delay(if(realtimeConnected)6000 else 2000)
         }
     }
 
@@ -184,7 +262,7 @@ fun ConnectedWatchPartyScreen(
     LaunchedEffect(partyId,party?.host?.id,meId,lobby?.myRole) {
         val id=partyId ?: return@LaunchedEffect
         while(isActive && partyId==id) {
-            delay(2000)
+            delay(1000)
             val p=party ?: continue
             if((p.host.id==meId || lobby?.myRole=="cohost") && p.state=="live" && player.duration>0) {
                 syncing=true
@@ -256,429 +334,142 @@ fun ConnectedWatchPartyScreen(
     val isHost=p.host.id==meId
     val canHostControl=isHost || lobby?.myRole=="cohost"
 
-    Column(Modifier.fillMaxSize().background(FqBg)) {
-        Box(
-            Modifier.fillMaxWidth().weight(.47f).background(Color.Black)
-        ) {
-            AndroidView(
-                factory={ctx->
-                    PlayerView(ctx).apply {
-                        this.player=player
-                        useController=false
-                        resizeMode=AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        keepScreenOn=true
-                    }
-                },
-                update={it.player=player},
-                modifier=Modifier.fillMaxSize()
-            )
-
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha=.55f),Color.Transparent,Color.Black.copy(alpha=.65f))
-                    )
-                )
-            )
-
-            Row(
-                Modifier.fillMaxWidth().padding(9.dp),
-                verticalAlignment=Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick=onBack,
-                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
-                ) { Icon(Icons.Default.Close,null) }
-                Spacer(Modifier.weight(1f))
-                if(canHostControl && p.visibility in setOf("invite","private")) {
-                    IconButton(
-                        onClick={showInviteDialog=true},
-                        modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
-                    ) {
-                        Icon(Icons.Default.Key,null)
-                    }
-                    Spacer(Modifier.width(6.dp))
-                }
-                IconButton(
-                    onClick={showQueue=true},
-                    enabled=lobby!=null,
-                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
-                ) {
-                    Icon(Icons.Default.PlaylistPlay,null)
-                }
-                Spacer(Modifier.width(6.dp))
-                IconButton(
-                    onClick={
-                        val code=when {
-                            p.visibility=="invite" -> inviteInfo?.inviteCode ?: initialInviteCode
-                            else -> null
-                        }
-                        FilmiqooDeepLinks.share(
-                            context,
-                            p.title,
-                            FilmiqooDeepLinks.watchParty(p.id,code)
-                        )
-                    },
-                    modifier=Modifier.clip(CircleShape).background(Color.Black.copy(alpha=.45f))
-                ) {
-                    Icon(Icons.Default.Share,null)
-                }
-                Spacer(Modifier.width(6.dp))
-                Surface(
-                    color=if(p.state=="live")FqDanger else FqSurface2,
-                    shape=RoundedCornerShape(9.dp)
-                ) {
-                    Text(
-                        if(p.state=="live")"● زنده" else partyStateLabel(p.state),
-                        fontSize=8.sp,
-                        modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp)
-                    )
-                }
-            }
-
-            Column(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp)
-            ) {
-                Text(p.title,fontSize=18.sp)
-                Text(
-                    p.media.title+" • "+p.participants+" نفر • "+(p.media.quality ?: "Auto"),
-                    color=Color.White.copy(alpha=.7f),
-                    fontSize=8.sp
-                )
-
-                Row(
-                    Modifier.fillMaxWidth().padding(top=10.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    if(canHostControl) {
-                        Button(
-                            onClick={
-                                if(p.state=="scheduled") {
-                                    player.play()
-                                    scope.launch {
-                                        runCatching {
-                                            partyRepo.updateState(
-                                                p.id,
-                                                player.currentPosition.coerceAtLeast(0),
-                                                true,
-                                                state="live"
-                                            )
-                                        }.onFailure { error=it.message }
-                                    }
-                                } else {
-                                    if(player.isPlaying) player.pause() else player.play()
-                                    scope.launch {
-                                        runCatching {
-                                            partyRepo.updateState(
-                                                p.id,
-                                                player.currentPosition.coerceAtLeast(0),
-                                                player.isPlaying
-                                            )
-                                        }.onFailure { error=it.message }
-                                    }
-                                }
-                            },
-                            enabled=!(
-                                p.state=="scheduled" &&
-                                lobby?.readyCheckEnabled==true &&
-                                (lobby?.readyCount ?: 0L) < (lobby?.participantCount ?: 0L)
-                            ),
-                            colors=ButtonDefaults.buttonColors(containerColor=FqGold)
-                        ) {
-                            Icon(
-                                if(p.state=="scheduled")Icons.Default.RocketLaunch
-                                else if(player.isPlaying)Icons.Default.Pause
-                                else Icons.Default.PlayArrow,
-                                null
-                            )
-                            Spacer(Modifier.width(5.dp))
-                            Text(
-                                if(p.state=="scheduled")"شروع الان"
-                                else if(player.isPlaying)"توقف برای همه"
-                                else "پخش برای همه"
-                            )
-                        }
-                    } else {
-                        Surface(color=Color.Black.copy(alpha=.55f),shape=RoundedCornerShape(11.dp)) {
-                            Text(
-                                if(p.state=="scheduled")
-                                    "تماشای گروهی زمان‌بندی شده • منتظر شروع میزبان"
-                                else
-                                    "کنترل پخش با میزبان • همگام‌سازی فعاله",
-                                fontSize=8.sp,
-                                modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if(syncing) CircularProgressIndicator(color=FqGold,strokeWidth=2.dp,modifier=Modifier.size(18.dp))
-                }
-            }
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=9.dp),
-            verticalAlignment=Alignment.CenterVertically
-        ) {
-            RemoteImage(p.host.avatarUrl.takeIf(String::isNotBlank),Modifier.size(38.dp).clip(CircleShape))
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text(p.host.displayName,fontSize=10.sp)
-                Text("میزبان • @"+p.host.username,color=FqMuted,fontSize=7.sp)
-            }
-            TextButton(
-                onClick={showLobby=true},
-                enabled=lobby!=null
-            ) {
-                Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(15.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    (lobby?.participantCount ?: p.participants).toString()+" نفر",
-                    fontSize=8.sp
-                )
-            }
-        }
-
-        if(privateJoinRequired) {
-            Surface(
-                color=FqDanger.copy(alpha=.08f),
-                shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=8.dp)
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(11.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Lock,null,tint=FqGold)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("تماشای گروهی خصوصی",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
-                        Text(
-                            if(joinRequestPending)"درخواست ورود ارسال شده؛ منتظر تأیید میزبان."
-                            else "برای ورود باید میزبان درخواستت رو تأیید کنه.",
-                            color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=2.dp)
-                        )
-                    }
-                    Button(
-                        enabled=!joinRequestPending && !lobbyBusy,
-                        onClick={
-                            if(!backend.session.isLoggedIn) {
-                                onRequireAuth()
-                            } else {
-                                lobbyBusy=true
-                                scope.launch {
-                                    runCatching { partyRepo.requestJoin(p.id) }
-                                        .onSuccess { joinRequestPending=it=="pending" }
-                                        .onFailure { error=it.message }
-                                    lobbyBusy=false
-                                }
-                            }
-                        },
-                        colors=ButtonDefaults.buttonColors(containerColor=FqGold)
-                    ) {
-                        Text(if(joinRequestPending)"ارسال شد" else "درخواست ورود",color=Color.Black,fontSize=7.sp)
-                    }
-                }
-            }
-        }
-
-        if(p.state=="scheduled") {
-            Surface(
-                color=FqGold.copy(alpha=.08f),
-                shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=8.dp)
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(10.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Event,null,tint=FqGold)
-                    Spacer(Modifier.width(7.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("زمان‌بندی شده",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
-                        Text(
-                            p.scheduledAt?.let(::formatPartySchedule) ?: "زمان شروع ثبت شده",
-                            color=FqMuted,
-                            fontSize=7.sp,
-                            modifier=Modifier.padding(top=2.dp)
-                        )
-                    }
-                    OutlinedButton(
-                        enabled=!reminderBusy,
-                        onClick={
-                            if(!backend.session.isLoggedIn) {
-                                onRequireAuth()
-                            } else {
-                                reminderBusy=true
-                                scope.launch {
-                                    runCatching { partyRepo.toggleReminder(p.id) }
-                                        .onSuccess { reminderEnabled=it }
-                                        .onFailure { error=it.message }
-                                    reminderBusy=false
-                                }
-                            }
-                        },
-                        contentPadding=PaddingValues(horizontal=9.dp,vertical=4.dp)
-                    ) {
-                        Icon(
-                            if(reminderEnabled)Icons.Default.NotificationsActive
-                            else Icons.Default.NotificationsNone,
-                            null,
-                            tint=if(reminderEnabled)FqGold else FqMuted,
-                            modifier=Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(if(reminderEnabled)"یادآوری فعاله" else "یادم بنداز",fontSize=7.sp)
-                    }
-                }
-            }
-        }
-
-        if(p.state=="scheduled" && lobby?.readyCheckEnabled==true && lobby!=null) {
-            val currentLobby=lobby!!
-            Surface(
-                color=FqSurface,
-                shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=8.dp)
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(10.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.HowToReg,null,tint=FqGold)
-                    Spacer(Modifier.width(7.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("آماده‌بودن اعضا",fontSize=9.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
-                        Text(
-                            currentLobby.readyCount.toString()+" از "+currentLobby.participantCount+" نفر آماده‌اند",
-                            color=FqMuted,fontSize=7.sp,modifier=Modifier.padding(top=2.dp)
-                        )
-                    }
-                    OutlinedButton(
-                        enabled=!lobbyBusy,
-                        onClick={
-                            lobbyBusy=true
-                            scope.launch {
-                                runCatching { partyRepo.toggleReady(p.id) }
-                                    .onSuccess { ready->
-                                        lobby=lobby?.copy(
-                                            myReady=ready,
-                                            readyCount=(
-                                                (lobby?.readyCount ?: 0L) +
-                                                if(ready)1 else -1
-                                            ).coerceAtLeast(0L)
-                                        )
-                                    }
-                                    .onFailure { error=it.message }
-                                lobbyBusy=false
-                            }
-                        }
-                    ) {
-                        Icon(
-                            if(currentLobby.myReady)Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                            null,
-                            tint=if(currentLobby.myReady)FqGreen else FqMuted,
-                            modifier=Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(if(currentLobby.myReady)"آماده‌ام" else "اعلام آمادگی",fontSize=7.sp)
-                    }
-                }
-            }
-        }
-
-        WatchPartyReactionBar(
-            reactions=reactions,
-            enabled=lobby!=null && !privateJoinRequired,
-            onReact={emoji->
+    PremiumWatchPartyStage(
+        party=p,
+        player=player,
+        lobby=lobby,
+        myUserId=meId,
+        canHostControl=canHostControl,
+        realtimeConnected=realtimeConnected,
+        syncing=syncing,
+        privateJoinRequired=privateJoinRequired,
+        joinRequestPending=joinRequestPending,
+        lobbyBusy=lobbyBusy,
+        reminderEnabled=reminderEnabled,
+        reminderBusy=reminderBusy,
+        reactions=reactions,
+        messages=messages,
+        messageText=text,
+        sendingMessage=sendingMessage,
+        error=error,
+        listState=listState,
+        onBack=onBack,
+        onPrimaryControl={
+            if(p.state=="scheduled") {
+                player.play()
                 scope.launch {
-                    runCatching { partyRepo.react(p.id,emoji) }
+                    runCatching {
+                        partyRepo.updateState(
+                            p.id,
+                            player.currentPosition.coerceAtLeast(0),
+                            true,
+                            state="live"
+                        )
+                    }.onFailure { error=it.message }
+                }
+            } else {
+                if(player.isPlaying) player.pause() else player.play()
+                scope.launch {
+                    runCatching {
+                        partyRepo.updateState(
+                            p.id,
+                            player.currentPosition.coerceAtLeast(0),
+                            player.isPlaying
+                        )
+                    }.onFailure { error=it.message }
+                }
+            }
+        },
+        onInvite={showInviteDialog=true},
+        onQueue={showQueue=true},
+        onShare={
+            val code=when {
+                p.visibility=="invite" -> inviteInfo?.inviteCode ?: initialInviteCode
+                else -> null
+            }
+            FilmiqooDeepLinks.share(
+                context,
+                p.title,
+                FilmiqooDeepLinks.watchParty(p.id,code)
+            )
+        },
+        onLobby={showLobby=true},
+        onRequestJoin={
+            if(!backend.session.isLoggedIn) {
+                onRequireAuth()
+            } else {
+                lobbyBusy=true
+                scope.launch {
+                    runCatching { partyRepo.requestJoin(p.id) }
+                        .onSuccess { joinRequestPending=it=="pending" }
                         .onFailure { error=it.message }
+                    lobbyBusy=false
                 }
             }
-        )
-
-        HorizontalDivider(color=FqSurface3)
-
-        LazyColumn(
-            state=listState,
-            modifier=Modifier.weight(.53f),
-            contentPadding=PaddingValues(12.dp),
-            verticalArrangement=Arrangement.spacedBy(7.dp)
-        ) {
-            items(messages,key={it.id}) { msg ->
-                Row(verticalAlignment=Alignment.Top) {
-                    RemoteImage(
-                        msg.author.avatarUrl.takeIf(String::isNotBlank),
-                        Modifier.size(30.dp).clip(CircleShape)
-                    )
-                    Spacer(Modifier.width(7.dp))
-                    Column {
-                        Text(msg.author.displayName,color=FqGold,fontSize=8.sp)
-                        Text(msg.body,fontSize=9.sp,modifier=Modifier.padding(top=2.dp))
-                    }
+        },
+        onToggleReminder={
+            if(!backend.session.isLoggedIn) {
+                onRequireAuth()
+            } else {
+                reminderBusy=true
+                scope.launch {
+                    runCatching { partyRepo.toggleReminder(p.id) }
+                        .onSuccess { reminderEnabled=it }
+                        .onFailure { error=it.message }
+                    reminderBusy=false
                 }
             }
-        }
-
-        Row(
-            Modifier.fillMaxWidth().background(FqSurface).padding(8.dp),
-            verticalAlignment=Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value=text,
-                onValueChange={text=it.take(4000)},
-                placeholder={Text("پیام برای گروه...")},
-                singleLine=true,
-                shape=RoundedCornerShape(20.dp),
-                modifier=Modifier.weight(1f)
-            )
-            IconButton(
-                enabled=!sendingMessage,
-                onClick={
-                    if(!backend.session.isLoggedIn) {
-                        onRequireAuth()
-                    } else if(
-                        text.isNotBlank() &&
-                        p.roomId.isNotBlank() &&
-                        lobby!=null &&
-                        !privateJoinRequired
-                    ) {
-                        val sending=text.trim()
-                        text=""
-                        sendingMessage=true
-                        scope.launch {
-                            runCatching { social.sendMessage(p.roomId,sending,false) }
-                                .onFailure {
-                                    error=it.message
-                                    if(text.isBlank()) text=sending
-                                }
-                            sendingMessage=false
+        },
+        onToggleReady={
+            lobbyBusy=true
+            scope.launch {
+                runCatching { partyRepo.toggleReady(p.id) }
+                    .onSuccess { ready->
+                        val before=lobby?.myReady ?: false
+                        val delta=when {
+                            ready && !before -> 1
+                            !ready && before -> -1
+                            else -> 0
                         }
+                        lobby=lobby?.copy(
+                            myReady=ready,
+                            readyCount=((lobby?.readyCount ?: 0L)+delta).coerceAtLeast(0L)
+                        )
                     }
-                }
+                    .onFailure { error=it.message }
+                lobbyBusy=false
+            }
+        },
+        onReact={emoji->
+            scope.launch {
+                runCatching { partyRepo.react(p.id,emoji) }
+                    .onFailure { error=it.message }
+            }
+        },
+        onMessageTextChange={text=it.take(4000)},
+        onSendMessage={
+            if(!backend.session.isLoggedIn) {
+                onRequireAuth()
+            } else if(
+                text.isNotBlank() &&
+                p.roomId.isNotBlank() &&
+                lobby!=null &&
+                !privateJoinRequired
             ) {
-                if(sendingMessage) {
-                    CircularProgressIndicator(
-                        color=FqGold,
-                        strokeWidth=2.dp,
-                        modifier=Modifier.size(18.dp)
-                    )
-                } else {
-                    Icon(Icons.Default.Send,null,tint=if(text.isBlank())FqMuted else FqGold)
+                val sending=text.trim()
+                text=""
+                sendingMessage=true
+                scope.launch {
+                    runCatching { social.sendMessage(p.roomId,sending,false) }
+                        .onFailure {
+                            error=it.message
+                            if(text.isBlank()) text=sending
+                        }
+                    sendingMessage=false
                 }
             }
         }
-
-        error?.let {
-            Text(
-                it,
-                color=FqDanger,
-                fontSize=8.sp,
-                modifier=Modifier.fillMaxWidth().background(FqDanger.copy(alpha=.08f)).padding(6.dp)
-            )
-        }
-    }
+    )
     if(showLobby && lobby!=null) {
         WatchPartyLobbySheet(
             lobby=lobby!!,
@@ -837,6 +628,7 @@ private fun WatchPartyStartScreen(
         "tomorrow" -> java.time.Instant.now().plusSeconds(24*60*60L).toString()
         else -> null
     }
+
     Box(Modifier.fillMaxSize().background(FqBg)) {
         RemoteImage(
             repository.backdrop(media?.backdropPath ?: media?.posterPath),
@@ -846,123 +638,223 @@ private fun WatchPartyStartScreen(
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    listOf(Color.Black.copy(alpha=.5f),Color.Black.copy(alpha=.72f),FqBg)
+                    listOf(
+                        Color.Black.copy(alpha=.28f),
+                        Color.Black.copy(alpha=.68f),
+                        FqBg.copy(alpha=.94f),
+                        FqBg
+                    )
                 )
             )
         )
+
         IconButton(
             onClick=onBack,
-            modifier=Modifier.align(Alignment.TopStart).padding(10.dp)
-        ) { Icon(Icons.Default.Close,null) }
+            modifier=Modifier
+                .align(Alignment.TopStart)
+                .padding(14.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha=.42f))
+        ) {
+            Icon(Icons.Default.Close,null)
+        }
 
         Column(
-            Modifier.align(Alignment.Center).fillMaxWidth().padding(26.dp),
-            horizontalAlignment=Alignment.CenterHorizontally
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal=18.dp,vertical=24.dp)
         ) {
-            Box(
-                Modifier.size(82.dp).clip(CircleShape).background(FqGold),
-                contentAlignment=Alignment.Center
+            Surface(
+                color=FqGold.copy(alpha=.16f),
+                shape=RoundedCornerShape(99.dp)
             ) {
-                Icon(Icons.Default.Groups,null,tint=Color.Black,modifier=Modifier.size(45.dp))
+                Row(
+                    Modifier.padding(horizontal=10.dp,vertical=6.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(16.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("FILMIQOO TOGETHER",color=FqGold,fontSize=9.sp,fontWeight=FontWeight.Black)
+                }
             }
-            Text("Watch Party",fontSize=30.sp,modifier=Modifier.padding(top=15.dp))
+
             Text(
-                media?.title ?: "یک عنوان انتخاب کن",
-                color=FqGold,
+                "با هم ببینید، دقیقاً همزمان",
+                fontSize=31.sp,
+                lineHeight=35.sp,
+                fontWeight=FontWeight.Black,
+                modifier=Modifier.padding(top=14.dp)
+            )
+            Text(
+                media?.title ?: "یک فیلم یا سریال انتخاب کن",
+                color=Color.White.copy(alpha=.78f),
                 fontSize=13.sp,
-                modifier=Modifier.padding(top=5.dp)
-            )
-            Text(
-                "تماشای همزمان، کنترل میزبان، Sync موقعیت پخش، دعوت خصوصی و Reminder.",
-                color=Color.White.copy(alpha=.72f),
-                fontSize=9.sp,
-                lineHeight=16.sp,
-                modifier=Modifier.padding(top=9.dp)
+                modifier=Modifier.padding(top=6.dp)
             )
 
-            Text(
-                "دسترسی",
-                fontSize=10.sp,
-                fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
-                modifier=Modifier.align(Alignment.Start).padding(top=18.dp)
-            )
             Row(
-                Modifier.fillMaxWidth().padding(top=7.dp),
-                horizontalArrangement=Arrangement.spacedBy(6.dp)
+                Modifier.fillMaxWidth().padding(top=14.dp),
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
             ) {
                 listOf(
-                    "public" to "Public",
-                    "invite" to "Invite",
-                    "private" to "Private"
-                ).forEach { option ->
-                    FilterChip(
-                        selected=visibility==option.first,
-                        onClick={visibility=option.first},
-                        label={Text(option.second,fontSize=7.sp)}
-                    )
+                    Icons.Default.Sync to "Live Sync",
+                    Icons.Default.Chat to "چت زنده",
+                    Icons.Default.EmojiEmotions to "واکنش"
+                ).forEach { feature->
+                    Surface(
+                        color=Color.White.copy(alpha=.075f),
+                        shape=RoundedCornerShape(13.dp),
+                        modifier=Modifier.weight(1f)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=8.dp,vertical=9.dp),
+                            verticalAlignment=Alignment.CenterVertically,
+                            horizontalArrangement=Arrangement.Center
+                        ) {
+                            Icon(feature.first,null,tint=FqGold,modifier=Modifier.size(15.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(feature.second,fontSize=8.sp,fontWeight=FontWeight.Bold)
+                        }
+                    }
                 }
             }
 
-            Text(
-                "زمان شروع",
-                fontSize=10.sp,
-                fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
-                modifier=Modifier.align(Alignment.Start).padding(top=10.dp)
-            )
-            Row(
-                Modifier.fillMaxWidth().padding(top=7.dp),
-                horizontalArrangement=Arrangement.spacedBy(5.dp)
+            Surface(
+                color=FqSurface.copy(alpha=.94f),
+                shape=RoundedCornerShape(24.dp),
+                modifier=Modifier.fillMaxWidth().padding(top=16.dp)
             ) {
-                listOf(
-                    "now" to "الان",
-                    "30m" to "۳۰ دقیقه",
-                    "1h" to "۱ ساعت",
-                    "tomorrow" to "فردا"
-                ).forEach { option ->
-                    FilterChip(
-                        selected=schedule==option.first,
-                        onClick={schedule=option.first},
-                        label={Text(option.second,fontSize=7.sp)}
+                Column(Modifier.padding(14.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("چه کسانی وارد شوند؟",fontSize=12.sp,fontWeight=FontWeight.Black)
+                            Text(
+                                when(visibility) {
+                                    "public" -> "همه می‌توانند Party را پیدا کنند و وارد شوند."
+                                    "invite" -> "ورود فقط با لینک و کد دعوت."
+                                    else -> "فقط با تأیید میزبان وارد می‌شوند."
+                                },
+                                color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(top=3.dp)
+                            )
+                        }
+                        Icon(
+                            when(visibility) {
+                                "public" -> Icons.Default.Public
+                                "invite" -> Icons.Default.VpnKey
+                                else -> Icons.Default.Lock
+                            },
+                            null,
+                            tint=FqGold
+                        )
+                    }
+
+                    Row(
+                        Modifier.fillMaxWidth().padding(top=11.dp),
+                        horizontalArrangement=Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            "public" to "عمومی",
+                            "invite" to "با دعوت",
+                            "private" to "خصوصی"
+                        ).forEach { option->
+                            FilterChip(
+                                selected=visibility==option.first,
+                                onClick={visibility=option.first},
+                                label={Text(option.second,fontSize=9.sp)},
+                                modifier=Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color=FqSurface3,
+                        modifier=Modifier.padding(vertical=13.dp)
                     )
+
+                    Text("زمان شروع",fontSize=12.sp,fontWeight=FontWeight.Black)
+                    Row(
+                        Modifier.fillMaxWidth().padding(top=8.dp),
+                        horizontalArrangement=Arrangement.spacedBy(5.dp)
+                    ) {
+                        listOf(
+                            "now" to "الان",
+                            "30m" to "۳۰ دقیقه",
+                            "1h" to "۱ ساعت",
+                            "tomorrow" to "فردا"
+                        ).forEach { option->
+                            FilterChip(
+                                selected=schedule==option.first,
+                                onClick={schedule=option.first},
+                                label={Text(option.second,fontSize=8.sp)}
+                            )
+                        }
+                    }
+
+                    if(scheduledAt!=null) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top=8.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Event,null,tint=FqGold,modifier=Modifier.size(16.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                "شروع "+formatPartySchedule(scheduledAt),
+                                color=FqGold,
+                                fontSize=9.sp,
+                                fontWeight=FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick={onStart(visibility,scheduledAt)},
+                        enabled=!creating && media!=null,
+                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
+                        shape=RoundedCornerShape(16.dp),
+                        contentPadding=PaddingValues(vertical=13.dp),
+                        modifier=Modifier.fillMaxWidth().padding(top=15.dp)
+                    ) {
+                        if(creating) {
+                            CircularProgressIndicator(
+                                color=Color.Black,
+                                strokeWidth=2.dp,
+                                modifier=Modifier.size(19.dp)
+                            )
+                        } else {
+                            Icon(
+                                if(scheduledAt==null)Icons.Default.PlayArrow else Icons.Default.Event,
+                                null,
+                                tint=Color.Black
+                            )
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            when {
+                                !loggedIn -> "ورود و ساخت Watch Party"
+                                scheduledAt==null -> "شروع Watch Party"
+                                else -> "زمان‌بندی Watch Party"
+                            },
+                            color=Color.Black,
+                            fontSize=12.sp,
+                            fontWeight=FontWeight.Black
+                        )
+                    }
                 }
             }
 
-            if(scheduledAt!=null) {
-                Text(
-                    "شروع: "+formatPartySchedule(scheduledAt),
-                    color=FqGold,
-                    fontSize=8.sp,
-                    modifier=Modifier.padding(top=6.dp)
-                )
-            }
-
-            Button(
-                onClick={onStart(visibility,scheduledAt)},
-                enabled=!creating,
-                colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                shape=RoundedCornerShape(15.dp),
-                modifier=Modifier.fillMaxWidth().padding(top=18.dp)
-            ) {
-                if(creating) {
-                    CircularProgressIndicator(color=Color.Black,strokeWidth=2.dp,modifier=Modifier.size(18.dp))
-                } else {
-                    Icon(Icons.Default.LiveTv,null,tint=Color.Black)
-                }
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    if(!loggedIn)"ورود و شروع"
-                    else if(scheduledAt==null)"شروع Watch Party"
-                    else "زمان‌بندی Watch Party",
-                    color=Color.Black
-                )
-            }
             error?.let {
-                Text(it,color=FqDanger,fontSize=8.sp,modifier=Modifier.padding(top=10.dp))
+                Surface(
+                    color=FqDanger.copy(alpha=.12f),
+                    shape=RoundedCornerShape(13.dp),
+                    modifier=Modifier.fillMaxWidth().padding(top=9.dp)
+                ) {
+                    Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(10.dp))
+                }
             }
         }
     }
 }
-
 
 @Composable
 private fun WatchPartyInviteDialog(
