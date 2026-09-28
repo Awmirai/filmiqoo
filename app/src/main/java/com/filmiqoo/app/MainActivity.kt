@@ -1162,12 +1162,12 @@ private fun FilmiqooBottomBar(
                 entries.forEach { item ->
                     val active=selected==item.third
                     val pillColor by animateColorAsState(
-                        if(active) Color.White.copy(alpha=.10f)
+                        if(active) FqGold.copy(alpha=.14f)
                         else Color.Transparent,
                         label="bottomBarPill"
                     )
                     val iconColor by animateColorAsState(
-                        if(active) Color.White else FqMuted,
+                        if(active) FqGoldSoft else FqMuted,
                         label="bottomBarIcon"
                     )
                     val indicatorWidth by animateDpAsState(
