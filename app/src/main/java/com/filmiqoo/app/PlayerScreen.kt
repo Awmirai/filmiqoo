@@ -1825,7 +1825,7 @@ private fun PlayerTopControls(
     Row(
         Modifier.fillMaxWidth()
             .statusBarsPadding()
-            .padding(start=12.dp,end=12.dp,top=8.dp),
+            .padding(horizontal=12.dp,vertical=8.dp),
         verticalAlignment=Alignment.CenterVertically
     ) {
         PlayerGlassIcon(
@@ -1838,59 +1838,61 @@ private fun PlayerTopControls(
             Text(
                 target.title,
                 color=Color.White,
-                style=MaterialTheme.typography.titleSmall,
-                fontWeight=FontWeight.Bold,
+                fontSize=13.sp,
+                fontWeight=FontWeight.Black,
                 maxLines=1,
                 overflow=TextOverflow.Ellipsis
             )
-            Text(
-                listOf(
-                    target.subtitle,
-                    currentVariant?.label.orEmpty()
-                ).filter(String::isNotBlank)
-                    .distinct()
-                    .joinToString(" • "),
-                color=Color.White.copy(alpha=.68f),
-                style=MaterialTheme.typography.labelSmall,
-                maxLines=1,
-                overflow=TextOverflow.Ellipsis
-            )
+            val meta=listOf(
+                target.subtitle,
+                currentVariant?.label.orEmpty()
+            ).filter(String::isNotBlank).distinct().joinToString(" • ")
+            if(meta.isNotBlank()) {
+                Text(
+                    meta,
+                    color=Color.White.copy(alpha=.62f),
+                    fontSize=9.sp,
+                    maxLines=1,
+                    overflow=TextOverflow.Ellipsis
+                )
+            }
         }
 
         PlayerCastRouteButton()
-        Spacer(Modifier.width(6.dp))
-
-        PlayerGlassIcon(
-            icon=if(downloadQueued)
-                Icons.Default.DownloadDone
-            else
-                Icons.Default.Download,
-            onClick=onDownload,
-            contentDescription="دانلود"
-        )
-        Spacer(Modifier.width(6.dp))
-
-        PlayerGlassIcon(
-            icon=Icons.Default.Settings,
-            onClick=onSettings,
-            contentDescription="تنظیمات پخش"
-        )
         Spacer(Modifier.width(6.dp))
 
         Box {
             PlayerGlassIcon(
                 icon=Icons.Default.MoreVert,
                 onClick={moreOpen=true},
-                contentDescription="گزینه‌های بیشتر"
+                contentDescription="ابزارهای پخش"
             )
             DropdownMenu(
                 expanded=moreOpen,
                 onDismissRequest={moreOpen=false},
-                containerColor=FqSurface
+                containerColor=Color(0xF5181818),
+                shape=RoundedCornerShape(18.dp)
             ) {
                 DropdownMenuItem(
-                    text={Text("لحظه‌ها و گفتگو")},
-                    leadingIcon={Icon(Icons.Default.Forum,null)},
+                    text={Text("تنظیمات پخش")},
+                    leadingIcon={Icon(Icons.Default.Tune,null,tint=FqGold)},
+                    onClick={moreOpen=false;onSettings()}
+                )
+                DropdownMenuItem(
+                    text={Text(if(downloadQueued)"دانلود در صف" else "دانلود آفلاین")},
+                    leadingIcon={
+                        Icon(
+                            if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
+                            null,
+                            tint=if(downloadQueued)FqGreen else FqGold
+                        )
+                    },
+                    onClick={moreOpen=false;onDownload()}
+                )
+                HorizontalDivider(color=Color.White.copy(alpha=.07f))
+                DropdownMenuItem(
+                    text={Text("لحظه‌ها و واکنش‌ها")},
+                    leadingIcon={Icon(Icons.Default.Whatshot,null)},
                     onClick={moreOpen=false;onMoments()}
                 )
                 DropdownMenuItem(
@@ -1899,20 +1901,18 @@ private fun PlayerTopControls(
                     onClick={moreOpen=false;onBookmarks()}
                 )
                 DropdownMenuItem(
-                    text={Text("جستجوی دیالوگ")},
+                    text={Text("پیدا کردن دیالوگ")},
                     leadingIcon={Icon(Icons.Default.ManageSearch,null)},
                     onClick={moreOpen=false;onDialogueSearch()}
                 )
-                if(
-                    target.previousMediaVersionId!=null ||
-                    target.upNext.isNotEmpty()
-                ) {
+                if(target.previousMediaVersionId!=null || target.upNext.isNotEmpty()) {
                     DropdownMenuItem(
-                        text={Text("صف قسمت‌ها")},
+                        text={Text("قسمت‌ها")},
                         leadingIcon={Icon(Icons.Default.QueuePlayNext,null)},
                         onClick={moreOpen=false;onQueue()}
                     )
                 }
+                HorizontalDivider(color=Color.White.copy(alpha=.07f))
                 DropdownMenuItem(
                     text={Text("ادامه روی دستگاه دیگر")},
                     leadingIcon={Icon(Icons.Default.DevicesOther,null)},
