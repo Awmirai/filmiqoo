@@ -27,9 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-private enum class LibraryTab { FAVORITES, WATCHLIST, COLLECTIONS, SCENES }
+private enum class LibraryTab { WATCHLIST, FAVORITES, COLLECTIONS, SCENES }
 
 @Composable
 fun LibraryScreen(
@@ -53,7 +55,7 @@ fun LibraryScreen(
             Box(
                 Modifier.fillMaxWidth().height(190.dp).background(
                     Brush.verticalGradient(
-                        listOf(Color(0xFF182033),Color(0xFF251C09),FqBg)
+                        listOf(Color(0xFF24070A),Color(0xFF10090A),FqBg)
                     )
                 )
             ) {
@@ -90,9 +92,9 @@ fun LibraryScreen(
         return
     }
 
-    var tabName by rememberSaveable { mutableStateOf(LibraryTab.FAVORITES.name) }
+    var tabName by rememberSaveable { mutableStateOf(LibraryTab.WATCHLIST.name) }
     val tab=runCatching { LibraryTab.valueOf(tabName) }
-        .getOrDefault(LibraryTab.FAVORITES)
+        .getOrDefault(LibraryTab.WATCHLIST)
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -112,21 +114,28 @@ fun LibraryScreen(
         loading=true
         error=null
 
-        runCatching { lib.favorites() }
-            .onSuccess { favorites=it }
-            .onFailure { error=it.message ?: "خطا در دریافت Favoriteها" }
+        coroutineScope {
+            val favoritesRequest=async { runCatching { lib.favorites() } }
+            val watchlistRequest=async { runCatching { lib.watchlist() } }
+            val collectionsRequest=async { runCatching { lib.collections() } }
+            val scenesRequest=async { runCatching { sceneRepo.all() } }
 
-        runCatching { lib.watchlist() }
-            .onSuccess { watchlist=it }
-            .onFailure { error=error ?: it.message ?: "خطا در دریافت Watchlist" }
+            favoritesRequest.await()
+                .onSuccess { favorites=it }
+                .onFailure { error=it.message ?: "خطا در دریافت علاقه‌مندی‌ها" }
 
-        runCatching { lib.collections() }
-            .onSuccess { collections=it }
-            .onFailure { error=error ?: it.message ?: "خطا در دریافت Collectionها" }
+            watchlistRequest.await()
+                .onSuccess { watchlist=it }
+                .onFailure { error=error ?: it.message ?: "خطا در دریافت «بعداً می‌بینم»" }
 
-        runCatching { sceneRepo.all() }
-            .onSuccess { sceneBookmarks=it }
-            .onFailure { error=error ?: it.message ?: "خطا در دریافت Scene Bookmarkها" }
+            collectionsRequest.await()
+                .onSuccess { collections=it }
+                .onFailure { error=error ?: it.message ?: "خطا در دریافت لیست‌ها" }
+
+            scenesRequest.await()
+                .onSuccess { sceneBookmarks=it }
+                .onFailure { error=error ?: it.message ?: "خطا در دریافت لحظه‌ها" }
+        }
 
         loading=false
     }
@@ -230,8 +239,8 @@ fun LibraryScreen(
             contentColor=FqGold
         ) {
             listOf(
-                LibraryTab.FAVORITES to "علاقه‌مندی‌ها",
-                LibraryTab.WATCHLIST to "بعداً می‌بینم",
+                LibraryTab.WATCHLIST to "بعداً",
+                LibraryTab.FAVORITES to "علاقه‌مندی",
                 LibraryTab.COLLECTIONS to "لیست‌ها",
                 LibraryTab.SCENES to "لحظه‌ها"
             ).forEach { item ->
