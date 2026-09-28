@@ -369,7 +369,7 @@ fun ConnectedWatchPartyScreen(
                 } else if(backendId.isNullOrBlank()) {
                     error="این عنوان در Catalog پخش Filmiqoo موجود نیست."
                 } else if(!startPlayable) {
-                    error=if(resolved.type==MediaType.TV)
+                    error=if(resolved?.type==MediaType.TV)
                         "برای این سریال هنوز قسمت قابل پخش آماده نیست."
                     else
                         "نسخه قابل پخش این فیلم هنوز آماده نشده."
@@ -379,7 +379,7 @@ fun ConnectedWatchPartyScreen(
                         runCatching {
                             partyRepo.create(
                                 mediaTitleId=backendId,
-                                title="Watch Party • "+resolved.title,
+                                title="Watch Party • "+(resolved?.title ?: media?.title.orEmpty()),
                                 visibility=visibility,
                                 scheduledAt=scheduledAt,
                                 episodeId=episodeId
