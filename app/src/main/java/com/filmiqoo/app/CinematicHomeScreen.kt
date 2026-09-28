@@ -303,7 +303,8 @@ private fun CinematicHero(
             Column(
                 Modifier.align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal=18.dp,bottom=34.dp)
+                    .padding(horizontal=18.dp)
+                    .padding(bottom=34.dp)
             ) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Surface(
