@@ -900,78 +900,153 @@ private fun PremiumDetailActions(
     onWatchParty: () -> Unit,
     onChat: () -> Unit
 ) {
-    LazyRow(
-        contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp),
-        horizontalArrangement=Arrangement.spacedBy(9.dp)
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal=16.dp)
+            .padding(top=8.dp,bottom=4.dp)
     ) {
-        item {
-            ActionTile(
-                icon=if(favorite)Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                label=if(favorite)"علاقه‌مندی ✓" else "علاقه‌مندی",
-                active=favorite,
-                loading=favoriteBusy,
-                onClick=onFavorite
-            )
-        }
-        item {
-            ActionTile(
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement=Arrangement.spacedBy(9.dp)
+        ) {
+            DetailPrimaryAction(
                 icon=if(watchlist)Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                label=if(watchlist)"برای بعد ✓" else "بعداً می‌بینم",
+                label=if(watchlist)"برای بعد ذخیره شد" else "بعداً می‌بینم",
                 active=watchlist,
                 loading=watchlistBusy,
-                onClick=onWatchlist
+                onClick=onWatchlist,
+                modifier=Modifier.weight(1f)
             )
-        }
-        if(showSeriesFollow) {
-            item {
-                ActionTile(
-                    icon=if(seriesFollowing)Icons.Default.NotificationsActive else Icons.Default.AddAlert,
-                    label=if(seriesFollowing)"دنبال می‌کنی" else "اعلان سریال",
-                    active=seriesFollowing,
-                    loading=seriesFollowBusy,
-                    onClick=onSeriesFollow
-                )
-            }
-        }
-        if(showAvailabilityAlerts) {
-            item {
-                ActionTile(
-                    icon=Icons.Default.AddAlert,
-                    label="دوبله / 4K",
-                    onClick=onAvailabilityAlerts
-                )
-            }
-        }
-        item {
-            ActionTile(
-                icon=Icons.Default.CollectionsBookmark,
-                label="افزودن به لیست",
-                onClick=onCollections
-            )
-        }
-        item {
-            ActionTile(
-                icon=Icons.Default.Download,
-                label="دانلود",
-                active=false,
+            DetailPrimaryAction(
+                icon=if(canDownload)Icons.Default.Download else Icons.Default.CloudOff,
+                label=if(canDownload)"دانلود" else "دانلود ندارد",
                 loading=downloadBusy,
                 enabled=canDownload,
-                onClick=onDownload
+                onClick=onDownload,
+                modifier=Modifier.weight(1f)
+            )
+            DetailPrimaryAction(
+                icon=if(favorite)Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                label=if(favorite)"پسندیده" else "علاقه‌مندی",
+                active=favorite,
+                loading=favoriteBusy,
+                onClick=onFavorite,
+                modifier=Modifier.weight(1f)
             )
         }
-        item {
-            ActionTile(
-                icon=Icons.Default.Groups,
-                label="تماشای گروهی",
-                onClick=onWatchParty
+
+        LazyRow(
+            contentPadding=PaddingValues(top=10.dp),
+            horizontalArrangement=Arrangement.spacedBy(8.dp)
+        ) {
+            if(showSeriesFollow) {
+                item {
+                    DetailSecondaryAction(
+                        icon=if(seriesFollowing)Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                        label=if(seriesFollowing)"اعلان قسمت‌ها فعاله" else "اعلان قسمت‌های جدید",
+                        active=seriesFollowing,
+                        loading=seriesFollowBusy,
+                        onClick=onSeriesFollow
+                    )
+                }
+            }
+            if(showAvailabilityAlerts) {
+                item {
+                    DetailSecondaryAction(
+                        icon=Icons.Default.HighQuality,
+                        label="خبرم کن: دوبله / 4K",
+                        onClick=onAvailabilityAlerts
+                    )
+                }
+            }
+            item {
+                DetailSecondaryAction(
+                    icon=Icons.Default.CollectionsBookmark,
+                    label="افزودن به لیست",
+                    onClick=onCollections
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailPrimaryAction(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    label:String,
+    active:Boolean=false,
+    loading:Boolean=false,
+    enabled:Boolean=true,
+    onClick:()->Unit,
+    modifier:Modifier=Modifier
+) {
+    Surface(
+        color=if(active) FqGold.copy(alpha=.14f) else FqSurface,
+        contentColor=if(active) FqGoldSoft else if(enabled) FqText else FqMuted,
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if(active) FqGold.copy(alpha=.42f) else Color.White.copy(alpha=.07f)
+        ),
+        modifier=modifier.heightIn(min=74.dp)
+            .clickable(enabled=enabled && !loading,onClick=onClick)
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal=9.dp,vertical=11.dp),
+            horizontalAlignment=Alignment.CenterHorizontally,
+            verticalArrangement=Arrangement.Center
+        ) {
+            if(loading) {
+                CircularProgressIndicator(
+                    color=FqGold,
+                    strokeWidth=2.dp,
+                    modifier=Modifier.size(19.dp)
+                )
+            } else {
+                Icon(icon,null,modifier=Modifier.size(21.dp))
+            }
+            Text(
+                label,
+                fontSize=8.sp,
+                lineHeight=11.sp,
+                fontWeight=FontWeight.Bold,
+                maxLines=2,
+                textAlign=androidx.compose.ui.text.style.TextAlign.Center,
+                modifier=Modifier.padding(top=6.dp)
             )
         }
-        item {
-            ActionTile(
-                icon=Icons.Default.Forum,
-                label="گفت‌وگو",
-                onClick=onChat
-            )
+    }
+}
+
+@Composable
+private fun DetailSecondaryAction(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    label:String,
+    active:Boolean=false,
+    loading:Boolean=false,
+    onClick:()->Unit
+) {
+    Surface(
+        color=if(active)FqGold.copy(alpha=.12f) else FqSurface2,
+        contentColor=if(active)FqGoldSoft else FqMutedStrong,
+        shape=RoundedCornerShape(14.dp),
+        modifier=Modifier.clickable(enabled=!loading,onClick=onClick)
+    ) {
+        Row(
+            Modifier.padding(horizontal=12.dp,vertical=9.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            if(loading) {
+                CircularProgressIndicator(
+                    color=FqGold,
+                    strokeWidth=2.dp,
+                    modifier=Modifier.size(16.dp)
+                )
+            } else {
+                Icon(icon,null,modifier=Modifier.size(17.dp))
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(label,fontSize=9.sp,fontWeight=FontWeight.Bold)
         }
     }
 }
