@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+
+private enum class CinePulseMode { NOW, REVIEWS, ROOMS, CLIPS }
 
 @Composable
 fun CinePulseScreen(
@@ -53,6 +56,22 @@ fun CinePulseScreen(
     var posts by remember { mutableStateOf<List<SocialPost>>(emptyList()) }
     var rooms by remember { mutableStateOf<List<SocialRoom>>(emptyList()) }
     var clips by remember { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
+    var modeName by rememberSaveable {
+        mutableStateOf(
+            if(initialPostId.isNullOrBlank())
+                CinePulseMode.NOW.name
+            else
+                CinePulseMode.REVIEWS.name
+        )
+    }
+    val mode=runCatching { CinePulseMode.valueOf(modeName) }
+        .getOrDefault(CinePulseMode.NOW)
+
+    LaunchedEffect(initialPostId) {
+        if(!initialPostId.isNullOrBlank()) {
+            modeName=CinePulseMode.REVIEWS.name
+        }
+    }
 
     LaunchedEffect(refresh,loggedIn) {
         loading=true
@@ -114,6 +133,13 @@ fun CinePulseScreen(
             )
         }
 
+        item {
+            PulseModeBar(
+                selected=mode,
+                onSelected={modeName=it.name}
+            )
+        }
+
         if(loading) {
             item {
                 LinearProgressIndicator(
@@ -144,90 +170,177 @@ fun CinePulseScreen(
             }
         }
 
-        if(loggedIn && watching.isNotEmpty()) {
-            item {
-                PulseSectionTitle(
-                    title="الان چی می‌بینن",
-                    subtitle="فعالیت زنده آدم‌هایی که دنبال می‌کنی",
-                    icon=Icons.Default.Visibility
-                )
+        when(mode) {
+            CinePulseMode.NOW -> {
+                if(loggedIn && watching.isNotEmpty()) {
+                    item {
+                        PulseSectionTitle(
+                            title="الان چی می‌بینن",
+                            subtitle="فعالیت زنده آدم‌هایی که دنبال می‌کنی",
+                            icon=Icons.Default.Visibility
+                        )
+                    }
+                    item {
+                        PulseWatchingRail(watching,repository,onMedia)
+                    }
+                }
+
+                if(trending.isNotEmpty()) {
+                    item {
+                        PulseSectionTitle(
+                            title="نبض داغ",
+                            subtitle="عنوان‌هایی که همین حالا بیشترین تماشا و واکنش رو دارن",
+                            icon=Icons.Default.Whatshot
+                        )
+                    }
+                    item {
+                        PulseTrendRail(trending,repository,onMedia)
+                    }
+                }
+
+                if(posts.isNotEmpty()) {
+                    item {
+                        PulseSectionTitle(
+                            title="نظرهای تازه",
+                            subtitle="چند نظر کوتاه درباره عنوان‌هایی که داغ شدن",
+                            icon=Icons.Default.RateReview
+                        )
+                    }
+                    items(posts.take(4),key={it.id}) { post ->
+                        PulsePostCard(
+                            post=post,
+                            repository=repository,
+                            onMedia=onMedia,
+                            onOpenPost=onOpenPost,
+                            onCreator=onCreator
+                        )
+                    }
+                }
             }
-            item {
-                PulseWatchingRail(watching,repository,onMedia)
+
+            CinePulseMode.REVIEWS -> {
+                if(posts.isNotEmpty()) {
+                    item {
+                        PulseSectionTitle(
+                            title="نقد و نظر",
+                            subtitle="فقط درباره فیلم و سریال؛ با محافظ اسپویل",
+                            icon=Icons.Default.RateReview
+                        )
+                    }
+                    items(posts,key={it.id}) { post ->
+                        PulsePostCard(
+                            post=post,
+                            repository=repository,
+                            onMedia=onMedia,
+                            onOpenPost=onOpenPost,
+                            onCreator=onCreator
+                        )
+                    }
+                }
+            }
+
+            CinePulseMode.ROOMS -> {
+                if(rooms.isNotEmpty()) {
+                    item {
+                        PulseSectionTitle(
+                            title="گفتگوهای باز",
+                            subtitle="بحث زنده برای عنوان‌ها و قسمت‌های مشخص",
+                            icon=Icons.Default.Forum
+                        )
+                    }
+                    item {
+                        PulseRoomRail(rooms,onOpenRoom)
+                    }
+                }
+            }
+
+            CinePulseMode.CLIPS -> {
+                if(clips.isNotEmpty()) {
+                    item {
+                        PulseSectionTitle(
+                            title="کلیپ‌های فیلم‌محور",
+                            subtitle="هر کلیپ به یک فیلم یا سریال مشخص وصله",
+                            icon=Icons.Default.SmartDisplay
+                        )
+                    }
+                    item {
+                        PulseClipRail(
+                            items=clips,
+                            repository=repository,
+                            onOpenClip=onOpenClip
+                        )
+                    }
+                }
             }
         }
 
-        if(trending.isNotEmpty()) {
-            item {
-                PulseSectionTitle(
-                    title="نبض داغ",
-                    subtitle="عنوان‌هایی که همین حالا بیشترین تماشا و واکنش رو دارن",
-                    icon=Icons.Default.Whatshot
-                )
-            }
-            item {
-                PulseTrendRail(trending,repository,onMedia)
-            }
+        val modeEmpty=when(mode) {
+            CinePulseMode.NOW ->
+                trending.isEmpty() && watching.isEmpty() && posts.isEmpty()
+            CinePulseMode.REVIEWS -> posts.isEmpty()
+            CinePulseMode.ROOMS -> rooms.isEmpty()
+            CinePulseMode.CLIPS -> clips.isEmpty()
         }
-
-        if(posts.isNotEmpty()) {
-            item {
-                PulseSectionTitle(
-                    title="نظرهای داغ",
-                    subtitle="نقد کوتاه و بحث درباره عنوان‌های مشخص",
-                    icon=Icons.Default.RateReview
-                )
-            }
-            items(posts.take(10),key={it.id}) { post ->
-                PulsePostCard(
-                    post=post,
-                    repository=repository,
-                    onMedia=onMedia,
-                    onOpenPost=onOpenPost,
-                    onCreator=onCreator
-                )
-            }
-        }
-
-        if(rooms.isNotEmpty()) {
-            item {
-                PulseSectionTitle(
-                    title="بحث‌های باز",
-                    subtitle="اتاق‌هایی که می‌تونی همین الان واردشون بشی",
-                    icon=Icons.Default.Forum
-                )
-            }
-            item {
-                PulseRoomRail(rooms,onOpenRoom)
-            }
-        }
-
-        if(clips.isNotEmpty()) {
-            item {
-                PulseSectionTitle(
-                    title="کلیپ‌های مرتبط",
-                    subtitle="کلیپ فقط وقتی معنا داره که به یک فیلم یا سریال وصل باشه",
-                    icon=Icons.Default.SmartDisplay
-                )
-            }
-            item {
-                PulseClipRail(
-                    items=clips,
-                    repository=repository,
-                    onOpenClip=onOpenClip
-                )
-            }
-        }
-
-        if(!loading && trending.isEmpty() && posts.isEmpty() && rooms.isEmpty() && clips.isEmpty()) {
+        if(!loading && modeEmpty) {
             item {
                 PremiumEmptyState(
-                    icon=Icons.Default.MovieFilter,
-                    title="Pulse هنوز ساکته",
-                    body="وقتی تماشا، واکنش، نقد و بحث درباره فیلم‌ها شروع بشه، همه‌ش اینجا جمع می‌شه.",
-                    action=if(loggedIn)"اولین نظر رو بساز" else "ورود به حساب",
+                    icon=when(mode) {
+                        CinePulseMode.NOW -> Icons.Default.Whatshot
+                        CinePulseMode.REVIEWS -> Icons.Default.RateReview
+                        CinePulseMode.ROOMS -> Icons.Default.Forum
+                        CinePulseMode.CLIPS -> Icons.Default.SmartDisplay
+                    },
+                    title=when(mode) {
+                        CinePulseMode.NOW -> "نبض فعلاً آرومه"
+                        CinePulseMode.REVIEWS -> "هنوز نقد تازه‌ای نیست"
+                        CinePulseMode.ROOMS -> "گفتگوی بازی نیست"
+                        CinePulseMode.CLIPS -> "کلیپ مرتبطی نیست"
+                    },
+                    body="Pulse فقط محتوایی رو نشون می‌ده که مستقیم به فیلم، سریال یا قسمت مشخص وصل باشه.",
+                    action=if(loggedIn)"محتوا بساز" else "ورود به حساب",
                     onAction=if(loggedIn) onCreate else onRequireAuth
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PulseModeBar(
+    selected:CinePulseMode,
+    onSelected:(CinePulseMode)->Unit
+) {
+    LazyRow(
+        contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp),
+        horizontalArrangement=Arrangement.spacedBy(8.dp)
+    ) {
+        listOf(
+            Triple(CinePulseMode.NOW,Icons.Default.Whatshot,"الان"),
+            Triple(CinePulseMode.REVIEWS,Icons.Default.RateReview,"نقدها"),
+            Triple(CinePulseMode.ROOMS,Icons.Default.Forum,"گفتگوها"),
+            Triple(CinePulseMode.CLIPS,Icons.Default.SmartDisplay,"کلیپ‌ها")
+        ).forEach { (mode,icon,label) ->
+            item {
+                val active=selected==mode
+                Surface(
+                    color=if(active)FqGold else FqSurface,
+                    contentColor=if(active)Color.White else FqMutedStrong,
+                    shape=RoundedCornerShape(15.dp),
+                    border=androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if(active)FqGold else Color.White.copy(alpha=.07f)
+                    ),
+                    modifier=Modifier.clickable { onSelected(mode) }
+                ) {
+                    Row(
+                        Modifier.padding(horizontal=13.dp,vertical=9.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(icon,null,modifier=Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(label,fontSize=10.sp,fontWeight=FontWeight.Black)
+                    }
+                }
             }
         }
     }
@@ -261,9 +374,10 @@ private fun PulseHeader(
                 Column(Modifier.weight(1f)) {
                     Text("Pulse",fontSize=28.sp,fontWeight=FontWeight.Black)
                     Text(
-                        "فیلم‌بازها همین الان چه حسی دارن؟",
+                        "شبکه اجتماعی برای آدم‌هایی که واقعاً فیلم و سریال می‌بینن",
                         color=FqMuted,
-                        fontSize=10.sp
+                        fontSize=10.sp,
+                        maxLines=2
                     )
                 }
                 FqIconButton(Icons.Default.Search,"جستجو",onSearch)
@@ -289,8 +403,8 @@ private fun PulseHeader(
                     }
                     Spacer(Modifier.width(9.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("درباره چیزی که دیدی حرف بزن",fontSize=11.sp,fontWeight=FontWeight.Bold)
-                        Text("نقد، نظر، واکنش، نظرسنجی یا کلیپ",color=FqMuted,fontSize=8.sp)
+                        Text("چی دیدی؟",fontSize=11.sp,fontWeight=FontWeight.Bold)
+                        Text("نقد، نظر، واکنش یا کلیپ رو به همون عنوان وصل کن",color=FqMuted,fontSize=8.sp)
                     }
                     Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
                 }
