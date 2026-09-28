@@ -97,14 +97,20 @@ fun StreamingExploreScreen(
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
         Column(
-            Modifier.fillMaxWidth().statusBarsPadding()
-                .padding(horizontal=16.dp,vertical=10.dp)
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF190507),FqBg)
+                    )
+                )
+                .statusBarsPadding()
+                .padding(horizontal=16.dp,vertical=12.dp)
         ) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("کشف",fontSize=28.sp,fontWeight=FontWeight.Black)
+                    Text("کشف برای تماشا",fontSize=28.sp,fontWeight=FontWeight.Black)
                     Text(
-                        "فیلم بعدی‌ات رو پیدا کن",
+                        "از حال‌وهوات شروع کن، نه از یک لیست بی‌پایان",
                         color=FqMuted,
                         fontSize=11.sp
                     )
@@ -120,7 +126,7 @@ fun StreamingExploreScreen(
                 value=query,
                 onValueChange={query=it.take(100)},
                 singleLine=true,
-                placeholder={Text("فیلم، سریال، بازیگر یا عنوان اصلی...")},
+                placeholder={Text("چی می‌خوای ببینی؟ عنوان، بازیگر یا اسم اصلی...")},
                 leadingIcon={Icon(Icons.Default.Search,null)},
                 trailingIcon={
                     if(query.isNotBlank()) {
@@ -368,8 +374,8 @@ private fun ExploreMoodGrid(
     onBollywood:()->Unit
 ) {
     Column(Modifier.padding(horizontal=16.dp,vertical=12.dp)) {
-        Text("یک مسیر انتخاب کن",fontSize=18.sp,fontWeight=FontWeight.Black)
-        Text("مستقیم وارد مجموعه‌ای شو که حال‌وهوات بهش نزدیکه",color=FqMuted,fontSize=10.sp)
+        Text("از یک دنیا شروع کن",fontSize=18.sp,fontWeight=FontWeight.Black)
+        Text("یک مسیر سریع برای رسیدن به چیزی که همین الان حالش رو داری",color=FqMuted,fontSize=10.sp)
         Row(
             Modifier.fillMaxWidth().padding(top=12.dp),
             horizontalArrangement=Arrangement.spacedBy(9.dp)
