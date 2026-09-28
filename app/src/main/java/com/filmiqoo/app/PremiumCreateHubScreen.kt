@@ -271,7 +271,7 @@ fun PremiumCreateHubScreen(
         item {
             Box(
                 Modifier.fillMaxWidth().background(
-                    Brush.verticalGradient(listOf(Color(0xFF171F31),FqBg))
+                    Brush.verticalGradient(listOf(Color(0xFF1B0507),FqBg))
                 )
             ) {
                 Row(
@@ -543,7 +543,7 @@ fun PremiumCreateHubScreen(
                             FilterChip(
                                 selected=spoiler,
                                 onClick={spoiler=!spoiler},
-                                label={Text("Spoiler",fontSize=11.sp)},
+                                label={Text("اسپویلر",fontSize=11.sp)},
                                 leadingIcon={Icon(Icons.Default.VisibilityOff,null,modifier=Modifier.size(15.dp))}
                             )
                             if(kind==CreateKind.STORY) {
@@ -552,7 +552,7 @@ fun PremiumCreateHubScreen(
                                     onClick={closeFriendsOnly=!closeFriendsOnly},
                                     label={
                                         Text(
-                                            if(closeFriendsOnly)"Close Friends" else "عمومی",
+                                            if(closeFriendsOnly)"دوستان نزدیک" else "عمومی",
                                             fontSize=11.sp
                                         )
                                     },
@@ -569,7 +569,7 @@ fun PremiumCreateHubScreen(
                                 FilterChip(
                                     selected=allowComments,
                                     onClick={allowComments=!allowComments},
-                                    label={Text(if(allowComments)"Comment روشن" else "Comment خاموش",fontSize=11.sp)},
+                                    label={Text(if(allowComments)"کامنت روشن" else "کامنت خاموش",fontSize=11.sp)},
                                     leadingIcon={Icon(Icons.Default.ChatBubbleOutline,null,modifier=Modifier.size(15.dp))}
                                 )
                             }
