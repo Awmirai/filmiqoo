@@ -39,7 +39,9 @@ fun CinePulseScreen(
     onSearch:()->Unit,
     onInbox:()->Unit,
     onCreate:()->Unit,
-    onRequireAuth:()->Unit
+    onRequireAuth:()->Unit,
+    initialPostId:String?=null,
+    onFocusedPostConsumed:()->Unit={}
 ) {
     val pulseRepo=remember { PulseRepository(backend) }
     val friendRepo=remember { FriendActivityRepository(backend) }
@@ -59,9 +61,15 @@ fun CinePulseScreen(
             coroutineScope {
                 val trendingReq=async { runCatching { pulseRepo.trending() }.getOrDefault(emptyList()) }
                 val postsReq=async {
-                    runCatching { social.feedPage(limit=24).items }
+                    val base=runCatching { social.feedPage(limit=24).items }
                         .getOrDefault(emptyList())
                         .filter { it.media!=null }
+                    val focused=initialPostId?.takeIf(String::isNotBlank)?.let { id ->
+                        runCatching { social.post(id) }.getOrNull()
+                    }
+                    if(focused!=null) {
+                        listOf(focused)+base.filterNot { it.id==focused.id }
+                    } else base
                 }
                 val roomsReq=async {
                     runCatching { social.rooms() }
@@ -89,6 +97,7 @@ fun CinePulseScreen(
             error=it.message ?: "Pulse در دسترس نیست"
         }
         loading=false
+        if(!initialPostId.isNullOrBlank()) onFocusedPostConsumed()
     }
 
     LazyColumn(
