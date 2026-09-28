@@ -113,7 +113,7 @@ fun CinePulseScreen(
                 watching=watchingReq.await()
             }
         }.onFailure {
-            error=it.message ?: "Pulse در دسترس نیست"
+            error=it.message ?: "نبض در دسترس نیست"
         }
         loading=false
         if(!initialPostId.isNullOrBlank()) onFocusedPostConsumed()
@@ -201,8 +201,8 @@ fun CinePulseScreen(
                 if(posts.isNotEmpty()) {
                     item {
                         PulseSectionTitle(
-                            title="نظرهای تازه",
-                            subtitle="چند نظر کوتاه درباره عنوان‌هایی که داغ شدن",
+                            title="تازه از فیلم‌بازها",
+                            subtitle="نظرهای کوتاه و مرتبط با عنوان‌هایی که همین حالا دیده می‌شن",
                             icon=Icons.Default.RateReview
                         )
                     }
@@ -222,8 +222,8 @@ fun CinePulseScreen(
                 if(posts.isNotEmpty()) {
                     item {
                         PulseSectionTitle(
-                            title="نقد و نظر",
-                            subtitle="فقط درباره فیلم و سریال؛ با محافظ اسپویل",
+                            title="نقدهای فیلم‌بازها",
+                            subtitle="عنوان‌محور، کوتاه و با محافظ اسپویل",
                             icon=Icons.Default.RateReview
                         )
                     }
@@ -243,8 +243,8 @@ fun CinePulseScreen(
                 if(rooms.isNotEmpty()) {
                     item {
                         PulseSectionTitle(
-                            title="گفتگوهای باز",
-                            subtitle="بحث زنده برای عنوان‌ها و قسمت‌های مشخص",
+                            title="اتاق‌های عنوان",
+                            subtitle="هر گفتگو به یک فیلم، سریال یا قسمت مشخص وصل است",
                             icon=Icons.Default.Forum
                         )
                     }
@@ -261,8 +261,8 @@ fun CinePulseScreen(
                 if(clips.isNotEmpty()) {
                     item {
                         PulseSectionTitle(
-                            title="کلیپ‌های فیلم‌محور",
-                            subtitle="هر کلیپ به یک فیلم یا سریال مشخص وصله",
+                            title="کلیپ‌های مرتبط",
+                            subtitle="کلیپ صحنه، واکنش و تحلیل؛ همیشه متصل به عنوان",
                             icon=Icons.Default.SmartDisplay
                         )
                     }
@@ -312,7 +312,7 @@ fun CinePulseScreen(
                         CinePulseMode.ROOMS -> "گفتگوی بازی نیست"
                         CinePulseMode.CLIPS -> "کلیپ مرتبطی نیست"
                     },
-                    body="نبض فقط محتوایی رو نشون می‌ده که مستقیم به فیلم، سریال یا قسمت مشخص وصل باشه.",
+                    body="اینجا فقط محتوایی میاد که مستقیم به فیلم، سریال یا قسمت مشخص وصل باشه؛ با محافظ اسپویل.",
                     action=if(loggedIn)"محتوا بساز" else "ورود به حساب",
                     onAction=if(loggedIn) onCreate else onRequireAuth
                 )
@@ -388,9 +388,9 @@ private fun PulseHeader(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Pulse",fontSize=28.sp,fontWeight=FontWeight.Black)
+                    Text("نبض",fontSize=28.sp,fontWeight=FontWeight.Black)
                     Text(
-                        "شبکه اجتماعی برای آدم‌هایی که واقعاً فیلم و سریال می‌بینن",
+                        "جایی برای واکنش، نقد و گفتگو؛ فقط درباره چیزی که دیدی",
                         color=FqMuted,
                         fontSize=10.sp,
                         maxLines=2
@@ -398,6 +398,48 @@ private fun PulseHeader(
                 }
                 FqIconButton(Icons.Default.Search,"جستجو",onSearch)
                 FqIconButton(Icons.Default.MarkChatUnread,"پیام‌ها",onInbox)
+            }
+
+            Row(
+                Modifier.padding(top=10.dp),
+                horizontalArrangement=Arrangement.spacedBy(7.dp)
+            ) {
+                Surface(
+                    color=Color.White.copy(alpha=.06f),
+                    shape=RoundedCornerShape(10.dp)
+                ) {
+                    Row(
+                        Modifier.padding(horizontal=8.dp,vertical=5.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.VisibilityOff,
+                            null,
+                            tint=FqGold,
+                            modifier=Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("محافظ اسپویل",fontSize=7.sp,fontWeight=FontWeight.Bold)
+                    }
+                }
+                Surface(
+                    color=Color.White.copy(alpha=.06f),
+                    shape=RoundedCornerShape(10.dp)
+                ) {
+                    Row(
+                        Modifier.padding(horizontal=8.dp,vertical=5.dp),
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.MovieFilter,
+                            null,
+                            tint=FqGold,
+                            modifier=Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("همه‌چیز عنوان‌محور",fontSize=7.sp,fontWeight=FontWeight.Bold)
+                    }
+                }
             }
 
             Surface(
