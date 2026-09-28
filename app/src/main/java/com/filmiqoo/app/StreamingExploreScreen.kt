@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 private enum class ExploreCatalogFilter { ALL, MOVIES, SERIES }
+private enum class ExploreLane { NONE, IRANIAN, KOREAN, ANIME, BOLLYWOOD }
 
 @Composable
 fun StreamingExploreScreen(
@@ -42,6 +43,9 @@ fun StreamingExploreScreen(
     var home by remember { mutableStateOf(HomeBundle()) }
     var results by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var laneName by rememberSaveable { mutableStateOf(ExploreLane.NONE.name) }
+    val lane=runCatching { ExploreLane.valueOf(laneName) }
+        .getOrDefault(ExploreLane.NONE)
 
     LaunchedEffect(Unit) {
         loading=true
@@ -71,6 +75,21 @@ fun StreamingExploreScreen(
             ExploreCatalogFilter.ALL -> results
             ExploreCatalogFilter.MOVIES -> results.filter { it.type==MediaType.MOVIE }
             ExploreCatalogFilter.SERIES -> results.filter { it.type==MediaType.TV }
+        }
+    }
+
+    val laneItems=remember(home,lane,filter) {
+        val base=when(lane) {
+            ExploreLane.NONE -> emptyList()
+            ExploreLane.IRANIAN -> home.iranian
+            ExploreLane.KOREAN -> home.korean
+            ExploreLane.ANIME -> home.anime
+            ExploreLane.BOLLYWOOD -> home.bollywood
+        }
+        when(filter) {
+            ExploreCatalogFilter.ALL -> base
+            ExploreCatalogFilter.MOVIES -> base.filter { it.type==MediaType.MOVIE }
+            ExploreCatalogFilter.SERIES -> base.filter { it.type==MediaType.TV }
         }
     }
 
@@ -173,6 +192,34 @@ fun StreamingExploreScreen(
                     }
                 }
             }
+        } else if(lane!=ExploreLane.NONE) {
+            Column(Modifier.fillMaxSize()) {
+                ExploreLaneHeader(
+                    lane=lane,
+                    count=laneItems.size,
+                    onBack={laneName=ExploreLane.NONE.name}
+                )
+
+                if(laneItems.isEmpty() && !loading) {
+                    PremiumEmptyState(
+                        icon=Icons.Default.MovieFilter,
+                        title="چیزی در این فیلتر پیدا نشد",
+                        body="فیلتر فیلم/سریال رو عوض کن یا به همه نتایج برگرد."
+                    )
+                } else {
+                    LazyVerticalGrid(
+                        columns=GridCells.Fixed(3),
+                        contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp),
+                        horizontalArrangement=Arrangement.spacedBy(9.dp),
+                        verticalArrangement=Arrangement.spacedBy(14.dp),
+                        modifier=Modifier.fillMaxSize()
+                    ) {
+                        items(laneItems,key={it.key}) { media ->
+                            ExplorePosterCard(media,repository,onMedia)
+                        }
+                    }
+                }
+            }
         } else {
             LazyColumn(
                 contentPadding=PaddingValues(bottom=26.dp),
@@ -190,18 +237,10 @@ fun StreamingExploreScreen(
 
                 item {
                     ExploreMoodGrid(
-                        onIranian={
-                            home.iranian.firstOrNull()?.let(onMedia)
-                        },
-                        onKorean={
-                            home.korean.firstOrNull()?.let(onMedia)
-                        },
-                        onAnime={
-                            home.anime.firstOrNull()?.let(onMedia)
-                        },
-                        onBollywood={
-                            home.bollywood.firstOrNull()?.let(onMedia)
-                        }
+                        onIranian={laneName=ExploreLane.IRANIAN.name},
+                        onKorean={laneName=ExploreLane.KOREAN.name},
+                        onAnime={laneName=ExploreLane.ANIME.name},
+                        onBollywood={laneName=ExploreLane.BOLLYWOOD.name}
                     )
                 }
 
@@ -276,6 +315,47 @@ private fun ExploreHeroStrip(
 }
 
 @Composable
+private fun ExploreLaneHeader(
+    lane:ExploreLane,
+    count:Int,
+    onBack:()->Unit
+) {
+    val (title,subtitle)=when(lane) {
+        ExploreLane.IRANIAN -> "سینمای ایران" to "فیلم و سریال فارسی‌زبان"
+        ExploreLane.KOREAN -> "کره‌ای" to "K-Drama، فیلم و سریال کره‌ای"
+        ExploreLane.ANIME -> "انیمه" to "انیمه‌های محبوب و تازه"
+        ExploreLane.BOLLYWOOD -> "سینمای هند" to "بالیوود و سینمای هند"
+        ExploreLane.NONE -> "کشف" to ""
+    }
+
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=10.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ) {
+        Surface(
+            color=FqSurface,
+            contentColor=Color.White,
+            shape=CircleShape,
+            modifier=Modifier.size(42.dp).clickable(onClick=onBack)
+        ) {
+            Box(contentAlignment=Alignment.Center) {
+                Icon(Icons.Default.ArrowBack,null,modifier=Modifier.size(19.dp))
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title,fontSize=20.sp,fontWeight=FontWeight.Black)
+            Text(
+                subtitle+" • "+count+" عنوان",
+                color=FqMuted,
+                fontSize=9.sp,
+                modifier=Modifier.padding(top=2.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ExploreMoodGrid(
     onIranian:()->Unit,
     onKorean:()->Unit,
@@ -283,8 +363,8 @@ private fun ExploreMoodGrid(
     onBollywood:()->Unit
 ) {
     Column(Modifier.padding(horizontal=16.dp,vertical=12.dp)) {
-        Text("از کجا شروع کنیم؟",fontSize=18.sp,fontWeight=FontWeight.Black)
-        Text("چهار مسیر سریع برای پیدا کردن چیزی که می‌خوای ببینی",color=FqMuted,fontSize=10.sp)
+        Text("یک مسیر انتخاب کن",fontSize=18.sp,fontWeight=FontWeight.Black)
+        Text("مستقیم وارد مجموعه‌ای شو که حال‌وهوات بهش نزدیکه",color=FqMuted,fontSize=10.sp)
         Row(
             Modifier.fillMaxWidth().padding(top=12.dp),
             horizontalArrangement=Arrangement.spacedBy(9.dp)
