@@ -69,30 +69,18 @@ fun WatchHistoryScreen(
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=7.dp),
-            verticalAlignment=Alignment.CenterVertically
-        ) {
-            IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
-            Column(Modifier.weight(1f)) {
-                Text("تماشای من",fontSize=22.sp,fontWeight=FontWeight.Black)
-                Text(
-                    when(filter) {
-                        1 -> visible.size.toString()+" مورد نیمه‌کاره"
-                        2 -> visible.size.toString()+" مورد تمام‌شده"
-                        else -> items.size.toString()+" مورد اخیر"
-                    },
-                    color=FqMuted,
-                    fontSize=11.sp
-                )
-            }
-            if(items.isNotEmpty()) {
-                TextButton(onClick={confirmClear=true}) {
-                    Text("پاک کردن همه",color=FqDanger,fontSize=11.sp)
-                }
-            }
-            IconButton(onClick={refresh++}){Icon(Icons.Default.Refresh,null)}
-        }
+        WatchHistoryHeader(
+            count=when(filter) {
+                1 -> visible.size
+                2 -> visible.size
+                else -> items.size
+            },
+            filter=filter,
+            hasItems=items.isNotEmpty(),
+            onBack=onBack,
+            onRefresh={refresh++},
+            onClear={confirmClear=true}
+        )
 
         Row(
             Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp),
@@ -192,6 +180,75 @@ fun WatchHistoryScreen(
                 TextButton(onClick={confirmClear=false}){Text("لغو")}
             }
         )
+    }
+}
+
+@Composable
+private fun WatchHistoryHeader(
+    count:Int,
+    filter:Int,
+    hasItems:Boolean,
+    onBack:()->Unit,
+    onRefresh:()->Unit,
+    onClear:()->Unit
+) {
+    Box(
+        Modifier.fillMaxWidth().height(180.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF230609),
+                        Color(0xFF100708),
+                        FqBg
+                    )
+                )
+            )
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal=10.dp,vertical=8.dp),
+            verticalAlignment=Alignment.CenterVertically
+        ) {
+            FqIconButton(
+                icon=Icons.Default.ArrowBack,
+                contentDescription="بازگشت",
+                onClick=onBack
+            )
+            Spacer(Modifier.weight(1f))
+            if(hasItems) {
+                TextButton(onClick=onClear) {
+                    Text("پاک کردن همه",color=FqDanger,fontSize=10.sp)
+                }
+            }
+            FqIconButton(
+                icon=Icons.Default.Refresh,
+                contentDescription="تازه‌سازی",
+                onClick=onRefresh
+            )
+        }
+
+        Column(
+            Modifier.align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal=18.dp,bottom=18.dp)
+        ) {
+            Text(
+                "تماشای من",
+                fontSize=30.sp,
+                fontWeight=FontWeight.Black
+            )
+            Text(
+                when(filter) {
+                    1 -> count.toString()+" عنوان نیمه‌کاره"
+                    2 -> count.toString()+" عنوان تمام‌شده"
+                    else -> count.toString()+" عنوان در تاریخچه تماشا"
+                },
+                color=FqMuted,
+                fontSize=10.sp,
+                modifier=Modifier.padding(top=3.dp)
+            )
+        }
     }
 }
 
