@@ -982,7 +982,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             overlayBackStack.clear()
                             tab=index
                             if(index!=2) deepLinkPostId=null
-                            if(index!=2) deepLinkPostId=null
                         }
                     )
                 }
@@ -1035,7 +1034,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onSearch={showSearch=true},
                             onInbox={overlay=OverlayRoute.Inbox},
                             onCreate={overlay=OverlayRoute.Create},
-                            onRequireAuth={overlay=OverlayRoute.Auth}
+                            onRequireAuth={overlay=OverlayRoute.Auth},
+                            initialPostId=deepLinkPostId,
+                            onFocusedPostConsumed={deepLinkPostId=null}
                         )
                         3 -> LibraryScreen(
                             backend=backend,
@@ -1099,7 +1100,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                 MeSignedOutScreen(
                                     onLogin={overlay=OverlayRoute.Auth},
                                     onClub={tab=2},
-                                    onClips={tab=1}
+                                    onClips={overlay=OverlayRoute.Clips()}
                                 )
                             }
                         }
