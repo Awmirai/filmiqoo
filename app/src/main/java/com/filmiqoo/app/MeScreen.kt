@@ -446,9 +446,9 @@ private fun MeHero(
                 Modifier.fillMaxWidth().height(205.dp).background(
                     Brush.linearGradient(
                         listOf(
-                            Color(0xFF18212D),
-                            Color(0xFF241B0E),
-                            Color(0xFF090B10)
+                            Color(0xFF250609),
+                            Color(0xFF121212),
+                            Color(0xFF050505)
                         )
                     )
                 )
@@ -586,7 +586,7 @@ private fun MeHero(
                     ) {
                         Icon(Icons.Default.ChildCare,null,tint=Color(0xFF70C7FF))
                         Spacer(Modifier.width(9.dp))
-                        Text("Kids Mode فعال است",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text("حالت کودک فعاله",fontSize=12.sp,fontWeight=FontWeight.Bold)
                     }
                 }
             }
