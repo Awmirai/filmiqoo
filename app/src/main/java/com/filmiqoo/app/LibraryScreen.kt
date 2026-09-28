@@ -395,44 +395,79 @@ private fun LibraryHeader(
     showBack:Boolean=true
 ) {
     Box(
-        Modifier.fillMaxWidth().height(215.dp).background(
+        Modifier.fillMaxWidth().height(205.dp).background(
             Brush.verticalGradient(
-                listOf(Color(0xFF182033),Color(0xFF251C09),FqBg)
+                listOf(Color(0xFF1C0507),Color(0xFF0C090A),FqBg)
             )
         )
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(8.dp),
+            Modifier.fillMaxWidth().statusBarsPadding()
+                .padding(horizontal=10.dp,vertical=8.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
             if(showBack) {
-                IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,null)}
+                FqIconButton(
+                    icon=Icons.Default.ArrowBack,
+                    contentDescription="بازگشت",
+                    onClick=onBack
+                )
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick=onRefresh){Icon(Icons.Default.Refresh,null)}
+            FqIconButton(
+                icon=Icons.Default.Refresh,
+                contentDescription="تازه‌سازی",
+                onClick=onRefresh
+            )
         }
 
         Column(
             Modifier.align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(start=18.dp,end=18.dp,bottom=18.dp)
+                .padding(horizontal=18.dp)
+                .padding(bottom=18.dp)
         ) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Icon(Icons.Default.VideoLibrary,null,tint=FqGold,modifier=Modifier.size(34.dp))
-                Spacer(Modifier.width(9.dp))
-                Column {
-                    Text("کتابخانه من",fontSize=27.sp,fontWeight=FontWeight.Black)
-                    Text("هر چیزی که ذخیره کردی، برای بعد گذاشتی یا نشانه زدی",color=FqMuted,fontSize=11.sp)
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(top=14.dp),
-                horizontalArrangement=Arrangement.spacedBy(8.dp)
+            Text(
+                "کتابخانه",
+                fontSize=30.sp,
+                fontWeight=FontWeight.Black
+            )
+            Text(
+                "همه چیزهایی که برای تماشای خودت نگه داشتی",
+                color=FqMuted,
+                fontSize=10.sp,
+                modifier=Modifier.padding(top=2.dp)
+            )
+
+            LazyRow(
+                horizontalArrangement=Arrangement.spacedBy(7.dp),
+                modifier=Modifier.padding(top=13.dp)
             ) {
-                PremiumStat(favoriteCount.toString(),"علاقه‌مندی",Modifier.weight(1f))
-                PremiumStat(watchlistCount.toString(),"بعداً",Modifier.weight(1f))
-                PremiumStat(collectionCount.toString(),"لیست",Modifier.weight(1f))
-                PremiumStat(sceneCount.toString(),"لحظه",Modifier.weight(1f))
+                items(
+                    listOf(
+                        favoriteCount.toString()+" علاقه‌مندی",
+                        watchlistCount.toString()+" برای بعد",
+                        collectionCount.toString()+" لیست",
+                        sceneCount.toString()+" لحظه"
+                    )
+                ) { label ->
+                    Surface(
+                        color=Color.White.copy(alpha=.06f),
+                        shape=RoundedCornerShape(999.dp),
+                        border=androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            Color.White.copy(alpha=.07f)
+                        )
+                    ) {
+                        Text(
+                            label,
+                            color=FqMutedStrong,
+                            fontSize=8.sp,
+                            fontWeight=FontWeight.Bold,
+                            modifier=Modifier.padding(horizontal=9.dp,vertical=6.dp)
+                        )
+                    }
+                }
             }
         }
     }
