@@ -950,10 +950,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     },
                     onOpenClip={ clipId ->
                         socialBadgeRefresh++
-                        overlayBackStack.add(route)
-                        overlay=null
-                        deepLinkReelId=clipId
-                        tab=1
+                        pushOverlay(OverlayRoute.Clips(clipId))
                     },
                     onOpenPost={ postId ->
                         socialBadgeRefresh++
