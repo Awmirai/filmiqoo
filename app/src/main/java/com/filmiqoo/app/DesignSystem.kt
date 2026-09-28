@@ -41,9 +41,9 @@ object FqDimens {
     val Touch=48.dp
 }
 
-val FqGlass=Color(0xE6111419)
+val FqGlass=Color(0xE60A0A0A)
 val FqBorder=Color.White.copy(alpha=.10f)
-val FqElevated=Color(0xFF141922)
+val FqElevated=Color(0xFF171112)
 
 @Composable
 fun PremiumTopBar(
