@@ -6,6 +6,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.os.Environment
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -231,6 +233,9 @@ class BackendRepository(context: Context) {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
     private val refreshMutex = Mutex()
+    private val progressMutex = Mutex()
+    private val progressRevision = MutableStateFlow(0L)
+    val watchProgressRevision = progressRevision.asStateFlow()
 
     suspend fun health(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
@@ -742,17 +747,26 @@ class BackendRepository(context: Context) {
             )
         }
 
-    suspend fun saveProgress(mediaVersionId: String, positionMs: Long, durationMs: Long) {
+    suspend fun saveProgress(
+        mediaVersionId: String,
+        positionMs: Long,
+        durationMs: Long,
+        viewerProfileId: String? = viewerProfiles.activeId()
+    ) {
         withContext(Dispatchers.IO) {
-            runCatching {
-                postJson(
-                    "/v1/watch/progress",
-                    JSONObject()
+            progressMutex.withLock {
+                executeJson(
+                    Request.Builder()
+                        .url(session.baseUrl + "/v1/watch/progress")
+                        .post(JSONObject()
                         .put("mediaVersionId", mediaVersionId)
                         .put("positionMs", positionMs)
-                        .put("durationMs", durationMs),
-                    authorized = true
+                        .put("durationMs", durationMs)
+                        .toString().toRequestBody(jsonType)),
+                    authorized = true,
+                    viewerProfileId = viewerProfileId
                 )
+                progressRevision.value++
             }
         }
     }
@@ -859,7 +873,11 @@ class BackendRepository(context: Context) {
             authorized
         )
 
-    private suspend fun executeJson(builder: Request.Builder, authorized: Boolean): JSONObject =
+    private suspend fun executeJson(
+        builder: Request.Builder,
+        authorized: Boolean,
+        viewerProfileId: String? = viewerProfiles.activeId()
+    ): JSONObject =
         withContext(Dispatchers.IO) {
             var requestBuilder = builder
             var accessUsed: String? = null
@@ -869,7 +887,7 @@ class BackendRepository(context: Context) {
                 if (!accessUsed.isNullOrBlank()) {
                     requestBuilder = requestBuilder.header("Authorization", "Bearer " + accessUsed)
                 }
-                viewerProfiles.activeId()?.let {
+                viewerProfileId?.let {
                     requestBuilder = requestBuilder.header("X-Filmiqoo-Viewer-Profile", it)
                 }
             }
