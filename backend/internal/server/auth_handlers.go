@@ -68,6 +68,54 @@ func (s *Server) forgotPassword(w http.ResponseWriter,r *http.Request) {
     writeJSON(w,http.StatusOK,map[string]bool{"ok":true})
 }
 
+
+type resetPasswordRequest struct {
+    Token string `json:"token"`
+    Password string `json:"password"`
+}
+
+func (s *Server) resetPassword(w http.ResponseWriter,r *http.Request) {
+    var body resetPasswordRequest
+    if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
+    tokenHash:=hashRefreshToken(strings.TrimSpace(body.Token))
+    if tokenHash=="" || len(body.Password)<10 || len(body.Password)>128 {
+        writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid token or password"}); return
+    }
+    passwordHash,err:=authpkg.HashPassword(body.Password)
+    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+
+    tx,err:=s.db.Begin(r.Context())
+    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+    defer tx.Rollback(r.Context())
+
+    var tokenID,userID string
+    err=tx.QueryRow(r.Context(),`
+        SELECT id::text,user_id::text
+          FROM password_reset_tokens
+         WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now()
+         FOR UPDATE
+    `,tokenHash).Scan(&tokenID,&userID)
+    if err!=nil {
+        writeJSON(w,http.StatusBadRequest,map[string]string{"error":"reset link is invalid or expired"}); return
+    }
+    if _,err=tx.Exec(r.Context(),"UPDATE users SET password_hash=$2 WHERE id=$1",userID,passwordHash); err!=nil {
+        writeError(w,http.StatusInternalServerError,err); return
+    }
+    if _,err=tx.Exec(r.Context(),"UPDATE password_reset_tokens SET used_at=now() WHERE id=$1",tokenID); err!=nil {
+        writeError(w,http.StatusInternalServerError,err); return
+    }
+    // Password changes revoke every existing login session.
+    if _,err=tx.Exec(r.Context(),"UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",userID); err!=nil {
+        writeError(w,http.StatusInternalServerError,err); return
+    }
+    // Invalidate any other outstanding recovery links for the same account.
+    if _,err=tx.Exec(r.Context(),"UPDATE password_reset_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL",userID); err!=nil {
+        writeError(w,http.StatusInternalServerError,err); return
+    }
+    if err=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+    writeJSON(w,http.StatusOK,map[string]bool{"ok":true})
+}
+
 type refreshRequest struct {
 	RefreshToken string `json:"refreshToken"`
 	DeviceName string `json:"deviceName"`
