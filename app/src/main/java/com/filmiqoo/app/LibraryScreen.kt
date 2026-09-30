@@ -31,7 +31,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-private enum class LibraryTab { WATCHLIST, FAVORITES, COLLECTIONS, SCENES }
+private enum class LibraryTab { DASHBOARD, WATCHLIST, FAVORITES, COLLECTIONS, SCENES }
 
 @Composable
 fun LibraryScreen(
@@ -92,9 +92,9 @@ fun LibraryScreen(
         return
     }
 
-    var tabName by rememberSaveable { mutableStateOf(LibraryTab.WATCHLIST.name) }
+    var tabName by rememberSaveable { mutableStateOf(LibraryTab.DASHBOARD.name) }
     val tab=runCatching { LibraryTab.valueOf(tabName) }
-        .getOrDefault(LibraryTab.WATCHLIST)
+        .getOrDefault(LibraryTab.DASHBOARD)
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -228,6 +228,17 @@ fun LibraryScreen(
             onHistory=onHistory
         )
 
+        if(tab==LibraryTab.DASHBOARD) {
+            StudioDashboard(
+                favorites=favorites,
+                watchlist=watchlist,
+                collections=collections,
+                scenes=sceneBookmarks,
+                onHistory=onHistory,
+                onDownloads=onDownloads
+            )
+        }
+
         LibrarySearchField(
             query=query,
             onQuery={query=it}
@@ -239,6 +250,7 @@ fun LibraryScreen(
             contentColor=FqGold
         ) {
             listOf(
+                LibraryTab.DASHBOARD to "داشبورد",
                 LibraryTab.WATCHLIST to "صف تماشا",
                 LibraryTab.FAVORITES to "منتخب‌ها",
                 LibraryTab.COLLECTIONS to "کالکشن‌ها",
@@ -268,6 +280,7 @@ fun LibraryScreen(
         }
 
         when(tab) {
+            LibraryTab.DASHBOARD -> Unit
             LibraryTab.FAVORITES -> LibraryMediaGrid(
                 items=filteredFavorites,
                 repository=repository,
@@ -391,6 +404,90 @@ fun LibraryScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun StudioDashboard(
+    favorites:List<MediaItem>,
+    watchlist:List<MediaItem>,
+    collections:List<MediaCollection>,
+    scenes:List<SceneBookmark>,
+    onHistory:()->Unit,
+    onDownloads:()->Unit
+) {
+    val total=favorites.size+watchlist.size
+    val movies=(favorites+watchlist).distinctBy { it.key }.count { it.type==MediaType.MOVIE }
+    val series=(favorites+watchlist).distinctBy { it.key }.count { it.type==MediaType.TV }
+    Column(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp)) {
+        Surface(
+            color=FqSurface,
+            shape=RoundedCornerShape(24.dp),
+            border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.07f)),
+            modifier=Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Icon(Icons.Default.Insights,null,tint=FqGold)
+                    Spacer(Modifier.width(7.dp))
+                    Text("نمای کلی سینمایی",fontSize=16.sp,fontWeight=FontWeight.Black)
+                    Spacer(Modifier.weight(1f))
+                    Text("FILMIQOO STUDIO",color=FqGold,fontSize=7.sp,fontWeight=FontWeight.Bold)
+                }
+                Row(Modifier.fillMaxWidth().padding(top=15.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    StudioMetric("آرشیو",total.toString(),Icons.Default.VideoLibrary,Modifier.weight(1f))
+                    StudioMetric("فیلم",movies.toString(),Icons.Default.Movie,Modifier.weight(1f))
+                    StudioMetric("سریال",series.toString(),Icons.Default.Tv,Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    StudioMetric("کالکشن",collections.size.toString(),Icons.Default.CollectionsBookmark,Modifier.weight(1f))
+                    StudioMetric("لحظه",scenes.size.toString(),Icons.Default.Bookmarks,Modifier.weight(1f))
+                    StudioMetric("صف",watchlist.size.toString(),Icons.Default.PlaylistPlay,Modifier.weight(1f))
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            StudioAction("تاریخچه تماشا","ادامه از جایی که ماندی",Icons.Default.History,onHistory,Modifier.weight(1f))
+            StudioAction("آفلاین","دانلودهای آماده پخش",Icons.Default.Download,onDownloads,Modifier.weight(1f))
+        }
+        Surface(
+            color=FqGold.copy(alpha=.08f),
+            shape=RoundedCornerShape(20.dp),
+            modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+        ) {
+            Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically) {
+                Box(Modifier.size(42.dp).background(FqGold.copy(alpha=.14f),RoundedCornerShape(13.dp)),contentAlignment=Alignment.Center) {
+                    Icon(Icons.Default.Fingerprint,null,tint=FqGold)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("Film DNA",fontSize=13.sp,fontWeight=FontWeight.Black)
+                    Text("پروفایل سلیقه‌ات با هر ذخیره و تماشا دقیق‌تر می‌شود",color=FqMuted,fontSize=9.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudioMetric(label:String,value:String,icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier) {
+    Surface(color=Color.White.copy(alpha=.045f),shape=RoundedCornerShape(16.dp),modifier=modifier) {
+        Column(Modifier.padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+            Icon(icon,null,tint=FqGold,modifier=Modifier.size(17.dp))
+            Text(value,fontSize=18.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(top=4.dp))
+            Text(label,color=FqMuted,fontSize=8.sp)
+        }
+    }
+}
+
+@Composable
+private fun StudioAction(title:String,subtitle:String,icon:androidx.compose.ui.graphics.vector.ImageVector,onClick:()->Unit,modifier:Modifier=Modifier) {
+    Surface(color=FqSurface,shape=RoundedCornerShape(18.dp),modifier=modifier.clickable(onClick=onClick)) {
+        Column(Modifier.padding(13.dp)) {
+            Icon(icon,null,tint=FqGold)
+            Text(title,fontSize=11.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=8.dp))
+            Text(subtitle,color=FqMuted,fontSize=7.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
     }
 }
 
