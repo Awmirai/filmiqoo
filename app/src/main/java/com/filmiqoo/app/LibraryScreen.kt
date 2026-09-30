@@ -42,6 +42,7 @@ fun LibraryScreen(
     onPlay: (PlaybackTarget) -> Unit,
     onDownloads: () -> Unit = {},
     onHistory: () -> Unit = {},
+    onFilmDna: () -> Unit = {},
     onRequireAuth: () -> Unit = {},
     showBack: Boolean = true
 ) {
@@ -235,7 +236,8 @@ fun LibraryScreen(
                 collections=collections,
                 scenes=sceneBookmarks,
                 onHistory=onHistory,
-                onDownloads=onDownloads
+                onDownloads=onDownloads,
+                onFilmDna=onFilmDna
             )
         }
 
@@ -414,7 +416,8 @@ private fun StudioDashboard(
     collections:List<MediaCollection>,
     scenes:List<SceneBookmark>,
     onHistory:()->Unit,
-    onDownloads:()->Unit
+    onDownloads:()->Unit,
+    onFilmDna:()->Unit
 ) {
     val total=favorites.size+watchlist.size
     val movies=(favorites+watchlist).distinctBy { it.key }.count { it.type==MediaType.MOVIE }
@@ -453,7 +456,7 @@ private fun StudioDashboard(
         Surface(
             color=FqGold.copy(alpha=.08f),
             shape=RoundedCornerShape(20.dp),
-            modifier=Modifier.fillMaxWidth().padding(top=10.dp)
+            modifier=Modifier.fillMaxWidth().padding(top=10.dp).clickable(onClick=onFilmDna)
         ) {
             Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically) {
                 Box(Modifier.size(42.dp).background(FqGold.copy(alpha=.14f),RoundedCornerShape(13.dp)),contentAlignment=Alignment.Center) {
@@ -464,6 +467,8 @@ private fun StudioDashboard(
                     Text("Film DNA",fontSize=13.sp,fontWeight=FontWeight.Black)
                     Text("پروفایل سلیقه‌ات با هر ذخیره و تماشا دقیق‌تر می‌شود",color=FqMuted,fontSize=9.sp)
                 }
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
             }
         }
     }
