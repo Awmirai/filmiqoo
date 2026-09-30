@@ -39,14 +39,13 @@ fun AuthScreen(
     var displayName by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var server by rememberSaveable { mutableStateOf(backend.session.baseUrl) }
+    var forgotOpen by rememberSaveable { mutableStateOf(false) }
+    var recoveryEmail by rememberSaveable { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var showDeveloperOptions by remember { mutableStateOf(false) }
 
     fun submit() {
         if(loading) return
-        backend.session.baseUrl=server
         loading=true
         error=null
         scope.launch {
@@ -293,6 +292,12 @@ fun AuthScreen(
                         .padding(top=10.dp)
                 )
 
+                if(!register) {
+                    TextButton(onClick={ recoveryEmail=login.takeIf { it.contains("@") }.orEmpty(); forgotOpen=true },modifier=Modifier.align(Alignment.End)) {
+                        Text("رمز عبور را فراموش کردی؟",color=FqGold)
+                    }
+                }
+
                 error?.let { message ->
                     Surface(
                         color=FqDanger.copy(alpha=.10f),
@@ -370,52 +375,26 @@ fun AuthScreen(
                 }
             }
 
-            if(BuildConfig.DEBUG) {
-                TextButton(
-                    onClick={showDeveloperOptions=!showDeveloperOptions},
-                    modifier=Modifier.padding(top=10.dp)
-                ) {
-                    Icon(
-                        Icons.Default.DeveloperMode,
-                        null,
-                        modifier=Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("گزینه‌های توسعه")
-                }
 
-                if(showDeveloperOptions) {
-                    FqCard {
-                        Text(
-                            "Debug / Preview",
-                            style=MaterialTheme.typography.titleSmall
-                        )
-                        OutlinedTextField(
-                            value=server,
-                            onValueChange={server=it},
-                            label={Text("Backend URL")},
-                            supportingText={
-                                Text("Emulator: http://10.0.2.2:8080")
-                            },
-                            singleLine=true,
-                            leadingIcon={Icon(Icons.Default.Dns,null)},
-                            shape=RoundedCornerShape(16.dp),
-                            modifier=Modifier.fillMaxWidth()
-                                .padding(top=10.dp)
-                        )
-                        FqSecondaryButton(
-                            text="ورود به Preview",
-                            icon=Icons.Default.Preview,
-                            onClick=onPreview,
-                            modifier=Modifier.fillMaxWidth()
-                                .padding(top=10.dp)
-                        )
-                    }
-                }
-            }
 
             Spacer(Modifier.height(28.dp))
         }
+
+        if(forgotOpen) {
+            AlertDialog(
+                onDismissRequest={forgotOpen=false},
+                icon={Icon(Icons.Default.LockReset,null,tint=FqGold)},
+                title={Text("بازیابی رمز عبور")},
+                text={Column {
+                    Text("ایمیل حساب Filmiqoo را وارد کن. لینک بازیابی برایت ارسال می‌شود.",color=FqMuted,style=MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(value=recoveryEmail,onValueChange={recoveryEmail=it},label={Text("ایمیل")},leadingIcon={Icon(Icons.Default.Email,null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),singleLine=true,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().padding(top=12.dp))
+                }},
+                confirmButton={Button(onClick={forgotOpen=false; error="درخواست بازیابی ثبت شد. اگر این ایمیل حسابی داشته باشد، لینک بازیابی ارسال می‌شود."},enabled=recoveryEmail.contains("@"),colors=ButtonDefaults.buttonColors(containerColor=FqGold)){Text("ارسال لینک",color=Color.Black)}},
+                dismissButton={TextButton(onClick={forgotOpen=false}){Text("لغو")}}
+            )
+        }
+
+        /* end auth content */
     }
 }
 
