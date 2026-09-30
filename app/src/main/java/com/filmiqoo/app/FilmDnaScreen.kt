@@ -3,6 +3,7 @@ package com.filmiqoo.app
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,8 @@ fun FilmDnaScreen(
     var loading by remember { mutableStateOf(true) }
     var dna by remember { mutableStateOf<FilmDna?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var wrappedOpen by remember { mutableStateOf(false) }
+    var wrappedPage by remember { mutableIntStateOf(0) }
 
     BackHandler { onBack() }
 
@@ -104,7 +107,7 @@ fun FilmDnaScreen(
                 }
 
                 item {
-                    DnaWrappedCard(value)
+                    DnaWrappedCard(value,onClick={ wrappedPage=0; wrappedOpen=true })
                 }
 
                 item {
@@ -228,10 +231,25 @@ fun FilmDnaScreen(
             }
         }
     }
+
+    if(wrappedOpen && dna!=null) {
+        FilmDnaWrappedStory(
+            dna=dna!!,
+            page=wrappedPage,
+            onPage={wrappedPage=it},
+            onClose={wrappedOpen=false},
+            onShare={
+                val value=dna!!
+                val text="FILMIQOO WRAPPED • "+value.archetype+" • "+(value.genres.firstOrNull()?.let { genreLabel(it.label) } ?: "Film DNA")+" • "+value.confidence+"٪"
+                val intent=Intent(Intent.ACTION_SEND).apply { type="text/plain"; putExtra(Intent.EXTRA_TEXT,text) }
+                context.startActivity(Intent.createChooser(intent,"اشتراک Filmiqoo Wrapped"))
+            }
+        )
+    }
 }
 
 @Composable
-private fun DnaWrappedCard(dna:FilmDna) {
+private fun DnaWrappedCard(dna:FilmDna,onClick:()->Unit) {
     val topGenre=dna.genres.firstOrNull()?.let { genreLabel(it.label) } ?: "در حال کشف"
     val topDecade=dna.decades.firstOrNull()?.label ?: "—"
     val topKind=dna.kinds.firstOrNull()?.let { kindLabel(it.label) } ?: "—"
@@ -239,7 +257,7 @@ private fun DnaWrappedCard(dna:FilmDna) {
         color=FqSurface,
         shape=RoundedCornerShape(26.dp),
         border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.08f)),
-        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp)
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp).clickable(onClick=onClick)
     ) {
         Column(Modifier.padding(18.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
@@ -259,6 +277,83 @@ private fun DnaWrappedCard(dna:FilmDna) {
                 "بر اساس رفتار واقعی پروفایل • "+dna.confidence+"٪ دقت",
                 color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(top=13.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun FilmDnaWrappedStory(
+    dna:FilmDna,
+    page:Int,
+    onPage:(Int)->Unit,
+    onClose:()->Unit,
+    onShare:()->Unit
+) {
+    val pages=5
+    androidx.compose.ui.window.Dialog(onDismissRequest=onClose) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(9f/16f).clip(RoundedCornerShape(30.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF500A18),Color(0xFF251338),Color(0xFF071925))))
+                .clickable { if(page<pages-1) onPage(page+1) }
+        ) {
+            Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                repeat(pages) { i ->
+                    Box(Modifier.weight(1f).height(3.dp).background(if(i<=page) Color.White else Color.White.copy(alpha=.22f),CircleShape))
+                }
+            }
+            IconButton(onClick=onClose,modifier=Modifier.align(Alignment.TopEnd).padding(top=22.dp,end=8.dp)) {
+                Icon(Icons.Default.Close,null,tint=Color.White)
+            }
+            Column(
+                Modifier.align(Alignment.Center).fillMaxWidth().padding(28.dp),
+                horizontalAlignment=Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    when(page) {
+                        0 -> Icons.Default.AutoAwesome
+                        1 -> Icons.Default.Category
+                        2 -> Icons.Default.Schedule
+                        3 -> Icons.Default.Public
+                        else -> Icons.Default.Fingerprint
+                    },null,tint=FqGold,modifier=Modifier.size(62.dp)
+                )
+                Spacer(Modifier.height(22.dp))
+                Text("FILMIQOO WRAPPED",color=FqGold,fontSize=10.sp,fontWeight=FontWeight.Black)
+                Spacer(Modifier.height(8.dp))
+                when(page) {
+                    0 -> {
+                        Text(dna.archetype,fontSize=30.sp,fontWeight=FontWeight.Black)
+                        Text("این امضای سینمایی توئه",color=Color.White.copy(alpha=.7f),fontSize=12.sp)
+                    }
+                    1 -> {
+                        Text(dna.genres.firstOrNull()?.let { genreLabel(it.label) } ?: "در حال کشف",fontSize=34.sp,fontWeight=FontWeight.Black)
+                        Text("ژانری که بیشتر از همه سمتش می‌ری",color=Color.White.copy(alpha=.7f),fontSize=12.sp)
+                    }
+                    2 -> {
+                        Text(formatDnaWatchTime(dna.stats.watchMinutes),fontSize=38.sp,fontWeight=FontWeight.Black)
+                        Text("زمان ثبت‌شده تماشای تو",color=Color.White.copy(alpha=.7f),fontSize=12.sp)
+                    }
+                    3 -> {
+                        Text(dna.languages.firstOrNull()?.let { languageLabelDna(it.label) } ?: "سینمای جهان",fontSize=32.sp,fontWeight=FontWeight.Black)
+                        Text((dna.decades.firstOrNull()?.label ?: "—")+" • دهه محبوب",color=Color.White.copy(alpha=.7f),fontSize=12.sp)
+                    }
+                    else -> {
+                        Text(dna.confidence.toString()+"٪",fontSize=44.sp,fontWeight=FontWeight.Black)
+                        Text("دقت Film DNA",color=Color.White.copy(alpha=.7f),fontSize=12.sp)
+                        Button(onClick=onShare,colors=ButtonDefaults.buttonColors(containerColor=FqGold),modifier=Modifier.padding(top=24.dp)) {
+                            Icon(Icons.Default.Share,null,tint=Color.Black)
+                            Spacer(Modifier.width(6.dp))
+                            Text("اشتراک Wrapped",color=Color.Black,fontWeight=FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            if(page>0) {
+                TextButton(onClick={onPage(page-1)},modifier=Modifier.align(Alignment.BottomStart).padding(12.dp)) { Text("قبلی",color=Color.White) }
+            }
+            if(page<pages-1) {
+                Text("برای ادامه لمس کن",color=Color.White.copy(alpha=.55f),fontSize=9.sp,modifier=Modifier.align(Alignment.BottomCenter).padding(22.dp))
+            }
         }
     }
 }
