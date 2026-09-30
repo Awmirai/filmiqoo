@@ -58,6 +58,12 @@ type Config struct {
 	PostgresMinConns int
 	RedisPoolSize int
 	APIRequestTimeoutSeconds int
+	SMTPHost string
+	SMTPPort int
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom string
+	PasswordResetBaseURL string
 }
 
 func Load() Config {
@@ -108,6 +114,12 @@ func Load() Config {
 		PostgresMinConns: envInt("POSTGRES_MIN_CONNS", 4),
 		RedisPoolSize: envInt("REDIS_POOL_SIZE", 60),
 		APIRequestTimeoutSeconds: envInt("API_REQUEST_TIMEOUT_SECONDS", 20),
+		SMTPHost: strings.TrimSpace(os.Getenv("SMTP_HOST")),
+		SMTPPort: envInt("SMTP_PORT",587),
+		SMTPUsername: strings.TrimSpace(os.Getenv("SMTP_USERNAME")),
+		SMTPPassword: strings.TrimSpace(os.Getenv("SMTP_PASSWORD")),
+		SMTPFrom: env("SMTP_FROM","Filmiqoo <no-reply@filmiqoo.com>"),
+		PasswordResetBaseURL: env("PASSWORD_RESET_BASE_URL","https://filmiqoo.com/reset-password"),
 	}
 }
 
