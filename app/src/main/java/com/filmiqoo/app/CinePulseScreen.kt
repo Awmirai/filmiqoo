@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-private enum class CinePulseMode { NOW, REVIEWS, ROOMS, CLIPS }
+private enum class CinePulseMode { FOR_YOU, NOW, REVIEWS, ROOMS, CLIPS }
 
 @Composable
 fun CinePulseScreen(
@@ -59,13 +59,13 @@ fun CinePulseScreen(
     var modeName by rememberSaveable {
         mutableStateOf(
             if(initialPostId.isNullOrBlank())
-                CinePulseMode.NOW.name
+                CinePulseMode.FOR_YOU.name
             else
                 CinePulseMode.REVIEWS.name
         )
     }
     val mode=runCatching { CinePulseMode.valueOf(modeName) }
-        .getOrDefault(CinePulseMode.NOW)
+        .getOrDefault(CinePulseMode.FOR_YOU)
 
     LaunchedEffect(initialPostId) {
         if(!initialPostId.isNullOrBlank()) {
@@ -171,6 +171,22 @@ fun CinePulseScreen(
         }
 
         when(mode) {
+            CinePulseMode.FOR_YOU -> {
+                val smartTrends=trending.sortedByDescending { it.watchingNow*3 + it.reactions }.take(8)
+                val smartPosts=posts.sortedByDescending { it.likes*2 + it.comments*3 }.take(8)
+                if(smartTrends.isNotEmpty()) {
+                    item { PulseSectionTitle("پیشنهاد برای تو","ترکیبی از ترند زنده و تعامل کاربران",Icons.Default.AutoAwesome) }
+                    item { PulseTrendRail(smartTrends,repository,onMedia) }
+                }
+                if(loggedIn && watching.isNotEmpty()) {
+                    item { PulseSectionTitle("دایره تو","چیزهایی که آدم‌های دنبال‌شده الان می‌بینند",Icons.Default.Groups) }
+                    item { PulseWatchingRail(watching,repository,onMedia) }
+                }
+                if(smartPosts.isNotEmpty()) {
+                    item { PulseSectionTitle("بحث‌های ارزش دیدن","نقد و گفتگوهای پرتعامل همین حالا",Icons.Default.Bolt) }
+                    items(smartPosts,key={it.id}) { post -> PulsePostCard(post,repository,onMedia,onOpenPost,onCreator) }
+                }
+            }
             CinePulseMode.NOW -> {
                 if(loggedIn && watching.isNotEmpty()) {
                     item {
@@ -291,6 +307,7 @@ fun CinePulseScreen(
         }
 
         val modeEmpty=when(mode) {
+            CinePulseMode.FOR_YOU -> trending.isEmpty() && watching.isEmpty() && posts.isEmpty()
             CinePulseMode.NOW ->
                 trending.isEmpty() && watching.isEmpty() && posts.isEmpty()
             CinePulseMode.REVIEWS -> posts.isEmpty()
@@ -301,12 +318,14 @@ fun CinePulseScreen(
             item {
                 PremiumEmptyState(
                     icon=when(mode) {
+                        CinePulseMode.FOR_YOU -> Icons.Default.AutoAwesome
                         CinePulseMode.NOW -> Icons.Default.Whatshot
                         CinePulseMode.REVIEWS -> Icons.Default.RateReview
                         CinePulseMode.ROOMS -> Icons.Default.Forum
                         CinePulseMode.CLIPS -> Icons.Default.SmartDisplay
                     },
                     title=when(mode) {
+                        CinePulseMode.FOR_YOU -> "هنوز پیشنهاد شخصی آماده نیست"
                         CinePulseMode.NOW -> "فعلاً ترند تازه‌ای نیست"
                         CinePulseMode.REVIEWS -> "هنوز نقد تازه‌ای نیست"
                         CinePulseMode.ROOMS -> "گفتگوی بازی نیست"
@@ -331,6 +350,7 @@ private fun PulseModeBar(
         horizontalArrangement=Arrangement.spacedBy(8.dp)
     ) {
         listOf(
+            Triple(CinePulseMode.FOR_YOU,Icons.Default.AutoAwesome,"برای تو"),
             Triple(CinePulseMode.NOW,Icons.Default.Whatshot,"الان"),
             Triple(CinePulseMode.REVIEWS,Icons.Default.RateReview,"نقدها"),
             Triple(CinePulseMode.ROOMS,Icons.Default.Forum,"گفتگوها"),
@@ -388,7 +408,8 @@ private fun PulseHeader(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("کشف",fontSize=28.sp,fontWeight=FontWeight.Black)
+                    Text("کشف",fontSize=30.sp,fontWeight=FontWeight.Black)
+                    Text("DISCOVER • LIVE",color=FqGold,fontSize=8.sp,fontWeight=FontWeight.Bold)
                     Text(
                         "مرکز کشف زنده فیلم‌ها، واکنش‌ها، گفتگوها و کلیپ‌های داغ",
                         color=FqMuted,
