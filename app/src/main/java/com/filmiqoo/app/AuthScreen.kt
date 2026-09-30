@@ -389,7 +389,17 @@ fun AuthScreen(
                     Text("ایمیل حساب Filmiqoo را وارد کن. لینک بازیابی برایت ارسال می‌شود.",color=FqMuted,style=MaterialTheme.typography.bodySmall)
                     OutlinedTextField(value=recoveryEmail,onValueChange={recoveryEmail=it},label={Text("ایمیل")},leadingIcon={Icon(Icons.Default.Email,null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),singleLine=true,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().padding(top=12.dp))
                 }},
-                confirmButton={Button(onClick={forgotOpen=false; error="درخواست بازیابی ثبت شد. اگر این ایمیل حسابی داشته باشد، لینک بازیابی ارسال می‌شود."},enabled=recoveryEmail.contains("@"),colors=ButtonDefaults.buttonColors(containerColor=FqGold)){Text("ارسال لینک",color=Color.Black)}},
+                confirmButton={Button(onClick={
+                    if(!loading) {
+                        loading=true
+                        scope.launch {
+                            runCatching { backend.requestPasswordReset(recoveryEmail.trim()) }
+                                .onSuccess { forgotOpen=false; error="اگر این ایمیل در Filmiqoo ثبت شده باشد، لینک بازیابی ارسال شده است." }
+                                .onFailure { error=it.message ?: "ارسال درخواست بازیابی انجام نشد." }
+                            loading=false
+                        }
+                    }
+                },enabled=recoveryEmail.contains("@") && !loading,colors=ButtonDefaults.buttonColors(containerColor=FqGold)){Text(if(loading)"در حال ارسال…" else "ارسال لینک",color=Color.Black)}},
                 dismissButton={TextButton(onClick={forgotOpen=false}){Text("لغو")}}
             )
         }
