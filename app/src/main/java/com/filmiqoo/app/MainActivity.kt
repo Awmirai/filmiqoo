@@ -669,6 +669,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onPlay={pushOverlay(OverlayRoute.Player(it))},
                     onDownloads={pushOverlay(OverlayRoute.Downloads)},
                     onHistory={pushOverlay(OverlayRoute.History)},
+                    onFilmDna={pushOverlay(OverlayRoute.FilmDna)},
                     onRequireAuth={pushOverlay(OverlayRoute.Auth)}
                 )
                 OverlayRoute.SocialSaves -> SavedSocialScreen(
@@ -1044,6 +1045,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onPlay={overlay=OverlayRoute.Player(it)},
                             onDownloads={overlay=OverlayRoute.Downloads},
                             onHistory={overlay=OverlayRoute.History},
+                            onFilmDna={overlay=OverlayRoute.FilmDna},
                             onRequireAuth={overlay=OverlayRoute.Auth},
                             showBack=false
                         )
