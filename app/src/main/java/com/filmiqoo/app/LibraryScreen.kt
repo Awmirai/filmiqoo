@@ -72,9 +72,9 @@ fun LibraryScreen(
                         .fillMaxWidth()
                         .padding(18.dp)
                 ) {
-                    Text("کتابخانه من",fontSize=27.sp,fontWeight=FontWeight.Black)
+                    Text("استودیوی من",fontSize=27.sp,fontWeight=FontWeight.Black)
                     Text(
-                        "ذخیره‌ها، دانلودها، تاریخچه و لیست‌های شخصی",
+                        "فضای شخصی تو برای مدیریت تماشا، لحظه‌ها، دانلودها و کالکشن‌ها",
                         color=FqMuted,
                         fontSize=11.sp,
                         modifier=Modifier.padding(top=3.dp)
@@ -83,8 +83,8 @@ fun LibraryScreen(
             }
             PremiumEmptyState(
                 icon=Icons.Default.Lock,
-                title="برای دیدن کتابخانه وارد شو",
-                body="بعد از ورود، علاقه‌مندی‌ها، «بعداً می‌بینم»، دانلودهای آفلاین، تاریخچه و لیست‌های شخصی‌ات اینجا همگام می‌شن.",
+                title="برای ورود به استودیوی خودت وارد شو",
+                body="بعد از ورود، صف تماشا، علاقه‌مندی‌ها، دانلودها، تاریخچه، لحظه‌های ذخیره‌شده و کالکشن‌های تو اینجا یکجا همگام می‌شن.",
                 action="ورود به حساب",
                 onAction=onRequireAuth
             )
@@ -239,10 +239,10 @@ fun LibraryScreen(
             contentColor=FqGold
         ) {
             listOf(
-                LibraryTab.WATCHLIST to "بعداً",
-                LibraryTab.FAVORITES to "علاقه‌مندی",
-                LibraryTab.COLLECTIONS to "لیست‌ها",
-                LibraryTab.SCENES to "لحظه‌ها"
+                LibraryTab.WATCHLIST to "صف تماشا",
+                LibraryTab.FAVORITES to "منتخب‌ها",
+                LibraryTab.COLLECTIONS to "کالکشن‌ها",
+                LibraryTab.SCENES to "لحظه‌های من"
             ).forEach { item ->
                 Tab(
                     selected=tab==item.first,
@@ -438,12 +438,12 @@ private fun LibraryHeader(
                 .padding(bottom=18.dp)
         ) {
             Text(
-                "کتابخانه من",
+                "استودیوی من",
                 fontSize=30.sp,
                 fontWeight=FontWeight.Black
             )
             Text(
-                "برای بعد، دانلود آفلاین، تاریخچه و چیزهایی که دوست داشتی",
+                "داشبورد شخصی تماشای تو؛ صف، آرشیو، لحظه‌ها و کالکشن‌ها",
                 color=FqMuted,
                 fontSize=10.sp,
                 modifier=Modifier.padding(top=2.dp)
