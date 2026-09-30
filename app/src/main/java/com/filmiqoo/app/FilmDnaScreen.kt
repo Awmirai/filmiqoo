@@ -104,6 +104,10 @@ fun FilmDnaScreen(
                 }
 
                 item {
+                    DnaWrappedCard(value)
+                }
+
+                item {
                     DnaStatsGrid(value.stats)
                 }
 
@@ -227,14 +231,57 @@ fun FilmDnaScreen(
 }
 
 @Composable
+private fun DnaWrappedCard(dna:FilmDna) {
+    val topGenre=dna.genres.firstOrNull()?.let { genreLabel(it.label) } ?: "در حال کشف"
+    val topDecade=dna.decades.firstOrNull()?.label ?: "—"
+    val topKind=dna.kinds.firstOrNull()?.let { kindLabel(it.label) } ?: "—"
+    Surface(
+        color=FqSurface,
+        shape=RoundedCornerShape(26.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp,Color.White.copy(alpha=.08f)),
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp)
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("FILMIQOO WRAPPED",color=FqGold,fontSize=9.sp,fontWeight=FontWeight.Black)
+                    Text("امضای سینمایی تو",fontSize=20.sp,fontWeight=FontWeight.Black)
+                }
+                Icon(Icons.Default.Fingerprint,null,tint=FqGold,modifier=Modifier.size(34.dp))
+            }
+            Text("«"+dna.archetype+"»",fontSize=17.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=15.dp))
+            Row(Modifier.fillMaxWidth().padding(top=14.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                WrappedPill("ژانر اول",topGenre,Modifier.weight(1f))
+                WrappedPill("فرمت",topKind,Modifier.weight(1f))
+                WrappedPill("دهه",topDecade,Modifier.weight(1f))
+            }
+            Text(
+                "بر اساس رفتار واقعی پروفایل • "+dna.confidence+"٪ دقت",
+                color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(top=13.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun WrappedPill(label:String,value:String,modifier:Modifier=Modifier) {
+    Surface(color=Color.White.copy(alpha=.05f),shape=RoundedCornerShape(16.dp),modifier=modifier) {
+        Column(Modifier.padding(horizontal=9.dp,vertical=11.dp)) {
+            Text(label,color=FqMuted,fontSize=7.sp)
+            Text(value,fontSize=10.sp,fontWeight=FontWeight.Black,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=3.dp))
+        }
+    }
+}
+
+@Composable
 private fun DnaHero(
     dna:FilmDna,
     onShare:()->Unit
 ) {
     Box(
-        Modifier.fillMaxWidth().height(280.dp).background(
+        Modifier.fillMaxWidth().height(330.dp).background(
             Brush.linearGradient(
-                listOf(Color(0xFF18243D),Color(0xFF3A2807),FqBg)
+                listOf(Color(0xFF4A0710),Color(0xFF24152F),Color(0xFF07131F),FqBg)
             )
         )
     ) {
@@ -245,23 +292,23 @@ private fun DnaHero(
         ) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(64.dp).clip(CircleShape)
-                        .background(FqGold.copy(alpha=.16f)),
+                    Modifier.size(78.dp).clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(FqGold,Color(0xFFFF5B6E)))),
                     contentAlignment=Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.AutoAwesome,
                         null,
-                        tint=FqGold,
-                        modifier=Modifier.size(34.dp)
+                        tint=Color.White,
+                        modifier=Modifier.size(38.dp)
                     )
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(dna.profileName,color=FqMuted,fontSize=11.sp)
+                    Text("YOUR FILM DNA • "+dna.profileName.uppercase(),color=FqGold,fontSize=9.sp,fontWeight=FontWeight.Bold)
                     Text(
                         dna.archetype,
-                        fontSize=24.sp,
+                        fontSize=28.sp,
                         fontWeight=FontWeight.Black,
                         maxLines=2,
                         overflow=TextOverflow.Ellipsis
@@ -286,12 +333,15 @@ private fun DnaHero(
                     )
                 }
                 Spacer(Modifier.width(10.dp))
-                Text(
+                Surface(color=FqGold.copy(alpha=.13f),shape=RoundedCornerShape(12.dp)) {
+                    Text(
                     dna.confidence.toString()+"٪",
                     color=FqGold,
                     fontSize=14.sp,
-                    fontWeight=FontWeight.Black
-                )
+                    fontWeight=FontWeight.Black,
+                    modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp)
+                    )
+                }
             }
 
             Text(
