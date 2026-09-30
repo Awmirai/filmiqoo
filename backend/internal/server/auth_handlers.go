@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"regexp"
@@ -30,6 +31,34 @@ type loginRequest struct {
 	Login string `json:"login"`
 	Password string `json:"password"`
 	DeviceName string `json:"deviceName"`
+}
+
+
+type forgotPasswordRequest struct { Email string `json:"email"` }
+
+func (s *Server) forgotPassword(w http.ResponseWriter,r *http.Request) {
+    var body forgotPasswordRequest
+    if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
+    email:=strings.ToLower(strings.TrimSpace(body.Email))
+    // Always return the same response to avoid leaking whether an account exists.
+    if email=="" || !strings.Contains(email,"@") {
+        writeJSON(w,http.StatusOK,map[string]bool{"ok":true}); return
+    }
+    var userID string
+    if err:=s.db.QueryRow(r.Context(),"SELECT id::text FROM users WHERE lower(email::text)=lower($1) AND status='active' LIMIT 1",email).Scan(&userID); err==nil {
+        token,tokenHash,err:=newRefreshToken()
+        if err==nil {
+            _,_=s.db.Exec(r.Context(),`
+                INSERT INTO password_reset_tokens (user_id,token_hash,expires_at)
+                VALUES ($1,$2,now()+interval '30 minutes')
+            `,userID,tokenHash)
+            // Until an SMTP/provider is configured, emit only the reset URL in non-production logs.
+            if !s.cfg.IsProduction() {
+                log.Printf("password reset for %s: %s/reset-password?token=%s",email,strings.TrimRight(s.cfg.PublicAPIBaseURL,"/"),token)
+            }
+        }
+    }
+    writeJSON(w,http.StatusOK,map[string]bool{"ok":true})
 }
 
 type refreshRequest struct {
