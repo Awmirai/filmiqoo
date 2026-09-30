@@ -11,6 +11,7 @@ import (
 	"github.com/Awmirai/filmiqoo/backend/internal/config"
 	"github.com/Awmirai/filmiqoo/backend/internal/server"
 	"github.com/Awmirai/filmiqoo/backend/internal/storage"
+	"github.com/Awmirai/filmiqoo/backend/internal/telegramlistener"
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 	defer redisClient.Close()
 
 	srv := server.New(cfg, db, redisClient)
+	go telegramlistener.Run(ctx,cfg)
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf(
