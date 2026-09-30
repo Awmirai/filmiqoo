@@ -5,6 +5,10 @@ import "testing"
 func strongProductionConfig() Config {
 	return Config{
 		Environment:"production",
+		SMTPHost:"smtp.example.com",
+		SMTPPort:587,
+		SMTPFrom:"Filmiqoo <security@example.com>",
+		SMTPTLSMode:"starttls",
 		DatabaseURL:"postgres://filmiqoo:secret@db.example.com:5432/filmiqoo?sslmode=require",
 		RedisAddr:"redis.example.com:6379",
 		JWTSecret:"0123456789abcdef0123456789abcdef0123456789abcdef",

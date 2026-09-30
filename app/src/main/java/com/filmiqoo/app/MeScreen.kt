@@ -626,7 +626,7 @@ private fun MeMetric(
         horizontalAlignment=Alignment.CenterHorizontally
     ) {
         Text(value,fontSize=15.sp,fontWeight=FontWeight.Black)
-        Text(label,color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=2.dp))
+        Text(label,color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=2.dp))
     }
 }
 
@@ -727,7 +727,7 @@ private fun MeTabs(
                     Text(
                         label,
                         color=fg,
-                        fontSize=11.sp,
+                        fontSize=12.sp,
                         fontWeight=if(active) FontWeight.Bold else FontWeight.Medium
                     )
                 }
@@ -776,7 +776,7 @@ private fun MePostCard(
                         else -> "Post"
                     },
                     color=FqMuted,
-                    fontSize=10.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold
                 )
                 post.publishedAt?.let { value ->
@@ -786,7 +786,7 @@ private fun MePostCard(
                         Text(
                             "• "+relative,
                             color=FqMuted,
-                            fontSize=9.sp
+                            fontSize=12.sp
                         )
                     }
                 }
@@ -794,7 +794,7 @@ private fun MePostCard(
                 Text(
                     compactMeCount(post.likes)+" پسند",
                     color=FqMuted,
-                    fontSize=10.sp
+                    fontSize=12.sp
                 )
                 IconButton(
                     onClick=onMore,
@@ -841,7 +841,7 @@ private fun MePostCard(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 media.title,
-                                fontSize=11.sp,
+                                fontSize=12.sp,
                                 fontWeight=FontWeight.Bold,
                                 maxLines=2,
                                 overflow=TextOverflow.Ellipsis
@@ -849,7 +849,7 @@ private fun MePostCard(
                             Text(
                                 media.year,
                                 color=FqMuted,
-                                fontSize=10.sp,
+                                fontSize=12.sp,
                                 modifier=Modifier.padding(top=3.dp)
                             )
                         }
@@ -919,7 +919,7 @@ private fun MeClipCard(
                 Text(
                     clip.media?.title ?: clip.caption,
                     color=Color.White,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=2,
                     overflow=TextOverflow.Ellipsis
@@ -927,7 +927,7 @@ private fun MeClipCard(
                 Text(
                     compactMeCount(clip.views)+" بازدید",
                     color=Color.White.copy(alpha=.68f),
-                    fontSize=9.sp,
+                    fontSize=12.sp,
                     modifier=Modifier.padding(top=4.dp)
                 )
             }
@@ -976,14 +976,14 @@ private fun MeContinueCard(
         }
         Text(
             item.media.title,
-            fontSize=11.sp,
+            fontSize=12.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
             modifier=Modifier.padding(top=7.dp)
         )
         if(item.episodeLabel.isNotBlank()) {
-            Text(item.episodeLabel,color=FqMuted,fontSize=9.sp)
+            Text(item.episodeLabel,color=FqMuted,fontSize=12.sp)
         }
     }
 }
@@ -997,7 +997,7 @@ private fun MeSectionTitle(
         Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=20.dp,bottom=10.dp)
     ) {
         Text(title,fontSize=18.sp,fontWeight=FontWeight.Black)
-        Text(subtitle,color=FqMuted,fontSize=10.sp,modifier=Modifier.padding(top=2.dp))
+        Text(subtitle,color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=2.dp))
     }
 }
 
@@ -1029,7 +1029,7 @@ private fun MeEmptyCard(
             Text(
                 body,
                 color=FqMuted,
-                fontSize=11.sp,
+                fontSize=12.sp,
                 lineHeight=17.sp,
                 modifier=Modifier.padding(top=5.dp)
             )
@@ -1128,7 +1128,7 @@ private fun MeTool(
             verticalArrangement=Arrangement.Center
         ) {
             Icon(icon,null,tint=Color.White,modifier=Modifier.size(20.dp))
-            Text(label,fontSize=9.sp,color=FqMuted,modifier=Modifier.padding(top=7.dp))
+            Text(label,fontSize=12.sp,color=FqMuted,modifier=Modifier.padding(top=7.dp))
         }
     }
 }
@@ -1163,7 +1163,7 @@ private fun MeMoreSheet(
         Text(
             "@"+profile.username,
             color=FqMuted,
-            fontSize=11.sp,
+            fontSize=12.sp,
             modifier=Modifier.padding(bottom=10.dp)
         )
 
@@ -1212,7 +1212,7 @@ private fun MeSheetSectionTitle(title:String) {
     Text(
         title,
         color=FqMuted,
-        fontSize=10.sp,
+        fontSize=12.sp,
         fontWeight=FontWeight.Bold,
         modifier=Modifier.padding(
             start=12.dp,

@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	fcm *fcmClient
 	fcmInitError string
 	workersCancel context.CancelFunc
+	recoveryMailer func(context.Context,recoveryEmail) error
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
@@ -97,6 +99,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		).Post("/telemetry/events",s.telemetryEvent)
 
 		r.Route("/auth", func(r chi.Router) {
+			r.With(s.authRateLimit("password-recovery",5,15*time.Minute)).Post("/password/forgot",s.requestPasswordReset)
+			r.With(s.authRateLimit("password-reset",10,15*time.Minute)).Post("/password/reset",s.resetPassword)
 			r.With(
 				s.authRateLimit(
 					"register",
@@ -414,6 +418,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	go s.runTelegramIngestWorker(workerCtx)
 	go s.runTelemetryMaintenanceWorker(workerCtx)
 	go s.runUploadCleanupWorker(workerCtx)
+	go s.runRecoveryDeliveryWorker(workerCtx)
 	return s
 }
 
@@ -735,6 +740,22 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		if err != nil || sub == "" {
 			writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"missing subject"})
 			return
+		}
+		var tokenVersion int64
+		if raw,exists:=claims["ver"];exists {
+			value,ok:=raw.(float64)
+			if !ok || value<0 || value!=float64(int64(value)) {
+				writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"invalid token version"}); return
+			}
+			tokenVersion=int64(value)
+		}
+		var currentVersion int64
+		err = s.db.QueryRow(r.Context(),"SELECT auth_version FROM users WHERE id=$1 AND status='active'",sub).Scan(&currentVersion)
+		if err != nil && !errors.Is(err,pgx.ErrNoRows) {
+			writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"authentication temporarily unavailable"}); return
+		}
+		if err!=nil || currentVersion!=tokenVersion {
+			writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"session expired; sign in again"}); return
 		}
 		if s.redis!=nil {
 			blocked,redisErr:=s.redis.Exists(

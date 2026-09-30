@@ -19,20 +19,24 @@ val releaseKeyAlias =
     System.getenv("FILMIQOO_KEY_ALIAS").orEmpty()
 val releaseKeyPassword =
     System.getenv("FILMIQOO_KEY_PASSWORD").orEmpty()
+val privacyPolicyUrl = System.getenv("FILMIQOO_PRIVACY_POLICY_URL").orEmpty()
+val termsUrl = System.getenv("FILMIQOO_TERMS_URL").orEmpty()
 val requireReleaseSigning =
     System.getenv("FILMIQOO_REQUIRE_SIGNING")?.equals("true",ignoreCase=true)==true
 
 android {
     namespace = "com.filmiqoo.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
+        buildConfigField("String","PRIVACY_POLICY_URL",quotedBuildConfig(privacyPolicyUrl))
+        buildConfigField("String","TERMS_URL",quotedBuildConfig(termsUrl))
         applicationId =
             System.getenv("FILMIQOO_APPLICATION_ID") ?: "com.filmiqoo.previewfix"
         minSdk = 26
-        targetSdk = 35
-        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 4
-        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.4-connected-preview"
+        targetSdk = 36
+        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 5
+        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "1.0.0-rc1"
         buildConfigField(
             "String",
             "FIREBASE_API_KEY",
@@ -102,6 +106,14 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty("roborazzi.test.record", "true")
+            it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+        }
+    }
+
     lint {
         lintConfig=file("lint.xml")
         abortOnError=true
@@ -119,6 +131,12 @@ val verifyProductionReleaseConfig=tasks.register("verifyProductionReleaseConfig"
             "FILMIQOO_RELEASE_API_BASE_URL must be a non-empty HTTPS URL"
         }
         if(requireReleaseSigning) {
+            require(!System.getenv("FILMIQOO_APPLICATION_ID").isNullOrBlank()) {
+                "FILMIQOO_APPLICATION_ID is required for production (use the existing Play application ID)"
+            }
+            require(privacyPolicyUrl.startsWith("https://") && termsUrl.startsWith("https://")) {
+                "Published HTTPS privacy policy and terms URLs are required for production"
+            }
             require(releaseKeystorePath.isNotBlank()) {
                 "FILMIQOO_KEYSTORE_PATH is required for signed production releases"
             }
@@ -161,4 +179,10 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.29.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.29.0")
 }

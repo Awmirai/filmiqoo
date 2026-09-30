@@ -25,9 +25,18 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.11.1'
       - name: Run Android unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Upload UI previews and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ui-review-${{ github.sha }}
+          path: |
+            app/build/outputs/ui-review/*.png
+            app/build/reports/tests/
+          if-no-files-found: ignore
       - name: Run Android lint
         run: gradle :app:lintDebug --stacktrace
       - name: Print Android lint report

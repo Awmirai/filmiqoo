@@ -112,7 +112,7 @@ fun StreamingExploreScreen(
                     Text(
                         "از حال‌وهوات شروع کن، نه از یک لیست بی‌پایان",
                         color=FqMuted,
-                        fontSize=11.sp
+                        fontSize=12.sp
                     )
                 }
                 FqIconButton(
@@ -175,7 +175,7 @@ fun StreamingExploreScreen(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=10.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(horizontal=16.dp,vertical=6.dp)
             )
         }
@@ -315,7 +315,7 @@ private fun ExploreHeroStrip(
                     Text(
                         listOf(media.year,if(media.vote>0)"★ "+formatVote(media.vote) else "").filter(String::isNotBlank).joinToString(" • "),
                         color=Color.White.copy(alpha=.72f),
-                        fontSize=9.sp
+                        fontSize=12.sp
                     )
                 }
             }
@@ -358,7 +358,7 @@ private fun ExploreLaneHeader(
             Text(
                 subtitle+" • "+count+" عنوان",
                 color=FqMuted,
-                fontSize=9.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(top=2.dp)
             )
         }
@@ -375,7 +375,7 @@ private fun ExploreMoodGrid(
 ) {
     Column(Modifier.padding(horizontal=16.dp,vertical=12.dp)) {
         Text("از یک دنیا شروع کن",fontSize=18.sp,fontWeight=FontWeight.Black)
-        Text("یک مسیر سریع برای رسیدن به چیزی که همین الان حالش رو داری",color=FqMuted,fontSize=10.sp)
+        Text("یک مسیر سریع برای رسیدن به چیزی که همین الان حالش رو داری",color=FqMuted,fontSize=12.sp)
         Row(
             Modifier.fillMaxWidth().padding(top=12.dp),
             horizontalArrangement=Arrangement.spacedBy(9.dp)
@@ -423,7 +423,7 @@ private fun ExploreMoodCard(
         Column(Modifier.padding(13.dp),verticalArrangement=Arrangement.Center) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(20.dp))
             Text(title,fontSize=12.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(top=8.dp))
-            Text(subtitle,color=FqMuted,fontSize=8.sp)
+            Text(subtitle,color=FqMuted,fontSize=12.sp)
         }
     }
 }
@@ -432,7 +432,7 @@ private fun ExploreMoodCard(
 private fun ExploreSectionTitle(title:String,subtitle:String) {
     Column(Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,top=24.dp,bottom=10.dp)) {
         Text(title,fontSize=18.sp,fontWeight=FontWeight.Black)
-        Text(subtitle,color=FqMuted,fontSize=10.sp)
+        Text(subtitle,color=FqMuted,fontSize=12.sp)
     }
 }
 
@@ -486,11 +486,11 @@ private fun ExplorePosterCard(
                 }
             }
         }
-        Text(media.title,fontSize=10.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=6.dp))
+        Text(media.title,fontSize=12.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=6.dp))
         Text(
             listOf(media.year,if(media.vote>0)"★ "+formatVote(media.vote) else "").filter(String::isNotBlank).joinToString(" • "),
             color=FqMuted,
-            fontSize=8.sp,
+            fontSize=12.sp,
             maxLines=1
         )
     }

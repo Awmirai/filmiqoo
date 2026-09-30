@@ -187,11 +187,8 @@ data class PlatformSeason(
 class SessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("filmiqoo_session_v1", Context.MODE_PRIVATE)
 
-    var baseUrl: String
-        get() = prefs.getString("base_url", BuildConfig.FILMIQOO_API_BASE_URL).orEmpty()
-            .ifBlank { BuildConfig.FILMIQOO_API_BASE_URL }
-            .trimEnd('/')
-        set(value) { prefs.edit().putString("base_url", value.trim().trimEnd('/')).apply() }
+    // The endpoint belongs to the build. Old preview overrides are ignored.
+    val baseUrl: String get() = BuildConfig.FILMIQOO_API_BASE_URL.trimEnd('/')
 
     var accessToken: String?
         get() = prefs.getString("access_token", null)
@@ -236,6 +233,16 @@ class BackendRepository(context: Context) {
     private val progressMutex = Mutex()
     private val progressRevision = MutableStateFlow(0L)
     val watchProgressRevision = progressRevision.asStateFlow()
+
+    suspend fun requestPasswordReset(email:String):Int = withContext(Dispatchers.IO) {
+        postJson("/v1/auth/password/forgot",JSONObject().put("email",email.trim()),authorized=false)
+            .optInt("retryAfterSeconds",60).coerceIn(1,3600)
+    }
+
+    suspend fun resetPassword(email:String,code:String,password:String) = withContext(Dispatchers.IO) {
+        postJson("/v1/auth/password/reset",JSONObject().put("email",email.trim()).put("code",code).put("password",password),authorized=false)
+        Unit
+    }
 
     suspend fun health(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
@@ -952,6 +959,12 @@ class BackendRepository(context: Context) {
             ?: return "خطای سرور ("+code+")"
 
         return when(message) {
+            "too many requests" ->
+                "درخواست‌های زیادی فرستاده شده؛ کمی صبر کنید و دوباره تلاش کنید."
+            "internal server error" ->
+                "سرویس موقتاً با مشکل روبه‌رو شده است. دوباره تلاش کنید."
+            "session expired; sign in again" ->
+                "نشست شما منقضی شده است. دوباره وارد حساب شوید."
             "invalid email" ->
                 "ایمیل واردشده معتبر نیست."
             "username must be 3-24 characters using letters, numbers, _ or ." ->

@@ -58,6 +58,12 @@ type Config struct {
 	PostgresMinConns int
 	RedisPoolSize int
 	APIRequestTimeoutSeconds int
+	SMTPHost string
+	SMTPPort int
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom string
+	SMTPTLSMode string
 }
 
 func Load() Config {
@@ -108,6 +114,12 @@ func Load() Config {
 		PostgresMinConns: envInt("POSTGRES_MIN_CONNS", 4),
 		RedisPoolSize: envInt("REDIS_POOL_SIZE", 60),
 		APIRequestTimeoutSeconds: envInt("API_REQUEST_TIMEOUT_SECONDS", 20),
+		SMTPHost: strings.TrimSpace(os.Getenv("SMTP_HOST")),
+		SMTPPort: envInt("SMTP_PORT",587),
+		SMTPUsername: strings.TrimSpace(os.Getenv("SMTP_USERNAME")),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom: strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		SMTPTLSMode: env("SMTP_TLS_MODE","starttls"),
 	}
 }
 
@@ -126,6 +138,7 @@ func envInt(key string, fallback int) int {
 
 
 func (c Config) Validate() error {
+	if err:=c.validateRecoveryEmail();err!=nil { return err }
 	if strings.TrimSpace(c.DatabaseURL)=="" {
 		return errors.New("DATABASE_URL is required")
 	}

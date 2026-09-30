@@ -41,9 +41,9 @@ object FqDimens {
     val Touch=48.dp
 }
 
-val FqGlass=Color(0xE60A0A0A)
+val FqGlass=Color(0xF0141C28)
 val FqBorder=Color.White.copy(alpha=.10f)
-val FqElevated=Color(0xFF171112)
+val FqElevated=Color(0xFF202B3B)
 
 @Composable
 fun PremiumTopBar(
@@ -273,7 +273,7 @@ fun PremiumChip(
         tonalElevation=elevation,
         shadowElevation=elevation,
         shape=RoundedCornerShape(FqDimens.PillRadius),
-        modifier=Modifier.heightIn(min=40.dp)
+        modifier=Modifier.heightIn(min=48.dp)
             .clickable(role=Role.Button,onClick=onClick)
     ) {
         Row(
@@ -417,7 +417,7 @@ fun FqPrimaryButton(
         ),
         shape=RoundedCornerShape(16.dp),
         contentPadding=PaddingValues(horizontal=18.dp,vertical=13.dp),
-        modifier=modifier.heightIn(min=50.dp)
+        modifier=modifier.heightIn(min=54.dp)
     ) {
         if(loading) {
             CircularProgressIndicator(
@@ -451,7 +451,7 @@ fun FqSecondaryButton(
         shape=RoundedCornerShape(16.dp),
         border=androidx.compose.foundation.BorderStroke(1.dp,FqBorder),
         contentPadding=PaddingValues(horizontal=18.dp,vertical=13.dp),
-        modifier=modifier.heightIn(min=50.dp)
+        modifier=modifier.heightIn(min=54.dp)
     ) {
         if(icon!=null) {
             Icon(icon,null,modifier=Modifier.size(20.dp))
