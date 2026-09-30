@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,8 @@ fun PersonScreen(
     var retry by remember { mutableIntStateOf(0) }
     var tab by remember { mutableStateOf(PersonTab.OVERVIEW) }
     var bioExpanded by remember { mutableStateOf(false) }
+    var selectedPhoto by remember(personId) { mutableStateOf<String?>(null) }
+    var filmQuery by remember(personId) { mutableStateOf("") }
 
     BackHandler { onBack() }
 
@@ -56,6 +59,14 @@ fun PersonScreen(
     }
 
     Column(Modifier.fillMaxSize().background(FqBg)) {
+        selectedPhoto?.let { path ->
+            Dialog(onDismissRequest={selectedPhoto=null}) {
+                Box(Modifier.fillMaxWidth().height(560.dp).clip(RoundedCornerShape(24.dp)).background(Color.Black)) {
+                    RemoteImage(repository.profile(path),Modifier.fillMaxSize(),ContentScale.Fit)
+                    IconButton(onClick={selectedPhoto=null},modifier=Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha=.6f),CircleShape)) { Icon(Icons.Default.Close,null) }
+                }
+            }
+        }
         if(loading) {
             LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth())
         }
@@ -100,10 +111,10 @@ fun PersonScreen(
                 item {
                     Surface(
                         color=FqSurface,
-                        shape=RoundedCornerShape(20.dp),
+                        shape=RoundedCornerShape(26.dp),
                         modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp)
                     ) {
-                        Column(Modifier.padding(15.dp)) {
+                        Column(Modifier.padding(19.dp)) {
                             Row(verticalAlignment=Alignment.CenterVertically) {
                                 Icon(Icons.Default.MenuBook,null,tint=FqGold)
                                 Spacer(Modifier.width(7.dp))
@@ -111,8 +122,8 @@ fun PersonScreen(
                             }
                             Text(
                                 person.biography,
-                                fontSize=11.sp,
-                                lineHeight=16.sp,
+                                fontSize=12.sp,
+                                lineHeight=20.sp,
                                 color=Color.White.copy(alpha=.83f),
                                 maxLines=if(bioExpanded)Int.MAX_VALUE else 7,
                                 overflow=TextOverflow.Ellipsis,
@@ -148,7 +159,7 @@ fun PersonScreen(
                             RemoteImage(
                                 repository.profile(path),
                                 Modifier.width(145.dp).height(205.dp)
-                                    .clip(RoundedCornerShape(17.dp)),
+                                    .clip(RoundedCornerShape(17.dp)).clickable { selectedPhoto=path },
                                 ContentScale.Crop
                             )
                         }
@@ -158,6 +169,20 @@ fun PersonScreen(
 
             item {
                 PersonTabBar(tab){tab=it}
+            }
+
+            if(tab!=PersonTab.OVERVIEW) {
+                item {
+                    OutlinedTextField(
+                        value=filmQuery,
+                        onValueChange={filmQuery=it},
+                        placeholder={Text("جستجو در آثار…",fontSize=12.sp)},
+                        leadingIcon={Icon(Icons.Default.Search,null)},
+                        singleLine=true,
+                        shape=RoundedCornerShape(18.dp),
+                        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=10.dp)
+                    )
+                }
             }
 
             when(tab) {
@@ -201,6 +226,7 @@ fun PersonScreen(
                 PersonTab.MOVIES -> {
                     val movies=person.movieCredits
                         .distinctBy { it.media.key }
+                        .filter { filmQuery.isBlank() || it.media.title.contains(filmQuery,true) || it.role.contains(filmQuery,true) }
                         .sortedByDescending { it.media.date }
                     item {
                         PersonFilmographyHeader(
@@ -220,6 +246,7 @@ fun PersonScreen(
                 PersonTab.SERIES -> {
                     val tv=person.tvCredits
                         .distinctBy { it.media.key }
+                        .filter { filmQuery.isBlank() || it.media.title.contains(filmQuery,true) || it.role.contains(filmQuery,true) }
                         .sortedByDescending { it.media.date }
                     item {
                         PersonFilmographyHeader(
@@ -247,7 +274,7 @@ private fun PersonHero(
     onBack:()->Unit
 ) {
     Box(
-        Modifier.fillMaxWidth().height(390.dp).background(
+        Modifier.fillMaxWidth().height(430.dp).background(
             Brush.verticalGradient(
                 listOf(Color(0xFF1A2234),Color(0xFF17120A),FqBg)
             )
@@ -282,7 +309,7 @@ private fun PersonHero(
             horizontalAlignment=Alignment.CenterHorizontally
         ) {
             Box(
-                Modifier.size(174.dp).background(FqGold,CircleShape).padding(4.dp)
+                Modifier.size(184.dp).background(Brush.linearGradient(listOf(FqGold,Color(0xFFFF3B30))),CircleShape).padding(4.dp)
             ) {
                 RemoteImage(
                     repository.profile(person.profilePath),
@@ -292,7 +319,7 @@ private fun PersonHero(
             }
             Text(
                 person.name,
-                fontSize=27.sp,
+                fontSize=30.sp,
                 fontWeight=FontWeight.Black,
                 modifier=Modifier.padding(top=12.dp)
             )
@@ -337,9 +364,9 @@ private fun PersonFacts(person:PersonDetail) {
         horizontalArrangement=Arrangement.spacedBy(7.dp)
     ) {
         items(facts) { fact ->
-            Surface(color=FqSurface,shape=RoundedCornerShape(13.dp)) {
+            Surface(color=Color.White.copy(alpha=.055f),shape=RoundedCornerShape(18.dp),tonalElevation=2.dp) {
                 Row(
-                    Modifier.padding(horizontal=10.dp,vertical=8.dp),
+                    Modifier.padding(horizontal=13.dp,vertical=11.dp),
                     verticalAlignment=Alignment.CenterVertically
                 ) {
                     Icon(fact.first,null,tint=FqGold,modifier=Modifier.size(15.dp))
@@ -425,8 +452,9 @@ private fun PersonCreditRow(
 ) {
     Surface(
         color=FqSurface,
-        shape=RoundedCornerShape(18.dp),
-        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp)
+        shape=RoundedCornerShape(22.dp),
+        tonalElevation=2.dp,
+        modifier=Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=5.dp)
             .clickable { onMedia(credit.media) }
     ) {
         Row(Modifier.padding(9.dp),verticalAlignment=Alignment.CenterVertically) {
