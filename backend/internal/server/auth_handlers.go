@@ -6,9 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/smtp"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -52,9 +55,13 @@ func (s *Server) forgotPassword(w http.ResponseWriter,r *http.Request) {
                 INSERT INTO password_reset_tokens (user_id,token_hash,expires_at)
                 VALUES ($1,$2,now()+interval '30 minutes')
             `,userID,tokenHash)
-            // Until an SMTP/provider is configured, emit only the reset URL in non-production logs.
-            if !s.cfg.IsProduction() {
-                log.Printf("password reset for %s: %s/reset-password?token=%s",email,strings.TrimRight(s.cfg.PublicAPIBaseURL,"/"),token)
+            resetURL:=strings.TrimRight(s.cfg.PasswordResetBaseURL,"?&")
+            sep:="?"
+            if strings.Contains(resetURL,"?") { sep="&" }
+            resetURL+=sep+"token="+url.QueryEscape(token)
+            if err:=s.sendPasswordResetEmail(email,resetURL); err!=nil {
+                log.Printf("password reset email delivery failed: %v",err)
+                if !s.cfg.IsProduction() { log.Printf("development reset URL for %s: %s",email,resetURL) }
             }
         }
     }
@@ -257,6 +264,26 @@ func (s *Server) me(w http.ResponseWriter,r *http.Request) {
 		"avatarUrl":avatarURL,"coverUrl":coverURL,"verified":verified,"private":privateAccount,
 		"followers":followerCount,"following":followingCount,
 	})
+}
+
+
+func (s *Server) sendPasswordResetEmail(to,resetURL string) error {
+    host:=strings.TrimSpace(s.cfg.SMTPHost)
+    if host=="" { return fmt.Errorf("SMTP_HOST is not configured") }
+    port:=s.cfg.SMTPPort
+    if port<=0 { port=587 }
+    fromHeader:=strings.TrimSpace(s.cfg.SMTPFrom)
+    envelopeFrom:=s.cfg.SMTPUsername
+    if envelopeFrom=="" { envelopeFrom=fromHeader }
+    if i:=strings.Index(envelopeFrom,"<"); i>=0 {
+        if j:=strings.Index(envelopeFrom[i:],">"); j>=0 { envelopeFrom=envelopeFrom[i+1:i+j] }
+    }
+    subject:="Filmiqoo - بازیابی رمز عبور"
+    body:="برای انتخاب رمز عبور جدید، لینک زیر را باز کنید:\r\n\r\n"+resetURL+"\r\n\r\nاین لینک ۳۰ دقیقه اعتبار دارد. اگر این درخواست از طرف شما نبوده، این ایمیل را نادیده بگیرید."
+    msg:=[]byte("From: "+fromHeader+"\r\nTo: "+to+"\r\nSubject: "+subject+"\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n"+body)
+    var auth smtp.Auth
+    if s.cfg.SMTPUsername!="" { auth=smtp.PlainAuth("",s.cfg.SMTPUsername,s.cfg.SMTPPassword,host) }
+    return smtp.SendMail(fmt.Sprintf("%s:%d",host,port),auth,envelopeFrom,[]string{to},msg)
 }
 
 func (s *Server) issueAccessToken(userID string) (string,int64,error) {
