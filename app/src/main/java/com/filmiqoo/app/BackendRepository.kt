@@ -274,6 +274,16 @@ class BackendRepository(context: Context) {
         }
     }
 
+    suspend fun resetPassword(token:String,password:String) = withContext(Dispatchers.IO) {
+        val body=JSONObject().put("token",token.trim()).put("password",password)
+        val req=Request.Builder().url(session.baseUrl+"/v1/auth/password/reset")
+            .post(body.toString().toRequestBody(jsonType)).build()
+        client.newCall(req).execute().use { res ->
+            val raw=res.body?.string().orEmpty()
+            if(!res.isSuccessful) throw IllegalStateException(apiError(raw,res.code))
+        }
+    }
+
     private suspend fun postAuth(path: String, body: JSONObject): AuthResult = withContext(Dispatchers.IO) {
         val req = Request.Builder()
             .url(session.baseUrl + path)
