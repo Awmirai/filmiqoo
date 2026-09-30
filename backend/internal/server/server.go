@@ -112,6 +112,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 				),
 			).Post("/login", s.login)
             r.With(s.authRateLimit("forgot-password",5,time.Hour)).Post("/password/forgot",s.forgotPassword)
+            r.With(s.authRateLimit("reset-password",10,time.Hour)).Post("/password/reset",s.resetPassword)
 			r.With(
 				s.authRateLimit(
 					"refresh",
