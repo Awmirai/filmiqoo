@@ -46,7 +46,7 @@ func (s *Server) register(w http.ResponseWriter,r *http.Request) {
 	body.Username=strings.TrimSpace(body.Username)
 	body.DisplayName=strings.TrimSpace(body.DisplayName)
 
-	if !strings.Contains(body.Email,"@") || len(body.Email)>254 {
+	if _,valid:=normalizeRecoveryEmail(body.Email); !valid {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid email"}); return
 	}
 	if !usernamePattern.MatchString(body.Username) {
@@ -113,17 +113,18 @@ func (s *Server) login(w http.ResponseWriter,r *http.Request) {
 		writeError(w,http.StatusBadRequest,err); return
 	}
 	login:=strings.TrimSpace(body.Login)
-	if login=="" || body.Password=="" {
+	if login=="" || body.Password=="" || len(body.Password)>128 {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"login and password are required"}); return
 	}
 
 	var userID,passwordHash,email,username,displayName,status string
+	var authVersion int64
 	err:=s.db.QueryRow(r.Context(),`
-		SELECT u.id::text,u.password_hash,COALESCE(u.email::text,''),p.username::text,p.display_name,u.status
+		SELECT u.id::text,u.password_hash,COALESCE(u.email::text,''),p.username::text,p.display_name,u.status,u.auth_version
 		  FROM users u JOIN profiles p ON p.user_id=u.id
 		 WHERE lower(COALESCE(u.email::text,''))=lower($1) OR lower(p.username::text)=lower($1)
 		 LIMIT 1
-	`,login).Scan(&userID,&passwordHash,&email,&username,&displayName,&status)
+	`,login).Scan(&userID,&passwordHash,&email,&username,&displayName,&status,&authVersion)
 	if err!=nil || status!="active" || !authpkg.VerifyPassword(body.Password,passwordHash) {
 		writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"invalid credentials"}); return
 	}
@@ -134,12 +135,12 @@ func (s *Server) login(w http.ResponseWriter,r *http.Request) {
 	if s.cfg.AuthRefreshTTLDays<=0 { refreshExpiry=time.Now().Add(30*24*time.Hour) }
 
 	_,err=s.db.Exec(r.Context(),`
-		INSERT INTO auth_sessions (user_id,refresh_token_hash,device_name,user_agent,ip_address,expires_at)
-		VALUES ($1,$2,$3,$4,$5,$6)
-	`,userID,refreshHash,body.DeviceName,r.UserAgent(),requestIP(r),refreshExpiry)
+		INSERT INTO auth_sessions (user_id,refresh_token_hash,device_name,user_agent,ip_address,expires_at,auth_version)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+	`,userID,refreshHash,body.DeviceName,r.UserAgent(),requestIP(r),refreshExpiry,authVersion)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
-	access,expiresIn,err:=s.issueAccessToken(userID)
+	access,expiresIn,err:=s.issueAccessToken(userID,authVersion)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 	writeJSON(w,http.StatusOK,map[string]any{
@@ -161,13 +162,15 @@ func (s *Server) refresh(w http.ResponseWriter,r *http.Request) {
 	}
 
 	var sessionID,userID string
+	var authVersion int64
 	var expiresAt time.Time
 	err:=s.db.QueryRow(r.Context(),`
-		SELECT id::text,user_id::text,expires_at
-		  FROM auth_sessions
-		 WHERE refresh_token_hash=$1 AND revoked_at IS NULL
+		SELECT a.id::text,a.user_id::text,a.expires_at,a.auth_version
+		  FROM auth_sessions a JOIN users u ON u.id=a.user_id
+		 WHERE a.refresh_token_hash=$1 AND a.revoked_at IS NULL
+		   AND u.status='active' AND a.auth_version=u.auth_version
 		 LIMIT 1
-	`,oldHash).Scan(&sessionID,&userID,&expiresAt)
+	`,oldHash).Scan(&sessionID,&userID,&expiresAt,&authVersion)
 	if err!=nil || time.Now().After(expiresAt) {
 		writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"invalid or expired refresh token"}); return
 	}
@@ -187,7 +190,7 @@ func (s *Server) refresh(w http.ResponseWriter,r *http.Request) {
 		writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"refresh token rotation failed"}); return
 	}
 
-	access,expiresIn,err:=s.issueAccessToken(userID)
+	access,expiresIn,err:=s.issueAccessToken(userID,authVersion)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	writeJSON(w,http.StatusOK,map[string]any{
 		"accessToken":access,"refreshToken":newToken,"expiresIn":expiresIn,
@@ -230,7 +233,9 @@ func (s *Server) me(w http.ResponseWriter,r *http.Request) {
 	})
 }
 
-func (s *Server) issueAccessToken(userID string) (string,int64,error) {
+func (s *Server) issueAccessToken(userID string,versions ...int64) (string,int64,error) {
+	var version int64
+	if len(versions)>0 { version=versions[0] }
 	minutes:=s.cfg.AuthAccessTTLMinutes
 	if minutes<=0 { minutes=15 }
 	now:=time.Now()
@@ -242,7 +247,10 @@ func (s *Server) issueAccessToken(userID string) (string,int64,error) {
 		IssuedAt:jwt.NewNumericDate(now),
 		ExpiresAt:jwt.NewNumericDate(exp),
 	}
-	token:=jwt.NewWithClaims(jwt.SigningMethodHS256,claims)
+	token:=jwt.NewWithClaims(jwt.SigningMethodHS256,struct {
+		jwt.RegisteredClaims
+		Version int64 `json:"ver"`
+	}{claims,version})
 	signed,err:=token.SignedString([]byte(s.cfg.JWTSecret))
 	return signed,int64(time.Until(exp).Seconds()),err
 }

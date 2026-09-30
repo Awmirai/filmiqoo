@@ -80,8 +80,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     ) { }
 
     var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
-    var previewMode by remember { mutableStateOf(false) }
-    var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val bottomTabStateHolder=rememberSaveableStateHolder()
     var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
@@ -543,25 +541,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     }
 
     Surface(Modifier.fillMaxSize(),color=FqBg) {
-        if (!authenticated && !previewMode && overlay !is OverlayRoute.Auth) {
+        if (!authenticated && overlay !is OverlayRoute.Auth) {
             AuthScreen(
                 backend=backend,
                 onSuccess={
                     viewerReady=false
                     authenticated=true
-                },
-                onPreview={ previewMode=true }
-            )
-            return@Surface
-        }
-
-        if (previewMode && !configuredPreview && !authenticated) {
-            TmdbSetupScreen(
-                onSave = { value ->
-                    repository.setApiKey(value)
-                    configuredPreview = repository.hasApiKey()
-                },
-                onSkip = { configuredPreview=true }
+                }
             )
             return@Surface
         }
@@ -708,11 +694,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         viewerReady=false
                         authenticated=true
                         closeOverlay()
-                    },
-                    onPreview={
-                        previewMode=true
-                        overlayBackStack.clear()
-                        overlay=null
                     }
                 )
                 is OverlayRoute.Story -> StoryViewer(
@@ -843,7 +824,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onCurrentSessionRevoked={
                         authenticated=false
-                        previewMode=false
                         overlay=null
                     }
                 )
@@ -1091,7 +1071,6 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                         backend.viewerProfiles.clear()
                                         activeViewer=null
                                         authenticated=false
-                                        previewMode=false
                                     }
                                 )
                             } else {
@@ -1112,203 +1091,44 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 }
 
 @Composable
-private fun FilmiqooBottomBar(
+internal fun FilmiqooBottomBar(
     selected:Int,
     kidsMode:Boolean=false,
     onSelected:(Int)->Unit
 ) {
     val haptic=LocalHapticFeedback.current
-    val entries=if(kidsMode) {
-        listOf(
-            Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.PersonOutline,"من",4)
-        )
-    } else {
-        listOf(
-            Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.Explore,"کشف",1),
-            Triple(Icons.Default.VideoLibrary,"کتابخانه",3),
-            Triple(Icons.Default.Whatshot,"نبض",2),
-            Triple(Icons.Default.PersonOutline,"من",4)
-        )
-    }
-
-    Box(
-        Modifier.fillMaxWidth()
-            .background(Color.Transparent)
-            .navigationBarsPadding()
-            .padding(start=10.dp,end=10.dp,bottom=8.dp,top=3.dp)
-    ) {
-        Surface(
-            color=Color(0xF20A0D12),
-            shape=RoundedCornerShape(24.dp),
-            tonalElevation=0.dp,
-            shadowElevation=18.dp,
-            border=androidx.compose.foundation.BorderStroke(
-                1.dp,
-                Color.White.copy(alpha=.08f)
-            ),
-            modifier=Modifier.fillMaxWidth()
-        ) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .height(64.dp)
-                    .padding(horizontal=5.dp),
-                verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.SpaceEvenly
-            ) {
-                entries.forEach { item ->
-                    val active=selected==item.third
-                    val pillColor by animateColorAsState(
-                        if(active) FqGold.copy(alpha=.14f)
-                        else Color.Transparent,
-                        label="bottomBarPill"
-                    )
-                    val iconColor by animateColorAsState(
-                        if(active) FqGoldSoft else FqMuted,
-                        label="bottomBarIcon"
-                    )
-                    val indicatorWidth by animateDpAsState(
-                        if(active) 18.dp else 0.dp,
-                        label="bottomBarIndicator"
-                    )
-                    Surface(
-                        color=Color.Transparent,
-                        contentColor=iconColor,
-                        shape=RoundedCornerShape(18.dp),
-                        modifier=Modifier.weight(1f)
-                            .fillMaxHeight()
-                            .clickable {
-                                if(!active) {
-                                    haptic.performHapticFeedback(
-                                        HapticFeedbackType.TextHandleMove
-                                    )
-                                    onSelected(item.third)
-                                }
+    val entries=if(kidsMode) listOf(
+        Triple(Icons.Default.Home,"خانه",0),
+        Triple(Icons.Default.PersonOutline,"حساب من",4)
+    ) else listOf(
+        Triple(Icons.Default.Home,"خانه",0),
+        Triple(Icons.Default.Explore,"کشف",1),
+        Triple(Icons.Default.VideoLibrary,"کتابخانه",3),
+        Triple(Icons.Default.Whatshot,"نبض",2),
+        Triple(Icons.Default.PersonOutline,"حساب من",4)
+    )
+    Surface(color=FqSurface,shadowElevation=12.dp) {
+        Column {
+            HorizontalDivider(color=FqBorder)
+            NavigationBar(containerColor=FqSurface,tonalElevation=0.dp) {
+                entries.forEach { (icon,label,index) ->
+                    NavigationBarItem(
+                        selected=selected==index,
+                        onClick={
+                            if(selected!=index) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelected(index)
                             }
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize().padding(vertical=6.dp),
-                            horizontalAlignment=Alignment.CenterHorizontally,
-                            verticalArrangement=Arrangement.Center
-                        ) {
-                            Box(
-                                Modifier.width(40.dp)
-                                    .height(28.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(pillColor),
-                                contentAlignment=Alignment.Center
-                            ) {
-                                Icon(
-                                    item.first,
-                                    contentDescription=item.second,
-                                    tint=iconColor,
-                                    modifier=Modifier.size(if(active)22.dp else 20.dp)
-                                )
-                            }
-                            Text(
-                                item.second,
-                                color=iconColor,
-                                style=MaterialTheme.typography.labelSmall,
-                                fontWeight=if(active) FontWeight.Bold else FontWeight.Medium,
-                                maxLines=1,
-                                modifier=Modifier.padding(top=2.dp)
-                            )
-                            Box(
-                                Modifier.padding(top=3.dp)
-                                    .width(indicatorWidth)
-                                    .height(2.dp)
-                                    .clip(CircleShape)
-                                    .background(if(active) FqGold else Color.Transparent)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TmdbSetupScreen(
-    onSave: (String) -> Unit,
-    onSkip: () -> Unit
-) {
-    var value by remember { mutableStateOf("") }
-    var showHelp by remember { mutableStateOf(false) }
-
-    Box(
-        Modifier.fillMaxSize().background(
-            androidx.compose.ui.graphics.Brush.verticalGradient(
-                listOf(Color(0xFF111722), FqBg)
-            )
-        ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                Modifier.size(76.dp).clip(RoundedCornerShape(22.dp)).background(FqGold),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.PlayArrow,null,tint=Color.Black,modifier=Modifier.size(54.dp))
-            }
-            Text("FILMIQOO",color=FqGold,fontSize=30.sp,modifier=Modifier.padding(top=14.dp))
-            Text("Preview Mode",color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))
-
-            Surface(
-                color=FqSurface,
-                shape=RoundedCornerShape(20.dp),
-                modifier=Modifier.fillMaxWidth().padding(top=28.dp)
-            ) {
-                Column(Modifier.padding(18.dp)) {
-                    Text("TMDB برای حالت Preview",fontSize=18.sp)
-                    Text(
-                        "اگر Backend Filmiqoo را اجرا نمی‌کنی، می‌توانی برای نمایش محتوای نمونه کلید TMDB را وارد کنی.",
-                        color=FqMuted,
-                        fontSize=11.sp,
-                        lineHeight=18.sp,
-                        modifier=Modifier.padding(top=7.dp)
-                    )
-                    OutlinedTextField(
-                        value=value,
-                        onValueChange={value=it},
-                        label={Text("TMDB API Key / Token")},
-                        singleLine=false,
-                        minLines=2,
-                        shape=RoundedCornerShape(14.dp),
-                        modifier=Modifier.fillMaxWidth().padding(top=14.dp)
-                    )
-                    Button(
-                        onClick={ onSave(value.trim()) },
-                        enabled=value.trim().length>=20,
-                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                        shape=RoundedCornerShape(14.dp),
-                        modifier=Modifier.fillMaxWidth().padding(top=12.dp)
-                    ) {
-                        Text("فعال‌کردن Preview")
-                    }
-                    TextButton(
-                        onClick={showHelp=!showHelp},
-                        modifier=Modifier.align(Alignment.CenterHorizontally)
-                    ) {
-                        Text("راهنما",color=FqGold)
-                    }
-                    if(showHelp) {
-                        Text(
-                            "در حالت Production کلید TMDB داخل APK قرار نمی‌گیرد و Backend Filmiqoo آن را مدیریت می‌کند.",
-                            color=FqMuted,
-                            fontSize=10.sp,
-                            lineHeight=17.sp,
-                            modifier=Modifier.padding(top=4.dp)
+                        },
+                        icon={Icon(icon,null,Modifier.size(24.dp))},
+                        label={Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)},
+                        colors=NavigationBarItemDefaults.colors(
+                            selectedIconColor=FqGoldSoft,selectedTextColor=FqText,
+                            indicatorColor=FqGold.copy(alpha=.15f),
+                            unselectedIconColor=FqMuted,unselectedTextColor=FqMuted
                         )
-                    }
+                    )
                 }
-            }
-            TextButton(onClick=onSkip,modifier=Modifier.padding(top=8.dp)) {
-                Text("رد کردن",color=FqMuted)
             }
         }
     }

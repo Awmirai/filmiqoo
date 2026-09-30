@@ -11,36 +11,7 @@ func (s *Server) continueWatching(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	viewerID:=s.viewerProfileID(r,userID)
 	maturity:=s.viewerMaturityLevel(r,userID)
-	rows,err:=s.db.Query(r.Context(),`
-		WITH progress AS (
-			SELECT media_version_id,position_ms,duration_ms,completed,updated_at
-			  FROM viewer_watch_progress
-			 WHERE viewer_profile_id::text=$2 AND $2<>''
-			UNION ALL
-			SELECT media_version_id,position_ms,duration_ms,completed,updated_at
-			  FROM watch_progress
-			 WHERE user_id=$1 AND $2=''
-		)
-		SELECT wp.media_version_id::text,wp.position_ms,wp.duration_ms,wp.completed,wp.updated_at,
-		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.poster_url,mt.backdrop_url,
-		       mt.year,mt.rating,mv.quality_label,
-		       e.id::text,e.episode_number,e.name,s.season_number
-		  FROM progress wp
-		  JOIN media_versions mv ON mv.id=wp.media_version_id
-		  LEFT JOIN episodes e ON e.id=mv.episode_id
-		  LEFT JOIN seasons s ON s.id=e.season_id
-		  JOIN media_titles mt ON mt.id=COALESCE(mv.media_title_id,s.media_title_id)
-		 WHERE wp.completed=false
-		   AND (
-		     $3='all'
-		     OR ($3='teen' AND mt.audience_level IN ('kids','teen'))
-		     OR ($3='kids' AND mt.audience_level='kids')
-		   )
-		   AND wp.position_ms>0
-		   AND (wp.duration_ms=0 OR wp.position_ms < wp.duration_ms*0.95)
-		 ORDER BY wp.updated_at DESC
-		 LIMIT 30
-	`,userID,viewerID,maturity)
+	rows,err:=s.db.Query(r.Context(),continueWatchingQuery,userID,viewerID,maturity)
 	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	defer rows.Close()
 
@@ -60,7 +31,7 @@ func (s *Server) continueWatching(w http.ResponseWriter,r *http.Request) {
 			&versionID,&position,&duration,&completed,&updated,
 			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,&quality,
 			&episodeID,&episodeNumber,&episodeName,&seasonNumber,
-		); err!=nil { continue }
+		); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 
 		progress:=0.0
 		if duration>0 { progress=float64(position)/float64(duration) }
@@ -77,6 +48,7 @@ func (s *Server) continueWatching(w http.ResponseWriter,r *http.Request) {
 			},
 		})
 	}
+	if err:=rows.Err(); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
 	writeJSON(w,http.StatusOK,map[string]any{"items":items})
 }
 

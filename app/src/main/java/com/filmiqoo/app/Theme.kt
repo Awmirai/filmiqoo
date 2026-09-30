@@ -10,30 +10,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val FqBg = Color(0xFF050505)
-val FqSurface = Color(0xFF101010)
-val FqSurface2 = Color(0xFF181818)
-val FqSurface3 = Color(0xFF222222)
-val FqSurface4 = Color(0xFF2B2B2B)
-val FqGold = Color(0xFFE50914)
-val FqGoldSoft = Color(0xFFFF5660)
+val FqBg = Color(0xFF0B1018)
+val FqSurface = Color(0xFF141C28)
+val FqSurface2 = Color(0xFF1C2736)
+val FqSurface3 = Color(0xFF283648)
+val FqSurface4 = Color(0xFF354357)
+val FqGold = Color(0xFFD92C46)
+val FqGoldSoft = Color(0xFFFF8998)
 val FqText = Color(0xFFF7F8FA)
-val FqMuted = Color(0xFFADB5C2)
-val FqMutedStrong = Color(0xFFC8CDD5)
-val FqDanger = Color(0xFFFF4757)
+val FqMuted = Color(0xFFACB9CC)
+val FqMutedStrong = Color(0xFFD1DAE8)
+val FqDanger = Color(0xFFFF919C)
 val FqGreen = Color(0xFF47D18C)
 val FqBlue = Color(0xFF5CA8FF)
 val FqPurple = Color(0xFFA98BFF)
 
 @Composable
 fun FilmiqooTheme(content:@Composable ()->Unit) {
-    val family=FontFamily.SansSerif
+    val family=FontFamily(
+        Font(R.font.vazirmatn_regular,FontWeight.Normal),
+        Font(R.font.vazirmatn_medium,FontWeight.Medium),
+        Font(R.font.vazirmatn_bold,FontWeight.Bold)
+    )
 
     val typography=remember {
         Typography(
@@ -123,8 +128,8 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
             ),
             labelSmall=TextStyle(
                 fontFamily=family,
-                fontSize=11.sp,
-                lineHeight=16.sp,
+                fontSize=12.sp,
+                lineHeight=19.sp,
                 fontWeight=FontWeight.SemiBold
             )
         )
@@ -133,7 +138,7 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
     val colors=darkColorScheme(
         primary=FqGold,
         onPrimary=Color.White,
-        primaryContainer=Color(0xFF4A070B),
+        primaryContainer=Color(0xFF462331),
         onPrimaryContainer=FqGoldSoft,
         secondary=FqBlue,
         onSecondary=Color(0xFF001D35),

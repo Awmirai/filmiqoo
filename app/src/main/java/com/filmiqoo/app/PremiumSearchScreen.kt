@@ -304,10 +304,10 @@ private fun RecentSearches(
             Modifier.fillMaxWidth().padding(horizontal=16.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
-            Text("جستجوهای اخیر",fontSize=11.sp,fontWeight=FontWeight.Bold)
+            Text("جستجوهای اخیر",fontSize=12.sp,fontWeight=FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             TextButton(onClick=onClear) {
-                Text("پاک کردن",fontSize=11.sp,color=FqMuted)
+                Text("پاک کردن",fontSize=12.sp,color=FqMuted)
             }
         }
         LazyRow(
@@ -317,7 +317,7 @@ private fun RecentSearches(
             items(history) { value ->
                 AssistChip(
                     onClick={onSelect(value)},
-                    label={Text(value,fontSize=11.sp)},
+                    label={Text(value,fontSize=12.sp)},
                     leadingIcon={
                         Icon(Icons.Default.History,null,modifier=Modifier.size(14.dp))
                     }
@@ -528,7 +528,7 @@ private fun SearchPostCard(
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text(
                             post.author.displayName,
-                            fontSize=10.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold,
                             maxLines=1,
                             overflow=TextOverflow.Ellipsis
@@ -552,7 +552,7 @@ private fun SearchPostCard(
                             if(relative.isNotBlank()) append(" • "+relative)
                         },
                         color=FqMuted,
-                        fontSize=8.sp
+                        fontSize=12.sp
                     )
                 }
                 Surface(
@@ -566,7 +566,7 @@ private fun SearchPostCard(
                             else -> "پست"
                         },
                         color=if(post.type.equals("review",true))FqGold else FqMuted,
-                        fontSize=8.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold,
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
@@ -588,14 +588,14 @@ private fun SearchPostCard(
                     Text(
                         "اسپویلر مخفی شده • برای دیدن پست بازش کن",
                         color=FqDanger,
-                        fontSize=9.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold
                     )
                 }
             } else if(post.body.isNotBlank()) {
                 Text(
                     post.body,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     lineHeight=17.sp,
                     maxLines=3,
                     overflow=TextOverflow.Ellipsis,
@@ -611,7 +611,7 @@ private fun SearchPostCard(
                     Text(
                         "🎬 "+it,
                         color=FqMuted,
-                        fontSize=8.sp,
+                        fontSize=12.sp,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.weight(1f)
@@ -621,7 +621,7 @@ private fun SearchPostCard(
                     compactSearchCount(post.likes)+" ♥  "+
                         compactSearchCount(post.comments)+" 💬",
                     color=FqMuted,
-                    fontSize=8.sp
+                    fontSize=12.sp
                 )
             }
         }
@@ -640,7 +640,7 @@ private fun SearchSectionTitle(
         Text(title,fontSize=16.sp,fontWeight=FontWeight.Bold)
         Spacer(Modifier.width(6.dp))
         Surface(color=FqSurface2,shape=CircleShape) {
-            Text(count.toString(),fontSize=11.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
+            Text(count.toString(),fontSize=12.sp,modifier=Modifier.padding(horizontal=7.dp,vertical=3.dp))
         }
         Spacer(Modifier.weight(1f))
     }
@@ -681,7 +681,7 @@ private fun SearchPosterCard(
         }
         Text(
             media.title,
-            fontSize=11.sp,
+            fontSize=12.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
@@ -694,7 +694,7 @@ private fun SearchPosterCard(
                 if(media.vote>0)"★ "+formatVote(media.vote) else ""
             ).filter(String::isNotBlank).joinToString(" • "),
             color=FqMuted,
-            fontSize=11.sp,
+            fontSize=12.sp,
             maxLines=1
         )
     }
@@ -874,7 +874,7 @@ private fun UserBubble(
         }
         Text(
             user.displayName,
-            fontSize=11.sp,
+            fontSize=12.sp,
             fontWeight=FontWeight.Bold,
             maxLines=1,
             overflow=TextOverflow.Ellipsis,
@@ -883,7 +883,7 @@ private fun UserBubble(
         Text(
             "@"+user.username,
             color=FqMuted,
-            fontSize=11.sp,
+            fontSize=12.sp,
             maxLines=1,
             overflow=TextOverflow.Ellipsis
         )
@@ -914,12 +914,12 @@ private fun UserRow(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                     }
                 }
-                Text("@"+user.username,color=FqMuted,fontSize=11.sp)
+                Text("@"+user.username,color=FqMuted,fontSize=12.sp)
                 if(user.bio.isNotBlank()) {
                     Text(
                         user.bio,
                         color=Color.White.copy(alpha=.72f),
-                        fontSize=11.sp,
+                        fontSize=12.sp,
                         maxLines=1,
                         overflow=TextOverflow.Ellipsis,
                         modifier=Modifier.padding(top=3.dp)
@@ -959,7 +959,7 @@ private fun ChannelRow(
                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(14.dp))
                     }
                 }
-                Text("@"+channel.slug,color=FqMuted,fontSize=11.sp)
+                Text("@"+channel.slug,color=FqMuted,fontSize=12.sp)
                 Text(
                     listOf(
                         compactSearchCount(channel.followers)+" دنبال‌کننده",
@@ -967,7 +967,7 @@ private fun ChannelRow(
                         channel.reels.toString()+" Reel"
                     ).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     modifier=Modifier.padding(top=3.dp)
                 )
             }
@@ -1016,7 +1016,7 @@ private fun ReelSearchCard(
                 Text(
                     compactSearchCount(reel.views),
                     color=Color.White,
-                    fontSize=11.sp
+                    fontSize=12.sp
                 )
             }
         }
@@ -1024,7 +1024,7 @@ private fun ReelSearchCard(
         Column(Modifier.padding(9.dp)) {
             Text(
                 reel.caption.ifBlank { reel.mediaTitle ?: "Clip" },
-                fontSize=11.sp,
+                fontSize=12.sp,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis
             )
@@ -1040,7 +1040,7 @@ private fun ReelSearchCard(
                 Text(
                     "@"+reel.author.username,
                     color=FqMuted,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis
                 )

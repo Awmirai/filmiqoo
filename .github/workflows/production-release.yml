@@ -59,7 +59,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
       - name: Resolve release version
         shell: bash
@@ -75,6 +75,8 @@ jobs:
       - name: Validate production release configuration
         shell: bash
         env:
+          FILMIQOO_PRIVACY_POLICY_URL: ${{ vars.FILMIQOO_PRIVACY_POLICY_URL }}
+          FILMIQOO_TERMS_URL: ${{ vars.FILMIQOO_TERMS_URL }}
           FILMIQOO_RELEASE_API_BASE_URL: ${{ vars.FILMIQOO_RELEASE_API_BASE_URL }}
           FILMIQOO_FIREBASE_API_KEY: ${{ vars.FILMIQOO_FIREBASE_API_KEY }}
           FILMIQOO_FIREBASE_APP_ID: ${{ vars.FILMIQOO_FIREBASE_APP_ID }}
@@ -85,6 +87,8 @@ jobs:
           FILMIQOO_KEY_ALIAS: ${{ secrets.FILMIQOO_KEY_ALIAS }}
           FILMIQOO_KEY_PASSWORD: ${{ secrets.FILMIQOO_KEY_PASSWORD }}
         run: |
+          [[ "$FILMIQOO_PRIVACY_POLICY_URL" == https://* ]]
+          [[ "$FILMIQOO_TERMS_URL" == https://* ]]
           test -n "$FILMIQOO_RELEASE_API_BASE_URL"
           [[ "$FILMIQOO_RELEASE_API_BASE_URL" == https://* ]]
           test -n "$FILMIQOO_FIREBASE_API_KEY"
@@ -111,6 +115,8 @@ jobs:
           FILMIQOO_KEY_ALIAS: ${{ secrets.FILMIQOO_KEY_ALIAS }}
           FILMIQOO_KEY_PASSWORD: ${{ secrets.FILMIQOO_KEY_PASSWORD }}
           FILMIQOO_APPLICATION_ID: ${{ vars.FILMIQOO_APPLICATION_ID }}
+          FILMIQOO_PRIVACY_POLICY_URL: ${{ vars.FILMIQOO_PRIVACY_POLICY_URL }}
+          FILMIQOO_TERMS_URL: ${{ vars.FILMIQOO_TERMS_URL }}
           FILMIQOO_RELEASE_API_BASE_URL: ${{ vars.FILMIQOO_RELEASE_API_BASE_URL }}
           FILMIQOO_FIREBASE_API_KEY: ${{ vars.FILMIQOO_FIREBASE_API_KEY }}
           FILMIQOO_FIREBASE_APP_ID: ${{ vars.FILMIQOO_FIREBASE_APP_ID }}

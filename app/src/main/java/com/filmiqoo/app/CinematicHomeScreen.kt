@@ -277,7 +277,7 @@ fun CinematicHomeContent(
             ) {
                 Icon(Icons.Default.Refresh,null,modifier=Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("تازه‌سازی پیشنهادها",fontSize=11.sp)
+                Text("تازه‌سازی پیشنهادها",fontSize=12.sp)
             }
         }
     }
@@ -354,7 +354,7 @@ private fun CinematicHeroPager(
                                     if(unreadNotifications>99)"99+"
                                     else unreadNotifications.toString(),
                                     color=Color.White,
-                                    fontSize=8.sp
+                                    fontSize=12.sp
                                 )
                             }
                         }
@@ -444,7 +444,7 @@ private fun CinematicHeroPage(
                 ) {
                     Text(
                         if(media.type==MediaType.MOVIE)"فیلم" else "سریال",
-                        fontSize=8.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Black,
                         modifier=Modifier.padding(horizontal=8.dp,vertical=4.dp)
                     )
@@ -457,7 +457,7 @@ private fun CinematicHeroPage(
                     ) {
                         Text(
                             media.quality.ifBlank { "آماده پخش" },
-                            fontSize=8.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold,
                             modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                         )
@@ -467,7 +467,7 @@ private fun CinematicHeroPage(
                     Text(
                         "★ "+formatVote(media.vote),
                         color=Color.White,
-                        fontSize=10.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Bold
                     )
                 }
@@ -475,7 +475,7 @@ private fun CinematicHeroPage(
                     Text(
                         media.year,
                         color=Color.White.copy(alpha=.70f),
-                        fontSize=10.sp
+                        fontSize=12.sp
                     )
                 }
             }
@@ -498,7 +498,7 @@ private fun CinematicHeroPage(
                 Text(
                     media.originalTitle,
                     color=Color.White.copy(alpha=.60f),
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=2.dp)
@@ -676,14 +676,14 @@ private fun StreamingQuickAction(
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(19.dp))
             Text(
                 title,
-                fontSize=11.sp,
+                fontSize=12.sp,
                 fontWeight=FontWeight.Black,
                 modifier=Modifier.padding(top=8.dp)
             )
             Text(
                 subtitle,
                 color=FqMuted,
-                fontSize=8.sp,
+                fontSize=12.sp,
                 maxLines=1,
                 overflow=TextOverflow.Ellipsis,
                 modifier=Modifier.padding(top=1.dp)
@@ -708,7 +708,7 @@ private fun StreamingSectionTitle(
             Text(
                 eyebrow.uppercase(),
                 color=FqGold,
-                fontSize=9.sp,
+                fontSize=12.sp,
                 fontWeight=FontWeight.Black,
                 letterSpacing=.8.sp
             )
@@ -722,7 +722,7 @@ private fun StreamingSectionTitle(
             Text(
                 subtitle,
                 color=FqMuted,
-                fontSize=10.sp,
+                fontSize=12.sp,
                 maxLines=1,
                 overflow=TextOverflow.Ellipsis,
                 modifier=Modifier.padding(top=2.dp)
@@ -730,7 +730,7 @@ private fun StreamingSectionTitle(
         }
         if(onMore!=null) {
             TextButton(onClick=onMore) {
-                Text("بیشتر",fontSize=10.sp)
+                Text("بیشتر",fontSize=12.sp)
                 Spacer(Modifier.width(2.dp))
                 Icon(Icons.Default.ChevronLeft,null,modifier=Modifier.size(16.dp))
             }
@@ -798,7 +798,7 @@ private fun ContinueWatchingRail(
                         Text(
                             item.episodeLabel.ifBlank { "ادامه تماشا" },
                             color=Color.White,
-                            fontSize=10.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold,
                             modifier=Modifier.align(Alignment.BottomStart)
                                 .padding(horizontal=11.dp,vertical=9.dp)
@@ -825,7 +825,7 @@ private fun ContinueWatchingRail(
                             Text(
                                 ((item.progress*100).toInt()).toString()+"٪ دیده شده",
                                 color=FqMuted,
-                                fontSize=8.sp,
+                                fontSize=12.sp,
                                 modifier=Modifier.padding(top=2.dp)
                             )
                         }
@@ -899,7 +899,7 @@ private fun TonightRail(
                             if(media.vote>0)"★ "+formatVote(media.vote) else ""
                         ).filter(String::isNotBlank).joinToString(" • "),
                         color=Color.White.copy(alpha=.72f),
-                        fontSize=9.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(top=3.dp)
                     )
                 }
@@ -1051,7 +1051,7 @@ private fun CinematicPosterRail(
                             Text(
                                 "★ "+formatVote(media.vote),
                                 color=Color.White,
-                                fontSize=8.sp,
+                                fontSize=12.sp,
                                 modifier=Modifier.padding(horizontal=6.dp,vertical=3.dp)
                             )
                         }
@@ -1059,7 +1059,7 @@ private fun CinematicPosterRail(
                 }
                 Text(
                     media.title,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
@@ -1071,7 +1071,7 @@ private fun CinematicPosterRail(
                         if(media.type==MediaType.MOVIE)"فیلم" else "سریال"
                     ).filter(String::isNotBlank).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=8.sp,
+                    fontSize=12.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=2.dp)
@@ -1132,7 +1132,7 @@ private fun CinematicLandscapeRail(
                             if(media.vote>0)"★ "+formatVote(media.vote) else ""
                         ).filter(String::isNotBlank).joinToString(" • "),
                         color=Color.White.copy(alpha=.70f),
-                        fontSize=9.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(top=3.dp)
                     )
                 }
@@ -1184,13 +1184,13 @@ private fun PulseHomeBridge(
                         else
                             "واکنش، نقد و بحثی که مستقیم به فیلم و سریال وصله",
                         color=FqMuted,
-                        fontSize=9.sp,
-                        lineHeight=14.sp,
+                        fontSize=12.sp,
+                        lineHeight=18.sp,
                         modifier=Modifier.padding(top=2.dp)
                     )
                 }
                 TextButton(onClick=onPulse) {
-                    Text("باز کردن",fontSize=10.sp)
+                    Text("باز کردن",fontSize=12.sp)
                     Icon(Icons.Default.ChevronLeft,null,modifier=Modifier.size(16.dp))
                 }
             }
@@ -1223,7 +1223,7 @@ private fun PulseHomeBridge(
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         item.user.displayName,
-                                        fontSize=9.sp,
+                                        fontSize=12.sp,
                                         fontWeight=FontWeight.Bold,
                                         maxLines=1,
                                         overflow=TextOverflow.Ellipsis
@@ -1231,7 +1231,7 @@ private fun PulseHomeBridge(
                                     Text(
                                         item.media.title,
                                         color=FqMuted,
-                                        fontSize=8.sp,
+                                        fontSize=12.sp,
                                         maxLines=1,
                                         overflow=TextOverflow.Ellipsis,
                                         modifier=Modifier.padding(top=2.dp)
@@ -1280,8 +1280,8 @@ private fun GuestStreamingCard() {
                 Text(
                     "ادامه تماشا، پیشنهاد شخصی، دانلود و همگام‌سازی دستگاه‌ها بعد از ورود فعال می‌شن.",
                     color=FqMuted,
-                    fontSize=10.sp,
-                    lineHeight=15.sp,
+                    fontSize=12.sp,
+                    lineHeight=18.sp,
                     modifier=Modifier.padding(top=3.dp)
                 )
             }

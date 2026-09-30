@@ -578,7 +578,7 @@ fun PremiumDetailScreen(
                                 item {
                                     Text(
                                         if(d.media.type==MediaType.MOVIE)"کارگردان" else "سازندگان و کارگردانان",
-                                        fontSize=11.sp,
+                                        fontSize=12.sp,
                                         fontWeight=FontWeight.Bold,
                                         color=FqGold,
                                         modifier=Modifier.padding(horizontal=16.dp,vertical=6.dp)
@@ -590,7 +590,7 @@ fun PremiumDetailScreen(
                                 item {
                                     Text(
                                         "بازیگران",
-                                        fontSize=11.sp,
+                                        fontSize=12.sp,
                                         fontWeight=FontWeight.Bold,
                                         color=FqGold,
                                         modifier=Modifier.padding(start=16.dp,end=16.dp,top=14.dp,bottom=6.dp)
@@ -749,7 +749,7 @@ private fun PremiumDetailHero(
                 ) {
                     Text(
                         if(detail.media.type==MediaType.MOVIE)"فیلم" else "سریال",
-                        fontSize=8.sp,
+                        fontSize=12.sp,
                         fontWeight=FontWeight.Black,
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
@@ -781,7 +781,7 @@ private fun PremiumDetailHero(
                 Text(
                     detail.media.originalTitle,
                     color=Color.White.copy(alpha=.58f),
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
                     modifier=Modifier.padding(top=2.dp)
@@ -797,7 +797,7 @@ private fun PremiumDetailHero(
                 Text(
                     meta,
                     color=Color.White.copy(alpha=.72f),
-                    fontSize=10.sp,
+                    fontSize=12.sp,
                     modifier=Modifier.padding(top=8.dp)
                 )
             }
@@ -806,7 +806,7 @@ private fun PremiumDetailHero(
                 Text(
                     detail.media.overview,
                     color=Color.White.copy(alpha=.80f),
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     lineHeight=18.sp,
                     maxLines=3,
                     overflow=TextOverflow.Ellipsis,
@@ -874,7 +874,7 @@ private fun DetailMetaPill(
         ) {
             Icon(icon,null,tint=FqGold,modifier=Modifier.size(12.dp))
             Spacer(Modifier.width(3.dp))
-            Text(text,fontSize=11.sp)
+            Text(text,fontSize=12.sp)
         }
     }
 }
@@ -1032,7 +1032,7 @@ private fun DetailExperienceAction(
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    fontSize=10.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Black,
                     maxLines=1
                 )
@@ -1087,7 +1087,7 @@ private fun DetailPrimaryAction(
             }
             Text(
                 label,
-                fontSize=8.sp,
+                fontSize=12.sp,
                 lineHeight=11.sp,
                 fontWeight=FontWeight.Bold,
                 maxLines=2,
@@ -1126,7 +1126,7 @@ private fun DetailSecondaryAction(
                 Icon(icon,null,modifier=Modifier.size(17.dp))
             }
             Spacer(Modifier.width(6.dp))
-            Text(label,fontSize=9.sp,fontWeight=FontWeight.Bold)
+            Text(label,fontSize=12.sp,fontWeight=FontWeight.Bold)
         }
     }
 }
@@ -1170,7 +1170,7 @@ private fun ActionTile(
         Text(
             label,
             color=if(enabled)FqMutedStrong else FqMuted,
-            fontSize=8.sp,
+            fontSize=12.sp,
             maxLines=2,
             lineHeight=11.sp,
             textAlign=androidx.compose.ui.text.style.TextAlign.Center,
@@ -1207,7 +1207,7 @@ private fun VersionSelector(
                     if(tech.isNotBlank()) {
                         Text(
                             tech,
-                            fontSize=11.sp,
+                            fontSize=12.sp,
                             color=if(selected)Color.Black.copy(alpha=.7f) else FqMuted,
                             modifier=Modifier.padding(top=2.dp)
                         )
@@ -1215,7 +1215,7 @@ private fun VersionSelector(
                     if(version.fileSizeBytes>0) {
                         Text(
                             formatBytes(version.fileSizeBytes),
-                            fontSize=11.sp,
+                            fontSize=12.sp,
                             color=if(selected)Color.Black.copy(alpha=.7f) else FqMuted,
                             modifier=Modifier.padding(top=2.dp)
                         )
@@ -1250,7 +1250,7 @@ private fun OverviewSection(
                 }
             },
             color=Color.White.copy(alpha=.82f),
-            fontSize=11.sp,
+            fontSize=12.sp,
             lineHeight=20.sp,
             modifier=Modifier.padding(top=8.dp)
         )
@@ -1301,7 +1301,7 @@ private fun PremiumCastRow(
                 )
                 Text(
                     actor.name,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
@@ -1310,7 +1310,7 @@ private fun PremiumCastRow(
                 Text(
                     actor.character,
                     color=FqMuted,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis
                 )
@@ -1338,7 +1338,7 @@ private fun PremiumCastListItem(
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text(actor.name,fontSize=12.sp,fontWeight=FontWeight.Bold)
-            Text(actor.character,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
+            Text(actor.character,color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=3.dp))
         }
         Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
     }
@@ -1365,7 +1365,7 @@ private fun PremiumRecommendationRow(
                 )
                 Text(
                     media.title,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
@@ -1375,7 +1375,7 @@ private fun PremiumRecommendationRow(
                     listOf(media.year,if(media.vote>0)"★ "+formatVote(media.vote) else "")
                         .filter(String::isNotBlank).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=11.sp
+                    fontSize=12.sp
                 )
             }
         }
@@ -1432,7 +1432,7 @@ private fun FranchiseWatchOrderRow(
                     ) {
                         Text(
                             "#"+index,
-                            fontSize=11.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Black,
                             modifier=Modifier.padding(horizontal=7.dp,vertical=5.dp)
                         )
@@ -1446,7 +1446,7 @@ private fun FranchiseWatchOrderRow(
                         ) {
                             Text(
                                 "در حال مشاهده",
-                                fontSize=11.sp,
+                                fontSize=12.sp,
                                 fontWeight=FontWeight.Bold,
                                 modifier=Modifier.padding(horizontal=8.dp,vertical=4.dp)
                             )
@@ -1456,7 +1456,7 @@ private fun FranchiseWatchOrderRow(
 
                 Text(
                     media.title,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     fontWeight=FontWeight.Bold,
                     maxLines=1,
                     overflow=TextOverflow.Ellipsis,
@@ -1468,7 +1468,7 @@ private fun FranchiseWatchOrderRow(
                         if(media.vote>0)"★ "+formatVote(media.vote) else ""
                     ).filter(String::isNotBlank).joinToString(" • "),
                     color=FqMuted,
-                    fontSize=11.sp
+                    fontSize=12.sp
                 )
             }
         }
@@ -1556,7 +1556,7 @@ private fun PremiumSeriesPanel(
                         Text(
                             ((progress.progress*100).toInt()).toString()+"٪",
                             color=FqGold,
-                            fontSize=11.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold
                         )
                     }
@@ -1583,7 +1583,7 @@ private fun PremiumSeriesPanel(
             Text(
                 it,
                 color=FqDanger,
-                fontSize=11.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(horizontal=16.dp,vertical=4.dp)
             )
         }
@@ -1623,13 +1623,13 @@ private fun PremiumSeriesPanel(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 if(selected.number==0)"قسمت‌های ویژه" else "فصل "+selected.number,
-                                fontSize=11.sp,
+                                fontSize=12.sp,
                                 fontWeight=FontWeight.Bold
                             )
                             Text(
                                 watchedCount.toString()+" از "+seasonTotal+" قسمت دیده شده",
                                 color=FqMuted,
-                                fontSize=11.sp,
+                                fontSize=12.sp,
                                 modifier=Modifier.padding(top=2.dp)
                             )
                         }
@@ -1670,12 +1670,12 @@ private fun PremiumSeriesPanel(
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     if(allWatched)"نادیده" else "همه دیده‌شده",
-                                    fontSize=11.sp
+                                    fontSize=12.sp
                                 )
                             }
                         } else {
                             TextButton(onClick=onRequireAuth) {
-                                Text("ورود برای Progress",fontSize=11.sp)
+                                Text("ورود برای Progress",fontSize=12.sp)
                             }
                         }
                     }
@@ -1702,7 +1702,7 @@ private fun PremiumSeriesPanel(
                             Text(
                                 "دانلود فصل "+selected.number+" • "+readyCount+" قسمت",
                                 color=FqGold,
-                                fontSize=11.sp
+                                fontSize=12.sp
                             )
                         }
                     }
@@ -1722,7 +1722,7 @@ private fun PremiumSeriesPanel(
                         FilterChip(
                             selected=episodeFilter==item,
                             onClick={episodeFilterName=item.name},
-                            label={Text(label,fontSize=10.sp)}
+                            label={Text(label,fontSize=12.sp)}
                         )
                     }
                 }
@@ -1776,7 +1776,7 @@ private fun PremiumSeriesPanel(
                         else
                             "قسمتی با این فیلتر پیدا نشد",
                         color=FqMuted,
-                        fontSize=11.sp
+                        fontSize=12.sp
                     )
                 }
             }
@@ -1866,7 +1866,7 @@ private fun EpisodeCard(
                     Text(
                         "S"+seasonNumber.toString().padStart(2,'0')+
                             "E"+episode.number.toString().padStart(2,'0'),
-                        fontSize=11.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp)
                     )
                 }
@@ -1949,15 +1949,15 @@ private fun EpisodeCard(
                             episode.quality.orEmpty()
                         ).filter(String::isNotBlank).joinToString(" • "),
                         color=FqMuted,
-                        fontSize=11.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(top=3.dp)
                     )
                     if(episode.overview.isNotBlank()) {
                         Text(
                             episode.overview,
                             color=Color.White.copy(alpha=.7f),
-                            fontSize=11.sp,
-                            lineHeight=14.sp,
+                            fontSize=12.sp,
+                            lineHeight=18.sp,
                             maxLines=2,
                             overflow=TextOverflow.Ellipsis,
                             modifier=Modifier.padding(top=5.dp)
@@ -2015,11 +2015,11 @@ private fun PreviewSeasonCard(
             Text(
                 season.episodes.toString()+" قسمت",
                 color=FqGold,
-                fontSize=11.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(top=4.dp)
             )
             if(season.airDate.isNotBlank()) {
-                Text(season.airDate,color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp))
+                Text(season.airDate,color=FqMuted,fontSize=12.sp,modifier=Modifier.padding(top=3.dp))
             }
         }
         Icon(Icons.Default.ChevronLeft,null,tint=FqMuted)
@@ -2074,7 +2074,7 @@ private fun PremiumCommunityPanel(
                         Text(
                             "امتیاز کاربران، Review، بحث و تماشای گروهی",
                             color=FqMuted,
-                            fontSize=11.sp,
+                            fontSize=12.sp,
                             modifier=Modifier.padding(top=3.dp)
                         )
                     }
@@ -2083,8 +2083,8 @@ private fun PremiumCommunityPanel(
                 Text(
                     "بحث این عنوان به Catalog متصل است؛ Reviewها و پیام‌های اسپویلر با Spoiler Shield محافظت می‌شن.",
                     color=Color.White.copy(alpha=.75f),
-                    fontSize=11.sp,
-                    lineHeight=16.sp,
+                    fontSize=12.sp,
+                    lineHeight=18.sp,
                     modifier=Modifier.padding(top=13.dp)
                 )
 
@@ -2125,7 +2125,7 @@ private fun PremiumCommunityPanel(
                 Text(
                     relatedClips.size.toString()+" Clip",
                     color=FqMuted,
-                    fontSize=10.sp
+                    fontSize=12.sp
                 )
             }
             LazyRow(
@@ -2150,7 +2150,7 @@ private fun PremiumCommunityPanel(
                 Text(
                     "امتیاز Club وقتی این عنوان وارد Catalog واقعی Filmiqoo بشه فعال می‌شه.",
                     color=FqMuted,
-                    fontSize=11.sp,
+                    fontSize=12.sp,
                     modifier=Modifier.padding(14.dp)
                 )
             }
@@ -2173,7 +2173,7 @@ private fun PremiumCommunityPanel(
                             fontWeight=FontWeight.Black,
                             color=FqGold
                         )
-                        Text("از 10",color=FqMuted,fontSize=11.sp)
+                        Text("از 10",color=FqMuted,fontSize=12.sp)
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
@@ -2202,7 +2202,7 @@ private fun PremiumCommunityPanel(
                     ) {
                         Icon(Icons.Default.StarRate,null,tint=Color.Black,modifier=Modifier.size(17.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("امتیاز",color=Color.Black,fontSize=11.sp)
+                        Text("امتیاز",color=Color.Black,fontSize=12.sp)
                     }
                 }
 
@@ -2215,7 +2215,7 @@ private fun PremiumCommunityPanel(
                                 Modifier.fillMaxWidth().padding(vertical=2.dp),
                                 verticalAlignment=Alignment.CenterVertically
                             ) {
-                                Text(rating.toString(),color=FqMuted,fontSize=11.sp,modifier=Modifier.width(18.dp))
+                                Text(rating.toString(),color=FqMuted,fontSize=12.sp,modifier=Modifier.width(18.dp))
                                 LinearProgressIndicator(
                                     progress={fraction},
                                     color=FqGold,
@@ -2230,7 +2230,7 @@ private fun PremiumCommunityPanel(
         }
 
         reviewError?.let {
-            Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
+            Text(it,color=FqDanger,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))
         }
 
         if(ratings!=null) {
@@ -2240,7 +2240,7 @@ private fun PremiumCommunityPanel(
             ) {
                 Text("Reviewهای کاربران",fontSize=14.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                Text(ratings.items.size.toString(),color=FqMuted,fontSize=11.sp)
+                Text(ratings.items.size.toString(),color=FqMuted,fontSize=12.sp)
             }
 
             if(ratings.items.isEmpty()) {
@@ -2252,7 +2252,7 @@ private fun PremiumCommunityPanel(
                     Text(
                         "اولین Review این عنوان رو ثبت کن.",
                         color=FqMuted,
-                        fontSize=11.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(14.dp)
                     )
                 }
@@ -2344,7 +2344,7 @@ private fun RelatedTitleClipCard(
         ) {
             Text(
                 clip.caption.ifBlank { clip.author.displayName },
-                fontSize=10.sp,
+                fontSize=12.sp,
                 fontWeight=FontWeight.Bold,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis
@@ -2352,7 +2352,7 @@ private fun RelatedTitleClipCard(
             Text(
                 compactPulseCount(clip.views)+" بازدید",
                 color=Color.White.copy(alpha=.66f),
-                fontSize=8.sp,
+                fontSize=12.sp,
                 modifier=Modifier.padding(top=4.dp)
             )
         }
@@ -2381,13 +2381,13 @@ private fun MediaReviewCard(
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        Text(review.author.displayName,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                        Text(review.author.displayName,fontSize=12.sp,fontWeight=FontWeight.Bold)
                         if(review.author.verified) {
                             Spacer(Modifier.width(3.dp))
                             Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(12.dp))
                         }
                     }
-                    Text("@"+review.author.username,color=FqMuted,fontSize=11.sp)
+                    Text("@"+review.author.username,color=FqMuted,fontSize=12.sp)
                 }
                 Surface(
                     color=FqGold.copy(alpha=.13f),
@@ -2399,7 +2399,7 @@ private fun MediaReviewCard(
                     ) {
                         Icon(Icons.Default.Star,null,tint=FqGold,modifier=Modifier.size(13.dp))
                         Spacer(Modifier.width(3.dp))
-                        Text(review.rating.toString()+"/10",color=FqGold,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                        Text(review.rating.toString()+"/10",color=FqGold,fontSize=12.sp,fontWeight=FontWeight.Bold)
                     }
                 }
             }
@@ -2413,14 +2413,14 @@ private fun MediaReviewCard(
                     Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically) {
                         Icon(Icons.Default.VisibilityOff,null,tint=FqDanger,modifier=Modifier.size(17.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Spoiler Shield • برای نمایش Review لمس کن",color=FqDanger,fontSize=11.sp)
+                        Text("Spoiler Shield • برای نمایش Review لمس کن",color=FqDanger,fontSize=12.sp)
                     }
                 }
             } else if(review.body.isNotBlank()) {
                 Text(
                     review.body,
-                    fontSize=11.sp,
-                    lineHeight=16.sp,
+                    fontSize=12.sp,
+                    lineHeight=18.sp,
                     modifier=Modifier.padding(top=9.dp)
                 )
             }
@@ -2432,7 +2432,7 @@ private fun MediaReviewCard(
             ) {
                 Icon(Icons.Default.ThumbUpOffAlt,null,modifier=Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(review.likes.toString(),fontSize=11.sp)
+                Text(review.likes.toString(),fontSize=12.sp)
             }
         }
     }
@@ -2453,7 +2453,7 @@ private fun ReviewComposerDialog(
         title={Text("امتیاز به "+mediaTitle)},
         text={
             Column {
-                Text("امتیاز از ۱ تا ۱۰",color=FqMuted,fontSize=11.sp)
+                Text("امتیاز از ۱ تا ۱۰",color=FqMuted,fontSize=12.sp)
                 LazyRow(
                     horizontalArrangement=Arrangement.spacedBy(5.dp),
                     modifier=Modifier.padding(top=7.dp)
@@ -2534,17 +2534,17 @@ private fun TechnicalInfoSection(
                         }
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(version.quality.ifBlank{"Auto"},fontSize=11.sp,fontWeight=FontWeight.Bold)
+                            Text(version.quality.ifBlank{"Auto"},fontSize=12.sp,fontWeight=FontWeight.Bold)
                             Text(
                                 listOf(version.codec,version.hdr)
                                     .filter(String::isNotBlank).joinToString(" • "),
                                 color=FqMuted,
-                                fontSize=11.sp,
+                                fontSize=12.sp,
                                 modifier=Modifier.padding(top=2.dp)
                             )
                         }
                         if(version.fileSizeBytes>0) {
-                            Text(formatBytes(version.fileSizeBytes),color=FqMuted,fontSize=11.sp)
+                            Text(formatBytes(version.fileSizeBytes),color=FqMuted,fontSize=12.sp)
                         }
                     }
                 }
@@ -2559,7 +2559,7 @@ private fun InfoRow(label: String,value: String) {
         Modifier.fillMaxWidth().padding(vertical=7.dp),
         verticalAlignment=Alignment.CenterVertically
     ) {
-        Text(label,color=FqMuted,fontSize=11.sp,modifier=Modifier.weight(1f))
+        Text(label,color=FqMuted,fontSize=12.sp,modifier=Modifier.weight(1f))
         Text(value,fontSize=12.sp,fontWeight=FontWeight.Bold)
     }
     HorizontalDivider(color=FqSurface3)
@@ -2630,7 +2630,7 @@ private fun FilmiqooPulseCard(
                             else -> "اولین واکنش این عنوان رو تو بفرست"
                         },
                         color=FqMuted,
-                        fontSize=11.sp,
+                        fontSize=12.sp,
                         modifier=Modifier.padding(top=2.dp)
                     )
                 }
@@ -2642,7 +2642,7 @@ private fun FilmiqooPulseCard(
                         Text(
                             "LIVE",
                             color=Color(0xFFFF6A7D),
-                            fontSize=10.sp,
+                            fontSize=12.sp,
                             fontWeight=FontWeight.Bold,
                             modifier=Modifier.padding(horizontal=9.dp,vertical=4.dp)
                         )
@@ -2674,7 +2674,7 @@ private fun FilmiqooPulseCard(
                                 Text(
                                     compactPulseCount(count),
                                     color=FqMuted,
-                                    fontSize=11.sp,
+                                    fontSize=12.sp,
                                     fontWeight=FontWeight.Bold
                                 )
                             }
@@ -2706,13 +2706,13 @@ private fun FilmiqooPulseCard(
                             Text(
                                 moments.size.toString()+" لحظه داغ ثبت شده",
                                 color=Color.White.copy(alpha=.88f),
-                                fontSize=9.sp,
+                                fontSize=12.sp,
                                 fontWeight=FontWeight.Bold
                             )
                             Text(
                                 "زمان دقیق بعد از رسیدن به هر لحظه داخل Player آشکار می‌شه",
                                 color=FqMuted,
-                                fontSize=8.sp,
+                                fontSize=12.sp,
                                 modifier=Modifier.padding(top=2.dp)
                             )
                         }
