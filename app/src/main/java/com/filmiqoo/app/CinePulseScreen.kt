@@ -113,7 +113,7 @@ fun CinePulseScreen(
                 watching=watchingReq.await()
             }
         }.onFailure {
-            error=it.message ?: "نبض در دسترس نیست"
+            error=it.message ?: "کشف در دسترس نیست"
         }
         loading=false
         if(!initialPostId.isNullOrBlank()) onFocusedPostConsumed()
@@ -188,7 +188,7 @@ fun CinePulseScreen(
                 if(trending.isNotEmpty()) {
                     item {
                         PulseSectionTitle(
-                            title="نبض داغ",
+                            title="ترندهای زنده",
                             subtitle="عنوان‌هایی که همین حالا بیشترین تماشا و واکنش رو دارن",
                             icon=Icons.Default.Whatshot
                         )
@@ -307,7 +307,7 @@ fun CinePulseScreen(
                         CinePulseMode.CLIPS -> Icons.Default.SmartDisplay
                     },
                     title=when(mode) {
-                        CinePulseMode.NOW -> "نبض فعلاً آرومه"
+                        CinePulseMode.NOW -> "فعلاً ترند تازه‌ای نیست"
                         CinePulseMode.REVIEWS -> "هنوز نقد تازه‌ای نیست"
                         CinePulseMode.ROOMS -> "گفتگوی بازی نیست"
                         CinePulseMode.CLIPS -> "کلیپ مرتبطی نیست"
@@ -388,9 +388,9 @@ private fun PulseHeader(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("نبض",fontSize=28.sp,fontWeight=FontWeight.Black)
+                    Text("کشف",fontSize=28.sp,fontWeight=FontWeight.Black)
                     Text(
-                        "جایی برای واکنش، نقد و گفتگو؛ فقط درباره چیزی که دیدی",
+                        "مرکز کشف زنده فیلم‌ها، واکنش‌ها، گفتگوها و کلیپ‌های داغ",
                         color=FqMuted,
                         fontSize=10.sp,
                         maxLines=2
