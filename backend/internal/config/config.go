@@ -64,6 +64,8 @@ type Config struct {
 	SMTPPassword string
 	SMTPFrom string
 	PasswordResetBaseURL string
+	TelegramBotToken string
+	TelegramSourceChannel string
 }
 
 func Load() Config {
@@ -120,6 +122,8 @@ func Load() Config {
 		SMTPPassword: strings.TrimSpace(os.Getenv("SMTP_PASSWORD")),
 		SMTPFrom: env("SMTP_FROM","Filmiqoo <no-reply@filmiqoo.com>"),
 		PasswordResetBaseURL: env("PASSWORD_RESET_BASE_URL","https://filmiqoo.com/reset-password"),
+		TelegramBotToken: strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
+		TelegramSourceChannel: env("TELEGRAM_SOURCE_CHANNEL","filmiqq1"),
 	}
 }
 
