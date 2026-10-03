@@ -1128,7 +1128,7 @@ private fun FilmiqooBottomBar(
     } else {
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.Explore,"کشف",1),
+            Triple(Icons.Default.LiveTv,"تماشا",1),
             Triple(Icons.Default.AutoAwesomeMosaic,"استودیوی من",3),
             Triple(Icons.Default.Explore,"کشف",2),
             Triple(Icons.Default.PersonOutline,"من",4)
@@ -1142,10 +1142,10 @@ private fun FilmiqooBottomBar(
             .padding(start=10.dp,end=10.dp,bottom=8.dp,top=3.dp)
     ) {
         Surface(
-            color=Color(0xF20A0D12),
-            shape=RoundedCornerShape(24.dp),
+            color=Color(0xF20B0B0D),
+            shape=RoundedCornerShape(28.dp),
             tonalElevation=0.dp,
-            shadowElevation=18.dp,
+            shadowElevation=24.dp,
             border=androidx.compose.foundation.BorderStroke(
                 1.dp,
                 Color.White.copy(alpha=.08f)
@@ -1154,8 +1154,8 @@ private fun FilmiqooBottomBar(
         ) {
             Row(
                 Modifier.fillMaxWidth()
-                    .height(64.dp)
-                    .padding(horizontal=5.dp),
+                    .height(68.dp)
+                    .padding(horizontal=6.dp),
                 verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.SpaceEvenly
             ) {
