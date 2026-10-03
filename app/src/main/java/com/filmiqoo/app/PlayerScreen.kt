@@ -245,14 +245,19 @@ fun FilmiqooPlayerScreen(
         if(castConnected) castController.play() else player.play()
     }
 
+    // MediaSession is an integration enhancement, not a prerequisite for playback.
+    // Some OEM builds can reject session creation (for example while an old session
+    // is still being torn down). Never let that close the player/app.
     val mediaSession=remember(player) {
-        MediaSession.Builder(context,player)
-            .setId("filmiqoo-player")
-            .build()
+        runCatching {
+            MediaSession.Builder(context,player)
+                .setId("filmiqoo-player-"+System.identityHashCode(player))
+                .build()
+        }.getOrNull()
     }
 
     DisposableEffect(mediaSession) {
-        onDispose { mediaSession.release() }
+        onDispose { mediaSession?.release() }
     }
 
     LaunchedEffect(castController) {
@@ -606,7 +611,9 @@ fun FilmiqooPlayerScreen(
             activity?.requestedOrientation=
                 oldOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             if(oldUi!=null) activity?.window?.decorView?.systemUiVisibility=oldUi
-            player.release()
+            runCatching { player.stop() }
+            runCatching { player.clearMediaItems() }
+            runCatching { player.release() }
         }
     }
 
