@@ -1129,8 +1129,8 @@ private fun FilmiqooBottomBar(
         listOf(
             Triple(Icons.Default.Home,"خانه",0),
             Triple(Icons.Default.LiveTv,"تماشا",1),
-            Triple(Icons.Default.AutoAwesomeMosaic,"استودیوی من",3),
-            Triple(Icons.Default.Explore,"کشف",2),
+            Triple(Icons.Default.AutoAwesomeMosaic,"کریتور",3),
+            Triple(Icons.Default.Explore,"اکسپلور",2),
             Triple(Icons.Default.PersonOutline,"من",4)
         )
     }
@@ -1142,8 +1142,8 @@ private fun FilmiqooBottomBar(
             .padding(start=10.dp,end=10.dp,bottom=8.dp,top=3.dp)
     ) {
         Surface(
-            color=Color(0xF20B0B0D),
-            shape=RoundedCornerShape(28.dp),
+            color=Color(0xF70A0A0C),
+            shape=RoundedCornerShape(34.dp),
             tonalElevation=0.dp,
             shadowElevation=24.dp,
             border=androidx.compose.foundation.BorderStroke(
@@ -1154,7 +1154,7 @@ private fun FilmiqooBottomBar(
         ) {
             Row(
                 Modifier.fillMaxWidth()
-                    .height(68.dp)
+                    .height(72.dp)
                     .padding(horizontal=6.dp),
                 verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.SpaceEvenly
@@ -1162,7 +1162,7 @@ private fun FilmiqooBottomBar(
                 entries.forEach { item ->
                     val active=selected==item.third
                     val pillColor by animateColorAsState(
-                        if(active) FqGold.copy(alpha=.14f)
+                        if(active) FqGold.copy(alpha=.20f)
                         else Color.Transparent,
                         label="bottomBarPill"
                     )
@@ -1171,7 +1171,7 @@ private fun FilmiqooBottomBar(
                         label="bottomBarIcon"
                     )
                     val indicatorWidth by animateDpAsState(
-                        if(active) 18.dp else 0.dp,
+                        if(active) 24.dp else 0.dp,
                         label="bottomBarIndicator"
                     )
                     Surface(
@@ -1195,8 +1195,8 @@ private fun FilmiqooBottomBar(
                             verticalArrangement=Arrangement.Center
                         ) {
                             Box(
-                                Modifier.width(40.dp)
-                                    .height(28.dp)
+                                Modifier.width(if(active)46.dp else 40.dp)
+                                    .height(if(active)32.dp else 28.dp)
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(pillColor),
                                 contentAlignment=Alignment.Center
@@ -1205,7 +1205,7 @@ private fun FilmiqooBottomBar(
                                     item.first,
                                     contentDescription=item.second,
                                     tint=iconColor,
-                                    modifier=Modifier.size(if(active)22.dp else 20.dp)
+                                    modifier=Modifier.size(if(active)23.dp else 20.dp)
                                 )
                             }
                             Text(
