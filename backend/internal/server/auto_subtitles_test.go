@@ -23,3 +23,29 @@ func TestSubtitleReleaseScorePrefersEpisodeAndGroup(t *testing.T) {
 		t.Fatalf("expected correct release to outrank mismatch: good=%d bad=%d",good,bad)
 	}
 }
+
+
+func TestSecureSubtitleURL(t *testing.T) {
+	got,ok:=secureSubtitleURL("http://stremio.alirostami.com/subtitles/download/123")
+	if !ok {
+		t.Fatal("expected known subtitle host to be upgraded to https")
+	}
+	if got!="https://stremio.alirostami.com/subtitles/download/123" {
+		t.Fatalf("unexpected upgraded url: %s",got)
+	}
+
+	if _,ok:=secureSubtitleURL("http://example.com/subtitle.srt"); ok {
+		t.Fatal("expected insecure third-party URL to be rejected")
+	}
+}
+
+func TestPersianLanguageAliases(t *testing.T) {
+	for _,language:=range []string{"fa","fas","per","Persian","farsi"} {
+		if !isPersianLanguage(language) {
+			t.Fatalf("expected %q to be recognized as Persian",language)
+		}
+	}
+	if isPersianLanguage("en") {
+		t.Fatal("english must not be recognized as Persian")
+	}
+}
