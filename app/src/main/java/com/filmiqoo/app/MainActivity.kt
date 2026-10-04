@@ -45,7 +45,7 @@ class MainActivity : FragmentActivity() {
         deepLinkState.value=intent?.dataString
         setContent {
             FilmiqooTheme {
-                IranAccessGate { FilmiqooApp(initialDeepLink=deepLinkState.value) }
+                CinemaSplash { IranAccessGate { FilmiqooApp(initialDeepLink=deepLinkState.value) } }
             }
         }
     }
@@ -1014,17 +1014,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onSearchAll={showSearch=true}
                         )
-                        2 -> CinePulseScreen(
+                        2 -> CinemaSocialScreen(
                             social=social,
                             backend=backend,
-                            repository=repository,
                             loggedIn=backend.session.isLoggedIn,
                             onMedia={overlay=OverlayRoute.Detail(it)},
-                            onOpenPost={ postId ->
-                                deepLinkPostId=postId
-                                overlay=null
-                                tab=2
-                            },
                             onOpenClip={ clipId ->
                                 overlay=OverlayRoute.Clips(clipId)
                             },
@@ -1034,21 +1028,17 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onInbox={overlay=OverlayRoute.Inbox},
                             onCreate={overlay=OverlayRoute.Create},
                             onRequireAuth={overlay=OverlayRoute.Auth},
+                            onCollection={overlay=OverlayRoute.SocialCollections(it)},
+                            onStories={stories,index -> overlay=OverlayRoute.SocialStories(stories,index)},
                             initialPostId=deepLinkPostId,
                             onFocusedPostConsumed={deepLinkPostId=null}
                         )
-                        3 -> CinemaLibraryScreen(
-                            backend=backend,
-                            repository=repository,
-                            onBack={tab=0},
-                            onMedia={overlay=OverlayRoute.Detail(it)},
-                            onPlay={overlay=OverlayRoute.Player(it)},
-                            onDownloads={overlay=OverlayRoute.Downloads},
-                            onHistory={overlay=OverlayRoute.History},
-                            onFilmDna={overlay=OverlayRoute.FilmDna},
-                            onRequireAuth={overlay=OverlayRoute.Auth},
-                            showBack=false
-                        )
+                        3 -> if (backend.session.isLoggedIn) InboxScreen(
+                            backend=backend, onBack={tab=0},
+                            onOpenRoom={conversation -> socialBadgeRefresh++; overlay=OverlayRoute.Room(conversation.id,conversation.title)}
+                        ) else Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment=Alignment.Center) {
+                            CinemaNotice("گفت‌وگو از اینجا شروع می‌شود", "برای پیام‌دادن به دوستان سینمایی‌ات وارد حساب شو.", Icons.Default.ChatBubbleOutline, "ورود", { overlay=OverlayRoute.Auth })
+                        }
                         else -> {
                             if(backend.session.isLoggedIn) {
                                 MeScreen(

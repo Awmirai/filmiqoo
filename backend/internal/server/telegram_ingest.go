@@ -44,7 +44,7 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 	// The resolver obtains the real MTProto file ID and hash directly from FSB.
 	body.StreamHash = ""
 
-	parsed := ingest.ParseFileName(body.FileName)
+	parsed, _ := ingest.ParseTelegramMedia(body.FileName, body.Caption)
 	fingerprint := telegramSourceFingerprint(body)
 
 	var id, status string

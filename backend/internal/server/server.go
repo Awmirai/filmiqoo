@@ -128,6 +128,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		})
 
 		r.Get("/catalog/home", s.catalogHome)
+		r.Get("/discussions/{scope}", s.titleComments)
 		r.With(
 			s.authRateLimit(
 				"tmdb-metadata",
@@ -190,6 +191,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 				),
 			)
 			r.Post("/catalog/{id}/pulse/react", s.reactMediaPulse)
+			r.Get("/discussions/{scope}/viewer", s.titleComments)
+			r.Post("/discussions/{scope}", s.addTitleComment)
+			r.Post("/discussion-comments/{id}/{action}", s.titleCommentAction)
 			r.Post("/social/reels", s.createReel)
 			r.Get("/social/reels/{id}/viewer", s.viewerReelDetail)
 			r.Get("/social/reels/{id}/viewer-state", s.reelViewerState)

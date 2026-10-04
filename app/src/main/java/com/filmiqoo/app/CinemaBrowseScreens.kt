@@ -166,7 +166,7 @@ fun CinemaHomeScreen(
         }
         if (data == null && error == null) item("loading") { LinearProgressIndicator(color = CinemaAccent, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) }
         error?.let { message -> item("error") { Box(Modifier.padding(horizontal = 20.dp)) { CinemaNotice("خانه آماده نشد", message, Icons.Default.CloudOff, "تلاش دوباره", { retry++ }) } } }
-        data?.trending?.firstOrNull()?.let { hero -> item("hero") { CinemaHomeHero(hero) { onMedia(hero) } } }
+        data?.let { bundle -> item("hero") { CinemaSpotlight(bundle, onMedia, onStory) } }
         item("latest-catalog") {
             RecentCatalogShelf(latest, onMedia)
         }

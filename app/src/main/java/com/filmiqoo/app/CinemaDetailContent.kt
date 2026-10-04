@@ -17,6 +17,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -63,7 +65,7 @@ internal fun CinemaDetailContent(
     val isSeries = media.type == MediaType.TV
     val listState = rememberLazyListState()
     val showToolbarTitle by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
-    var tab by rememberSaveable(media.key) { mutableStateOf("about") }
+    var tab by rememberSaveable(media.key) { mutableStateOf(if (isSeries) "episodes" else "about") }
     var selectedSeason by rememberSaveable(media.key) { mutableIntStateOf(data.platform?.seasons?.firstOrNull { it.number > 0 }?.number ?: 1) }
     var episodeFilter by rememberSaveable(media.key) { mutableIntStateOf(0) }
     var episodeSearch by rememberSaveable(media.key) { mutableStateOf("") }
@@ -81,7 +83,7 @@ internal fun CinemaDetailContent(
         (episodeSearch.isBlank() || ep.number.toString() == cinemaSearchKey(episodeSearch) || cinemaSearchKey(ep.name).contains(cinemaSearchKey(episodeSearch))) &&
             when (episodeFilter) { 1 -> ep.streamReady && !ep.mediaVersionId.isNullOrBlank(); 2 -> progress?.episodes?.get(ep.id)?.completed != true; else -> true }
     }
-    val tabs = buildList { add("about" to "درباره"); if (isSeries) add("episodes" to "قسمت‌ها"); add("cast" to "بازیگران"); add("club" to "کلاب") }
+    val tabs = buildList { add("about" to "درباره"); if (isSeries) add("episodes" to "قسمت‌ها"); add("cast" to "بازیگران"); add("club" to "دیدگاه‌ها") }
     BackHandler { if (versionsOpen) versionsOpen = false else actions.back() }
 
     Scaffold(
@@ -244,8 +246,9 @@ internal fun CinemaDetailContent(
                     if (d.directors.isNotEmpty()) item("creators") { CinemaPeopleRow(if (isSeries) "سازندگان و کارگردانان" else "کارگردان", d.directors, actions.person) }
                     if (d.cast.isEmpty() && d.directors.isEmpty()) item("empty-cast") { Box(Modifier.padding(20.dp)) { CinemaNotice("اطلاعات عوامل موجود نیست", "این بخش پس از دریافت اطلاعات معتبر نمایش داده می‌شود.") } }
                 }
-                "club" -> item("community") { community() }
+                "club" -> Unit
             }
+            item("community") { community() }
         }
     }
     if (versionsOpen) {
@@ -304,36 +307,29 @@ private fun CinemaTitleHero(data: CinemaTitleData) {
 private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: EpisodeWatchState?, hideSpoilers: Boolean, busy: Boolean, actions: CinemaDetailActions) {
     val ready = ep.streamReady && !ep.mediaVersionId.isNullOrBlank()
     val completed = progress?.completed == true
-    Surface(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp).fillMaxWidth().testTag("episode-${ep.id}"), color = CinemaSurface,
-        shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, if (completed) FqGreen.copy(alpha = .25f) else CinemaLine)) {
-        Column(Modifier.padding(13.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(92.dp).aspectRatio(16f / 10f).clip(RoundedCornerShape(11.dp)).clickable(enabled = ready && !busy) { ep.mediaVersionId?.let(actions.play) }) {
-                    if (hideSpoilers) {
-                        Box(Modifier.fillMaxSize().background(CinemaLine), contentAlignment = Alignment.Center) {
-                            if (!ready) Icon(Icons.Default.VisibilityOff, "تصویر قسمت برای جلوگیری از اسپویل پنهان است", tint = CinemaSoft)
-                        }
-                    } else CinemaImage(ep.stillUrl, Modifier.fillMaxSize(), backdrop = true)
-                    if (ready) Icon(Icons.Default.PlayCircle, "پخش قسمت ${ep.number}", modifier = Modifier.align(Alignment.Center).size(29.dp), tint = Color.White)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                        Text(cinemaEpisodeLabel(season, ep.number), color = CinemaAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Text(if (hideSpoilers) "قسمت ${ep.number}" else ep.name.ifBlank { "قسمت ${ep.number}" }, color = CinemaPaper, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
-                    Text(if (ready) listOf(ep.quality.orEmpty(), if (ep.runtimeMinutes > 0) "${ep.runtimeMinutes} دقیقه" else "").filter(String::isNotBlank).joinToString(" · ") else "فایل موجود نیست", color = CinemaSoft, fontSize = 12.sp)
-                }
-                IconButton({ ep.mediaVersionId?.let(actions.download) }, enabled = ready && !busy) { Icon(Icons.Default.Download, "دانلود قسمت ${ep.number}", tint = if (ready) CinemaPaper else CinemaSoft.copy(alpha = .4f)) }
+    CinemaCard(Modifier.padding(horizontal = 20.dp, vertical = 8.dp).fillMaxWidth().testTag("episode-${ep.id}"), accent = completed) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 8f).clip(RoundedCornerShape(15.dp))) {
+            CinemaImage(ep.stillUrl, Modifier.fillMaxSize(), backdrop = true)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, CinemaInk.copy(alpha = .75f)))))
+            Surface(color = CinemaInk.copy(alpha = .8f), shape = RoundedCornerShape(10.dp), modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) {
+                Text(cinemaEpisodeLabel(season, ep.number), color = CinemaGold, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
             }
-            if (!hideSpoilers && ep.overview.isNotBlank()) Text(ep.overview, color = CinemaSoft, fontSize = 13.sp, lineHeight = 21.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-            if ((progress?.progress ?: 0f) > 0f) LinearProgressIndicator(progress = { progress?.progress?.coerceIn(0f, 1f) ?: 0f }, color = if (completed) FqGreen else CinemaAccent,
-                trackColor = CinemaLine, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-            TextButton({ actions.episodeSeen(ep, !completed) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
-                Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = if (completed) FqGreen else CinemaSoft, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp)); Text(if (completed) "دیده شده" else "علامت‌گذاری به‌عنوان دیده‌شده", color = CinemaSoft, fontSize = 12.sp)
+            if (ready) IconButton({ ep.mediaVersionId?.let(actions.play) }, enabled = !busy, modifier = Modifier.align(Alignment.Center).size(56.dp)) {
+                Icon(Icons.Default.PlayCircle, "پخش قسمت ${ep.number}", tint = Color.White, modifier = Modifier.size(48.dp))
             }
+            Text(if (completed) "✓ دیده شده" else if (ready) "آمادهٔ تماشا" else "به‌زودی در فیلمیکو", color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
+        }
+        Text(if (hideSpoilers) "قسمت ${ep.number}" else ep.name.ifBlank { "قسمت ${ep.number}" }, color = CinemaPaper, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 13.dp))
+        Text(listOf(ep.quality.orEmpty(), if (ep.runtimeMinutes > 0) "${ep.runtimeMinutes} دقیقه" else "").filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        if (!hideSpoilers && ep.overview.isNotBlank()) Text(ep.overview, color = CinemaSoft, fontSize = 13.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 10.dp))
+        if ((progress?.progress ?: 0f) > 0f) LinearProgressIndicator(progress = { progress?.progress?.coerceIn(0f,1f) ?: 0f }, color = CinemaAccent, trackColor = CinemaLine, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CinemaAction(Icons.Default.PlayArrow, if ((progress?.positionMs ?: 0) > 0 && !completed) "ادامهٔ تماشا" else "تماشا", { ep.mediaVersionId?.let(actions.play) }, Modifier.weight(1f), primary = true, enabled = ready && !busy)
+            CinemaAction(Icons.Default.Download, "دانلود", { ep.mediaVersionId?.let(actions.download) }, Modifier.weight(1f).semantics { contentDescription = "دانلود قسمت ${ep.number}" }, enabled = ready && !busy)
+        }
+        TextButton({ actions.episodeSeen(ep, !completed) }, enabled = !busy) {
+            Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = CinemaSoft, modifier = Modifier.size(18.dp))
+            Text(if (completed) "  دیده‌ام · لغو علامت" else "  این قسمت را دیده‌ام", color = CinemaSoft, fontSize = 12.sp)
         }
     }
 }

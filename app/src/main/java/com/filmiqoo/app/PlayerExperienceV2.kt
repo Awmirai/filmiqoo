@@ -94,6 +94,7 @@ internal fun PlayerChromeTopBarV2(
     onBack: () -> Unit,
     onShare: () -> Unit,
     onMore: () -> Unit,
+    onHide: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -113,6 +114,11 @@ internal fun PlayerChromeTopBarV2(
                 onClick=onMore
             )
             FilmiqooCastRouteButton()
+            PlayerRoundAction(
+                icon=Icons.Default.VisibilityOff,
+                contentDescription="پنهان‌کردن کنترل‌ها",
+                onClick=onHide
+            )
 
         }
 
@@ -433,15 +439,12 @@ internal fun PlayerToolsSheetV2(
     onPip: () -> Unit,
     onLock: () -> Unit
 ) {
-    val sheetState=rememberModalBottomSheetState(
-        skipPartiallyExpanded=true,
-        confirmValueChange={ it!=SheetValue.Hidden }
-    )
+    val sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
 
     BackHandler(onBack=onDismiss)
 
     ModalBottomSheet(
-        onDismissRequest={},
+        onDismissRequest=onDismiss,
         sheetState=sheetState,
         containerColor=PlayerPanel,
         contentColor=Color.White,

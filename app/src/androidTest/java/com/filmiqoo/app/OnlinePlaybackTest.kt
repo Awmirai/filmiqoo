@@ -100,6 +100,18 @@ class OnlinePlaybackTest {
         }
         assertTrue("Online token endpoint was used", tokens.get() > 0)
         assertTrue("Video was actually fetched over HTTP", mediaRequests.get() > 0)
+        // Controls auto-hide during real decoding, and video taps still reach Compose
+        // above the native PlayerView. Tools must dismiss before leaving playback.
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("پنهان‌کردن کنترل‌ها").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("player-video-gestures").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .2f, height * .4f)) }
+        compose.onNodeWithContentDescription("پنهان‌کردن کنترل‌ها").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("پنهان‌کردن کنترل‌ها").assertDoesNotExist()
+        compose.onNodeWithTag("player-video-gestures").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .2f, height * .4f)) }
+        compose.onAllNodesWithContentDescription("ابزارهای پخش").onFirst().performClick()
+        compose.onNodeWithContentDescription("بستن").assertIsDisplayed()
+        androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        compose.onNodeWithContentDescription("بستن").assertDoesNotExist()
+        compose.onNodeWithContentDescription("پنهان‌کردن کنترل‌ها").performClick()
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("online-video-playing.png").use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Awmirai/filmiqoo/backend/internal/ingest"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,18 +16,18 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 	}
 
 	var chatID, messageID, fileNumericID, fileSize int64
-	var fileName, mimeType, streamHash, kind, title, quality, source, codec string
+	var fileName, mimeType, streamHash, kind, title, quality, source, codec, caption string
 	var season, episode, year *int
 
 	err := s.db.QueryRow(ctx, `
 		SELECT telegram_chat_id,telegram_message_id,telegram_file_numeric_id,file_size_bytes,
 		       file_name,mime_type,stream_hash,parsed_kind,parsed_title,parsed_quality,
-		       parsed_source,parsed_codec,parsed_season,parsed_episode,parsed_year
+		       parsed_source,parsed_codec,parsed_season,parsed_episode,parsed_year,caption
 		  FROM telegram_ingest_items
 		 WHERE id=$1
 	`, ingestID).Scan(
 		&chatID, &messageID, &fileNumericID, &fileSize, &fileName, &mimeType, &streamHash,
-		&kind, &title, &quality, &source, &codec, &season, &episode, &year,
+		&kind, &title, &quality, &source, &codec, &season, &episode, &year, &caption,
 	)
 	if err != nil {
 		return err
@@ -60,7 +61,22 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 		return fmt.Errorf("persist telegram stream metadata: %w", err)
 	}
 
+	parsed, candidates := ingest.ParseTelegramMedia(fileName, caption)
+	kind, title, quality, source, codec = parsed.Kind, parsed.Title, parsed.Quality, parsed.Source, parsed.Codec
+	season, episode, year = parsed.Season, parsed.Episode, parsed.Year
+	_, err = s.db.Exec(ctx, `UPDATE telegram_ingest_items SET parsed_kind=$2,parsed_title=$3,
+		parsed_quality=$4,parsed_source=$5,parsed_codec=$6,parsed_season=$7,parsed_episode=$8,parsed_year=$9 WHERE id=$1`,
+		ingestID, kind, title, quality, source, codec, season, episode, year)
+	if err != nil {
+		return err
+	}
 	match, err := s.tmdb.Search(ctx, kind, title, year)
+	for _, candidate := range candidates[1:] {
+		if err == nil || ctx.Err() != nil {
+			break
+		}
+		match, err = s.tmdb.Search(ctx, kind, candidate, year)
+	}
 	if err != nil {
 		_, _ = s.db.Exec(ctx, "UPDATE telegram_ingest_items SET status='failed',error_text=$2,updated_at=now() WHERE id=$1", ingestID, err.Error())
 		return err

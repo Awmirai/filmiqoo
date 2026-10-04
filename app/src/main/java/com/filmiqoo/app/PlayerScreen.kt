@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -940,11 +941,12 @@ fun FilmiqooPlayerScreen(
         bookmarksOpen,
         handoffOpen,
         dialogueSearchOpen,
-        queueOpen
+        queueOpen,
+        isScrubbing
     ) {
         val overlayOpen=toolsOpen || settingsOpen || momentsOpen || bookmarksOpen ||
             handoffOpen || dialogueSearchOpen || queueOpen
-        if(controlsVisible && isPlaying && !locked && !overlayOpen) {
+        if(controlsVisible && isPlaying && !locked && !overlayOpen && !isScrubbing) {
             delay(3_500)
             controlsVisible=false
         }
@@ -993,6 +995,8 @@ fun FilmiqooPlayerScreen(
             dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
             queueOpen -> queueOpen=false
+            bookmarksOpen -> bookmarksOpen=false
+            handoffOpen -> handoffOpen=false
             toolsOpen -> toolsOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
@@ -1010,9 +1014,7 @@ fun FilmiqooPlayerScreen(
         playerTrackChoices(player,C.TRACK_TYPE_TEXT)
     }
 
-    Box(
-        Modifier.fillMaxSize()
-            .background(Color.Black)
+    val videoGestures = Modifier.fillMaxSize()
             .pointerInput(locked,currentVersionId) {
                 detectTapGestures(
                     onTap={
@@ -1116,7 +1118,7 @@ fun FilmiqooPlayerScreen(
                     )
                 }
             }
-    ) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         if(playUrl!=null) {
             AndroidView(
                 factory={ ctx ->
@@ -1151,6 +1153,8 @@ fun FilmiqooPlayerScreen(
                 modifier=Modifier.fillMaxSize()
             )
         }
+
+        Box(videoGestures.then(Modifier.testTag("player-video-gestures")))
 
         if(loading || buffering) {
             PlayerBufferingOverlay(
@@ -1253,6 +1257,7 @@ fun FilmiqooPlayerScreen(
             )
 
             PlayerChromeTopBarV2(
+                onHide={ controlsVisible=false },
                 target=currentTarget,
                 currentVariant=currentTarget.variants.firstOrNull {
                     it.mediaVersionId==selectedVariantId
@@ -1527,7 +1532,7 @@ fun FilmiqooPlayerScreen(
             autoSubtitleBusy=autoSubtitleBusy,
             autoSubtitleStatus=autoSubtitleStatus,
             activeSubtitleLabel=externalSubtitleLabel,
-            onDismiss={toolsOpen=false},
+            onDismiss={toolsOpen=false; bumpControls()},
             onAutoPersianSubtitle={ enabled ->
                 if(!enabled) {
                     autoPersianSubtitleEnabled=false
@@ -1717,7 +1722,7 @@ fun FilmiqooPlayerScreen(
             diagnosticsEnabled=diagnosticsEnabled,
             orientationMode=orientationMode,
             currentPositionMs=positionMs,
-            onDismiss={settingsOpen=false},
+            onDismiss={settingsOpen=false; bumpControls()},
             onVariant={ variant ->
                 val position=player.currentPosition.coerceAtLeast(0L)
                 if(variant.mediaVersionId!=currentVersionId) {

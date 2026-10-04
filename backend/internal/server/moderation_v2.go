@@ -29,7 +29,7 @@ func (s *Server) submitReport(w http.ResponseWriter,r *http.Request) {
 	body.Detail=strings.TrimSpace(body.Detail)
 
 	switch body.TargetType {
-	case "user","post","reel","story","message","channel","review","moment":
+	case "user","post","reel","story","message","channel","review","moment","discussion":
 	default:
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported report target"})
 		return

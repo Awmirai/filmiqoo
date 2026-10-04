@@ -146,11 +146,11 @@ internal fun CinemaNotice(title: String, message: String, icon: ImageVector = Ic
 internal fun CinemaBottomBar(selected: Int, kidsMode: Boolean, onSelected: (Int) -> Unit) {
     val entries = if (kidsMode) listOf(Triple(0, "خانه", Icons.Default.Home), Triple(4, "من", Icons.Default.PersonOutline)) else listOf(
         Triple(0, "خانه", Icons.Default.Home), Triple(1, "تماشا", Icons.Default.Explore),
-        Triple(2, "کلاب", Icons.Default.Forum), Triple(3, "کتابخانه", Icons.Default.Bookmarks), Triple(4, "من", Icons.Default.PersonOutline))
+        Triple(2, "سینماکلاب", Icons.Default.Diversity3), Triple(3, "پیام‌ها", Icons.Default.ChatBubbleOutline), Triple(4, "من", Icons.Default.PersonOutline))
     Box(Modifier.fillMaxWidth().background(CinemaInk).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-        Surface(Modifier.widthIn(max = 760.dp).fillMaxWidth(), color = CinemaSurface, shape = RoundedCornerShape(26.dp),
+        Surface(Modifier.widthIn(max = 760.dp).fillMaxWidth(), color = CinemaSurface, shape = RoundedCornerShape(32.dp),
             border = BorderStroke(1.dp, CinemaLine), shadowElevation = 12.dp) {
-            Row(Modifier.fillMaxWidth().selectableGroup().heightIn(min = 76.dp)) {
+            Row(Modifier.fillMaxWidth().selectableGroup().heightIn(min = 72.dp)) {
                 entries.forEach { (id, label, icon) ->
                     val active = selected == id
                     val tint by animateColorAsState(if (active) CinemaAccent else CinemaSoft, label = "navigation-tint")

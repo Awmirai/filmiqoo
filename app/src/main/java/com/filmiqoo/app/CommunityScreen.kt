@@ -380,7 +380,7 @@ fun CommunityScreen(
 }
 
 @Composable
-private fun SocialPostCard(
+internal fun SocialPostCard(
     post: SocialPost,
     social: SocialRepository,
     loggedIn: Boolean,
@@ -612,7 +612,7 @@ private fun compactPollVotes(value:Long):String=when {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PostCommentsSheet(
+internal fun PostCommentsSheet(
     post: SocialPost,
     social: SocialRepository,
     loggedIn: Boolean,
