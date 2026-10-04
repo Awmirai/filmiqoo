@@ -63,6 +63,9 @@ services:
       PUBLIC_MEDIA_BASE_URL: https://${FILMIQOO_MEDIA_DOMAIN}/${OBJECT_STORAGE_BUCKET:-filmiqoo-media}
       BUILD_VERSION: ${FILMIQOO_VERSION:?FILMIQOO_VERSION is required}
       BUILD_COMMIT: ${FILMIQOO_COMMIT:?FILMIQOO_COMMIT is required}
+      IRAN_ONLY_ENABLED: "true"
+      GEO_PROXY_HEADER_SECRET: ${GEO_PROXY_HEADER_SECRET:-}
+      GEO_COUNTRY_DATA_PATH: /geo/iran-country.json
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,6 +87,7 @@ services:
       FILMIQOO_DOMAIN: ${FILMIQOO_DOMAIN:?FILMIQOO_DOMAIN is required}
       FILMIQOO_MEDIA_DOMAIN: ${FILMIQOO_MEDIA_DOMAIN:?FILMIQOO_MEDIA_DOMAIN is required}
       FILMIQOO_TLS_EMAIL: ${FILMIQOO_TLS_EMAIL:?FILMIQOO_TLS_EMAIL is required}
+      GEO_PROXY_HEADER_SECRET: ${GEO_PROXY_HEADER_SECRET:-}
     ports:
       - "80:80"
       - "443:443"

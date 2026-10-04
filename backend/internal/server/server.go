@@ -20,6 +20,7 @@ import (
 )
 
 type Server struct {
+	regionAccess *regionAccessPolicy
 	cfg   config.Config
 	db    *pgxpool.Pool
 	redis *redis.Client
@@ -47,6 +48,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	}
 	s := &Server{
 		cfg: cfg,
+		regionAccess: loadRegionAccess(cfg.Environment),
 		db: db,
 		redis: redisClient,
 		tmdb: tmdb.New(cfg.TMDBToken),
@@ -72,6 +74,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
+	r.Use(s.regionStatusMiddleware)
+	r.Use(s.enforceRegion)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(s.securityHeaders)
@@ -443,6 +447,10 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
+    if !s.regionAccess.ready() {
+        writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"region access configuration unavailable"})
+        return
+    }
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	if err := s.db.Ping(ctx); err != nil {

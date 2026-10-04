@@ -22,9 +22,10 @@ import (
 )
 
 func main() {
-    month := flag.String("month", "2026-10", "DB-IP Lite publication month YYYY-MM")
+    month := flag.String("month", "", "DB-IP Lite publication month YYYY-MM; defaults to current UTC month")
     output := flag.String("out", "/out/iran-country.json", "output file")
     flag.Parse()
+    if *month == "" { *month = time.Now().UTC().Format("2006-01") }
     published, err := time.Parse("2006-01", *month)
     if err != nil { log.Fatal("invalid publication month") }
     source := "https://download.db-ip.com/free/dbip-country-lite-" + *month + ".csv.gz"
@@ -42,7 +43,9 @@ func main() {
     gz, err := gzip.NewReader(bytes.NewReader(compressed))
     if err != nil { log.Fatal(err) }
     defer gz.Close()
-    reader := csv.NewReader(io.LimitReader(gz, 128*1024*1024))
+    expanded, err := io.ReadAll(io.LimitReader(gz, 128*1024*1024+1))
+    if err != nil || len(expanded) > 128*1024*1024 { log.Fatal("country dataset decompression failed or exceeded size limit") }
+    reader := csv.NewReader(bytes.NewReader(expanded))
     reader.FieldsPerRecord = 3
     dataset := geoaccess.Dataset{Country: "IR", Published: published.Format("2006-01-02"), Source: source, SourceSHA256: hex.EncodeToString(sum[:])}
     rows := 0

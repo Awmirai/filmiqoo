@@ -80,17 +80,17 @@ fun CinemaDetailScreen(
         val id = current.platform?.id ?: return@LaunchedEffect
         if (!backend.session.isLoggedIn) return@LaunchedEffect
         if (current.detail.media.type == MediaType.TV) {
-            progress = cinemaOptional { series.load(id) }
-            following = cinemaOptional { subscriptions.status(id).following } ?: following
+            progress = cinemaUiOptional { series.load(id) }
+            following = cinemaUiOptional { subscriptions.status(id).following } ?: following
         }
     }
     LaunchedEffect(data?.platform?.id, backend.session.isLoggedIn) {
         val id = data?.platform?.id ?: return@LaunchedEffect
         if (backend.session.isLoggedIn) {
-            cinemaOptional { library.watchlist() }?.let { items -> saved = saved || items.any { it.backendId == id } }
-            cinemaOptional { library.favorites() }?.let { items -> favorite = favorite || items.any { it.backendId == id } }
+            cinemaUiOptional { library.watchlist() }?.let { items -> saved = saved || items.any { it.backendId == id } }
+            cinemaUiOptional { library.favorites() }?.let { items -> favorite = favorite || items.any { it.backendId == id } }
         }
-        clips = cinemaOptional { SocialRepository(backend).mediaClips(id) }.orEmpty()
+        clips = cinemaUiOptional { SocialRepository(backend).mediaClips(id) }.orEmpty()
     }
     BackHandler(onBack = onBack)
 

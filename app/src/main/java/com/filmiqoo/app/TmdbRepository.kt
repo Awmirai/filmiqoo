@@ -41,6 +41,9 @@ class TmdbRepository(private val context: Context) {
 
     private suspend fun get(path: String, params: Map<String, String> = emptyMap()): JSONObject = withContext(Dispatchers.IO) {
         val serverResult = runCatching { backend.tmdbMetadata(path, params) }
+        serverResult.exceptionOrNull()?.let {
+            if (it is IranAccessDeniedException || it is kotlinx.coroutines.CancellationException) throw it
+        }
         serverResult.getOrNull()?.let { return@withContext it }
 
         val localToken = prefs.getString("credential", "").orEmpty().trim()
@@ -96,7 +99,7 @@ class TmdbRepository(private val context: Context) {
         return MediaItem(
             id = obj.optInt("id"),
             type = type,
-            title = title.ifBlank { original.ifBlank { "بدون عنوان" } },
+            title = (if (obj.optString("original_language") == "fa") original.ifBlank { title } else title).ifBlank { original.ifBlank { "بدون عنوان" } },
             originalTitle = original,
             overview = obj.optString("overview"),
             posterPath = obj.optString("poster_path").takeIf { it.isNotBlank() && it != "null" },
@@ -112,101 +115,14 @@ class TmdbRepository(private val context: Context) {
         return buildList {
             for (i in 0 until arr.length()) {
                 val item = arr.optJSONObject(i) ?: continue
+                if (item.optString("media_type") == "person" || item.optBoolean("adult")) continue
                 val media = parseMedia(item, fallback)
                 if (media.id > 0 && media.title.isNotBlank()) add(media)
             }
         }
     }
 
-    suspend fun home(): HomeBundle = coroutineScope {
-        val platform = runCatching {
-            if (backend.health()) backend.catalogHome() else emptyList()
-        }.getOrDefault(emptyList())
-        if (platform.isNotEmpty()) {
-            val movies = platform.filter { it.type == MediaType.MOVIE }
-            val tv = platform.filter { it.type == MediaType.TV }
-            return@coroutineScope HomeBundle(
-                trending = platform,
-                popularMovies = movies,
-                popularTv = tv,
-                iranian = platform.filter { it.originalTitle.contains("ایران", ignoreCase = true) }.ifEmpty { movies.take(10) },
-                korean = tv.take(10),
-                bollywood = movies.drop(3).take(10),
-                anime = tv.drop(3).take(10)
-            )
-        }
-        val trending = async {
-            parseList(get("trending/all/day", mapOf("language" to "fa-IR")), MediaType.MOVIE)
-                .filter { it.type == MediaType.MOVIE || it.type == MediaType.TV }
-        }
-        val movies = async {
-            parseList(get("movie/popular", mapOf("language" to "fa-IR", "page" to "1")), MediaType.MOVIE)
-        }
-        val tv = async {
-            parseList(get("tv/popular", mapOf("language" to "fa-IR", "page" to "1")), MediaType.TV)
-        }
-        val iranian = async {
-            val a = parseList(
-                get("discover/movie", mapOf(
-                    "language" to "fa-IR",
-                    "sort_by" to "popularity.desc",
-                    "with_origin_country" to "IR",
-                    "include_adult" to "false"
-                )),
-                MediaType.MOVIE
-            )
-            val b = parseList(
-                get("discover/tv", mapOf(
-                    "language" to "fa-IR",
-                    "sort_by" to "popularity.desc",
-                    "with_origin_country" to "IR"
-                )),
-                MediaType.TV
-            )
-            (a + b).sortedByDescending { it.popularity }.take(20)
-        }
-        val korean = async {
-            parseList(
-                get("discover/tv", mapOf(
-                    "language" to "fa-IR",
-                    "sort_by" to "popularity.desc",
-                    "with_original_language" to "ko"
-                )),
-                MediaType.TV
-            )
-        }
-        val bollywood = async {
-            parseList(
-                get("discover/movie", mapOf(
-                    "language" to "fa-IR",
-                    "sort_by" to "popularity.desc",
-                    "with_original_language" to "hi",
-                    "include_adult" to "false"
-                )),
-                MediaType.MOVIE
-            )
-        }
-        val anime = async {
-            parseList(
-                get("discover/tv", mapOf(
-                    "language" to "fa-IR",
-                    "sort_by" to "popularity.desc",
-                    "with_genres" to "16",
-                    "with_original_language" to "ja"
-                )),
-                MediaType.TV
-            )
-        }
-        HomeBundle(
-            trending = trending.await(),
-            popularMovies = movies.await(),
-            popularTv = tv.await(),
-            iranian = iranian.await(),
-            korean = korean.await(),
-            bollywood = bollywood.await(),
-            anime = anime.await()
-        )
-    }
+    suspend fun home(): HomeBundle = CinemaDataRepository(context, backend).home()
 
     suspend fun trending(): List<MediaItem> {
         val platform = runCatching { backend.catalogHome() }.getOrDefault(emptyList())
@@ -268,7 +184,7 @@ class TmdbRepository(private val context: Context) {
             }
         val metadata = parseList(
             get("search/multi", mapOf(
-                "language" to "fa-IR",
+                "language" to "en-US",
                 "query" to query,
                 "include_adult" to "false",
                 "page" to "1"
@@ -276,227 +192,11 @@ class TmdbRepository(private val context: Context) {
             MediaType.MOVIE
         ).filter { it.type == MediaType.MOVIE || it.type == MediaType.TV }
         return (platform + metadata)
-            .distinctBy { it.type to it.id }
+            .distinctBy(::cinemaMediaKey)
             .take(60)
     }
 
-    suspend fun detail(media: MediaItem): MediaDetail {
-        if (!media.backendId.isNullOrBlank()) {
-            val platform = backend.detail(media.backendId)
-            return MediaDetail(
-                media = media.copy(overview = platform.overview.ifBlank { media.overview }),
-                tagline = "",
-                genres = emptyList(),
-                runtime = 0,
-                status = "available",
-                cast = emptyList(),
-                trailerKey = null,
-                recommendations = emptyList(),
-                seasons = platform.seasons.map {
-                    SeasonInfo(
-                        number = it.number,
-                        name = it.name.ifBlank { "فصل " + it.number },
-                        episodes = it.episodes.size,
-                        posterPath = it.posterUrl.takeIf(String::isNotBlank),
-                        airDate = ""
-                    )
-                }
-            )
-        }
-        val typePath = if (media.type == MediaType.MOVIE) "movie" else "tv"
-        var obj = get(
-            typePath + "/" + media.id,
-            mapOf(
-                "language" to "fa-IR",
-                "append_to_response" to "credits,videos,recommendations,similar"
-            )
-        )
-
-        if (obj.optString("overview").isBlank()) {
-            val english = get(
-                typePath + "/" + media.id,
-                mapOf(
-                    "language" to "en-US",
-                    "append_to_response" to "credits,videos,recommendations,similar"
-                )
-            )
-            val merged = JSONObject(obj.toString())
-            if (merged.optString("overview").isBlank()) merged.put("overview", english.optString("overview"))
-            if (merged.optString("tagline").isBlank()) merged.put("tagline", english.optString("tagline"))
-            if (merged.optJSONArray("credits") == null) merged.put("credits", english.optJSONObject("credits"))
-            obj = merged
-        }
-
-        val normalized = MediaItem(
-            id = media.id,
-            type = media.type,
-            title = when(media.type) {
-                MediaType.MOVIE -> obj.optString("title").ifBlank { media.title }
-                MediaType.TV -> obj.optString("name").ifBlank { media.title }
-            },
-            originalTitle = media.originalTitle,
-            overview = obj.optString("overview").ifBlank { media.overview },
-            posterPath = obj.optString("poster_path").takeIf { it.isNotBlank() && it != "null" } ?: media.posterPath,
-            backdropPath = obj.optString("backdrop_path").takeIf { it.isNotBlank() && it != "null" } ?: media.backdropPath,
-            vote = obj.optDouble("vote_average", media.vote),
-            date = when(media.type) {
-                MediaType.MOVIE -> obj.optString("release_date").ifBlank { media.date }
-                MediaType.TV -> obj.optString("first_air_date").ifBlank { media.date }
-            },
-            popularity = obj.optDouble("popularity", media.popularity),
-            backendId = media.backendId,
-            mediaVersionId = media.mediaVersionId,
-            streamReady = media.streamReady,
-            quality = media.quality
-        )
-
-        val genresArray = obj.optJSONArray("genres") ?: JSONArray()
-        val genres = buildList {
-            for (i in 0 until genresArray.length()) {
-                genresArray.optJSONObject(i)?.optString("name")?.takeIf { it.isNotBlank() }?.let(::add)
-            }
-        }
-
-        val castArray = obj.optJSONObject("credits")?.optJSONArray("cast") ?: JSONArray()
-        val cast = buildList {
-            for (i in 0 until minOf(castArray.length(), 16)) {
-                val c = castArray.optJSONObject(i) ?: continue
-                add(
-                    CastMember(
-                        id = c.optInt("id"),
-                        name = c.optString("name"),
-                        character = c.optString("character"),
-                        profilePath = c.optString("profile_path").takeIf { it.isNotBlank() && it != "null" }
-                    )
-                )
-            }
-        }
-
-        val crewArray = obj.optJSONObject("credits")?.optJSONArray("crew") ?: JSONArray()
-        val directors = buildList<CastMember> {
-            for (i in 0 until crewArray.length()) {
-                val c = crewArray.optJSONObject(i) ?: continue
-                val job=c.optString("job")
-                val department=c.optString("department")
-                val isDirector=job.equals("Director",true) ||
-                    (media.type==MediaType.TV && (
-                        job.equals("Executive Producer",true) ||
-                        department.equals("Directing",true)
-                    ))
-                if(!isDirector) continue
-                val id=c.optInt("id")
-                if(id<=0 || any { it.id==id }) continue
-                add(
-                    CastMember(
-                        id=id,
-                        name=c.optString("name"),
-                        character=job.ifBlank { department },
-                        profilePath=c.optString("profile_path").takeIf { it.isNotBlank() && it!="null" }
-                    )
-                )
-                if(size>=8) break
-            }
-        }
-
-        val videos = obj.optJSONObject("videos")?.optJSONArray("results") ?: JSONArray()
-        var trailer: String? = null
-        for (i in 0 until videos.length()) {
-            val v = videos.optJSONObject(i) ?: continue
-            if (v.optString("site") == "YouTube" && v.optString("type") == "Trailer") {
-                trailer = v.optString("key").takeIf { it.isNotBlank() }
-                if (v.optBoolean("official")) break
-            }
-        }
-
-        val recObj = obj.optJSONObject("recommendations") ?: obj.optJSONObject("similar") ?: JSONObject()
-        val recommendations = parseList(recObj, media.type)
-
-        val seasonsArray = obj.optJSONArray("seasons") ?: JSONArray()
-        val seasons = buildList {
-            for (i in 0 until seasonsArray.length()) {
-                val s = seasonsArray.optJSONObject(i) ?: continue
-                val number = s.optInt("season_number")
-                if (number < 0) continue
-                add(
-                    SeasonInfo(
-                        number = number,
-                        name = s.optString("name").ifBlank { "فصل " + number },
-                        episodes = s.optInt("episode_count"),
-                        posterPath = s.optString("poster_path").takeIf { it.isNotBlank() && it != "null" },
-                        airDate = s.optString("air_date")
-                    )
-                )
-            }
-        }
-
-        val franchise=if(media.type==MediaType.MOVIE) {
-            val collectionRef=obj.optJSONObject("belongs_to_collection")
-            val collectionId=collectionRef?.optInt("id") ?: 0
-            if(collectionId>0) {
-                runCatching {
-                    val collection=get(
-                        "collection/"+collectionId,
-                        mapOf("language" to "fa-IR")
-                    )
-                    val partsArray=collection.optJSONArray("parts") ?: JSONArray()
-                    val parts=buildList {
-                        for(i in 0 until partsArray.length()) {
-                            val x=partsArray.optJSONObject(i) ?: continue
-                            add(
-                                MediaItem(
-                                    id=x.optInt("id"),
-                                    type=MediaType.MOVIE,
-                                    title=x.optString("title").ifBlank{x.optString("original_title")},
-                                    originalTitle=x.optString("original_title"),
-                                    overview=x.optString("overview"),
-                                    posterPath=x.optString("poster_path").takeIf { it.isNotBlank() && it!="null" },
-                                    backdropPath=x.optString("backdrop_path").takeIf { it.isNotBlank() && it!="null" },
-                                    vote=x.optDouble("vote_average",0.0),
-                                    date=x.optString("release_date"),
-                                    popularity=x.optDouble("popularity",0.0)
-                                )
-                            )
-                        }
-                    }.sortedWith(
-                        compareBy<MediaItem> {
-                            it.date.takeIf(String::isNotBlank) ?: "9999-12-31"
-                        }.thenBy { it.id }
-                    )
-                    FranchiseInfo(
-                        id=collectionId,
-                        name=collection.optString("name")
-                            .ifBlank{collectionRef?.optString("name").orEmpty()},
-                        posterPath=collection.optString("poster_path")
-                            .takeIf { it.isNotBlank() && it!="null" },
-                        backdropPath=collection.optString("backdrop_path")
-                            .takeIf { it.isNotBlank() && it!="null" },
-                        parts=parts
-                    )
-                }.getOrNull()
-            } else null
-        } else null
-
-        val runtime = if (media.type == MediaType.MOVIE) {
-            obj.optInt("runtime")
-        } else {
-            val arr = obj.optJSONArray("episode_run_time") ?: JSONArray()
-            if (arr.length() > 0) arr.optInt(0) else 0
-        }
-
-        return MediaDetail(
-            media = normalized,
-            tagline = obj.optString("tagline"),
-            genres = genres,
-            runtime = runtime,
-            status = obj.optString("status"),
-            cast = cast,
-            trailerKey = trailer,
-            recommendations = recommendations,
-            seasons = seasons,
-            directors = directors,
-            franchise = franchise
-        )
-    }
+    suspend fun detail(media: MediaItem): MediaDetail = CinemaDataRepository(context, backend).title(media).detail
 
     suspend fun person(id:Int):PersonDetail {
         require(id>0) { "Invalid person id" }

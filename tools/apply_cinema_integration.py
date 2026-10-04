@@ -14,12 +14,13 @@ changed = []
 def replace(text, old, new, count=1):
     if old == new:
         return text
-    found = text.count(old)
-    if found == 0 and new in text:
+    parts = text.split(new)
+    found = sum(part.count(old) for part in parts)
+    if found == 0 and len(parts) > 1:
         return text
     if found != count:
         raise RuntimeError(f"Expected {count} occurrences, found {found}: {old[:100]!r}")
-    return text.replace(old, new)
+    return new.join(part.replace(old, new) for part in parts)
 
 def span(text, start, end, replacement):
     a, b = text.find(start), text.find(end, text.find(start) + len(start))

@@ -45,7 +45,7 @@ class MainActivity : FragmentActivity() {
         deepLinkState.value=intent?.dataString
         setContent {
             FilmiqooTheme {
-                FilmiqooApp(initialDeepLink=deepLinkState.value)
+                IranAccessGate { FilmiqooApp(initialDeepLink=deepLinkState.value) }
             }
         }
     }
@@ -589,7 +589,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 }
             )
             overlay != null -> when(val route=overlay!!) {
-                is OverlayRoute.Detail -> PremiumDetailScreen(
+                is OverlayRoute.Detail -> CinemaDetailScreen(
                     media=route.media,
                     repository=repository,
                     backend=backend,
@@ -661,7 +661,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onPlay={pushOverlay(OverlayRoute.Player(it))}
                 )
-                OverlayRoute.Library -> LibraryScreen(
+                OverlayRoute.Library -> CinemaLibraryScreen(
                     backend=backend,
                     repository=repository,
                     onBack=closeOverlay,
@@ -917,7 +917,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onBack=closeOverlay,
                     onRequireAuth={pushOverlay(OverlayRoute.Auth)}
                 )
-                OverlayRoute.Create -> PremiumCreateHubScreen(
+                OverlayRoute.Create -> CinemaCreateScreen(
                     social=social,
                     backend=backend,
                     repository=repository,
@@ -989,7 +989,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         key="main-tab-"+tab
                     ) {
                     when(tab) {
-                        0 -> PremiumHomeScreen(
+                        0 -> CinemaHomeScreen(
                             repository=repository,
                             backend=backend,
                             loggedIn=backend.session.isLoggedIn,
@@ -998,18 +998,17 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onStory={m,i->overlay=OverlayRoute.Story(m,i)},
                             onSearch={
                                 if(activeViewer?.kidsMode!=true) {
-                                    showSearch=false
-                                    tab=1
+                                    showSearch=true
                                 }
                             },
                             onNotifications=openNotifications,
                             onReleases={overlay=OverlayRoute.Releases},
-                            onClips={tab=2},
+                            onClips={overlay=OverlayRoute.Clips()},
                             onClub={tab=2},
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)},
                             badgeRefreshKey=socialBadgeRefresh
                         )
-                        1 -> StreamingExploreScreen(
+                        1 -> CinemaDiscoverScreen(
                             repository=repository,
                             onMedia={overlay=OverlayRoute.Detail(it)},
                             onSearchAll={showSearch=true}
@@ -1037,7 +1036,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             initialPostId=deepLinkPostId,
                             onFocusedPostConsumed={deepLinkPostId=null}
                         )
-                        3 -> LibraryScreen(
+                        3 -> CinemaLibraryScreen(
                             backend=backend,
                             repository=repository,
                             onBack={tab=0},
@@ -1119,116 +1118,7 @@ private fun FilmiqooBottomBar(
     kidsMode:Boolean=false,
     onSelected:(Int)->Unit
 ) {
-    val haptic=LocalHapticFeedback.current
-    val entries=if(kidsMode) {
-        listOf(
-            Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.PersonOutline,"من",4)
-        )
-    } else {
-        listOf(
-            Triple(Icons.Default.Home,"خانه",0),
-            Triple(Icons.Default.LiveTv,"تماشا",1),
-            Triple(Icons.Default.AutoAwesomeMosaic,"کریتور",3),
-            Triple(Icons.Default.Explore,"اکسپلور",2),
-            Triple(Icons.Default.PersonOutline,"من",4)
-        )
-    }
-
-    Box(
-        Modifier.fillMaxWidth()
-            .background(Color.Transparent)
-            .navigationBarsPadding()
-            .padding(start=10.dp,end=10.dp,bottom=8.dp,top=3.dp)
-    ) {
-        Surface(
-            color=Color(0xF70A0A0C),
-            shape=RoundedCornerShape(34.dp),
-            tonalElevation=0.dp,
-            shadowElevation=24.dp,
-            border=androidx.compose.foundation.BorderStroke(
-                1.dp,
-                Color.White.copy(alpha=.08f)
-            ),
-            modifier=Modifier.fillMaxWidth()
-        ) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .height(72.dp)
-                    .padding(horizontal=6.dp),
-                verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.SpaceEvenly
-            ) {
-                entries.forEach { item ->
-                    val active=selected==item.third
-                    val pillColor by animateColorAsState(
-                        if(active) FqGold.copy(alpha=.20f)
-                        else Color.Transparent,
-                        label="bottomBarPill"
-                    )
-                    val iconColor by animateColorAsState(
-                        if(active) FqGoldSoft else FqMuted,
-                        label="bottomBarIcon"
-                    )
-                    val indicatorWidth by animateDpAsState(
-                        if(active) 24.dp else 0.dp,
-                        label="bottomBarIndicator"
-                    )
-                    Surface(
-                        color=Color.Transparent,
-                        contentColor=iconColor,
-                        shape=RoundedCornerShape(18.dp),
-                        modifier=Modifier.weight(1f)
-                            .fillMaxHeight()
-                            .clickable {
-                                if(!active) {
-                                    haptic.performHapticFeedback(
-                                        HapticFeedbackType.TextHandleMove
-                                    )
-                                    onSelected(item.third)
-                                }
-                            }
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize().padding(vertical=6.dp),
-                            horizontalAlignment=Alignment.CenterHorizontally,
-                            verticalArrangement=Arrangement.Center
-                        ) {
-                            Box(
-                                Modifier.width(if(active)46.dp else 40.dp)
-                                    .height(if(active)32.dp else 28.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(pillColor),
-                                contentAlignment=Alignment.Center
-                            ) {
-                                Icon(
-                                    item.first,
-                                    contentDescription=item.second,
-                                    tint=iconColor,
-                                    modifier=Modifier.size(if(active)23.dp else 20.dp)
-                                )
-                            }
-                            Text(
-                                item.second,
-                                color=iconColor,
-                                style=MaterialTheme.typography.labelSmall,
-                                fontWeight=if(active) FontWeight.Bold else FontWeight.Medium,
-                                maxLines=1,
-                                modifier=Modifier.padding(top=2.dp)
-                            )
-                            Box(
-                                Modifier.padding(top=3.dp)
-                                    .width(indicatorWidth)
-                                    .height(2.dp)
-                                    .clip(CircleShape)
-                                    .background(if(active) FqGold else Color.Transparent)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    CinemaBottomBar(selected, kidsMode, onSelected)
 }
 
 @Composable

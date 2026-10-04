@@ -73,7 +73,7 @@ fun LibraryScreen(
                         .fillMaxWidth()
                         .padding(18.dp)
                 ) {
-                    Text("استودیوی من",fontSize=27.sp,fontWeight=FontWeight.Black)
+                    Text("کتابخانهٔ من",fontSize=27.sp,fontWeight=FontWeight.Black)
                     Text(
                         "فضای شخصی تو برای مدیریت تماشا، لحظه‌ها، دانلودها و کالکشن‌ها",
                         color=FqMuted,
@@ -540,7 +540,7 @@ private fun LibraryHeader(
                 .padding(bottom=18.dp)
         ) {
             Text(
-                "استودیوی من",
+                "کتابخانهٔ من",
                 fontSize=30.sp,
                 fontWeight=FontWeight.Black
             )

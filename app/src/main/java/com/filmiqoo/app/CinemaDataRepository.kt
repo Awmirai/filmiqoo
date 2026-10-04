@@ -19,6 +19,13 @@ internal suspend fun <T> cinemaOptional(block: suspend () -> T): T? = try {
     null
 }
 
+/** The access interceptor has already closed the gate; an optional UI job must not crash the activity. */
+internal suspend fun <T> cinemaUiOptional(block: suspend () -> T): T? = try {
+    cinemaOptional(block)
+} catch (_: IranAccessDeniedException) {
+    null
+}
+
 data class CinemaPage(val items: List<MediaItem>, val page: Int, val totalPages: Int) {
     val hasMore: Boolean get() = page < totalPages.coerceAtMost(500)
 }
@@ -32,7 +39,7 @@ data class CinemaTitleData(
     val englishTitle: String = "",
     val metadataAvailable: Boolean = true
 ) {
-    val playableMovies: List<PlatformVersion> get() = platform?.versions.orEmpty().filter { it.streamReady }
+    val playableMovies: List<PlatformVersion> get() = platform?.versions.orEmpty().filter { it.streamReady && it.id.isNotBlank() }
     val playableEpisodes: List<Pair<Int, PlatformEpisode>> get() = platform?.seasons.orEmpty()
         .sortedBy { it.number }.flatMap { season -> season.episodes.sortedBy { it.number }.map { season.number to it } }
         .filter { it.second.streamReady && !it.second.mediaVersionId.isNullOrBlank() }
@@ -160,8 +167,8 @@ class CinemaDataRepository(context: Context, private val backend: BackendReposit
         val worldMovies = async { cinemaOptional { catalog(CinemaQuery(CinemaRegion.WORLD)) }?.items.orEmpty() }
         val worldSeries = async { cinemaOptional { catalog(CinemaQuery(CinemaRegion.WORLD, MediaType.TV)) }?.items.orEmpty() }
         val playable = ready.await()
-        val bundle = HomeBundle((playable + trending.await()).distinctBy { it.type to it.id }.take(30), worldMovies.await(), worldSeries.await(),
-            (iranMovies.await() + iranSeries.await()).distinctBy { it.type to it.id }, korean.await(), india.await())
+        val bundle = HomeBundle((playable + trending.await()).distinctBy(::cinemaMediaKey).take(30), worldMovies.await(), worldSeries.await(),
+            (iranMovies.await() + iranSeries.await()).distinctBy(::cinemaMediaKey), korean.await(), india.await())
         if (bundle.trending.isEmpty() && bundle.iranian.isEmpty()) error("دریافت کاتالوگ ناموفق بود. دوباره تلاش کن.")
         bundle
     }
@@ -182,7 +189,7 @@ class CinemaDataRepository(context: Context, private val backend: BackendReposit
                 o.optDouble("vote_average").takeIf { it.isFinite() } ?: 0.0,
                 o.optString(if (type == MediaType.MOVIE) "release_date" else "first_air_date"), o.optDouble("popularity", 0.0)))
         }
-    }.filter { it.title.isNotBlank() }.distinctBy { it.type to it.id }
+    }.filter { it.title.isNotBlank() }.distinctBy(::cinemaMediaKey)
 
     private fun names(array: JSONArray?): List<String> = buildList {
         if (array != null) for (i in 0 until array.length()) array.optJSONObject(i)?.optString("name")?.takeIf(String::isNotBlank)?.let(::add)

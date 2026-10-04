@@ -2027,7 +2027,7 @@ private fun PreviewSeasonCard(
 }
 
 @Composable
-private fun PremiumCommunityPanel(
+internal fun PremiumCommunityPanel(
     media: MediaItem,
     backend: BackendRepository,
     loggedIn: Boolean,

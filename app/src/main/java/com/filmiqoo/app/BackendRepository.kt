@@ -242,6 +242,7 @@ class BackendRepository(context: Context) {
     val viewerProfiles = ViewerProfileStore(appContext)
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val client = OkHttpClient.Builder()
+        .addInterceptor(IranAccessInterceptor())
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(35, TimeUnit.SECONDS)
         .writeTimeout(20, TimeUnit.SECONDS)

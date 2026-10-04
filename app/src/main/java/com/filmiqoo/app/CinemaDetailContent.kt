@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -267,7 +268,7 @@ internal fun CinemaDetailContent(
 private fun CinemaTitleHero(data: CinemaTitleData) {
     val media = data.detail.media
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val heroHeight = (maxWidth * .88f).coerceIn(310.dp, 420.dp)
+        val heroHeight = (maxWidth * .88f).coerceIn(310.dp, 420.dp) * LocalDensity.current.fontScale.coerceIn(1f, 1.7f)
         Box(Modifier.fillMaxWidth().height(heroHeight)) {
             CinemaImage(media.backdropPath ?: media.posterPath, Modifier.fillMaxSize(), backdrop = true)
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .04f), CinemaInk.copy(alpha = .42f), CinemaInk))))

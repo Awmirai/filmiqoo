@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -119,7 +121,7 @@ fun IranAccessGate(content: @Composable () -> Unit) {
 @Composable
 internal fun IranAccessScreen(state: IranAccessViewState, retry: () -> Unit) {
     val context = LocalContext.current
-    Column(Modifier.fillMaxSize().background(CinemaInk).safeDrawingPadding().padding(24.dp).testTag("iran-access-screen"), verticalArrangement = Arrangement.Center) {
+    Column(Modifier.fillMaxSize().background(CinemaInk).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp).testTag("iran-access-screen"), verticalArrangement = Arrangement.Center) {
         Icon(if (state.checking) Icons.Default.Public else Icons.Default.LocationOn, null, tint = CinemaAccent, modifier = Modifier.size(56.dp))
         Text("FILMIQOO", color = CinemaPaper, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 22.dp))
         Text(if (state.checking) "در حال بررسی دسترسی…" else "ویژهٔ اتصال داخل ایران", color = CinemaPaper, fontSize = 21.sp, lineHeight = 30.sp,

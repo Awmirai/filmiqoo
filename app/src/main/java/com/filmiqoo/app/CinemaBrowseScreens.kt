@@ -139,7 +139,7 @@ fun CinemaHomeScreen(
         catch (failure: Exception) { error = failure.message ?: "دریافت خانه ناموفق بود." }
     }
     LaunchedEffect(loggedIn, badgeRefreshKey, retry) {
-        continued = if (loggedIn) cinemaOptional { backend.continueWatching() }.orEmpty() else emptyList()
+        continued = if (loggedIn) cinemaUiOptional { backend.continueWatching() }.orEmpty() else emptyList()
     }
     val opened = region
     if (opened != null) {
@@ -163,7 +163,7 @@ fun CinemaHomeScreen(
         error?.let { message -> item("error") { Box(Modifier.padding(horizontal = 20.dp)) { CinemaNotice("خانه آماده نشد", message, Icons.Default.CloudOff, "تلاش دوباره", { retry++ }) } } }
         data?.trending?.firstOrNull()?.let { hero -> item("hero") { CinemaHomeHero(hero) { onMedia(hero) } } }
         item("regions") {
-            CinemaHeading("سینمای تو، بدون مرزِ سلیقه", "بخش‌های واقعی بر اساس کشور تولید، نه دسته‌بندی حدسی")
+            CinemaHeading("جهانِ سلیقهٔ تو", "از سینمای ایران تا قصه‌های آن سوی دنیا")
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 items(CinemaRegion.entries) { entry ->
                     val code = when (entry) { CinemaRegion.IRAN -> "IR"; CinemaRegion.KOREA -> "KR"; CinemaRegion.INDIA -> "IN"; CinemaRegion.BOLLYWOOD -> "HI"; CinemaRegion.WORLD -> "WORLD" }

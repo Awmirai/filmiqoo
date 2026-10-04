@@ -21,7 +21,7 @@ func loadRegionAccess(environment string) *regionAccessPolicy {
     enabled := production
     if raw, ok := os.LookupEnv("IRAN_ONLY_ENABLED"); ok {
         value, err := strconv.ParseBool(raw)
-        if err == nil { enabled = value } else { enabled = true }
+        if err == nil { enabled = production || value } else { enabled = true }
     }
     policy := &regionAccessPolicy{enabled: enabled, edgeSecret: strings.TrimSpace(os.Getenv("GEO_PROXY_HEADER_SECRET"))}
     if !enabled { return policy }

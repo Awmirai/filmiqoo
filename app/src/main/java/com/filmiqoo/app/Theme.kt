@@ -16,15 +16,15 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val FqBg = Color(0xFF070708)
-val FqSurface = Color(0xFF111113)
-val FqSurface2 = Color(0xFF18181B)
-val FqSurface3 = Color(0xFF202024)
-val FqSurface4 = Color(0xFF29292E)
-val FqGold = Color(0xFFE50914)
+val FqBg = Color(0xFF090B10)
+val FqSurface = Color(0xFF131720)
+val FqSurface2 = Color(0xFF1A202B)
+val FqSurface3 = Color(0xFF232C38)
+val FqSurface4 = Color(0xFF303B49)
+val FqGold = Color(0xFFFF4155)
 val FqGoldSoft = Color(0xFFFF5660)
 val FqText = Color(0xFFF7F8FA)
-val FqMuted = Color(0xFFADB5C2)
+val FqMuted = Color(0xFFA8B2C4)
 val FqMutedStrong = Color(0xFFC8CDD5)
 val FqDanger = Color(0xFFFF4757)
 val FqGreen = Color(0xFF47D18C)

@@ -9,6 +9,11 @@ import (
 )
 
 var tmdbProxyQueryKeys = map[string]struct{}{
+	"primary_release_date.gte": {},
+	"primary_release_date.lte": {},
+	"first_air_date.gte": {},
+	"first_air_date.lte": {},
+	"vote_count.gte": {},
 	"language": {},
 	"page": {},
 	"sort_by": {},

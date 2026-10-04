@@ -79,7 +79,7 @@ func (s *Server) catalogDetail(w http.ResponseWriter, r *http.Request) {
 					SELECT id,quality_label,stream_ready,preferred
 					  FROM media_versions
 					 WHERE episode_id=e.id
-					 ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+					 ORDER BY stream_ready DESC,preferred DESC,height DESC,file_size_bytes DESC
 					 LIMIT 1
 				  ) mv ON true
 				 WHERE e.season_id=$1
