@@ -89,7 +89,7 @@ internal fun CinemaTag(label: String, selected: Boolean = false, onClick: (() ->
 internal fun CinemaAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false, enabled: Boolean = true) {
     Button(onClick, modifier.heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) CinemaAccent else CinemaSurface,
-            contentColor = if (primary) Color.White else CinemaPaper),
+            contentColor = if (primary) CinemaInk else CinemaPaper),
         border = if (primary) null else BorderStroke(1.dp, CinemaLine), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
         Icon(icon, null, modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(8.dp))

@@ -140,7 +140,7 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
 
     val colors=darkColorScheme(
         primary=FqGold,
-        onPrimary=Color.White,
+        onPrimary=FqBg,
         primaryContainer=Color(0xFF4A070B),
         onPrimaryContainer=FqGoldSoft,
         secondary=FqBlue,
