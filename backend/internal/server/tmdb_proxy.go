@@ -66,6 +66,19 @@ func allowedTMDBProxyPath(path string) bool {
 	}
 
 	parts := strings.Split(path, "/")
+	if len(parts) == 3 {
+		if parts[2] != "external_ids" {
+			return false
+		}
+		switch parts[0] {
+		case "movie", "tv":
+		default:
+			return false
+		}
+		id, err := strconv.ParseInt(parts[1], 10, 64)
+		return err == nil && id > 0
+	}
+
 	if len(parts) != 2 {
 		return false
 	}
