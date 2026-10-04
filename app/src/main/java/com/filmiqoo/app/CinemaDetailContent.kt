@@ -61,6 +61,7 @@ internal fun CinemaDetailContent(
     val media = d.media
     val isSeries = media.type == MediaType.TV
     val listState = rememberLazyListState()
+    val showToolbarTitle by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     var tab by rememberSaveable(media.key) { mutableStateOf("about") }
     var selectedSeason by rememberSaveable(media.key) { mutableIntStateOf(data.platform?.seasons?.firstOrNull { it.number > 0 }?.number ?: 1) }
     var episodeFilter by rememberSaveable(media.key) { mutableIntStateOf(0) }
@@ -89,7 +90,7 @@ internal fun CinemaDetailContent(
         topBar = {
             Row(Modifier.fillMaxWidth().background(CinemaInk).statusBarsPadding().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(actions.back) { Icon(Icons.Default.ArrowForward, "بازگشت", tint = CinemaPaper) }
-                Text(if (listState.firstVisibleItemIndex > 0) media.title else "FILMIQOO", color = CinemaPaper,
+                Text(if (showToolbarTitle) media.title else "FILMIQOO", color = CinemaPaper,
                     fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 IconButton(actions.share) { Icon(Icons.Default.Share, "اشتراک‌گذاری عنوان", tint = CinemaPaper) }
             }

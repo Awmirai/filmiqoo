@@ -20,25 +20,25 @@ import (
 )
 
 type Server struct {
-	regionAccess *regionAccessPolicy
-	cfg   config.Config
-	db    *pgxpool.Pool
-	redis *redis.Client
-	http  *http.Server
-	upstreamClient *http.Client
-	tmdb *tmdb.Client
-	objects *objectstore.Store
+	regionAccess         *regionAccessPolicy
+	cfg                  config.Config
+	db                   *pgxpool.Pool
+	redis                *redis.Client
+	http                 *http.Server
+	upstreamClient       *http.Client
+	tmdb                 *tmdb.Client
+	objects              *objectstore.Store
 	objectStoreInitError string
-	fcm *fcmClient
-	fcmInitError string
-	workersCancel context.CancelFunc
+	fcm                  *fcmClient
+	fcmInitError         string
+	workersCancel        context.CancelFunc
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server {
 	var objects *objectstore.Store
 	var objectErr error
-	if strings.TrimSpace(cfg.ObjectStorageEndpoint)!="" {
-		objects,objectErr=objectstore.New(
+	if strings.TrimSpace(cfg.ObjectStorageEndpoint) != "" {
+		objects, objectErr = objectstore.New(
 			cfg.ObjectStorageEndpoint,
 			cfg.ObjectStoragePublicEndpoint,
 			cfg.ObjectStorageKey,
@@ -47,29 +47,29 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		)
 	}
 	s := &Server{
-		cfg: cfg,
+		cfg:          cfg,
 		regionAccess: loadRegionAccess(cfg.Environment),
-		db: db,
-		redis: redisClient,
-		tmdb: tmdb.New(cfg.TMDBToken),
-		objects: objects,
+		db:           db,
+		redis:        redisClient,
+		tmdb:         tmdb.New(cfg.TMDBToken),
+		objects:      objects,
 		upstreamClient: &http.Client{
 			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				MaxIdleConns: 100,
-				MaxIdleConnsPerHost: 20,
-				IdleConnTimeout: 90 * time.Second,
+				Proxy:                 http.ProxyFromEnvironment,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   20,
+				IdleConnTimeout:       90 * time.Second,
 				ResponseHeaderTimeout: 20 * time.Second,
 			},
 		},
 	}
-	if objectErr!=nil {
-		s.objectStoreInitError=objectErr.Error()
-		log.Printf("object storage unavailable: %v",objectErr)
+	if objectErr != nil {
+		s.objectStoreInitError = objectErr.Error()
+		log.Printf("object storage unavailable: %v", objectErr)
 	}
-	if err:=s.configureFCM(); err!=nil {
-		s.fcmInitError=err.Error()
-		log.Printf("firebase push disabled: %v",err)
+	if err := s.configureFCM(); err != nil {
+		s.fcmInitError = err.Error()
+		log.Printf("firebase push disabled: %v", err)
 	}
 
 	r := chi.NewRouter()
@@ -87,9 +87,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	r.Get("/readyz", s.ready)
 
 	r.Route("/internal", func(r chi.Router) {
-		r.Get("/ops/status",s.opsStatus)
-		r.Get("/ops/moderation",s.opsModerationQueue)
-		r.Post("/ops/moderation/{id}/status",s.opsResolveModeration)
+		r.Get("/ops/status", s.opsStatus)
+		r.Get("/ops/moderation", s.opsModerationQueue)
+		r.Post("/ops/moderation/{id}/status", s.opsResolveModeration)
 		r.Post("/telegram/ingest", s.telegramIngest)
 		r.Get("/telegram/pending", s.pendingTelegramIngest)
 		r.Post("/telegram/{id}/resolve", s.resolveTelegramIngestNow)
@@ -97,8 +97,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 	r.Route("/v1", func(r chi.Router) {
 		r.With(
-			s.authRateLimit("telemetry",30,time.Minute),
-		).Post("/telemetry/events",s.telemetryEvent)
+			s.authRateLimit("telemetry", 30, time.Minute),
+		).Post("/telemetry/events", s.telemetryEvent)
 
 		r.Route("/auth", func(r chi.Router) {
 			r.With(
@@ -115,8 +115,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 					time.Minute,
 				),
 			).Post("/login", s.login)
-            r.With(s.authRateLimit("forgot-password",5,time.Hour)).Post("/password/forgot",s.forgotPassword)
-            r.With(s.authRateLimit("reset-password",10,time.Hour)).Post("/password/reset",s.resetPassword)
+			r.With(s.authRateLimit("forgot-password", 5, time.Hour)).Post("/password/forgot", s.forgotPassword)
+			r.With(s.authRateLimit("reset-password", 10, time.Hour)).Post("/password/reset", s.resetPassword)
 			r.With(
 				s.authRateLimit(
 					"refresh",
@@ -147,7 +147,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 				s.cfg.PublicSearchRateLimit,
 				time.Minute,
 			),
-		).Get("/search",s.universalSearch)
+		).Get("/search", s.universalSearch)
 		r.Get("/social/reels", s.reels)
 		r.Get("/social/reels/{id}", s.reelDetail)
 		r.Get("/social/feed", s.socialFeed)
@@ -161,8 +161,8 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/social/channels/{id}/stories", s.channelStories)
 		r.Get("/social/channels/{id}/members", s.channelMembers)
 		r.Get("/social/channels/{id}/rooms", s.channelRooms)
-			r.Get("/social/channels/{id}/manage", s.channelManageOverview)
-			r.Get("/social/channels/{id}/manage/rooms", s.channelManageRooms)
+		r.Get("/social/channels/{id}/manage", s.channelManageOverview)
+		r.Get("/social/channels/{id}/manage/rooms", s.channelManageRooms)
 		r.Get("/social/users/{id}", s.publicUserProfile)
 		r.Get("/social/users/{id}/reputation", s.userReputation)
 		r.Get("/social/users/{id}/posts", s.publicUserPosts)
@@ -389,7 +389,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/settings", s.updateSettings)
 			r.Get("/privacy/export", s.privacyExport)
 			r.With(
-				s.authRateLimit("delete-account",5,time.Hour),
+				s.authRateLimit("delete-account", 5, time.Hour),
 			).Post("/privacy/delete-account", s.deleteAccount)
 			r.Post("/security/sessions", s.securitySessions)
 			r.Post("/security/sessions/revoke-others", s.revokeOtherSessions)
@@ -409,13 +409,13 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	})
 
 	s.http = &http.Server{
-		Addr: cfg.HTTPAddr,
-		Handler: r,
+		Addr:              cfg.HTTPAddr,
+		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout: 60 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
-	workerCtx,workerCancel:=context.WithCancel(context.Background())
-	s.workersCancel=workerCancel
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	s.workersCancel = workerCancel
 	go s.runRoomMessageScheduler(workerCtx)
 	go s.runPushDeliveryWorker(workerCtx)
 	go s.runTelegramIngestWorker(workerCtx)
@@ -426,104 +426,108 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 
 func (s *Server) ListenAndServe() error {
 	err := s.http.ListenAndServe()
-	if errors.Is(err, http.ErrServerClosed) { return nil }
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
 	return err
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	if s.workersCancel!=nil { s.workersCancel() }
+	if s.workersCancel != nil {
+		s.workersCancel()
+	}
 	return s.http.Shutdown(ctx)
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w,http.StatusOK,map[string]any{
-		"service":"filmiqoo-api",
-		"status":"ok",
-		"version":s.cfg.BuildVersion,
-		"commit":s.cfg.BuildCommit,
-		"environment":s.cfg.Environment,
-		"time":time.Now().UTC(),
+	writeJSON(w, http.StatusOK, map[string]any{
+		"service":     "filmiqoo-api",
+		"status":      "ok",
+		"version":     s.cfg.BuildVersion,
+		"commit":      s.cfg.BuildCommit,
+		"environment": s.cfg.Environment,
+		"time":        time.Now().UTC(),
 	})
 }
 
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
-    if !s.regionAccess.ready() {
-        writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"region access configuration unavailable"})
-        return
-    }
+	if !s.regionAccess.ready() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "region access configuration unavailable"})
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	if err := s.db.Ping(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"postgres unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "postgres unavailable"})
 		return
 	}
 	if err := s.redis.Ping(ctx).Err(); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status":"redis unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "redis unavailable"})
 		return
 	}
-	if strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!="" {
-		if s.objects==nil {
-			writeJSON(w,http.StatusServiceUnavailable,map[string]string{
-				"status":"object storage unavailable",
-				"detail":s.objectStoreInitError,
+	if strings.TrimSpace(s.cfg.ObjectStorageEndpoint) != "" {
+		if s.objects == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"status": "object storage unavailable",
+				"detail": s.objectStoreInitError,
 			})
 			return
 		}
-		objectCtx,objectCancel:=context.WithTimeout(ctx,1500*time.Millisecond)
-		objectErr:=s.objects.Health(objectCtx)
+		objectCtx, objectCancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+		objectErr := s.objects.Health(objectCtx)
 		objectCancel()
-		if objectErr!=nil {
-			writeJSON(w,http.StatusServiceUnavailable,map[string]string{
-				"status":"object storage unavailable",
+		if objectErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"status": "object storage unavailable",
 			})
 			return
 		}
 	}
-	if s.cfg.FirebasePushEnabled && s.fcm==nil {
-		writeJSON(w,http.StatusServiceUnavailable,map[string]string{
-			"status":"firebase push unavailable",
-			"detail":s.fcmInitError,
+	if s.cfg.FirebasePushEnabled && s.fcm == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"status": "firebase push unavailable",
+			"detail": s.fcmInitError,
 		})
 		return
 	}
-	tmdbStatus:="disabled"
-	if s.tmdb!=nil && s.tmdb.Enabled() {
-		tmdbStatus="ready"
+	tmdbStatus := "disabled"
+	if s.tmdb != nil && s.tmdb.Enabled() {
+		tmdbStatus = "ready"
 	}
-	writeJSON(w,http.StatusOK,map[string]string{
-		"status":"ready",
-		"push":map[bool]string{true:"enabled",false:"disabled"}[s.fcm!=nil],
-		"objectStorage":map[bool]string{
-			true:"ready",
-			false:"disabled",
-		}[strings.TrimSpace(s.cfg.ObjectStorageEndpoint)!=""],
-		"tmdb":tmdbStatus,
-		"telegramStream":s.telegramStreamStatus(r.Context()),
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ready",
+		"push":   map[bool]string{true: "enabled", false: "disabled"}[s.fcm != nil],
+		"objectStorage": map[bool]string{
+			true:  "ready",
+			false: "disabled",
+		}[strings.TrimSpace(s.cfg.ObjectStorageEndpoint) != ""],
+		"tmdb":           tmdbStatus,
+		"telegramStream": s.telegramStreamStatus(r.Context()),
 	})
 }
 
 func (s *Server) telegramStreamStatus(parent context.Context) string {
-	base:=strings.TrimSpace(s.cfg.TelegramStreamBaseURL)
-	if base=="" {
+	base := strings.TrimSpace(s.cfg.TelegramStreamBaseURL)
+	if base == "" {
 		return "disabled"
 	}
-	ctx,cancel:=context.WithTimeout(parent,900*time.Millisecond)
+	ctx, cancel := context.WithTimeout(parent, 900*time.Millisecond)
 	defer cancel()
-	req,err:=http.NewRequestWithContext(
+	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		strings.TrimRight(base,"/")+"/",
+		strings.TrimRight(base, "/")+"/",
 		nil,
 	)
-	if err!=nil {
+	if err != nil {
 		return "unavailable"
 	}
-	resp,err:=s.upstreamClient.Do(req)
-	if err!=nil {
+	resp, err := s.upstreamClient.Do(req)
+	if err != nil {
 		return "unavailable"
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode>=200 && resp.StatusCode<400 {
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		return "ready"
 	}
 	return "unavailable"
@@ -546,33 +550,37 @@ func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
 		 ORDER BY mt.created_at DESC
 		 LIMIT 60
 	`)
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
 	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,kind,title,originalTitle,overview,posterURL,backdropURL string
+		var id, kind, title, originalTitle, overview, posterURL, backdropURL string
 		var tmdbID *int64
 		var year int
 		var rating *float64
-		var versionID,quality *string
+		var versionID, quality *string
 		var ready *bool
-		if err := rows.Scan(&id,&tmdbID,&kind,&title,&originalTitle,&overview,&year,&posterURL,&backdropURL,&rating,
-			&versionID,&quality,&ready); err != nil {
-			writeError(w, http.StatusInternalServerError, err); return
+		if err := rows.Scan(&id, &tmdbID, &kind, &title, &originalTitle, &overview, &year, &posterURL, &backdropURL, &rating,
+			&versionID, &quality, &ready); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
 		}
 		items = append(items, map[string]any{
-			"id":id,"tmdbId":tmdbID,"kind":kind,"title":title,"originalTitle":originalTitle,
-			"overview":overview,"year":year,"posterUrl":posterURL,"backdropUrl":backdropURL,
-			"rating":rating,"mediaVersionId":versionID,"quality":quality,"streamReady":ready,
+			"id": id, "tmdbId": tmdbID, "kind": kind, "title": title, "originalTitle": originalTitle,
+			"overview": overview, "year": year, "posterUrl": posterURL, "backdropUrl": backdropURL,
+			"rating": rating, "mediaVersionId": versionID, "quality": quality, "streamReady": ready,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
-	limit,offset:=socialPageParams(r,24,40)
+	limit, offset := socialPageParams(r, 24, 40)
 	rows, err := s.db.Query(r.Context(), `
 		SELECT r.id::text,r.caption,r.playback_url,r.cover_url,r.duration_ms,
 		       r.like_count,r.comment_count,r.save_count,r.share_count,r.view_count,r.spoiler,
@@ -591,54 +599,60 @@ func (s *Server) reels(w http.ResponseWriter, r *http.Request) {
 		   )
 		 ORDER BY r.published_at DESC NULLS LAST,r.created_at DESC
 		 LIMIT $1 OFFSET $2
-	`,limit,offset)
-	if err != nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
-	items:=make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,caption,playbackURL,coverURL,authorID,displayName,username,avatar string
+		var id, caption, playbackURL, coverURL, authorID, displayName, username, avatar string
 		var duration int
-		var likes,comments,saves,shares,views int64
-		var spoiler,verified bool
-		var mediaID,kind,title,originalTitle,poster,backdrop *string
+		var likes, comments, saves, shares, views int64
+		var spoiler, verified bool
+		var mediaID, kind, title, originalTitle, poster, backdrop *string
 		var tmdbID *int64
 		var year *int
 		var rating *float64
-		if err:=rows.Scan(
-			&id,&caption,&playbackURL,&coverURL,&duration,
-			&likes,&comments,&saves,&shares,&views,&spoiler,
-			&authorID,&displayName,&username,&avatar,&verified,
-			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating,
-		); err!=nil {
+		if err := rows.Scan(
+			&id, &caption, &playbackURL, &coverURL, &duration,
+			&likes, &comments, &saves, &shares, &views, &spoiler,
+			&authorID, &displayName, &username, &avatar, &verified,
+			&mediaID, &tmdbID, &kind, &title, &originalTitle, &poster, &backdrop, &year, &rating,
+		); err != nil {
 			continue
 		}
-		items=append(items,map[string]any{
-			"id":id,"caption":caption,"playbackUrl":playbackURL,"coverUrl":coverURL,
-			"durationMs":duration,"likes":likes,"comments":comments,"saves":saves,
-			"shares":shares,"views":views,"spoiler":spoiler,
-			"author":map[string]any{
-				"id":authorID,"displayName":displayName,"username":username,
-				"avatarUrl":avatar,"verified":verified,
+		items = append(items, map[string]any{
+			"id": id, "caption": caption, "playbackUrl": playbackURL, "coverUrl": coverURL,
+			"durationMs": duration, "likes": likes, "comments": comments, "saves": saves,
+			"shares": shares, "views": views, "spoiler": spoiler,
+			"author": map[string]any{
+				"id": authorID, "displayName": displayName, "username": username,
+				"avatarUrl": avatar, "verified": verified,
 			},
-			"media":map[string]any{
-				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
-				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
-				"year":year,"rating":rating,
+			"media": map[string]any{
+				"id": mediaID, "tmdbId": tmdbID, "kind": kind, "title": title,
+				"originalTitle": originalTitle, "posterUrl": poster, "backdropUrl": backdrop,
+				"year": year, "rating": rating,
 			},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{
-		"items":items,
-		"nextCursor":nextSocialCursor(offset,len(items),limit),
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items":      items,
+		"nextCursor": nextSocialCursor(offset, len(items), limit),
 	})
 }
 
 func (s *Server) channels(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(),
-		"SELECT id::text, slug, name, bio, avatar_url, cover_url, follower_count, verified " +
-		"FROM channels WHERE visibility='public' ORDER BY follower_count DESC, created_at DESC LIMIT 30")
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
+		"SELECT id::text, slug, name, bio, avatar_url, cover_url, follower_count, verified "+
+			"FROM channels WHERE visibility='public' ORDER BY follower_count DESC, created_at DESC LIMIT 30")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
 	items := make([]map[string]any, 0)
@@ -646,15 +660,16 @@ func (s *Server) channels(w http.ResponseWriter, r *http.Request) {
 		var id, slug, name, bio, avatarURL, coverURL string
 		var followers int64
 		var verified bool
-		if err := rows.Scan(&id,&slug,&name,&bio,&avatarURL,&coverURL,&followers,&verified); err != nil {
-			writeError(w, http.StatusInternalServerError, err); return
+		if err := rows.Scan(&id, &slug, &name, &bio, &avatarURL, &coverURL, &followers, &verified); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
 		}
 		items = append(items, map[string]any{
-			"id":id,"slug":slug,"name":name,"bio":bio,"avatarUrl":avatarURL,
-			"coverUrl":coverURL,"followers":followers,"verified":verified,
+			"id": id, "slug": slug, "name": name, "bio": bio, "avatarUrl": avatarURL,
+			"coverUrl": coverURL, "followers": followers, "verified": verified,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (s *Server) likeReel(w http.ResponseWriter, r *http.Request) {
@@ -663,8 +678,11 @@ func (s *Server) likeReel(w http.ResponseWriter, r *http.Request) {
 	_, err := s.db.Exec(r.Context(),
 		"INSERT INTO reel_likes (reel_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
 		reelID, userID)
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
-	writeJSON(w, http.StatusOK, map[string]any{"liked":true})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"liked": true})
 }
 
 func (s *Server) followChannel(w http.ResponseWriter, r *http.Request) {
@@ -673,25 +691,29 @@ func (s *Server) followChannel(w http.ResponseWriter, r *http.Request) {
 	_, err := s.db.Exec(r.Context(),
 		"INSERT INTO channel_followers (channel_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
 		channelID, userID)
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
-	writeJSON(w, http.StatusOK, map[string]any{"following":true})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"following": true})
 }
 
 func (s *Server) saveProgress(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromContext(r.Context())
 	var body struct {
 		MediaVersionID string
-		PositionMS int64
-		DurationMS int64
+		PositionMS     int64
+		DurationMS     int64
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, err); return
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
 	completed := body.DurationMS > 0 && float64(body.PositionMS)/float64(body.DurationMS) >= 0.95
-	viewerID:=s.viewerProfileID(r,userID)
+	viewerID := s.viewerProfileID(r, userID)
 	var err error
-	if viewerID!="" {
-		_,err=s.db.Exec(r.Context(),`
+	if viewerID != "" {
+		_, err = s.db.Exec(r.Context(), `
 			INSERT INTO viewer_watch_progress (
 				viewer_profile_id,media_version_id,position_ms,duration_ms,completed,updated_at
 			) VALUES ($1,$2,$3,$4,$5,now())
@@ -701,65 +723,72 @@ func (s *Server) saveProgress(w http.ResponseWriter, r *http.Request) {
 				duration_ms=EXCLUDED.duration_ms,
 				completed=EXCLUDED.completed,
 				updated_at=now()
-		`,viewerID,body.MediaVersionID,body.PositionMS,body.DurationMS,completed)
+		`, viewerID, body.MediaVersionID, body.PositionMS, body.DurationMS, completed)
 	} else {
-		_,err=s.db.Exec(r.Context(),
-			"INSERT INTO watch_progress (user_id,media_version_id,position_ms,duration_ms,completed,updated_at) " +
-			"VALUES ($1,$2,$3,$4,$5,now()) ON CONFLICT (user_id,media_version_id) DO UPDATE SET " +
-			"position_ms=EXCLUDED.position_ms,duration_ms=EXCLUDED.duration_ms,completed=EXCLUDED.completed,updated_at=now()",
+		_, err = s.db.Exec(r.Context(),
+			"INSERT INTO watch_progress (user_id,media_version_id,position_ms,duration_ms,completed,updated_at) "+
+				"VALUES ($1,$2,$3,$4,$5,now()) ON CONFLICT (user_id,media_version_id) DO UPDATE SET "+
+				"position_ms=EXCLUDED.position_ms,duration_ms=EXCLUDED.duration_ms,completed=EXCLUDED.completed,updated_at=now()",
 			userID, body.MediaVersionID, body.PositionMS, body.DurationMS, completed)
 	}
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
-	writeJSON(w, http.StatusOK, map[string]any{"saved":true,"viewerProfileId":viewerID})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true, "viewerProfileId": viewerID})
 }
 
 type ctxKey string
+
 const userKey ctxKey = "userID"
 
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := strings.TrimSpace(r.Header.Get("Authorization"))
 		if !strings.HasPrefix(header, "Bearer ") {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"missing bearer token"}); return
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing bearer token"})
+			return
 		}
 		tokenString := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 		token, err := jwt.Parse(
 			tokenString,
-			func(t *jwt.Token) (any,error) {
-				if t.Method.Alg()!=jwt.SigningMethodHS256.Alg() {
-					return nil,errors.New("unexpected signing method")
+			func(t *jwt.Token) (any, error) {
+				if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+					return nil, errors.New("unexpected signing method")
 				}
-				return []byte(s.cfg.JWTSecret),nil
+				return []byte(s.cfg.JWTSecret), nil
 			},
 			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 			jwt.WithIssuer("filmiqoo"),
 			jwt.WithAudience("filmiqoo-android"),
 		)
 		if err != nil || !token.Valid {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid token"}); return
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid token"})
+			return
 		}
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid claims"}); return
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid claims"})
+			return
 		}
 		sub, err := claims.GetSubject()
 		if err != nil || sub == "" {
-			writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"missing subject"})
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing subject"})
 			return
 		}
-		if s.redis!=nil {
-			blocked,redisErr:=s.redis.Exists(
+		if s.redis != nil {
+			blocked, redisErr := s.redis.Exists(
 				r.Context(),
 				"auth:blocked-user:"+sub,
 			).Result()
-			if redisErr==nil && blocked>0 {
-				writeJSON(w,http.StatusUnauthorized,map[string]string{"error":"account is unavailable"})
+			if redisErr == nil && blocked > 0 {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "account is unavailable"})
 				return
 			}
 		}
 		next.ServeHTTP(
 			w,
-			r.WithContext(context.WithValue(r.Context(),userKey,sub)),
+			r.WithContext(context.WithValue(r.Context(), userKey, sub)),
 		)
 	})
 }
@@ -775,18 +804,18 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func writeError(w http.ResponseWriter,status int,err error) {
-	if err==nil {
-		err=errors.New(http.StatusText(status))
+func writeError(w http.ResponseWriter, status int, err error) {
+	if err == nil {
+		err = errors.New(http.StatusText(status))
 	}
-	if errors.Is(err,context.DeadlineExceeded) {
-		writeJSON(w,http.StatusGatewayTimeout,map[string]string{"error":"request timed out"})
+	if errors.Is(err, context.DeadlineExceeded) {
+		writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": "request timed out"})
 		return
 	}
-	if status>=http.StatusInternalServerError {
-		log.Printf("internal server error: %v",err)
-		writeJSON(w,status,map[string]string{"error":"internal server error"})
+	if status >= http.StatusInternalServerError {
+		log.Printf("internal server error: %v", err)
+		writeJSON(w, status, map[string]string{"error": "internal server error"})
 		return
 	}
-	writeJSON(w,status,map[string]string{"error":err.Error()})
+	writeJSON(w, status, map[string]string{"error": err.Error()})
 }

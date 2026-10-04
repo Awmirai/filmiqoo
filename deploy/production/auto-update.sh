@@ -93,11 +93,11 @@ PY
 BACKEND_SHA=""
 CONTRACT_SHA=""
 if [[ "$BACKEND_CHANGED" -eq 1 ]]; then
-  BACKEND_SHA="$(git rev-list -1 "$LOCAL_SHA..$REMOTE_SHA" -- backend)"
+  BACKEND_SHA="$REMOTE_SHA"
   check_workflow "$BACKEND_SHA" "Backend CI" || exit 0
 fi
 if [[ "$BACKEND_CHANGED" -eq 1 || "$PRODUCTION_CHANGED" -eq 1 ]]; then
-  CONTRACT_SHA="$(git rev-list -1 "$LOCAL_SHA..$REMOTE_SHA" -- backend deploy/production .github/workflows/production-release.yml .github/workflows/production-contract.yml)"
+  CONTRACT_SHA="$REMOTE_SHA"
   check_workflow "$CONTRACT_SHA" "Production Contract Checks" || exit 0
 fi
 
