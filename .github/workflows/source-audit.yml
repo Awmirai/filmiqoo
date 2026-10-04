@@ -1,0 +1,22 @@
+name: Repository audit snapshot
+on:
+  workflow_dispatch:
+  push:
+    branches: [cinema-redesign-iran-release]
+    paths: [.github/workflows/source-audit.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive tracked source only
+        run: git archive --format=zip --output="$RUNNER_TEMP/filmiqoo-source.zip" HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filmiqoo-source-review
+          path: ${{ runner.temp }}/filmiqoo-source.zip
+          retention-days: 1
+          if-no-files-found: error
