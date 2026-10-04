@@ -22,9 +22,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Verify API TLS and health
+        run: curl --fail --show-error --silent --max-time 15 https://api.filmiqo.com/healthz
+
       - name: Verify Android build
         env:
-          FILMIQOO_DEBUG_API_BASE_URL: https://filmiqo.com
+          FILMIQOO_DEBUG_API_BASE_URL: https://api.filmiqo.com
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
