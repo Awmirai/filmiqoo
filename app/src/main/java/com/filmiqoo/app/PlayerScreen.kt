@@ -265,6 +265,10 @@ fun FilmiqooPlayerScreen(
         onDispose { mediaSession?.release() }
     }
 
+    DisposableEffect(castController) {
+        onDispose { castController.close() }
+    }
+
     LaunchedEffect(castController) {
         var wasConnected=false
         while(true) {
