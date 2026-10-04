@@ -704,11 +704,16 @@ class BackendRepository(context: Context) {
         )
     }
 
-    suspend fun playbackUrl(mediaVersionId: String, download: Boolean = false): String =
+    suspend fun playbackUrl(
+        mediaVersionId: String,
+        download: Boolean = false,
+        remote: Boolean = false
+    ): String =
         withContext(Dispatchers.IO) {
             val body = JSONObject()
                 .put("mediaVersionId", mediaVersionId)
                 .put("download", download)
+                .put("remote", remote)
             val obj = postJson("/v1/playback/token", body, authorized = true)
             obj.getString("url")
         }
