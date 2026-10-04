@@ -227,6 +227,7 @@ class FilmiqooCastController(context: Context) : Closeable {
 
     fun load(
         url:String,
+        contentType:String?,
         mediaVersionId:String,
         title:String,
         subtitle:String,
@@ -288,7 +289,11 @@ class FilmiqooCastController(context: Context) : Closeable {
 
         val builder=MediaInfo.Builder(url)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-            .setContentType(castContentType(url))
+            .setContentType(
+                contentType
+                    ?.takeIf(String::isNotBlank)
+                    ?: castContentType(url)
+            )
             .setMetadata(metadata)
             .setCustomData(customData)
 
