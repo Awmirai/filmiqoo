@@ -26,8 +26,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Verify API TLS and health
-        run: curl --fail --show-error --silent --max-time 15 https://api.filmiqo.com/healthz
+      - name: Verify API TLS, health and deployed commit
+        run: |
+          echo "Production API health:"
+          curl --fail --show-error --silent --max-time 15 https://api.filmiqo.com/healthz
+          echo
 
       - name: Verify Android build
         env:
