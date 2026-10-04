@@ -170,8 +170,28 @@ data class PlatformVersion(
     val fileSizeBytes: Long,
     val durationMs: Long,
     val streamReady: Boolean,
-    val preferred: Boolean
+    val preferred: Boolean,
+    val audioTracks: List<String> = emptyList(),
+    val subtitleTracks: List<String> = emptyList()
 )
+
+internal fun cinemaTrackLabels(array: org.json.JSONArray?): List<String> = buildList {
+    if (array != null) for (index in 0 until array.length()) {
+        val value = array.opt(index)
+        val label = if (value is JSONObject) {
+            listOf("label", "title", "name", "language", "lang").firstNotNullOfOrNull { key ->
+                value.optString(key).trim().takeIf { it.isNotBlank() && it != "null" }
+            }.orEmpty()
+        } else (value as? String).orEmpty().trim()
+        if (label.isNotBlank() && label != "null") add(when (label.lowercase(Locale.ROOT)) {
+            "fa", "fas", "per", "persian" -> "فارسی"
+            "en", "eng", "english" -> "English"
+            "ko", "kor", "korean" -> "Korean"
+            "hi", "hin", "hindi" -> "Hindi"
+            else -> label
+        })
+    }
+}.distinct()
 
 data class PlatformEpisode(
     val id: String,
@@ -394,7 +414,9 @@ class BackendRepository(context: Context) {
                         fileSizeBytes = x.optLong("fileSizeBytes"),
                         durationMs = x.optLong("durationMs"),
                         streamReady = x.optBoolean("streamReady"),
-                        preferred = x.optBoolean("preferred")
+                        preferred = x.optBoolean("preferred"),
+                        audioTracks = cinemaTrackLabels(x.optJSONArray("audioTracks")),
+                        subtitleTracks = cinemaTrackLabels(x.optJSONArray("subtitleTracks"))
                     )
                 )
             }

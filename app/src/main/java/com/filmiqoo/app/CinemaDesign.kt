@@ -1,5 +1,7 @@
 package com.filmiqoo.app
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -144,18 +147,20 @@ internal fun CinemaBottomBar(selected: Int, kidsMode: Boolean, onSelected: (Int)
     val entries = if (kidsMode) listOf(Triple(0, "خانه", Icons.Default.Home), Triple(4, "من", Icons.Default.PersonOutline)) else listOf(
         Triple(0, "خانه", Icons.Default.Home), Triple(1, "تماشا", Icons.Default.Explore),
         Triple(2, "کلاب", Icons.Default.Forum), Triple(3, "کتابخانه", Icons.Default.Bookmarks), Triple(4, "من", Icons.Default.PersonOutline))
-    Surface(color = CinemaInk, tonalElevation = 0.dp) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
-            HorizontalDivider(color = CinemaLine, thickness = 1.dp)
-            Row(Modifier.align(Alignment.CenterHorizontally).widthIn(max = 760.dp).fillMaxWidth().selectableGroup().heightIn(min = 76.dp)) {
+    Box(Modifier.fillMaxWidth().background(CinemaInk).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+        Surface(Modifier.widthIn(max = 760.dp).fillMaxWidth(), color = CinemaSurface, shape = RoundedCornerShape(26.dp),
+            border = BorderStroke(1.dp, CinemaLine), shadowElevation = 12.dp) {
+            Row(Modifier.fillMaxWidth().selectableGroup().heightIn(min = 76.dp)) {
                 entries.forEach { (id, label, icon) ->
                     val active = selected == id
+                    val tint by animateColorAsState(if (active) CinemaAccent else CinemaSoft, label = "navigation-tint")
+                    val indicatorWidth by animateDpAsState(if (active) 48.dp else 32.dp, label = "navigation-indicator")
                     Column(Modifier.weight(1f).heightIn(min = 76.dp)
                         .selectable(active, role = Role.Tab, onClick = { if (!active) onSelected(id) }).testTag("navigation-$id")
                         .padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                        Box(Modifier.size(width = 48.dp, height = 30.dp).clip(RoundedCornerShape(10.dp))
+                        Box(Modifier.size(width = indicatorWidth, height = 30.dp).clip(RoundedCornerShape(10.dp))
                             .background(if (active) CinemaAccent.copy(alpha = .15f) else Color.Transparent), contentAlignment = Alignment.Center) {
-                            Icon(icon, null, tint = if (active) CinemaAccent else CinemaSoft, modifier = Modifier.size(23.dp))
+                            Icon(icon, null, tint = tint, modifier = Modifier.size(23.dp))
                         }
                         Text(label, color = if (active) CinemaPaper else CinemaSoft, fontSize = 12.sp,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,

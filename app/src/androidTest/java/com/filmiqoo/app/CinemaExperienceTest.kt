@@ -10,14 +10,14 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.UiDevice
+import androidx.test.platform.io.PlatformTestStorageRegistry
+import android.graphics.Bitmap
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestName
 import org.junit.runner.RunWith
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class CinemaExperienceTest {
@@ -26,9 +26,10 @@ class CinemaExperienceTest {
 
     @After fun screenshot() {
         compose.waitForIdle()
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val directory = File(context.getExternalFilesDir(null), "cinema-screenshots").apply { mkdirs() }
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(directory, testName.methodName + ".png"))
+        val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        PlatformTestStorageRegistry.getInstance().openOutputFile("cinema-" + testName.methodName + ".png").use { output ->
+            assertTrue("Screenshot must be written to test storage", bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+        }
     }
 
     @Test fun moviePlaybackUsesRealVersionAndMetadataStaysReadable() {
@@ -103,6 +104,13 @@ class CinemaExperienceTest {
         }
         compose.onNodeWithText("بررسی دوباره").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(retried) }
+    }
+
+    @Test fun versionTracksUseOnlyMetadataProvidedByTheServer() {
+        val tracks = org.json.JSONArray("[\"fa\",{\"language\":\"en\"},{\"label\":\"دوبله فارسی\"},null,{},\"fa\"]")
+        assertEquals(listOf("فارسی", "English", "دوبله فارسی"), cinemaTrackLabels(tracks))
+        assertEquals(emptyList<String>(), cinemaTrackLabels(null))
+        compose.setContent { FilmiqooTheme { CinemaDetailContent(movie()) } }
     }
 
     private fun movie(): CinemaTitleData {

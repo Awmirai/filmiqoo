@@ -83,3 +83,17 @@ internal fun cinemaBytes(bytes: Long): String = when {
 
 internal fun cinemaEpisodeLabel(season: Int, episode: Int): String =
     String.format(Locale.US, "S%02dE%02d", season, episode)
+
+/** Accept Persian and Arabic keyboards for names and episode numbers. */
+internal fun cinemaSearchKey(value: String): String = buildString {
+    value.trim().lowercase(Locale.ROOT).forEach { char ->
+        append(when (char) {
+            in '۰'..'۹' -> '0' + (char - '۰')
+            in '٠'..'٩' -> '0' + (char - '٠')
+            'ي', 'ى' -> 'ی'
+            'ك' -> 'ک'
+            '\u200c' -> ' '
+            else -> char
+        })
+    }
+}.replace(Regex("\\s+"), " ")

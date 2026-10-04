@@ -92,7 +92,6 @@ jobs:
           disable-animations: true
           script: |
             gradle :app:connectedDebugAndroidTest --stacktrace
-            adb pull /sdcard/Android/data/com.filmiqoo.previewfix/files/cinema-screenshots cinema-screenshots
       - name: Upload device test results and screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -101,5 +100,5 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
-            cinema-screenshots/
+            app/build/outputs/connected_android_test_additional_output/
           if-no-files-found: warn

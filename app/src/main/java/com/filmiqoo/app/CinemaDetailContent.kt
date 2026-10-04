@@ -69,14 +69,15 @@ internal fun CinemaDetailContent(
     var selectedVersion by rememberSaveable(media.key) { mutableStateOf(data.playableMovies.firstOrNull { it.preferred }?.id ?: data.playableMovies.firstOrNull()?.id) }
     var nightsPace by rememberSaveable(media.key) { mutableIntStateOf(2) }
     val selectedMovie = data.playableMovies.firstOrNull { it.id == selectedVersion } ?: data.playableMovies.firstOrNull()
-    val resumable = data.playableEpisodes.firstOrNull { (_, ep) -> progress?.episodes?.get(ep.id)?.let { !it.completed && it.positionMs > 0 } == true }
-        ?: data.playableEpisodes.firstOrNull { (_, ep) -> progress?.episodes?.get(ep.id)?.completed != true }
-        ?: data.playableEpisodes.firstOrNull()
+    val regularEpisodes = data.playableEpisodes.filter { it.first > 0 }.ifEmpty { data.playableEpisodes }
+    val resumable = regularEpisodes.firstOrNull { (_, ep) -> progress?.episodes?.get(ep.id)?.let { !it.completed && it.positionMs > 0 } == true }
+        ?: regularEpisodes.firstOrNull { (_, ep) -> progress?.episodes?.get(ep.id)?.completed != true }
+        ?: regularEpisodes.firstOrNull()
     val primaryId = if (isSeries) resumable?.second?.mediaVersionId else selectedMovie?.id
     val season = data.platform?.seasons?.firstOrNull { it.number == selectedSeason } ?: data.platform?.seasons?.firstOrNull()
     val episodes = season?.episodes.orEmpty().sortedBy { it.number }.filter { ep ->
-        (episodeSearch.isBlank() || ep.number.toString() == episodeSearch.trim() || ep.name.contains(episodeSearch, true)) &&
-            when (episodeFilter) { 1 -> ep.streamReady; 2 -> progress?.episodes?.get(ep.id)?.completed != true; else -> true }
+        (episodeSearch.isBlank() || ep.number.toString() == cinemaSearchKey(episodeSearch) || cinemaSearchKey(ep.name).contains(cinemaSearchKey(episodeSearch))) &&
+            when (episodeFilter) { 1 -> ep.streamReady && !ep.mediaVersionId.isNullOrBlank(); 2 -> progress?.episodes?.get(ep.id)?.completed != true; else -> true }
     }
     val tabs = buildList { add("about" to "درباره"); if (isSeries) add("episodes" to "قسمت‌ها"); add("cast" to "بازیگران"); add("club" to "کلاب") }
     BackHandler { if (versionsOpen) versionsOpen = false else actions.back() }
@@ -99,7 +100,7 @@ internal fun CinemaDetailContent(
                     HorizontalDivider(color = CinemaLine)
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         CinemaAction(if (busy) Icons.Default.HourglassTop else Icons.Default.PlayArrow,
-                            when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "فایل پخش موجود نیست"; isSeries -> "ادامهٔ سریال"; else -> "پخش فیلم" },
+                            when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "هنوز قابل پخش نیست"; isSeries && progress?.episodes?.values?.any { it.positionMs > 0 || it.completed } == true -> "ادامهٔ سریال"; isSeries -> "شروع تماشا"; else -> "پخش فیلم" },
                             { primaryId?.let(actions.play) }, Modifier.weight(1f).testTag("detail-primary"), primary = true, enabled = !busy && primaryId != null)
                         if (isSeries) {
                             OutlinedIconButton({ tab = "episodes" }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
@@ -171,7 +172,8 @@ internal fun CinemaDetailContent(
                         CinemaHeading("برنامهٔ تماشای من", "برآورد ساده، بر اساس اطلاعات موجود؛ نه زمان قطعی")
                         CinemaCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
                             if (isSeries) {
-                                val total = (data.platform?.seasons?.sumOf { it.episodes.size } ?: d.seasons.sumOf { it.episodes }).coerceAtLeast(0)
+                                val total = maxOf(data.platform?.seasons?.filter { it.number > 0 }?.sumOf { it.episodes.size } ?: 0,
+                                    d.seasons.filter { it.number > 0 }.sumOf { it.episodes }).coerceAtLeast(0)
                                 val remaining = (total - (progress?.watchedCount?.toInt() ?: 0)).coerceAtLeast(0)
                                 Text("$remaining قسمت باقی‌مانده", color = CinemaPaper, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                 Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,6 +255,8 @@ internal fun CinemaDetailContent(
                     CinemaCard(Modifier.fillMaxWidth(), accent = selectedMovie?.id == version.id) {
                         Text(version.quality.ifBlank { "نسخهٔ اصلی" }, color = CinemaPaper, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text(listOf(cinemaBytes(version.fileSizeBytes), version.codec, version.hdr).filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 13.sp)
+                        if (version.audioTracks.isNotEmpty()) Text("صدا: " + version.audioTracks.joinToString(" · "), color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                        if (version.subtitleTracks.isNotEmpty()) Text("زیرنویس: " + version.subtitleTracks.joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CinemaAction(Icons.Default.PlayArrow, "پخش", { selectedVersion = version.id; versionsOpen = false; actions.play(version.id) }, Modifier.weight(1f), primary = true, enabled = !busy)
                             CinemaAction(Icons.Default.Download, "دانلود", { selectedVersion = version.id; versionsOpen = false; actions.download(version.id) }, Modifier.weight(1f), enabled = !busy)
@@ -302,7 +306,11 @@ private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: Episode
         Column(Modifier.padding(13.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(92.dp).aspectRatio(16f / 10f).clip(RoundedCornerShape(11.dp)).clickable(enabled = ready && !busy) { ep.mediaVersionId?.let(actions.play) }) {
-                    CinemaImage(ep.stillUrl, Modifier.fillMaxSize(), backdrop = true)
+                    if (hideSpoilers) {
+                        Box(Modifier.fillMaxSize().background(CinemaLine), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.VisibilityOff, "تصویر قسمت برای جلوگیری از اسپویل پنهان است", tint = CinemaSoft)
+                        }
+                    } else CinemaImage(ep.stillUrl, Modifier.fillMaxSize(), backdrop = true)
                     if (ready) Icon(Icons.Default.PlayCircle, "پخش قسمت ${ep.number}", modifier = Modifier.align(Alignment.Center).size(29.dp), tint = Color.White)
                 }
                 Spacer(Modifier.width(12.dp))

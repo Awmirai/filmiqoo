@@ -42,7 +42,7 @@ fun CinemaLibraryScreen(
     var favorites by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     val localItems = remember(personal, favorites) { if (favorites) personal.favorites() else personal.saved() }
-    val items = localItems.filter { it.title.contains(query, true) || it.originalTitle.contains(query, true) }
+    val items = localItems.filter { cinemaSearchKey(it.title).contains(cinemaSearchKey(query)) || cinemaSearchKey(it.originalTitle).contains(cinemaSearchKey(query)) }
     if (showBack) BackHandler { if (mode == 1) mode = 0 else onBack() }
     Column(Modifier.fillMaxSize().background(CinemaInk).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {

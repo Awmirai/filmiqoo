@@ -68,4 +68,10 @@ class CinemaRulesTest {
         val b = MediaItem(0, MediaType.MOVIE, "B", backendId = "b")
         assertNotEquals(cinemaMediaKey(a), cinemaMediaKey(b))
     }
+    @Test fun persianAndArabicKeyboardsFindTheSameEpisodeAndTitle() {
+        assertEquals("23", cinemaSearchKey(" ۲۳ "))
+        assertEquals("23", cinemaSearchKey("٢٣"))
+        assertEquals(cinemaSearchKey("کیان"), cinemaSearchKey("كيان"))
+        assertEquals("my liberation notes", cinemaSearchKey("My Liberation  Notes"))
+    }
 }

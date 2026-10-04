@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -33,7 +34,14 @@ val FqPurple = Color(0xFFA98BFF)
 
 @Composable
 fun FilmiqooTheme(content:@Composable ()->Unit) {
-    val family=FontFamily.SansSerif
+    val family=remember {
+        FontFamily(
+            Font(R.font.vazirmatn_regular, FontWeight.Normal),
+            Font(R.font.vazirmatn_medium, FontWeight.Medium),
+            Font(R.font.vazirmatn_bold, FontWeight.Bold),
+            Font(R.font.vazirmatn_black, FontWeight.Black)
+        )
+    }
 
     val typography=remember {
         Typography(
