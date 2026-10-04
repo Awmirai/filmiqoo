@@ -338,12 +338,14 @@ fun FilmiqooPlayerScreen(
                         castController.deviceName().ifBlank { "TV" }
                 } else {
                     playerSettingsMessage="اتصال برقرار شد، اما ارسال ویدیو به TV ناموفق بود."
-                    bumpControls()
+                    controlsVisible=true
+                    controlsEpoch++
                 }
             }.onFailure {
                 playerSettingsMessage=
                     it.message ?: "ساخت لینک پخش مخصوص تلویزیون ناموفق بود."
-                bumpControls()
+                controlsVisible=true
+                controlsEpoch++
             }
         }
     }
