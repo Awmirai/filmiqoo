@@ -65,6 +65,7 @@ private data class PlayerTrackChoice(
     val groupIndex: Int,
     val trackIndex: Int,
     val label: String,
+    val language: String? = null,
     val selected: Boolean
 )
 
@@ -1206,48 +1207,12 @@ fun FilmiqooPlayerScreen(
                 )
             )
 
-            PlayerTopControls(
+            PlayerChromeTopBarV2(
                 target=currentTarget,
                 currentVariant=currentTarget.variants.firstOrNull {
                     it.mediaVersionId==selectedVariantId
                 },
-                downloadQueued=downloadQueued,
                 onBack=onBack,
-                onDownload={
-                    scope.launch {
-                        if(currentTarget.localUri!=null) {
-                            downloadQueued=true
-                            return@launch
-                        }
-                        runCatching {
-                            backend.enqueueDownload(
-                                context,
-                                currentTarget.copy(mediaVersionId=currentVersionId)
-                            )
-                        }.onSuccess {
-                            downloadQueued=true
-                        }.onFailure {
-                            error=it.message
-                        }
-                    }
-                },
-                onMoments={
-                    if(backend.session.isLoggedIn) momentsOpen=true
-                    else onRequireAuth()
-                },
-                onBookmarks={
-                    if(backend.session.isLoggedIn) bookmarksOpen=true
-                    else onRequireAuth()
-                },
-                onDialogueSearch={
-                    if(backend.session.isLoggedIn) dialogueSearchOpen=true
-                    else onRequireAuth()
-                },
-                onQueue={queueOpen=true},
-                onHandoff={
-                    if(backend.session.isLoggedIn) handoffOpen=true
-                    else onRequireAuth()
-                },
                 onShare={
                     sharePlayerMoment(
                         context=context,
@@ -1256,28 +1221,14 @@ fun FilmiqooPlayerScreen(
                         positionMs=activePositionMs()
                     )
                 },
-                onPip={
-                    activity?.enterPictureInPictureMode(
-                        PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(16,9))
-                            .build()
-                    )
-                },
                 onMore={
                     toolsOpen=true
                     controlsVisible=true
-                },
-                onSettings={
-                    settingsOpen=true
-                    settingsTab=PlayerSettingsTab.QUALITY
-                },
-                onLock={
-                    locked=true
-                    controlsVisible=false
+                    controlsEpoch++
                 }
             )
 
-            PlayerCenterControls(
+            PlayerCenterControlsV2(
                 isPlaying=isPlaying,
                 onBack10={
                     val next=(activePositionMs()-10_000L).coerceAtLeast(0L)
@@ -1340,7 +1291,7 @@ fun FilmiqooPlayerScreen(
                     )
                 }
 
-            PlayerBottomControls(
+            PlayerBottomControlsV2(
                 positionMs=positionMs,
                 durationMs=durationMs,
                 fraction=seekFraction,
@@ -1369,9 +1320,19 @@ fun FilmiqooPlayerScreen(
                     isScrubbing=false
                     bumpControls()
                 },
-                onSettings={
+                onSpeed={
                     settingsOpen=true
                     settingsTab=PlayerSettingsTab.SPEED
+                },
+                onCaptions={
+                    toolsOpen=true
+                    controlsVisible=true
+                    controlsEpoch++
+                },
+                onMore={
+                    toolsOpen=true
+                    controlsVisible=true
+                    controlsEpoch++
                 },
                 modifier=Modifier.align(Alignment.BottomCenter)
             )
@@ -1514,51 +1475,81 @@ fun FilmiqooPlayerScreen(
     }
 
     if(toolsOpen) {
-        PlayerToolsSheet(
+        PlayerToolsSheetV2(
             downloadQueued=downloadQueued,
             hasQueue=currentTarget.previousMediaVersionId!=null || currentTarget.upNext.isNotEmpty(),
             autoPersianSubtitleEnabled=autoPersianSubtitleEnabled,
             autoSubtitleBusy=autoSubtitleBusy,
             autoSubtitleStatus=autoSubtitleStatus,
+            activeSubtitleLabel=externalSubtitleLabel,
             onDismiss={toolsOpen=false},
             onAutoPersianSubtitle={ enabled ->
                 if(!enabled) {
                     autoPersianSubtitleEnabled=false
+                    autoSubtitleBusy=false
                     autoSubtitleStatus=null
                     if(externalSubtitleLabel?.startsWith("Auto فارسی")==true) {
                         applyExternalSubtitle(null,null,null)
+                    } else {
+                        player.trackSelectionParameters=
+                            player.trackSelectionParameters.buildUpon()
+                                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT,true)
+                                .build()
+                        trackRevision++
                     }
-                    return@PlayerToolsSheet
-                }
-                if(!backend.session.isLoggedIn) {
-                    autoPersianSubtitleEnabled=false
-                    toolsOpen=false
-                    onRequireAuth()
-                    return@PlayerToolsSheet
-                }
-                autoPersianSubtitleEnabled=true
-                autoSubtitleBusy=true
-                autoSubtitleStatus="در حال پیدا کردن زیرنویس دقیق این ریلیز..."
-                scope.launch {
-                    runCatching {
-                        backend.autoSubtitle(currentVersionId,"fa")
-                    }.onSuccess { match ->
-                        applyExternalSubtitle(
-                            match.url,
-                            match.mimeType,
-                            "Auto فارسی • "+match.release
-                        )
-                        autoSubtitleStatus=
-                            if(match.exactRelease)
-                                "زیرنویس فارسی با مچ دقیق ریلیز فعال شد."
-                            else
-                                "بهترین زیرنویس فارسی موجود فعال شد."
-                    }.onFailure {
+                } else {
+                    val embeddedPersian=subtitleTracks.firstOrNull { choice ->
+                        val language=choice.language
+                            ?.lowercase(Locale.ROOT)
+                            .orEmpty()
+                        language in setOf("fa","fas","per") ||
+                            choice.label.contains("فارسی",ignoreCase=true) ||
+                            choice.label.contains("persian",ignoreCase=true)
+                    }
+
+                    if(embeddedPersian!=null) {
+                        applyTrackChoice(player,C.TRACK_TYPE_TEXT,embeddedPersian)
+                        trackRevision++
+                        autoPersianSubtitleEnabled=true
+                        autoSubtitleBusy=false
+                        autoSubtitleStatus="زیرنویس فارسی داخل همین فایل فعال شد."
+                    } else if(!backend.session.isLoggedIn) {
                         autoPersianSubtitleEnabled=false
-                        autoSubtitleStatus=it.message ?: "زیرنویس فارسی مناسب پیدا نشد."
+                        autoSubtitleBusy=false
+                        autoSubtitleStatus="برای جستجوی اینترنتی زیرنویس وارد حساب شو."
+                        toolsOpen=false
+                        onRequireAuth()
+                    } else {
+                        autoPersianSubtitleEnabled=true
+                        autoSubtitleBusy=true
+                        autoSubtitleStatus="در حال بررسی ریلیز و پیدا کردن زیرنویس فارسی..."
+                        scope.launch {
+                            runCatching {
+                                backend.autoSubtitle(currentVersionId,"fa")
+                            }.onSuccess { match ->
+                                applyExternalSubtitle(
+                                    match.url,
+                                    match.mimeType,
+                                    "Auto فارسی • "+match.release
+                                )
+                                autoSubtitleStatus=
+                                    when {
+                                        match.exactRelease ->
+                                            "مچ دقیق ریلیز پیدا شد • "+match.provider
+                                        else ->
+                                            "بهترین زیرنویس فارسی موجود فعال شد • "+match.provider
+                                    }
+                            }.onFailure {
+                                autoPersianSubtitleEnabled=false
+                                autoSubtitleStatus=
+                                    it.message?.takeIf(String::isNotBlank)
+                                        ?: "برای این نسخه زیرنویس فارسی مناسبی پیدا نشد."
+                            }
+                            autoSubtitleBusy=false
+                            bumpControls()
+                        }
                     }
-                    autoSubtitleBusy=false
-                    bumpControls()
                 }
             },
             onSubtitleSettings={
@@ -3441,6 +3432,7 @@ private fun playerTrackChoices(
                         groupIndex=groupIndex,
                         trackIndex=trackIndex,
                         label=label,
+                        language=format.language,
                         selected=group.isTrackSelected(trackIndex)
                     )
                 )
