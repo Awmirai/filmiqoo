@@ -655,6 +655,9 @@ fun FilmiqooPlayerScreen(
         externalSubtitleUri=null
         externalSubtitleMime=null
         externalSubtitleLabel=null
+        autoPersianSubtitleEnabled=false
+        autoSubtitleBusy=false
+        autoSubtitleStatus=null
 
         selectedVariantId=currentTarget.mediaVersionId
         resumePromptPositionMs=null
