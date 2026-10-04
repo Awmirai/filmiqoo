@@ -71,6 +71,7 @@ type Config struct {
 	OpenSubtitlesUsername string
 	OpenSubtitlesPassword string
 	OpenSubtitlesUserAgent string
+	PersianSubtitleAddonURL string
 }
 
 func Load() Config {
@@ -134,6 +135,10 @@ func Load() Config {
 		OpenSubtitlesUsername: strings.TrimSpace(os.Getenv("OPENSUBTITLES_USERNAME")),
 		OpenSubtitlesPassword: strings.TrimSpace(os.Getenv("OPENSUBTITLES_PASSWORD")),
 		OpenSubtitlesUserAgent: env("OPENSUBTITLES_USER_AGENT","Filmiqoo v1.0"),
+		PersianSubtitleAddonURL: env(
+			"PERSIAN_SUBTITLE_ADDON_URL",
+			"https://stremio.alirostami.com/subtitles",
+		),
 	}
 }
 
