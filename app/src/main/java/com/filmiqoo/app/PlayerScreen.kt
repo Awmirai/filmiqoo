@@ -1676,6 +1676,8 @@ fun FilmiqooPlayerScreen(
                 trackRevision++
             },
             onSubtitle={ choice ->
+                autoPersianSubtitleEnabled=false
+                autoSubtitleStatus=null
                 if(choice==null) {
                     player.trackSelectionParameters=
                         player.trackSelectionParameters.buildUpon()
@@ -1697,6 +1699,8 @@ fun FilmiqooPlayerScreen(
             onSubtitleBackgroundOpacity={subtitleBackgroundOpacity=it},
             onSubtitleEdgeStyle={subtitleEdgeStyle=it},
             onPickExternalSubtitle={
+                autoPersianSubtitleEnabled=false
+                autoSubtitleStatus=null
                 externalSubtitlePicker.launch(
                     arrayOf(
                         "application/x-subrip",
@@ -1708,6 +1712,8 @@ fun FilmiqooPlayerScreen(
                 )
             },
             onClearExternalSubtitle={
+                autoPersianSubtitleEnabled=false
+                autoSubtitleStatus=null
                 applyExternalSubtitle(null,null,null)
                 playerSettingsMessage="زیرنویس خارجی حذف شد"
             },
