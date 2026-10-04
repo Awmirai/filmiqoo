@@ -1,4 +1,5 @@
 package com.filmiqoo.app
+import androidx.compose.material.icons.filled.VisibilityOff
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke

@@ -624,12 +624,17 @@ internal fun PostCommentsSheet(
     var text by remember { mutableStateOf("") }
     var spoiler by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
+    var sending by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
             loading=true
-            comments=runCatching { social.comments(post.id) }.getOrDefault(emptyList())
-            loading=false
+            error=null
+            try { comments=social.comments(post.id) }
+            catch (e:kotlinx.coroutines.CancellationException) { throw e }
+            catch (_:Exception) { error="دریافت پاسخ‌ها ناموفق بود؛ دوباره تلاش کن." }
+            finally { loading=false }
         }
     }
 
@@ -640,6 +645,10 @@ internal fun PostCommentsSheet(
             Text("نظرها",fontSize=20.sp,fontWeight=FontWeight.Bold)
             Text(post.author.displayName+" • "+post.body.take(70),color=FqMuted,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
 
+            error?.let { message -> Row(verticalAlignment=Alignment.CenterVertically) {
+                Text(message,color=FqDanger,fontSize=12.sp,modifier=Modifier.weight(1f))
+                TextButton({reload()}) { Text("تلاش دوباره") }
+            } }
             if(loading) LinearProgressIndicator(color=FqGold,modifier=Modifier.fillMaxWidth().padding(top=8.dp))
 
             LazyColumn(
@@ -669,19 +678,22 @@ internal fun PostCommentsSheet(
                 FilterChip(selected=spoiler,onClick={spoiler=!spoiler},label={Text("اسپویلر",fontSize=11.sp)})
                 Spacer(Modifier.width(7.dp))
                 OutlinedTextField(
-                    value=text,onValueChange={text=it},
+                    value=text,onValueChange={text=it.take(3000)},enabled=!sending,
                     placeholder={Text("نظر بنویس...")},
                     shape=RoundedCornerShape(18.dp),
                     modifier=Modifier.weight(1f),
                     maxLines=3
                 )
-                IconButton(onClick={
+                IconButton(enabled=!sending,onClick={
                     if(!loggedIn) {
                         onRequireAuth()
                     } else if(text.isNotBlank()) {
+                        sending=true
                         scope.launch {
-                            runCatching { social.addComment(post.id,text.trim(),spoiler) }
-                                .onSuccess { text="";spoiler=false;reload() }
+                            try { social.addComment(post.id,text.trim(),spoiler);text="";spoiler=false;reload() }
+                            catch (e:kotlinx.coroutines.CancellationException) { throw e }
+                            catch (_:Exception) { error="ارسال نشد؛ متن محفوظ است. دوباره تلاش کن." }
+                            finally { sending=false }
                         }
                     }
                 }) {

@@ -278,23 +278,20 @@ internal fun CinemaDetailContent(
 private fun CinemaTitleHero(data: CinemaTitleData) {
     val media = data.detail.media
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val heroHeight = (maxWidth * .88f).coerceIn(310.dp, 420.dp) * LocalDensity.current.fontScale.coerceIn(1f, 1.7f)
-        Box(Modifier.fillMaxWidth().height(heroHeight)) {
-            CinemaImage(media.backdropPath ?: media.posterPath, Modifier.fillMaxSize(), backdrop = true)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .04f), CinemaInk.copy(alpha = .42f), CinemaInk))))
-            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.Bottom) {
-                Surface(shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Color.White.copy(alpha = .2f)), shadowElevation = 10.dp) {
-                    CinemaImage(media.posterPath, Modifier.width(104.dp).aspectRatio(2f / 3f))
+        val minHeight = (maxWidth * 1.15f).coerceIn(390.dp, 580.dp)
+        Box(Modifier.fillMaxWidth().heightIn(min = minHeight)) {
+            CinemaImage(media.backdropPath ?: media.posterPath, Modifier.matchParentSize(), backdrop = true)
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .12f), Color.Transparent, CinemaInk.copy(alpha = .7f), CinemaInk))))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 26.dp).padding(top = 240.dp, bottom = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(color = CinemaInk.copy(alpha = .8f), shape = RoundedCornerShape(30.dp), border = BorderStroke(1.dp, CinemaLine)) {
+                    Text(if (media.type == MediaType.MOVIE) "فیلم سینمایی" else "دنیای یک سریال", color = CinemaGold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp))
                 }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(if (media.type == MediaType.MOVIE) "فیلم سینمایی" else "سریال", color = CinemaAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(media.title, color = CinemaPaper, fontSize = 25.sp, lineHeight = 33.sp, fontWeight = FontWeight.Black,
-                        maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 7.dp))
-                    Text(listOf(media.year, if (data.detail.runtime > 0) cinemaDuration(data.detail.runtime) else "").filter(String::isNotBlank).joinToString(" · "),
-                        color = CinemaSoft, fontSize = 12.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 9.dp))
-                    if (media.vote > 0) Text("★ " + String.format(Locale.US, "%.1f", media.vote) + "  TMDB", color = CinemaGold, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 7.dp))
-                }
+                Text(media.title, color = CinemaPaper, fontSize = 34.sp, lineHeight = 44.sp, fontWeight = FontWeight.Black,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+                Text(listOf(media.year, if (data.detail.runtime > 0) cinemaDuration(data.detail.runtime) else "").filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                if (media.vote > 0) Text("★ " + String.format(Locale.US, "%.1f", media.vote) + "  TMDB", color = CinemaGold, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                if (data.detail.tagline.isNotBlank()) Text(data.detail.tagline, color = CinemaSoft, fontSize = 13.sp, lineHeight = 22.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
             }
         }
     }

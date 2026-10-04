@@ -130,7 +130,7 @@ fun CinemaSocialScreen(
                         }
                         SocialPostCard(post, social, loggedIn, onRequireAuth,
                             onLike = { mutate { val liked = social.togglePostLike(post.id); posts = posts.map { if (it.id == post.id) it.copy(likedByMe = liked, likes = (it.likes + if (liked) 1 else -1).coerceAtLeast(0)) else it } } },
-                            onSave = { mutate { val saved = social.togglePostSave(post.id); posts = posts.map { if (it.id == post.id) it.copy(savedByMe = saved) else it } } },
+                            onSave = { mutate { val (saved, count) = social.togglePostSave(post.id); posts = posts.map { if (it.id == post.id) it.copy(savedByMe = saved, saves = count) else it } } },
                             onShare = { FilmiqooDeepLinks.share(context, post.author.displayName, FilmiqooDeepLinks.post(post.id)) },
                             onComments = { commentsFor = post }, onSafety = { if (loggedIn) safetyFor = post else onRequireAuth() },
                             onCreator = { onCreator(Creator(post.author.displayName, "@${post.author.username}", "", "", post.author.verified, post.author.id, avatarUrl = post.author.avatarUrl)) })

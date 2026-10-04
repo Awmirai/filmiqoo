@@ -62,6 +62,9 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 	}
 
 	parsed, candidates := ingest.ParseTelegramMedia(fileName, caption)
+	if len(candidates) == 0 {
+		return fmt.Errorf("no usable title in filename or caption")
+	}
 	kind, title, quality, source, codec = parsed.Kind, parsed.Title, parsed.Quality, parsed.Source, parsed.Codec
 	season, episode, year = parsed.Season, parsed.Episode, parsed.Year
 	_, err = s.db.Exec(ctx, `UPDATE telegram_ingest_items SET parsed_kind=$2,parsed_title=$3,

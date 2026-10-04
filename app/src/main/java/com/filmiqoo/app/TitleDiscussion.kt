@@ -128,6 +128,11 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
     var upload by rememberSaveable(key, parent) { mutableStateOf("") }
     var gif by rememberSaveable(key, parent) { mutableStateOf("") }
     var client by rememberSaveable(key, parent) { mutableStateOf(UUID.randomUUID().toString()) }
+    var lastDraft by rememberSaveable(key, parent) { mutableStateOf("") }
+    val draftSignature = listOf(draft, spoiler.toString(), sticker, upload).joinToString("\u0000")
+    LaunchedEffect(draftSignature) {
+        if (lastDraft != draftSignature) { client = UUID.randomUUID().toString(); lastDraft = draftSignature }
+    }
     var pickSticker by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<TitleComment?>(null) }
     var reporting by remember { mutableStateOf<TitleComment?>(null) }
@@ -176,7 +181,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
                 Text("سلیقهٔ تو، شروع یک گفت‌وگوست", color = CinemaPaper, fontWeight = FontWeight.Bold)
                 TextButton(onRequireAuth) { Text("ورود و نوشتن دیدگاه", color = CinemaAccent) }
             } else {
-                OutlinedTextField(draft, { if (it.length <= 3000) { draft = it; client = UUID.randomUUID().toString() } },
+                OutlinedTextField(draft, { if (it.length <= 3000) draft = it },
                     enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("discussion-draft"), minLines = 2, maxLines = 6,
                     placeholder = { Text(if (parent == null) "از تجربهٔ تماشایت بنویس…" else "پاسخت را بنویس…") }, shape = RoundedCornerShape(16.dp),
                     supportingText = { Text("${draft.length}/3000", color = CinemaSoft) })

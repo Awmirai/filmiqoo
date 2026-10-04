@@ -168,7 +168,8 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
         )
     }
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl,
+        androidx.compose.material3.LocalContentColor provides FqText) {
         MaterialTheme(
             colorScheme=colors,
             typography=typography,
