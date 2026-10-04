@@ -172,7 +172,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
         loading = true; error = null
         try { page = repository.page(key, parent, cursor) }
         catch (e: CancellationException) { throw e }
-        catch (_: Exception) { error = "دیدگاه‌ها دریافت نشد. اتصال را بررسی کن؛ این بخش به نسخهٔ جدید سرویس دیدگاه‌ها نیاز دارد." }
+        catch (_: Exception) { error = "دیدگاه‌ها فعلاً در دسترس نیستند. اتصال را بررسی کن و دوباره تلاش کن." }
         finally { loading = false }
     }
     Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -227,7 +227,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
                         }
                         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                             Text(comment.author, color = CinemaPaper, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(comment.created.take(10), color = CinemaSoft, fontSize = 11.sp)
+                            Text(socialRelativeTime(comment.created), color = CinemaSoft, fontSize = 11.sp)
                         }
                         if (!comment.deleted) IconButton({ if (!backend.session.isLoggedIn) onRequireAuth() else if (comment.own) deleting = comment else reporting = comment }) {
                             Icon(if (comment.own) Icons.Default.DeleteOutline else Icons.Default.Flag, if (comment.own) "حذف دیدگاه" else "گزارش دیدگاه", tint = CinemaSoft, modifier = Modifier.size(20.dp))

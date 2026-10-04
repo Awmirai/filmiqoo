@@ -37,6 +37,7 @@ func TestTitleDiscussionPersistenceAndAuthorization(t *testing.T) {
 	}
 	defer db.Close()
 	s := &Server{db: db}
+	s.cfg.OpsSecret = "discussion-test-only-operations-secret"
 	user := func() string {
 		var id string
 		if err := db.QueryRow(ctx, `INSERT INTO users(status) VALUES ('active') RETURNING id::text`).Scan(&id); err != nil {
@@ -52,6 +53,9 @@ func TestTitleDiscussionPersistenceAndAuthorization(t *testing.T) {
 	call := func(handler http.HandlerFunc, who, scope, id, action, query, body string) *httptest.ResponseRecorder {
 		t.Helper()
 		r := httptest.NewRequest("POST", "/test"+query, strings.NewReader(body))
+		if who == "ops" {
+			r.Header.Set("X-Filmiqoo-Ops-Secret", s.cfg.OpsSecret)
+		}
 		rc := chi.NewRouteContext()
 		rc.URLParams.Add("scope", scope)
 		rc.URLParams.Add("id", id)
@@ -144,4 +148,29 @@ func TestTitleDiscussionPersistenceAndAuthorization(t *testing.T) {
 	if err = db.QueryRow(ctx, "SELECT count(*) FROM title_comments WHERE parent_id=$1", id).Scan(&remaining); err != nil || remaining != 1 {
 		t.Fatal("replies lost", remaining, err)
 	}
+	// Reports flow to the existing operations queue; only authenticated operations
+	// may remove content, and removal retains replies and creates an audit record.
+	w = post(alice, scope, uuid(100), "", "moderation target", "", "")
+	json.Unmarshal(w.Body.Bytes(), &created)
+	target := created["id"]
+	w = call(s.submitReport, bob, "", "", "", "", fmt.Sprintf(`{"targetType":"discussion","targetId":"%s","reason":"harassment"}`, target))
+	if w.Code != 201 {
+		t.Fatalf("report %d %s", w.Code, w.Body)
+	}
+	var report struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &report)
+	if w = call(s.opsResolveModeration, alice, "", report.ID, "", "", `{"status":"resolved","note":"reviewed","removeContent":true}`); w.Code != 401 {
+		t.Fatal("unprivileged moderation", w.Code)
+	}
+	if w = call(s.opsResolveModeration, "ops", "", report.ID, "", "", `{"status":"resolved","note":"reviewed","removeContent":true}`); w.Code != 200 {
+		t.Fatalf("moderation %d %s", w.Code, w.Body)
+	}
+	var removed bool
+	if err = db.QueryRow(ctx, "SELECT deleted FROM title_comments WHERE id=$1", target).Scan(&removed); err != nil || !removed {
+		t.Fatal("moderation did not remove content", err)
+	}
+	defer db.Exec(context.Background(), "DELETE FROM moderation_actions WHERE target_type='discussion' AND target_id=$1", target)
+	defer db.Exec(context.Background(), "DELETE FROM reports WHERE target_type='discussion' AND target_id=$1", target)
 }

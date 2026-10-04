@@ -44,6 +44,9 @@ class OnlinePlaybackTest {
     }
 
     @After fun cleanUp() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
+            PlatformTestStorageRegistry.getInstance().openOutputFile("player-final-state.png").use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
         // Dispose the player and polling effects before restoring the real endpoint.
         compose.runOnUiThread { compose.activity.setContentView(android.widget.FrameLayout(compose.activity)) }
         SessionStore(compose.activity).also {
@@ -104,9 +107,11 @@ class OnlinePlaybackTest {
         // above the native PlayerView. Tools must dismiss before leaving playback.
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("پنهان‌کردن کنترل‌ها").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("player-video-gestures").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .2f, height * .4f)) }
+        compose.waitUntil(2_500) { compose.onAllNodesWithContentDescription("پنهان‌کردن کنترل‌ها").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("پنهان‌کردن کنترل‌ها").assertIsDisplayed().performClick()
         compose.onNodeWithContentDescription("پنهان‌کردن کنترل‌ها").assertDoesNotExist()
         compose.onNodeWithTag("player-video-gestures").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .2f, height * .4f)) }
+        compose.waitUntil(2_500) { compose.onAllNodesWithContentDescription("پنهان‌کردن کنترل‌ها").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithContentDescription("ابزارهای پخش").onFirst().performClick()
         compose.onNodeWithContentDescription("بستن").assertIsDisplayed()
         androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()

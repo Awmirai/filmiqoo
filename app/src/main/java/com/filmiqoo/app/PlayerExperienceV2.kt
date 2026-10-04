@@ -98,14 +98,15 @@ internal fun PlayerChromeTopBarV2(
     onHide: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Row(
         modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal=14.dp, vertical=10.dp)
+            .padding(horizontal=14.dp, vertical=10.dp),
+        verticalAlignment=Alignment.CenterVertically
     ) {
         Row(
-            modifier=Modifier.align(Alignment.CenterStart),
+            modifier=Modifier,
             horizontalArrangement=Arrangement.spacedBy(8.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
@@ -125,8 +126,8 @@ internal fun PlayerChromeTopBarV2(
 
         Column(
             modifier=Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(.55f),
+                .weight(1f)
+                .padding(horizontal=8.dp),
             horizontalAlignment=Alignment.CenterHorizontally
         ) {
             Text(
@@ -157,7 +158,7 @@ internal fun PlayerChromeTopBarV2(
             icon=Icons.Default.ArrowBack,
             contentDescription="بازگشت",
             onClick=onBack,
-            modifier=Modifier.align(Alignment.CenterEnd)
+            modifier=Modifier
         )
     }
 }

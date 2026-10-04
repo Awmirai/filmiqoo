@@ -314,7 +314,7 @@ private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: Episode
             if (ready) IconButton({ ep.mediaVersionId?.let(actions.play) }, enabled = !busy, modifier = Modifier.align(Alignment.Center).size(56.dp)) {
                 Icon(Icons.Default.PlayCircle, "پخش قسمت ${ep.number}", tint = Color.White, modifier = Modifier.size(48.dp))
             }
-            Text(if (completed) "✓ دیده شده" else if (ready) "آمادهٔ تماشا" else "به‌زودی در فیلمیکو", color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
+            Text(if (completed) "✓ دیده شده" else if (ready) "آمادهٔ تماشا" else "هنوز فایل پخش ندارد", color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
         }
         Text(if (hideSpoilers) "قسمت ${ep.number}" else ep.name.ifBlank { "قسمت ${ep.number}" }, color = CinemaPaper, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 13.dp))
         Text(listOf(ep.quality.orEmpty(), if (ep.runtimeMinutes > 0) "${ep.runtimeMinutes} دقیقه" else "").filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))

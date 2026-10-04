@@ -173,8 +173,13 @@ fun CinemaSocialScreen(
                 if (rooms.isEmpty() && !loading && error == null) item("rooms-empty") { Box(Modifier.padding(20.dp)) { CinemaNotice("هنوز اتاقی وجود ندارد", "اتاق هر عنوان از صفحهٔ همان فیلم یا سریال در دسترس قرار می‌گیرد.") } }
             }
             3 -> {
-                items(clips, key = { it.id }) { clip -> Box(Modifier.padding(horizontal = 20.dp)) {
-                    CinemaAction(Icons.Default.PlayCircle, clip.caption.ifBlank { "کلیپ سینمایی" }, { onOpenClip(clip.id) }, Modifier.fillMaxWidth())
+                items(clips, key = { it.id }) { clip -> CinemaCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth().clickable { onOpenClip(clip.id) }) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp))) {
+                        if (!clip.spoiler) CinemaImage(clip.coverUrl, Modifier.fillMaxSize(), true)
+                        Icon(if (clip.spoiler) Icons.Default.VisibilityOff else Icons.Default.PlayCircle, null, tint = CinemaPaper, modifier = Modifier.align(Alignment.Center).size(44.dp))
+                    }
+                    Text(if (clip.spoiler) "کلیپ دارای اسپویل · برای تماشا باز کن" else clip.caption.ifBlank { "کلیپ سینمایی" }, color = CinemaPaper, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+                    Text("${clip.author.displayName} · ${clip.views} بازدید", color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                 } }
                 if (clips.isEmpty() && !loading && error == null) item("clips-empty") { Box(Modifier.padding(20.dp)) { CinemaNotice("هنوز کلیپی منتشر نشده", "کلیپ‌های تازهٔ جامعهٔ فیلمیکو اینجا دیده می‌شود.") } }
             }

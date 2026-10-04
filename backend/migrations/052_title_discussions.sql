@@ -13,6 +13,7 @@ CREATE TABLE title_comments (
     UNIQUE(user_id, client_id)
 );
 CREATE INDEX title_comments_page ON title_comments(scope, parent_id, created_at DESC, id DESC);
+CREATE INDEX title_comments_replies ON title_comments(parent_id) WHERE parent_id IS NOT NULL;
 CREATE TABLE title_comment_likes (
     comment_id uuid NOT NULL REFERENCES title_comments(id) ON DELETE CASCADE,
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

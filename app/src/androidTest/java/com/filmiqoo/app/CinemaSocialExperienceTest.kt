@@ -81,4 +81,21 @@ class CinemaSocialExperienceTest {
         compose.onNodeWithTag("cinema-splash").assertDoesNotExist()
         compose.onNodeWithText("صفحهٔ ورود آماده است").assertIsDisplayed()
     }
+
+    @Test fun homeSpotlightOpensRealTitleAndKeepsNavigationReachable() {
+        val title=MediaItem(259731,MediaType.TV,"HIS & HERS",posterPath="https://image.tmdb.org/t/p/w500/cDSXLVQLkCSBIpBx3UW04TsfZ5c.jpg",
+            backdropPath="https://image.tmdb.org/t/p/w1280/n4hJLZmBG8kZccNn7bNgBDsVQ6a.jpg",vote=7.3,date="2026")
+        var opened:MediaItem?=null
+        compose.setContent { FilmiqooTheme {
+            androidx.compose.material3.Scaffold(containerColor=CinemaInk,bottomBar={CinemaBottomBar(0,false,{})}) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+                    CinemaHeading("FILMIQOO","خانهٔ فیلم‌بازها")
+                    CinemaSpotlight(HomeBundle(trending=listOf(title),popularTv=listOf(title)),{opened=it},{_,_->})
+                }
+            }
+        } }
+        compose.onNodeWithText("کشف این عنوان").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(259731,opened?.id) }
+        compose.onNodeWithTag("navigation-2").assertIsDisplayed()
+    }
 }

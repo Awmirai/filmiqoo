@@ -25,6 +25,7 @@ func ParseTelegramMedia(filename, caption string) (ParsedMedia, []string) {
 	var headings []string
 	caption = html.UnescapeString(captionTags.ReplaceAllString(caption, ""))
 	caption = normalizeCaptionDigits(caption)
+	firstContentLine := true
 	for _, raw := range strings.Split(caption, "\n") {
 		line := strings.TrimSpace(raw)
 		line = strings.TrimLeftFunc(line, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
@@ -32,6 +33,16 @@ func ParseTelegramMedia(filename, caption string) (ParsedMedia, []string) {
 			continue
 		}
 		var heading string
+		// Some channels use a release heading without a label. Accept only the
+		// first short line with a year/episode marker, never an arbitrary synopsis.
+		if firstContentLine && len([]rune(line)) <= 100 && len(strings.Fields(line)) <= 10 &&
+			(yearPattern.MatchString(line) || seasonEpisode.MatchString(line)) &&
+			!strings.ContainsAny(line, ":：") && !strings.Contains(line, "http") &&
+			!strings.HasPrefix(line, "خلاصه") && !strings.HasPrefix(line, "داستان") &&
+			!strings.HasPrefix(line, "سال") && !strings.HasPrefix(line, "کیفیت") {
+			heading = line
+		}
+		firstContentLine = false
 		if m := captionTitle.FindStringSubmatch(line); len(m) > 1 {
 			heading = m[1]
 		}
@@ -55,6 +66,18 @@ func ParseTelegramMedia(filename, caption string) (ParsedMedia, []string) {
 		}
 		// Only standalone episode/year headings; a synopsis can mention other seasons.
 		lower := strings.ToLower(line)
+		if strings.HasPrefix(line, "کیفیت") || strings.HasPrefix(lower, "quality") {
+			technical := ParseFileName(line + ".mp4")
+			if out.Quality == "" {
+				out.Quality = technical.Quality
+			}
+			if out.Source == "" {
+				out.Source = technical.Source
+			}
+			if out.Codec == "" {
+				out.Codec = technical.Codec
+			}
+		}
 		if strings.HasPrefix(line, "فصل") || strings.HasPrefix(lower, "season") || strings.HasPrefix(line, "قسمت") || strings.HasPrefix(lower, "episode") {
 			if m := captionSeason.FindStringSubmatch(line); out.Season == nil && len(m) > 1 {
 				v, _ := strconv.Atoi(m[1])
