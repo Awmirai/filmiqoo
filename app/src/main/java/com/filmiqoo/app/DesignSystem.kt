@@ -34,16 +34,16 @@ object FqDimens {
     val Xl=24.dp
     val Xxl=32.dp
     val Screen=16.dp
-    val SectionGap=28.dp
-    val CardRadius=22.dp
-    val SmallRadius=14.dp
+    val SectionGap=32.dp
+    val CardRadius=26.dp
+    val SmallRadius=16.dp
     val PillRadius=999.dp
     val Touch=48.dp
 }
 
-val FqGlass=Color(0xE60A0A0A)
-val FqBorder=Color.White.copy(alpha=.10f)
-val FqElevated=Color(0xFF171112)
+val FqGlass=Color(0xF20A0A0C)
+val FqBorder=Color.White.copy(alpha=.075f)
+val FqElevated=Color(0xFF151113)
 
 @Composable
 fun PremiumTopBar(
