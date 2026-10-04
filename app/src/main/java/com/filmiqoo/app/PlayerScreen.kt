@@ -292,29 +292,60 @@ fun FilmiqooPlayerScreen(
         }
     }
 
-    LaunchedEffect(castConnected,playUrl,currentVersionId,currentTarget.title) {
-        val url=playUrl
+    LaunchedEffect(
+        castConnected,
+        currentVersionId,
+        currentTarget.title,
+        externalSubtitleUri,
+        externalSubtitleMime
+    ) {
         if(
             castConnected &&
-            !url.isNullOrBlank() &&
+            currentTarget.localUri==null &&
             castLoadedVersionId!=currentVersionId
         ) {
-            val start=player.currentPosition.coerceAtLeast(0L)
-            val autoplay=player.isPlaying || player.playWhenReady
-            val loaded=castController.load(
-                url=url,
-                title=currentTarget.title,
-                subtitle=currentTarget.subtitle,
-                artworkUrl=currentTarget.posterUrl,
-                positionMs=start,
-                autoplay=autoplay
-            )
-            if(loaded) {
-                lastCastPositionMs=start
+            val remoteState=castController.state.value
+            if(remoteState.mediaVersionId==currentVersionId) {
                 castLoadedVersionId=currentVersionId
+                lastCastPositionMs=remoteState.positionMs
                 player.pause()
-                playerSettingsMessage="پخش روی "+
-                    castController.deviceName().ifBlank { "TV" }
+                return@LaunchedEffect
+            }
+
+            val startPosition=player.currentPosition.coerceAtLeast(0L)
+            val autoplay=player.isPlaying || player.playWhenReady
+            runCatching {
+                backend.playbackUrl(
+                    mediaVersionId=currentVersionId,
+                    remote=true
+                )
+            }.onSuccess { remoteUrl ->
+                val loaded=castController.load(
+                    url=remoteUrl,
+                    mediaVersionId=currentVersionId,
+                    title=currentTarget.title,
+                    subtitle=currentTarget.subtitle,
+                    artworkUrl=currentTarget.posterUrl,
+                    positionMs=startPosition,
+                    autoplay=autoplay,
+                    externalSubtitleUrl=externalSubtitleUri,
+                    externalSubtitleMime=externalSubtitleMime,
+                    externalSubtitleLabel=externalSubtitleLabel
+                )
+                if(loaded) {
+                    lastCastPositionMs=startPosition
+                    castLoadedVersionId=currentVersionId
+                    player.pause()
+                    playerSettingsMessage="پخش روی "+
+                        castController.deviceName().ifBlank { "TV" }
+                } else {
+                    playerSettingsMessage="اتصال برقرار شد، اما ارسال ویدیو به TV ناموفق بود."
+                    bumpControls()
+                }
+            }.onFailure {
+                playerSettingsMessage=
+                    it.message ?: "ساخت لینک پخش مخصوص تلویزیون ناموفق بود."
+                bumpControls()
             }
         }
     }
