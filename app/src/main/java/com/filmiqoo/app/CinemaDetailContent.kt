@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -255,7 +256,8 @@ internal fun CinemaDetailContent(
                 items(data.playableMovies, key = { it.id }) { version ->
                     CinemaCard(Modifier.fillMaxWidth(), accent = selectedMovie?.id == version.id) {
                         Text(version.quality.ifBlank { "نسخهٔ اصلی" }, color = CinemaPaper, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(listOf(cinemaBytes(version.fileSizeBytes), version.codec, version.hdr).filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 13.sp)
+                        Text(listOf(cinemaBytes(version.fileSizeBytes), version.codec, version.hdr).filter(String::isNotBlank).joinToString(" · "),
+                            color = CinemaSoft, fontSize = 13.sp, style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr))
                         if (version.audioTracks.isNotEmpty()) Text("صدا: " + version.audioTracks.joinToString(" · "), color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                         if (version.subtitleTracks.isNotEmpty()) Text("زیرنویس: " + version.subtitleTracks.joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
