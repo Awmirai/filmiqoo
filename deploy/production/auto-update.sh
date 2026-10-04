@@ -23,14 +23,22 @@ git fetch --quiet origin main
 LOCAL_SHA="$(git rev-parse HEAD)"
 REMOTE_SHA="$(git rev-parse origin/main)"
 
-if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
-  exit 0
-fi
-
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Refusing auto-update: repository worktree is not clean."
   git status --short
   exit 2
+fi
+
+if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
+  # Refresh the monthly country database even when the application has no new commits.
+  # A failed download leaves the running image intact; the existing timer retries.
+  GEO_MONTH="$(date -u +%Y-%m)"
+  DEPLOYED_GEO_MONTH="$(awk -F= '$1=="GEO_DATA_MONTH" { value=$2 } END { print value }' "$DEPLOY_DIR/.env.production")"
+  if [[ "$DEPLOYED_GEO_MONTH" != "$GEO_MONTH" ]]; then
+    echo "Refreshing Iran IP country data for $GEO_MONTH..."
+    bash "$DEPLOY_DIR/update-api.sh"
+  fi
+  exit 0
 fi
 
 if ! git merge-base --is-ancestor "$LOCAL_SHA" "$REMOTE_SHA"; then

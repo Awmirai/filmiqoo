@@ -33,6 +33,7 @@ jobs:
           bash -n rollback.sh
           bash -n bootstrap-vps.sh
           bash -n update-api.sh
+          bash -n auto-update.sh
 
       - name: Validate production compose
         working-directory: deploy/production

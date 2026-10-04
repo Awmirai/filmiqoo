@@ -16,7 +16,8 @@ fi
 
 SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
 SHORT_SHA="${SHA:0:12}"
-IMAGE="filmiqoo-api:${SHORT_SHA}"
+GEO_MONTH="$(date -u +%Y-%m)"
+IMAGE="filmiqoo-api:${SHORT_SHA}-geo-${GEO_MONTH}"
 VERSION="live-${SHORT_SHA}"
 
 read_env() {
@@ -47,16 +48,17 @@ fi
 chmod 600 "$ENV_FILE"
 
 echo "Building $IMAGE from $SHA..."
-docker build -t "$IMAGE" "$REPO_DIR/backend"
+docker build --build-arg GEO_DATA_MONTH="$GEO_MONTH" -t "$IMAGE" "$REPO_DIR/backend"
+
+cd "$DEPLOY_DIR"
+docker compose --env-file .env.production run --rm --no-deps caddy \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 write_env FILMIQOO_API_IMAGE "$IMAGE"
 write_env FILMIQOO_VERSION "$VERSION"
 write_env FILMIQOO_COMMIT "$SHA"
 chmod 600 "$ENV_FILE"
 
-cd "$DEPLOY_DIR"
-docker compose --env-file .env.production run --rm --no-deps caddy \
-  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 if ! docker compose --env-file .env.production up -d --no-build api caddy; then
   echo "API deployment failed; restoring previous image."
   write_env FILMIQOO_API_IMAGE "$OLD_IMAGE"
@@ -84,5 +86,6 @@ if [[ "$ready" -ne 1 ]]; then
   exit 1
 fi
 
+write_env GEO_DATA_MONTH "$GEO_MONTH"
 docker compose --env-file .env.production ps api
 echo "Filmiqoo API deployed: $IMAGE"

@@ -390,7 +390,7 @@ class BackendRepository(context: Context) {
                         date = x.optInt("year", 0).takeIf { it > 0 }?.toString().orEmpty(),
                         popularity = 0.0,
                         backendId = x.optString("id"),
-                        mediaVersionId = x.optString("mediaVersionId").takeIf(String::isNotBlank),
+                        mediaVersionId = x.optString("mediaVersionId").takeIf { it.isNotBlank() && it != "null" },
                         streamReady = x.optBoolean("streamReady", false),
                         quality = x.optString("quality")
                     )
@@ -438,7 +438,7 @@ class BackendRepository(context: Context) {
                                 overview = x.optString("overview"),
                                 stillUrl = x.optString("stillUrl"),
                                 runtimeMinutes = x.optInt("runtimeMinutes"),
-                                mediaVersionId = x.optString("mediaVersionId").takeIf(String::isNotBlank),
+                                mediaVersionId = x.optString("mediaVersionId").takeIf { it.isNotBlank() && it != "null" },
                                 quality = x.optString("quality").takeIf(String::isNotBlank),
                                 streamReady = x.optBoolean("streamReady"),
                                 introStartMs = if(x.isNull("introStartMs")) null else x.optLong("introStartMs"),

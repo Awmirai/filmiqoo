@@ -107,7 +107,7 @@ internal fun CinemaDetailContent(
                                 Icon(Icons.Default.FormatListNumbered, "انتخاب قسمت", tint = CinemaPaper)
                             }
                         } else {
-                            OutlinedIconButton({ versionsOpen = true }, enabled = !busy && data.playableMovies.isNotEmpty(), modifier = Modifier.size(52.dp), shape = RoundedCornerShape(16.dp)) {
+                            OutlinedIconButton({ versionsOpen = true }, enabled = !busy && data.playableMovies.isNotEmpty(), modifier = Modifier.size(52.dp).testTag("detail-versions"), shape = RoundedCornerShape(16.dp)) {
                                 Icon(Icons.Default.Download, "کیفیت و دانلود", tint = CinemaPaper)
                             }
                         }
@@ -259,7 +259,7 @@ internal fun CinemaDetailContent(
                         if (version.subtitleTracks.isNotEmpty()) Text("زیرنویس: " + version.subtitleTracks.joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CinemaAction(Icons.Default.PlayArrow, "پخش", { selectedVersion = version.id; versionsOpen = false; actions.play(version.id) }, Modifier.weight(1f), primary = true, enabled = !busy)
-                            CinemaAction(Icons.Default.Download, "دانلود", { selectedVersion = version.id; versionsOpen = false; actions.download(version.id) }, Modifier.weight(1f), enabled = !busy)
+                            CinemaAction(Icons.Default.Download, "دانلود", { selectedVersion = version.id; versionsOpen = false; actions.download(version.id) }, Modifier.weight(1f).testTag("download-${version.id}"), enabled = !busy)
                         }
                     }
                 }
@@ -308,7 +308,7 @@ private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: Episode
                 Box(Modifier.width(92.dp).aspectRatio(16f / 10f).clip(RoundedCornerShape(11.dp)).clickable(enabled = ready && !busy) { ep.mediaVersionId?.let(actions.play) }) {
                     if (hideSpoilers) {
                         Box(Modifier.fillMaxSize().background(CinemaLine), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.VisibilityOff, "تصویر قسمت برای جلوگیری از اسپویل پنهان است", tint = CinemaSoft)
+                            if (!ready) Icon(Icons.Default.VisibilityOff, "تصویر قسمت برای جلوگیری از اسپویل پنهان است", tint = CinemaSoft)
                         }
                     } else CinemaImage(ep.stillUrl, Modifier.fillMaxSize(), backdrop = true)
                     if (ready) Icon(Icons.Default.PlayCircle, "پخش قسمت ${ep.number}", modifier = Modifier.align(Alignment.Center).size(29.dp), tint = Color.White)

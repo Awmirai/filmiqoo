@@ -972,6 +972,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             }
             else -> Scaffold(
                 containerColor=FqBg,
+                contentWindowInsets=WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
                 bottomBar={
                     FilmiqooBottomBar(
                         selected=tab,

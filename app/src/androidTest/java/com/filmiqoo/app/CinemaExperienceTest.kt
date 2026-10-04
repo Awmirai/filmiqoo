@@ -1,7 +1,10 @@
 package com.filmiqoo.app
 
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -26,6 +29,7 @@ class CinemaExperienceTest {
 
     @After fun screenshot() {
         compose.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(250, 3000)
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("cinema-" + testName.methodName + ".png").use { output ->
             assertTrue("Screenshot must be written to test storage", bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
@@ -47,10 +51,14 @@ class CinemaExperienceTest {
     }
 
     @Test fun episodeBrowserCanReachLastRowWithoutClipping() {
-        compose.setContent { FilmiqooTheme { CinemaDetailContent(series()) } }
+        var downloaded: String? = null
+        compose.setContent { FilmiqooTheme { CinemaDetailContent(series(), actions = CinemaDetailActions(download = { downloaded = it })) } }
         compose.onNodeWithTag("detail-episodes-shortcut").performClick()
         compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e30"))
-        compose.onNodeWithTag("episode-e30").assertIsDisplayed()
+        compose.onNodeWithContentDescription("دانلود قسمت 30").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("v30", downloaded) }
+        assertTrue(compose.onNodeWithContentDescription("دانلود قسمت 30").fetchSemanticsNode().boundsInRoot.bottom <=
+            compose.onNodeWithTag("detail-primary").fetchSemanticsNode().boundsInRoot.top)
     }
 
     @Test fun largeFontsKeepPlaybackAndEpisodeControlsReachable() {
@@ -63,13 +71,19 @@ class CinemaExperienceTest {
         compose.onNodeWithTag("detail-primary").assertIsDisplayed()
         compose.onNodeWithTag("detail-episodes-shortcut").assertIsDisplayed().performClick()
         compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e30"))
-        compose.onNodeWithTag("episode-e30").assertExists()
+        compose.onNodeWithContentDescription("دانلود قسمت 30").performScrollTo().assertIsDisplayed()
+        assertTrue(compose.onNodeWithContentDescription("دانلود قسمت 30").fetchSemanticsNode().boundsInRoot.bottom <=
+            compose.onNodeWithTag("detail-primary").fetchSemanticsNode().boundsInRoot.top)
     }
 
     @Test fun navigationLabelsMatchDestinationIds() {
         compose.setContent {
             var selected by remember { mutableIntStateOf(0) }
-            FilmiqooTheme { CinemaBottomBar(selected, false) { selected = it } }
+            FilmiqooTheme {
+                Scaffold(containerColor = CinemaInk, bottomBar = { CinemaBottomBar(selected, false) { selected = it } }) { padding ->
+                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("FILMIQOO", color = CinemaPaper) }
+                }
+            }
         }
         compose.onNodeWithTag("navigation-3").performClick().assertIsSelected()
         compose.onNodeWithTag("navigation-3").assert(hasText("کتابخانه"))
@@ -111,6 +125,22 @@ class CinemaExperienceTest {
         assertEquals(listOf("فارسی", "English", "دوبله فارسی"), cinemaTrackLabels(tracks))
         assertEquals(emptyList<String>(), cinemaTrackLabels(null))
         compose.setContent { FilmiqooTheme { CinemaDetailContent(movie()) } }
+    }
+
+    @Test fun qualitySheetShowsTracksAndQueuesTheSelectedFile() {
+        var downloaded: String? = null
+        val original = movie()
+        val platform = requireNotNull(original.platform)
+        val version = platform.versions.first().copy(audioTracks = listOf("فارسی"), subtitleTracks = listOf("English"))
+        compose.setContent { FilmiqooTheme {
+            CinemaDetailContent(original.copy(platform = platform.copy(versions = listOf(version))), actions = CinemaDetailActions(download = { downloaded = it }))
+        } }
+        compose.onNodeWithTag("detail-versions").performClick()
+        compose.onNodeWithText("صدا: فارسی").assertIsDisplayed()
+        compose.onNodeWithText("زیرنویس: English").assertIsDisplayed()
+        compose.onNodeWithTag("download-movie-version").performClick()
+        compose.runOnIdle { assertEquals("movie-version", downloaded) }
+        compose.onNodeWithTag("detail-versions").performClick()
     }
 
     private fun movie(): CinemaTitleData {

@@ -13,6 +13,32 @@
 6. Verify API readiness and the protected operations status endpoint.
 7. Check push and Telegram queues before declaring the deploy healthy.
 
+## Iran connection policy
+
+The cinema Android build requires `GET /v1/access` to return HTTP 200 with
+`allowed: true`, `country: IR`, `enforced: true` and `policy: iran-only-v1`.
+Deploy the API and Caddy changes together before distributing the APK. An old
+server with no access endpoint intentionally does not unlock the app.
+
+`bootstrap-vps.sh` generates a private `GEO_PROXY_HEADER_SECRET`. For existing
+installations, `update-api.sh` adds it without printing the value and restarts both
+API and Caddy. Keep the API port private. Caddy must be the direct internet edge;
+placing another proxy in front requires an explicitly trusted client-IP design.
+Public `X-Forwarded-For` or country headers never authorize access.
+
+The image includes DB-IP IP-to-Country Lite data (CC BY 4.0). The deployment helper
+uses the UTC month as a Docker build argument and image tag, so Docker cannot reuse
+an expired dataset. The existing `filmiqoo-auto-update.timer` refreshes it monthly,
+including months without source changes, and retries failed downloads on its next
+run. Ensure that timer is installed and enabled. For installations without that
+timer, run `update-api.sh` at least monthly. Data older than 62 days fails closed.
+
+After deployment, verify `/healthz` and `/readyz`, then `/v1/access` from real
+Iranian IPv4 and IPv6 connections and from an outside-Iran connection. The latter
+must return HTTP 403. Check login, catalog, playback and downloads in both cases.
+This policy checks the network exit country, not legal residence; an Iranian VPN
+exit can appear to be inside Iran.
+
 ## Database migrations
 
 The API applies embedded migrations before accepting traffic.
