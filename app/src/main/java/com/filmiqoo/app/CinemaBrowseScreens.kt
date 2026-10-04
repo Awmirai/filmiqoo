@@ -29,6 +29,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 
 @Composable
 fun CinemaDiscoverScreen(
@@ -133,6 +137,7 @@ fun CinemaHomeScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
     var region by rememberSaveable { mutableStateOf<String?>(null) }
+    val latest = rememberRecentCatalog(backend)
     LaunchedEffect(retry, loggedIn) {
         try { data = catalog.home(); error = null }
         catch (cancelled: CancellationException) { throw cancelled }
@@ -162,6 +167,9 @@ fun CinemaHomeScreen(
         if (data == null && error == null) item("loading") { LinearProgressIndicator(color = CinemaAccent, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) }
         error?.let { message -> item("error") { Box(Modifier.padding(horizontal = 20.dp)) { CinemaNotice("خانه آماده نشد", message, Icons.Default.CloudOff, "تلاش دوباره", { retry++ }) } } }
         data?.trending?.firstOrNull()?.let { hero -> item("hero") { CinemaHomeHero(hero) { onMedia(hero) } } }
+        item("latest-catalog") {
+            RecentCatalogShelf(latest, onMedia)
+        }
         item("regions") {
             CinemaHeading("جهانِ سلیقهٔ تو", "از سینمای ایران تا قصه‌های آن سوی دنیا")
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -213,6 +221,52 @@ fun CinemaHomeScreen(
             }
         }
         item("notice") { Text("اطلاعات عنوان‌ها از بانک‌های فراداده دریافت می‌شود. امکان پخش و دانلود به موجود بودن فایل مجاز در کاتالوگ فیلمیکو بستگی دارد.", color = CinemaSoft, fontSize = 12.sp, lineHeight = 20.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) }
+    }
+}
+
+internal class RecentCatalogState {
+    var items by mutableStateOf<List<MediaItem>>(emptyList())
+    var loading by mutableStateOf(true)
+    var failed by mutableStateOf(false)
+    var refresh by mutableIntStateOf(0)
+}
+
+@Composable
+internal fun rememberRecentCatalog(backend: BackendRepository, pollMillis: Long = 8_000): RecentCatalogState {
+    val state = remember(backend) { RecentCatalogState() }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(backend, lifecycle, state.refresh) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                state.loading = true
+                try {
+                    state.items = backend.catalogHome().distinctBy(::cinemaMediaKey)
+                    state.failed = false
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { state.failed = true }
+                finally { state.loading = false }
+                delay(pollMillis)
+            }
+        }
+    }
+    return state
+}
+
+@Composable
+internal fun RecentCatalogShelf(state: RecentCatalogState, onMedia: (MediaItem) -> Unit) {
+    Column(Modifier.testTag("recent-catalog")) {
+        CinemaShelf("تازه اضافه‌شده‌ها", "جدیدترین فایل‌های فیلمیکو؛ به‌روزرسانی خودکار", state.items, onMedia)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(when {
+                state.failed -> "به‌روزرسانی انجام نشد؛ دوباره تلاش کن."
+                state.loading -> "در حال بررسی تازه‌ها…"
+                state.items.isEmpty() -> "هنوز عنوانی به فهرست اضافه نشده است."
+                else -> "فهرست به‌روز است"
+            }, color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            IconButton(onClick = { state.refresh++ }, enabled = !state.loading) {
+                Icon(Icons.Default.Refresh, "به‌روزرسانی تازه‌ها", tint = CinemaAccent)
+            }
+        }
     }
 }
 

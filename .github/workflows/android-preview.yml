@@ -95,6 +95,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
+            bash scripts/generate-player-test-fixture.sh
             gradle :app:connectedDebugAndroidTest --stacktrace
       - name: Upload device test results and screenshots
         if: always()

@@ -1,0 +1,143 @@
+package com.filmiqoo.app
+
+import android.graphics.Bitmap
+import android.view.View
+import android.view.ViewGroup
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.media3.ui.PlayerView
+import androidx.mediarouter.app.MediaRouteButton
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.platform.io.PlatformTestStorageRegistry
+import okhttp3.mockwebserver.*
+import okio.Buffer
+import org.json.JSONObject
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicInteger
+
+@RunWith(AndroidJUnit4::class)
+class OnlinePlaybackTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val server = MockWebServer()
+    private var originalBase: String? = null
+    private var originalAccess: String? = null
+    private var originalRefresh: String? = null
+
+    private fun backend(): BackendRepository {
+        server.start()
+        return BackendRepository(compose.activity).also {
+            originalBase = it.session.baseUrl
+            originalAccess = it.session.accessToken
+            originalRefresh = it.session.refreshToken
+            it.session.baseUrl = server.url("/").toString()
+            it.session.accessToken = "instrumentation-only"
+            it.session.refreshToken = "instrumentation-only"
+        }
+    }
+
+    @After fun cleanUp() {
+        // Dispose the player and polling effects before restoring the real endpoint.
+        compose.runOnUiThread { compose.activity.setContentView(android.widget.FrameLayout(compose.activity)) }
+        SessionStore(compose.activity).also {
+            originalBase?.let { url -> it.baseUrl = url }
+            it.accessToken = originalAccess
+            it.refreshToken = originalRefresh
+        }
+        server.shutdown()
+    }
+
+    @Test fun realOnlineFlowDecodesVideoAdvancesAndReturnsSafely() {
+        val bytes = InstrumentationRegistry.getInstrumentation().context.assets
+            .open("player-fixture.mp4").use { it.readBytes() }
+        val tokens = AtomicInteger()
+        val mediaRequests = AtomicInteger()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.requestUrl?.encodedPath) {
+                "/v1/playback/token" -> {
+                    assertEquals("network-regression", JSONObject(request.body.readUtf8()).getString("mediaVersionId"))
+                    tokens.incrementAndGet()
+                    json(JSONObject().put("url", server.url("/media.mp4").toString()).toString())
+                }
+                "/media.mp4" -> {
+                    mediaRequests.incrementAndGet()
+                    val start = request.getHeader("Range")?.substringAfter("bytes=")?.substringBefore('-')?.toIntOrNull() ?: 0
+                    if (start >= bytes.size) MockResponse().setResponseCode(416)
+                    else MockResponse().setResponseCode(if (request.getHeader("Range") == null) 200 else 206)
+                        .setHeader("Content-Type", "video/mp4")
+                        .setHeader("Accept-Ranges", "bytes")
+                        .apply { if (request.getHeader("Range") != null) setHeader("Content-Range", "bytes $start-${bytes.lastIndex}/${bytes.size}") }
+                        .setBody(Buffer().write(bytes, start, bytes.size - start))
+                }
+                else -> MockResponse().setResponseCode(404).setBody("{}")
+            }
+        }
+        compose.activity.setTheme(R.style.Theme_Filmiqoo)
+        // Verify the theme supports the native Cast widget, even on a device without Cast services.
+        compose.runOnUiThread { MediaRouteButton(compose.activity) }
+        val repository = backend()
+        compose.setContent {
+            var open by remember { mutableStateOf(true) }
+            FilmiqooTheme {
+                if (open) FilmiqooPlayerScreen(PlaybackTarget("network-regression", "Network playback"), repository, onBack = { open = false })
+                else Text("Online player closed safely")
+            }
+        }
+        compose.waitUntil(30_000) {
+            var playing = false
+            compose.runOnUiThread {
+                val player = findPlayer(compose.activity.window.decorView)?.player
+                playing = player?.isPlaying == true && player.currentPosition >= 2_000 && player.videoSize.width == 320
+            }
+            playing
+        }
+        assertTrue("Online token endpoint was used", tokens.get() > 0)
+        assertTrue("Video was actually fetched over HTTP", mediaRequests.get() > 0)
+        val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        PlatformTestStorageRegistry.getInstance().openOutputFile("online-video-playing.png").use {
+            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithText("Online player closed safely").assertIsDisplayed()
+    }
+
+    @Test fun newCatalogPostAppearsWithoutReopeningScreenAndSurvivesRefreshFailure() {
+        val requests = AtomicInteger()
+        val available = AtomicInteger(0)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                if (request.requestUrl?.encodedPath != "/v1/catalog/home") return MockResponse().setResponseCode(404)
+                requests.incrementAndGet()
+                return when (available.get()) {
+                    0 -> json("""{"items":[]}""")
+                    1 -> json("""{"items":[{"id":"post21","tmdbId":1482938,"kind":"movie","title":"Union County","year":2026}]}""")
+                    else -> MockResponse().setResponseCode(503)
+                }
+            }
+        }
+        val repository = backend()
+        compose.setContent { FilmiqooTheme { RecentCatalogShelf(rememberRecentCatalog(repository, 150), {}) } }
+        compose.waitUntil(10_000) { requests.get() > 0 }
+        compose.onNodeWithText("Union County").assertDoesNotExist()
+        available.set(1)
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Union County").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Union County").assertIsDisplayed()
+        available.set(2)
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("به‌روزرسانی انجام نشد؛ دوباره تلاش کن.").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Union County").assertIsDisplayed()
+    }
+
+    private fun json(body: String) = MockResponse().setHeader("Content-Type", "application/json").setBody(body)
+    private fun findPlayer(view: View): PlayerView? {
+        if (view is PlayerView) return view
+        if (view is ViewGroup) for (i in 0 until view.childCount) findPlayer(view.getChildAt(i))?.let { return it }
+        return null
+    }
+}

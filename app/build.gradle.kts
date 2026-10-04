@@ -34,8 +34,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 6
-        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.5.1-cinema-preview"
+        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 7
+        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.5.2-cinema-preview"
         manifestPlaceholders["appLabel"] = "Filmiqoo"
         buildConfigField(
             "String",
@@ -157,6 +157,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.10.0")
