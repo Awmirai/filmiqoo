@@ -146,7 +146,7 @@ internal fun PlayerChromeTopBarV2(
         }
 
         PlayerRoundAction(
-            icon=androidx.compose.material.icons.automirrored.filled.ArrowBack,
+            icon=Icons.Default.ArrowBack,
             contentDescription="بازگشت",
             onClick=onBack,
             modifier=Modifier.align(Alignment.CenterEnd)
@@ -325,13 +325,13 @@ internal fun PlayerBottomControlsV2(
             verticalAlignment=Alignment.CenterVertically
         ) {
             Text(
-                formatPlayerTime(positionMs),
+                playerUiTime(positionMs),
                 color=Color.White,
                 fontSize=11.sp,
                 fontWeight=FontWeight.SemiBold
             )
             Text(
-                "  /  "+formatPlayerTime(durationMs),
+                "  /  "+playerUiTime(durationMs),
                 color=PlayerMuted,
                 fontSize=10.sp
             )
@@ -340,7 +340,7 @@ internal fun PlayerBottomControlsV2(
 
             PlayerCompactChip(
                 icon=Icons.Default.Speed,
-                text=formatSpeed(speed),
+                text=playerUiSpeed(speed),
                 onClick=onSpeed
             )
             Spacer(Modifier.width(7.dp))
@@ -833,3 +833,24 @@ private fun PlayerToolRowV2(
         )
     }
 }
+
+
+private fun playerUiTime(ms: Long): String {
+    if(ms<=0L) return "00:00"
+    val total=ms/1000L
+    val hours=total/3600L
+    val minutes=(total%3600L)/60L
+    val seconds=total%60L
+    return if(hours>0L) {
+        "%02d:%02d:%02d".format(hours,minutes,seconds)
+    } else {
+        "%02d:%02d".format(minutes,seconds)
+    }
+}
+
+private fun playerUiSpeed(value: Float): String =
+    if(kotlin.math.abs(value-value.toInt())<.01f) {
+        value.toInt().toString()+"x"
+    } else {
+        "%.2gx".format(value)
+    }
