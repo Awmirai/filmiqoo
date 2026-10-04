@@ -18,6 +18,7 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import okio.BufferedSink
 
