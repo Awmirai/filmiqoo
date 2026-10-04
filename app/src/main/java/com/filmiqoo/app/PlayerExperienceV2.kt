@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -755,7 +756,7 @@ private fun PlayerSheetSectionTitleV2(
         color=PlayerMuted,
         fontSize=10.sp,
         fontWeight=FontWeight.Bold,
-        modifier=Modifier.padding(horizontal=4.dp,top=2.dp)
+        modifier=Modifier.padding(horizontal=4.dp).padding(top=2.dp)
     )
 }
 
