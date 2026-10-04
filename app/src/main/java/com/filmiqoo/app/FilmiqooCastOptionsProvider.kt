@@ -12,6 +12,7 @@ class FilmiqooCastOptionsProvider : OptionsProvider {
             .setReceiverApplicationId(
                 CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
             )
+            .setRemoteToLocalEnabled(true)
             .build()
 
     override fun getAdditionalSessionProviders(

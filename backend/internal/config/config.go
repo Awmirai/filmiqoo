@@ -30,6 +30,7 @@ type Config struct {
 	PlaybackSigningSecret string
 	PublicAPIBaseURL string
 	PlaybackTokenTTLSeconds int
+	CastPlaybackTokenTTLSeconds int
 	TelegramStreamHashLength int
 	AuthAccessTTLMinutes int
 	AuthRefreshTTLDays int
@@ -94,6 +95,7 @@ func Load() Config {
 		PlaybackSigningSecret: env("PLAYBACK_SIGNING_SECRET", "dev-playback-change-me"),
 		PublicAPIBaseURL: env("PUBLIC_API_BASE_URL", "http://localhost:8080"),
 		PlaybackTokenTTLSeconds: envInt("PLAYBACK_TOKEN_TTL_SECONDS", 300),
+		CastPlaybackTokenTTLSeconds: envInt("CAST_PLAYBACK_TOKEN_TTL_SECONDS", 28800),
 		TelegramStreamHashLength: envInt("TELEGRAM_STREAM_HASH_LENGTH", 6),
 		AuthAccessTTLMinutes: envInt("AUTH_ACCESS_TTL_MINUTES", 15),
 		AuthRefreshTTLDays: envInt("AUTH_REFRESH_TTL_DAYS", 30),

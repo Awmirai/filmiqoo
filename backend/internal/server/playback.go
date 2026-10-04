@@ -21,6 +21,7 @@ import (
 type playbackTokenRequest struct {
 	MediaVersionID string `json:"mediaVersionId"`
 	Download bool `json:"download"`
+	Remote bool `json:"remote"`
 }
 
 func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
@@ -37,9 +38,9 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ready bool
-	var audienceLevel string
+	var audienceLevel,fileName string
 	if err := s.db.QueryRow(r.Context(),`
-		SELECT mv.stream_ready,mt.audience_level
+		SELECT mv.stream_ready,mt.audience_level,mv.file_name
 		  FROM media_versions mv
 		  LEFT JOIN episodes e ON e.id=mv.episode_id
 		  LEFT JOIN seasons sn ON sn.id=e.season_id
@@ -47,7 +48,7 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 		 WHERE mv.id=$1
 	`,
 		body.MediaVersionID,
-	).Scan(&ready,&audienceLevel); err != nil {
+	).Scan(&ready,&audienceLevel,&fileName); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error":"media version not found"})
 		return
 	}
@@ -64,6 +65,12 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 
 	ttl := time.Duration(s.cfg.PlaybackTokenTTLSeconds) * time.Second
 	if ttl <= 0 { ttl = 5 * time.Minute }
+	if body.Remote {
+		remoteTTL:=time.Duration(s.cfg.CastPlaybackTokenTTLSeconds)*time.Second
+		if remoteTTL<=0 { remoteTTL=8*time.Hour }
+		if remoteTTL>24*time.Hour { remoteTTL=24*time.Hour }
+		if remoteTTL>ttl { ttl=remoteTTL }
+	}
 	exp := time.Now().Add(ttl).Unix()
 	sig := s.signPlayback(body.MediaVersionID, exp, body.Download)
 
@@ -82,6 +89,8 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 		"url": playURL,
 		"expiresAt": exp,
 		"download": body.Download,
+		"remote": body.Remote,
+		"contentType": playbackContentType(fileName),
 	})
 }
 
@@ -442,4 +451,23 @@ func (s *Server) recordPlaybackOriginResult(ctx context.Context,success bool) {
 	pipe.Incr(ctx,key)
 	pipe.Expire(ctx,key,48*time.Hour)
 	_,_=pipe.Exec(ctx)
+}
+
+
+func playbackContentType(fileName string) string {
+	name:=strings.ToLower(strings.TrimSpace(fileName))
+	switch {
+	case strings.HasSuffix(name,".m3u8"):
+		return "application/x-mpegURL"
+	case strings.HasSuffix(name,".mpd"):
+		return "application/dash+xml"
+	case strings.HasSuffix(name,".webm"):
+		return "video/webm"
+	case strings.HasSuffix(name,".mkv"):
+		return "video/x-matroska"
+	case strings.HasSuffix(name,".mov"):
+		return "video/quicktime"
+	default:
+		return "video/mp4"
+	}
 }

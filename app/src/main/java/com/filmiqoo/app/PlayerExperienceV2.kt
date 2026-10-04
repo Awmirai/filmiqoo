@@ -112,11 +112,8 @@ internal fun PlayerChromeTopBarV2(
                 contentDescription="ابزارهای پخش",
                 onClick=onMore
             )
-            PlayerRoundAction(
-                icon=Icons.Default.Share,
-                contentDescription="اشتراک‌گذاری",
-                onClick=onShare
-            )
+            FilmiqooCastRouteButton()
+
         }
 
         Column(
@@ -552,8 +549,8 @@ internal fun PlayerToolsSheetV2(
                     listOf(
                         PlayerToolActionV2(
                             icon=Icons.Default.DevicesOther,
-                            title="ادامه روی دستگاه دیگر",
-                            subtitle="تماشا را روی تلویزیون یا دستگاه دیگری ادامه بده",
+                            title="تلویزیون و دستگاه‌ها",
+                            subtitle="Cast، Smart View و انتقال پخش به دستگاه‌های دیگه",
                             onClick=onHandoff
                         ),
                         PlayerToolActionV2(

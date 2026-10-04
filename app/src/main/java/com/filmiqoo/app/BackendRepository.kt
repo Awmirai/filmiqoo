@@ -60,6 +60,12 @@ data class PlaybackQueueItem(
     val posterUrl: String? = null
 )
 
+data class RemotePlaybackSource(
+    val url:String,
+    val contentType:String,
+    val expiresAt:Long
+)
+
 data class AutoSubtitleMatch(
     val url: String,
     val mimeType: String,
@@ -704,14 +710,38 @@ class BackendRepository(context: Context) {
         )
     }
 
-    suspend fun playbackUrl(mediaVersionId: String, download: Boolean = false): String =
+    suspend fun playbackUrl(
+        mediaVersionId: String,
+        download: Boolean = false,
+        remote: Boolean = false
+    ): String =
         withContext(Dispatchers.IO) {
             val body = JSONObject()
                 .put("mediaVersionId", mediaVersionId)
                 .put("download", download)
+                .put("remote", remote)
             val obj = postJson("/v1/playback/token", body, authorized = true)
             obj.getString("url")
         }
+
+    suspend fun remotePlaybackSource(
+        mediaVersionId:String
+    ):RemotePlaybackSource = withContext(Dispatchers.IO) {
+        val body=JSONObject()
+            .put("mediaVersionId",mediaVersionId)
+            .put("download",false)
+            .put("remote",true)
+        val o=postJson(
+            "/v1/playback/token",
+            body,
+            authorized=true
+        )
+        RemotePlaybackSource(
+            url=o.getString("url"),
+            contentType=o.optString("contentType").ifBlank { "video/mp4" },
+            expiresAt=o.optLong("expiresAt")
+        )
+    }
 
     suspend fun autoSubtitle(
         mediaVersionId:String,
