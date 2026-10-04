@@ -1947,12 +1947,32 @@ private fun PlayerTopControls(
 
 @Composable
 private fun PlayerCastRouteButton() {
-    val context=LocalContext.current
+    // Some OEM/Google Play Services combinations can throw while Cast is
+    // initialising. Cast is optional, so never let that close the player/app.
     AndroidView(
         factory={ctx->
-            androidx.mediarouter.app.MediaRouteButton(ctx).apply {
-                com.google.android.gms.cast.framework.CastButtonFactory
-                    .setUpMediaRouteButton(ctx,this)
+            android.widget.FrameLayout(ctx).apply {
+                val child=runCatching {
+                    androidx.mediarouter.app.MediaRouteButton(ctx).apply {
+                        com.google.android.gms.cast.framework.CastButtonFactory
+                            .setUpMediaRouteButton(ctx,this)
+                    } as android.view.View
+                }.getOrElse {
+                    android.widget.ImageView(ctx).apply {
+                        setImageResource(android.R.drawable.ic_menu_share)
+                        setColorFilter(android.graphics.Color.WHITE)
+                        scaleType=android.widget.ImageView.ScaleType.CENTER_INSIDE
+                        contentDescription="Cast unavailable"
+                        alpha=.72f
+                    }
+                }
+                addView(
+                    child,
+                    android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                )
             }
         },
         modifier=Modifier.size(40.dp)
