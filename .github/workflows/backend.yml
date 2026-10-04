@@ -11,6 +11,10 @@ on:
       - "backend/**"
       - ".github/workflows/backend.yml"
 
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
