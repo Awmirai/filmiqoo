@@ -357,6 +357,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/playback/{versionID}/moments", s.playbackMoments)
 			r.Get("/playback/{versionID}/bookmarks", s.playbackSceneBookmarks)
 			r.Get("/playback/{versionID}/dialogue-search", s.dialogueSearch)
+			r.Get("/playback/{versionID}/subtitles/auto", s.autoSubtitle)
 			r.Post("/playback/{versionID}/moments", s.createPlaybackMoment)
 			r.Post("/playback/{versionID}/bookmarks", s.createSceneBookmark)
 			r.Post("/playback/bookmarks/{id}", s.updateSceneBookmark)
