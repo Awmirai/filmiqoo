@@ -132,9 +132,9 @@ fun PremiumDetailScreen(
 
             val tabs=remember(d.media.type) {
                 if(d.media.type==MediaType.TV) {
-                    listOf("معرفی","قسمت‌ها","بازیگران","Pulse","اطلاعات")
+                    listOf("نمای کلی","اپیزودها","بازیگران","کلاب","جزئیات")
                 } else {
-                    listOf("معرفی","بازیگران","Pulse","اطلاعات")
+                    listOf("نمای کلی","بازیگران","کلاب","جزئیات")
                 }
             }
             var tab by rememberSaveable(d.media.key) { mutableIntStateOf(0) }
@@ -676,7 +676,7 @@ private fun PremiumDetailHero(
     onTrailer: () -> Unit,
     onShare: () -> Unit
 ) {
-    Box(Modifier.fillMaxWidth().height(570.dp)) {
+    Box(Modifier.fillMaxWidth().height(600.dp)) {
         RemoteImage(
             repository.backdrop(detail.media.backdropPath ?: detail.media.posterPath),
             Modifier.fillMaxSize(),
@@ -768,8 +768,8 @@ private fun PremiumDetailHero(
             Text(
                 detail.media.title,
                 color=Color.White,
-                fontSize=32.sp,
-                lineHeight=38.sp,
+                fontSize=34.sp,
+                lineHeight=40.sp,
                 fontWeight=FontWeight.Black,
                 maxLines=2,
                 overflow=TextOverflow.Ellipsis,
@@ -828,13 +828,13 @@ private fun PremiumDetailHero(
                         disabledContainerColor=Color.White.copy(alpha=.16f),
                         disabledContentColor=Color.White.copy(alpha=.55f)
                     ),
-                    shape=RoundedCornerShape(14.dp),
-                    modifier=Modifier.height(50.dp)
+                    shape=RoundedCornerShape(18.dp),
+                    modifier=Modifier.height(54.dp)
                 ) {
                     Icon(Icons.Default.PlayArrow,null)
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        if(canPlay)"تماشا" else "فعلاً قابل پخش نیست",
+                        if(canPlay)"پخش" else "فعلاً در دسترس نیست",
                         fontWeight=FontWeight.Black
                     )
                 }
