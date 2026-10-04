@@ -117,6 +117,10 @@ fun FilmiqooPlayerScreen(
     var controlsEpoch by remember { mutableLongStateOf(0L) }
     var locked by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var toolsOpen by remember { mutableStateOf(false) }
+    var autoPersianSubtitleEnabled by remember { mutableStateOf(false) }
+    var autoSubtitleBusy by remember { mutableStateOf(false) }
+    var autoSubtitleStatus by remember { mutableStateOf<String?>(null) }
     var momentsOpen by remember { mutableStateOf(false) }
     var bookmarksOpen by remember { mutableStateOf(false) }
     var handoffOpen by remember { mutableStateOf(false) }
@@ -879,8 +883,22 @@ fun FilmiqooPlayerScreen(
         }
     }
 
-    LaunchedEffect(controlsVisible,isPlaying,controlsEpoch,locked) {
-        if(controlsVisible && isPlaying && !locked) {
+    LaunchedEffect(
+        controlsVisible,
+        isPlaying,
+        controlsEpoch,
+        locked,
+        toolsOpen,
+        settingsOpen,
+        momentsOpen,
+        bookmarksOpen,
+        handoffOpen,
+        dialogueSearchOpen,
+        queueOpen
+    ) {
+        val overlayOpen=toolsOpen || settingsOpen || momentsOpen || bookmarksOpen ||
+            handoffOpen || dialogueSearchOpen || queueOpen
+        if(controlsVisible && isPlaying && !locked && !overlayOpen) {
             delay(3_500)
             controlsVisible=false
         }
@@ -929,6 +947,7 @@ fun FilmiqooPlayerScreen(
             dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
             queueOpen -> queueOpen=false
+            toolsOpen -> toolsOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
                 locked=false
@@ -1244,6 +1263,10 @@ fun FilmiqooPlayerScreen(
                             .build()
                     )
                 },
+                onMore={
+                    toolsOpen=true
+                    controlsVisible=true
+                },
                 onSettings={
                     settingsOpen=true
                     settingsTab=PlayerSettingsTab.QUALITY
@@ -1487,6 +1510,128 @@ fun FilmiqooPlayerScreen(
             },
             onPlayItem={playQueueItem(it)},
             onDismiss={queueOpen=false}
+        )
+    }
+
+    if(toolsOpen) {
+        PlayerToolsSheet(
+            downloadQueued=downloadQueued,
+            hasQueue=currentTarget.previousMediaVersionId!=null || currentTarget.upNext.isNotEmpty(),
+            autoPersianSubtitleEnabled=autoPersianSubtitleEnabled,
+            autoSubtitleBusy=autoSubtitleBusy,
+            autoSubtitleStatus=autoSubtitleStatus,
+            onDismiss={toolsOpen=false},
+            onAutoPersianSubtitle={ enabled ->
+                if(!enabled) {
+                    autoPersianSubtitleEnabled=false
+                    autoSubtitleStatus=null
+                    if(externalSubtitleLabel?.startsWith("Auto فارسی")==true) {
+                        applyExternalSubtitle(null,null,null)
+                    }
+                    return@PlayerToolsSheet
+                }
+                if(!backend.session.isLoggedIn) {
+                    autoPersianSubtitleEnabled=false
+                    toolsOpen=false
+                    onRequireAuth()
+                    return@PlayerToolsSheet
+                }
+                autoPersianSubtitleEnabled=true
+                autoSubtitleBusy=true
+                autoSubtitleStatus="در حال پیدا کردن زیرنویس دقیق این ریلیز..."
+                scope.launch {
+                    runCatching {
+                        backend.autoSubtitle(currentVersionId,"fa")
+                    }.onSuccess { match ->
+                        applyExternalSubtitle(
+                            match.url,
+                            match.mimeType,
+                            "Auto فارسی • "+match.release
+                        )
+                        autoSubtitleStatus=
+                            if(match.exactRelease)
+                                "زیرنویس فارسی با مچ دقیق ریلیز فعال شد."
+                            else
+                                "بهترین زیرنویس فارسی موجود فعال شد."
+                    }.onFailure {
+                        autoPersianSubtitleEnabled=false
+                        autoSubtitleStatus=it.message ?: "زیرنویس فارسی مناسب پیدا نشد."
+                    }
+                    autoSubtitleBusy=false
+                    bumpControls()
+                }
+            },
+            onSubtitleSettings={
+                toolsOpen=false
+                settingsOpen=true
+                settingsTab=PlayerSettingsTab.SUBTITLE
+            },
+            onSettings={
+                toolsOpen=false
+                settingsOpen=true
+                settingsTab=PlayerSettingsTab.QUALITY
+            },
+            onDownload={
+                toolsOpen=false
+                scope.launch {
+                    if(currentTarget.localUri!=null) {
+                        downloadQueued=true
+                        return@launch
+                    }
+                    runCatching {
+                        backend.enqueueDownload(
+                            context,
+                            currentTarget.copy(mediaVersionId=currentVersionId)
+                        )
+                    }.onSuccess {
+                        downloadQueued=true
+                    }.onFailure {
+                        error=it.message
+                    }
+                }
+            },
+            onMoments={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) momentsOpen=true else onRequireAuth()
+            },
+            onBookmarks={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) bookmarksOpen=true else onRequireAuth()
+            },
+            onDialogueSearch={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) dialogueSearchOpen=true else onRequireAuth()
+            },
+            onQueue={
+                toolsOpen=false
+                queueOpen=true
+            },
+            onHandoff={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) handoffOpen=true else onRequireAuth()
+            },
+            onShare={
+                toolsOpen=false
+                sharePlayerMoment(
+                    context=context,
+                    target=currentTarget,
+                    mediaVersionId=currentVersionId,
+                    positionMs=activePositionMs()
+                )
+            },
+            onPip={
+                toolsOpen=false
+                activity?.enterPictureInPictureMode(
+                    PictureInPictureParams.Builder()
+                        .setAspectRatio(Rational(16,9))
+                        .build()
+                )
+            },
+            onLock={
+                toolsOpen=false
+                locked=true
+                controlsVisible=false
+            }
         )
     }
 
@@ -1824,11 +1969,10 @@ private fun PlayerTopControls(
     onHandoff:()->Unit,
     onShare:()->Unit,
     onPip:()->Unit,
+    onMore:()->Unit,
     onSettings:()->Unit,
     onLock:()->Unit
 ) {
-    var moreOpen by remember { mutableStateOf(false) }
-
     Row(
         Modifier.fillMaxWidth()
             .statusBarsPadding()
@@ -1865,85 +2009,284 @@ private fun PlayerTopControls(
             }
         }
 
-        PlayerCastRouteButton()
+        PlayerGlassIcon(
+            icon=Icons.Default.Share,
+            onClick=onShare,
+            contentDescription="اشتراک‌گذاری"
+        )
         Spacer(Modifier.width(6.dp))
+        PlayerGlassIcon(
+            icon=Icons.Default.MoreVert,
+            onClick=onMore,
+            contentDescription="ابزارهای پخش"
+        )
+    }
+}
 
-        Box {
-            PlayerGlassIcon(
-                icon=Icons.Default.MoreVert,
-                onClick={moreOpen=true},
-                contentDescription="ابزارهای پخش"
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerToolsSheet(
+    downloadQueued:Boolean,
+    hasQueue:Boolean,
+    autoPersianSubtitleEnabled:Boolean,
+    autoSubtitleBusy:Boolean,
+    autoSubtitleStatus:String?,
+    onDismiss:()->Unit,
+    onAutoPersianSubtitle:(Boolean)->Unit,
+    onSubtitleSettings:()->Unit,
+    onSettings:()->Unit,
+    onDownload:()->Unit,
+    onMoments:()->Unit,
+    onBookmarks:()->Unit,
+    onDialogueSearch:()->Unit,
+    onQueue:()->Unit,
+    onHandoff:()->Unit,
+    onShare:()->Unit,
+    onPip:()->Unit,
+    onLock:()->Unit
+) {
+    val sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
+    ModalBottomSheet(
+        onDismissRequest=onDismiss,
+        sheetState=sheetState,
+        containerColor=Color(0xFF0C0C0F),
+        contentColor=Color.White,
+        tonalElevation=0.dp,
+        dragHandle={
+            Box(
+                Modifier.padding(top=10.dp,bottom=8.dp)
+                    .size(width=54.dp,height=5.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha=.24f))
             )
-            DropdownMenu(
-                expanded=moreOpen,
-                onDismissRequest={moreOpen=false},
-                containerColor=Color(0xF5181818),
-                shape=RoundedCornerShape(18.dp)
+        }
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal=16.dp)
+                .padding(bottom=18.dp)
+        ) {
+            Surface(
+                color=Color(0xFF170E12),
+                shape=RoundedCornerShape(24.dp),
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    FqGold.copy(alpha=.34f)
+                ),
+                modifier=Modifier.fillMaxWidth()
             ) {
-                DropdownMenuItem(
-                    text={Text("تنظیمات پخش")},
-                    leadingIcon={Icon(Icons.Default.Tune,null,tint=FqGold)},
-                    onClick={moreOpen=false;onSettings()}
-                )
-                DropdownMenuItem(
-                    text={Text(if(downloadQueued)"دانلود در صف" else "دانلود آفلاین")},
-                    leadingIcon={
-                        Icon(
-                            if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
-                            null,
-                            tint=if(downloadQueued)FqGreen else FqGold
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment=Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            color=FqGold.copy(alpha=.13f),
+                            contentColor=FqGold,
+                            shape=RoundedCornerShape(12.dp),
+                            modifier=Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment=Alignment.Center) {
+                                Icon(Icons.Default.ClosedCaption,null)
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "زیرنویس فارسی خودکار",
+                                fontSize=16.sp,
+                                fontWeight=FontWeight.Black
+                            )
+                            Text(
+                                "بهترین زیرنویس هماهنگ با ریلیز، فصل و قسمت به‌صورت هوشمند پیدا می‌شود.",
+                                color=FqMuted,
+                                fontSize=10.sp,
+                                lineHeight=15.sp
+                            )
+                        }
+                        if(autoSubtitleBusy) {
+                            CircularProgressIndicator(
+                                modifier=Modifier.size(26.dp),
+                                strokeWidth=2.dp,
+                                color=FqGold
+                            )
+                        } else {
+                            Switch(
+                                checked=autoPersianSubtitleEnabled,
+                                onCheckedChange=onAutoPersianSubtitle,
+                                colors=SwitchDefaults.colors(
+                                    checkedThumbColor=Color.White,
+                                    checkedTrackColor=FqGold,
+                                    uncheckedThumbColor=Color.White.copy(alpha=.76f),
+                                    uncheckedTrackColor=Color.White.copy(alpha=.12f)
+                                )
+                            )
+                        }
+                    }
+
+                    autoSubtitleStatus?.let {
+                        Text(
+                            it,
+                            color=if(autoPersianSubtitleEnabled)FqGreen else Color(0xFFFF8794),
+                            fontSize=10.sp,
+                            modifier=Modifier.padding(top=10.dp)
                         )
-                    },
-                    onClick={moreOpen=false;onDownload()}
-                )
-                HorizontalDivider(color=Color.White.copy(alpha=.07f))
-                DropdownMenuItem(
-                    text={Text("لحظه‌ها و واکنش‌ها")},
-                    leadingIcon={Icon(Icons.Default.Whatshot,null)},
-                    onClick={moreOpen=false;onMoments()}
-                )
-                DropdownMenuItem(
-                    text={Text("نشانه‌گذاری صحنه")},
-                    leadingIcon={Icon(Icons.Default.BookmarkAdd,null)},
-                    onClick={moreOpen=false;onBookmarks()}
-                )
-                DropdownMenuItem(
-                    text={Text("پیدا کردن دیالوگ")},
-                    leadingIcon={Icon(Icons.Default.ManageSearch,null)},
-                    onClick={moreOpen=false;onDialogueSearch()}
-                )
-                if(target.previousMediaVersionId!=null || target.upNext.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text={Text("قسمت‌ها")},
-                        leadingIcon={Icon(Icons.Default.QueuePlayNext,null)},
-                        onClick={moreOpen=false;onQueue()}
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        color=Color.White.copy(alpha=.045f),
+                        shape=RoundedCornerShape(16.dp),
+                        modifier=Modifier.fillMaxWidth()
+                            .clickable(onClick=onSubtitleSettings)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal=12.dp,vertical=11.dp),
+                            verticalAlignment=Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Settings,null,tint=Color.White.copy(alpha=.84f))
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("تنظیمات زیرنویس",fontSize=12.sp,fontWeight=FontWeight.Bold)
+                                Text(
+                                    "زبان، اندازه، استایل، همگام‌سازی و زیرنویس دستی",
+                                    color=FqMuted,
+                                    fontSize=9.sp
+                                )
+                            }
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight,null,tint=FqMuted)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Surface(
+                color=Color(0xFF101013),
+                shape=RoundedCornerShape(24.dp),
+                border=androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha=.065f)
+                ),
+                modifier=Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    PlayerToolsRow(
+                        Icons.Default.Tune,
+                        "تنظیمات پخش",
+                        "کیفیت تصویر، صدا، سرعت پخش و تایمر خواب",
+                        onSettings,
+                        accent=true
+                    )
+                    PlayerToolsRow(
+                        if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
+                        if(downloadQueued)"دانلود در صف" else "دانلود آفلاین",
+                        "تماشای آفلاین با کیفیت دلخواه",
+                        onDownload,
+                        accent=true
+                    )
+                    PlayerToolsRow(
+                        Icons.Default.Whatshot,
+                        "لحظه‌ها و واکنش‌ها",
+                        "بخش‌های جذاب را ذخیره و با دیگران به اشتراک بگذار",
+                        onMoments
+                    )
+                    PlayerToolsRow(
+                        Icons.Default.BookmarkAdd,
+                        "نشانه‌گذاری صحنه",
+                        "این لحظه را برای تماشای دوباره ذخیره کن",
+                        onBookmarks
+                    )
+                    PlayerToolsRow(
+                        Icons.Default.ManageSearch,
+                        "پیدا کردن دیالوگ",
+                        "داخل دیالوگ‌های همین عنوان جستجو کن",
+                        onDialogueSearch
+                    )
+                    if(hasQueue) {
+                        PlayerToolsRow(
+                            Icons.Default.QueuePlayNext,
+                            "قسمت‌ها",
+                            "لیست قسمت‌ها و انتخاب سریع",
+                            onQueue
+                        )
+                    }
+                    HorizontalDivider(color=Color.White.copy(alpha=.06f))
+                    PlayerToolsRow(
+                        Icons.Default.DevicesOther,
+                        "ادامه روی دستگاه دیگر",
+                        "تماشا را روی تلویزیون یا دستگاه دیگر ادامه بده",
+                        onHandoff
+                    )
+                    PlayerToolsRow(
+                        Icons.Default.Share,
+                        "اشتراک‌گذاری",
+                        "عنوان یا همین لحظه از پخش را به اشتراک بگذار",
+                        onShare
+                    )
+                    PlayerToolsRow(
+                        Icons.Default.PictureInPictureAlt,
+                        "تصویر در تصویر",
+                        "تماشا را در پنجره کوچک ادامه بده",
+                        onPip
+                    )
+                    PlayerToolsRow(
+                        Icons.Default.LockOpen,
+                        "قفل کنترل‌ها",
+                        "از لمس تصادفی صفحه جلوگیری کن",
+                        onLock
                     )
                 }
-                HorizontalDivider(color=Color.White.copy(alpha=.07f))
-                DropdownMenuItem(
-                    text={Text("ادامه روی دستگاه دیگر")},
-                    leadingIcon={Icon(Icons.Default.DevicesOther,null)},
-                    onClick={moreOpen=false;onHandoff()}
-                )
-                DropdownMenuItem(
-                    text={Text("اشتراک‌گذاری")},
-                    leadingIcon={Icon(Icons.Default.Share,null)},
-                    onClick={moreOpen=false;onShare()}
-                )
-                DropdownMenuItem(
-                    text={Text("تصویر در تصویر")},
-                    leadingIcon={Icon(Icons.Default.PictureInPictureAlt,null)},
-                    onClick={moreOpen=false;onPip()}
-                )
-                DropdownMenuItem(
-                    text={Text("قفل کنترل‌ها")},
-                    leadingIcon={Icon(Icons.Default.LockOpen,null)},
-                    onClick={moreOpen=false;onLock()}
-                )
             }
         }
     }
 }
+
+@Composable
+private fun PlayerToolsRow(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    title:String,
+    subtitle:String,
+    onClick:()->Unit,
+    accent:Boolean=false
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(onClick=onClick)
+            .padding(horizontal=14.dp,vertical=12.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ) {
+        Surface(
+            color=if(accent)FqGold.copy(alpha=.11f) else Color.White.copy(alpha=.045f),
+            contentColor=if(accent)FqGold else Color.White.copy(alpha=.78f),
+            shape=RoundedCornerShape(12.dp),
+            modifier=Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment=Alignment.Center) {
+                Icon(icon,null,modifier=Modifier.size(21.dp))
+            }
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold)
+            Text(
+                subtitle,
+                color=FqMuted,
+                fontSize=9.sp,
+                lineHeight=13.sp,
+                maxLines=2,
+                overflow=TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            null,
+            tint=Color.White.copy(alpha=.28f)
+        )
+    }
+}
+
 
 @Composable
 private fun PlayerCastRouteButton() {
@@ -2017,39 +2360,65 @@ private fun PlayerCenterControls(
     Row(
         modifier,
         verticalAlignment=Alignment.CenterVertically,
-        horizontalArrangement=Arrangement.spacedBy(30.dp)
+        horizontalArrangement=Arrangement.spacedBy(24.dp)
     ) {
-        Column(
-            horizontalAlignment=Alignment.CenterHorizontally,
-            modifier=Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp)
-                .clickable { onBack10() }
-                .padding(6.dp)
+        PlayerSeekGlassButton(
+            icon=Icons.Default.Replay10,
+            onClick=onBack10,
+            contentDescription="۱۰ ثانیه عقب"
+        )
+
+        Surface(
+            color=Color(0xD91B1B1F),
+            contentColor=Color.White,
+            shape=CircleShape,
+            border=androidx.compose.foundation.BorderStroke(
+                1.25.dp,
+                FqGold.copy(alpha=.82f)
+            ),
+            shadowElevation=10.dp,
+            modifier=Modifier.size(64.dp)
+                .clickable(onClick=onPlayPause)
         ) {
-            Icon(Icons.Default.Replay10,null,tint=Color.White,modifier=Modifier.size(34.dp))
-            Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
+            Box(contentAlignment=Alignment.Center) {
+                Icon(
+                    if(isPlaying)Icons.Default.Pause else Icons.Default.PlayArrow,
+                    null,
+                    modifier=Modifier.size(34.dp)
+                )
+            }
         }
 
-        Box(
-            Modifier.size(68.dp).clip(CircleShape).background(Color.White)
-                .clickable { onPlayPause() },
-            contentAlignment=Alignment.Center
-        ) {
+        PlayerSeekGlassButton(
+            icon=Icons.Default.Forward10,
+            onClick=onForward10,
+            contentDescription="۱۰ ثانیه جلو"
+        )
+    }
+}
+
+@Composable
+private fun PlayerSeekGlassButton(
+    icon:androidx.compose.ui.graphics.vector.ImageVector,
+    onClick:()->Unit,
+    contentDescription:String
+) {
+    Surface(
+        color=Color.Black.copy(alpha=.52f),
+        contentColor=Color.White,
+        shape=CircleShape,
+        border=androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha=.15f)
+        ),
+        modifier=Modifier.size(54.dp).clickable(onClick=onClick)
+    ) {
+        Box(contentAlignment=Alignment.Center) {
             Icon(
-                if(isPlaying)Icons.Default.Pause else Icons.Default.PlayArrow,
-                null,
-                tint=Color.Black,
-                modifier=Modifier.size(38.dp)
+                icon,
+                contentDescription=contentDescription,
+                modifier=Modifier.size(30.dp)
             )
-        }
-
-        Column(
-            horizontalAlignment=Alignment.CenterHorizontally,
-            modifier=Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp)
-                .clickable { onForward10() }
-                .padding(6.dp)
-        ) {
-            Icon(Icons.Default.Forward10,null,tint=Color.White,modifier=Modifier.size(34.dp))
-            Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
         }
     }
 }
