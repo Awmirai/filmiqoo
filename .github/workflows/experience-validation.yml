@@ -1,0 +1,32 @@
+name: Experience V3 Validation
+
+on:
+  push:
+    branches: [experience-v3-iran-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: experience-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export tracked source for audit
+        run: |
+          git archive --format=zip HEAD -o source-audit.zip
+          git rev-parse HEAD > audit-source-sha.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experience-source-audit
+          path: |
+            source-audit.zip
+            audit-source-sha.txt
+          retention-days: 3
+          if-no-files-found: error
