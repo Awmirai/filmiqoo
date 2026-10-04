@@ -499,7 +499,9 @@ private fun CastPrimaryCard(
 }
 
 @Composable
-private fun FilmiqooCastRouteButton() {
+internal fun FilmiqooCastRouteButton(
+    modifier:Modifier=Modifier
+) {
     AndroidView(
         factory={ctx->
             FrameLayout(ctx).apply {
@@ -524,7 +526,7 @@ private fun FilmiqooCastRouteButton() {
                 )
             }
         },
-        modifier=Modifier.size(48.dp)
+        modifier=modifier.size(48.dp)
     )
 }
 
