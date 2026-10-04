@@ -315,13 +315,11 @@ fun FilmiqooPlayerScreen(
             val startPosition=player.currentPosition.coerceAtLeast(0L)
             val autoplay=player.isPlaying || player.playWhenReady
             runCatching {
-                backend.playbackUrl(
-                    mediaVersionId=currentVersionId,
-                    remote=true
-                )
-            }.onSuccess { remoteUrl ->
+                backend.remotePlaybackSource(currentVersionId)
+            }.onSuccess { remoteSource ->
                 val loaded=castController.load(
-                    url=remoteUrl,
+                    url=remoteSource.url,
+                    contentType=remoteSource.contentType,
                     mediaVersionId=currentVersionId,
                     title=currentTarget.title,
                     subtitle=currentTarget.subtitle,
