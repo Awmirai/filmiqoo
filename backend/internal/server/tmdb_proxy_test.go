@@ -15,6 +15,8 @@ func TestAllowedTMDBProxyPath(t *testing.T) {
 		"tv/1399",
 		"person/287",
 		"collection/10",
+		"movie/550/external_ids",
+		"tv/1399/external_ids",
 	}
 	for _, path := range allowed {
 		if !allowedTMDBProxyPath(path) {
@@ -29,6 +31,8 @@ func TestAllowedTMDBProxyPath(t *testing.T) {
 		"movie/0",
 		"movie/abc",
 		"movie/550/videos",
+		"person/287/external_ids",
+		"collection/10/external_ids",
 		"authentication/token/new",
 		"account/1",
 		"../../configuration",

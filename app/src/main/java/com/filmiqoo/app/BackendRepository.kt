@@ -772,11 +772,18 @@ class BackendRepository(context: Context) {
             throw IllegalStateException("فصل و قسمت این ویدیو برای زیرنویس خودکار مشخص نیست.")
         }
 
-        val externalPath=
-            if(media.kind=="movie") "movie/$tmdbId/external_ids"
-            else "tv/$tmdbId/external_ids"
-        val external=tmdbMetadata(externalPath)
-        val imdbId=external.optString("imdb_id").trim()
+        val metadataPath=
+            if(media.kind=="movie") "movie/$tmdbId"
+            else "tv/$tmdbId"
+        val metadata=tmdbMetadata(
+            metadataPath,
+            mapOf("append_to_response" to "external_ids")
+        )
+        val imdbId=metadata
+            .optJSONObject("external_ids")
+            ?.optString("imdb_id")
+            ?.trim()
+            .orEmpty()
         if(!imdbId.startsWith("tt")) {
             throw IllegalStateException("شناسه IMDb این عنوان برای زیرنویس پیدا نشد.")
         }
@@ -1149,6 +1156,8 @@ class BackendRepository(context: Context) {
                 "معرفی پروفایل حداکثر ۳۰۰ کاراکتر است."
             "profile images must come from your Filmiqoo uploads" ->
                 "عکس پروفایل و کاور باید از فایل‌های آپلودشده خودت در Filmiqoo باشند."
+            "unsupported TMDB metadata path" ->
+                "سرویس اطلاعات عنوان برای زیرنویس آماده نیست. دوباره امتحان کن."
             else -> message
         }
     }
