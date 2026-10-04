@@ -1615,11 +1615,17 @@ fun FilmiqooPlayerScreen(
             },
             onPip={
                 toolsOpen=false
-                activity?.enterPictureInPictureMode(
-                    PictureInPictureParams.Builder()
-                        .setAspectRatio(Rational(16,9))
-                        .build()
-                )
+                val entered=runCatching {
+                    activity?.enterPictureInPictureMode(
+                        PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(16,9))
+                            .build()
+                    ) ?: false
+                }.getOrDefault(false)
+                if(!entered) {
+                    playerSettingsMessage="تصویر در تصویر روی این دستگاه در دسترس نیست."
+                    bumpControls()
+                }
             },
             onLock={
                 toolsOpen=false
