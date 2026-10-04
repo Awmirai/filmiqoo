@@ -1517,19 +1517,27 @@ fun FilmiqooPlayerScreen(
                         autoPersianSubtitleEnabled=true
                         autoSubtitleBusy=false
                         autoSubtitleStatus="زیرنویس فارسی داخل همین فایل فعال شد."
-                    } else if(!backend.session.isLoggedIn) {
-                        autoPersianSubtitleEnabled=false
-                        autoSubtitleBusy=false
-                        autoSubtitleStatus="برای جستجوی اینترنتی زیرنویس وارد حساب شو."
-                        toolsOpen=false
-                        onRequireAuth()
                     } else {
                         autoPersianSubtitleEnabled=true
                         autoSubtitleBusy=true
                         autoSubtitleStatus="در حال بررسی ریلیز و پیدا کردن زیرنویس فارسی..."
                         scope.launch {
                             runCatching {
-                                backend.autoSubtitle(currentVersionId,"fa")
+                                if(backend.session.isLoggedIn) {
+                                    runCatching {
+                                        backend.autoSubtitle(currentVersionId,"fa")
+                                    }.getOrElse {
+                                        backend.autoPersianSubtitleFallback(
+                                            currentTarget,
+                                            currentVersionId
+                                        )
+                                    }
+                                } else {
+                                    backend.autoPersianSubtitleFallback(
+                                        currentTarget,
+                                        currentVersionId
+                                    )
+                                }
                             }.onSuccess { match ->
                                 applyExternalSubtitle(
                                     match.url,

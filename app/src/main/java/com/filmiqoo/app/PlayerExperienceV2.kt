@@ -67,14 +67,17 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -325,17 +328,23 @@ internal fun PlayerBottomControlsV2(
                 .padding(horizontal=2.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
-            Text(
-                playerUiTime(positionMs),
-                color=Color.White,
-                fontSize=11.sp,
-                fontWeight=FontWeight.SemiBold
-            )
-            Text(
-                "  /  "+playerUiTime(durationMs),
-                color=PlayerMuted,
-                fontSize=10.sp
-            )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides LayoutDirection.Ltr
+            ) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Text(
+                        playerUiTime(positionMs),
+                        color=Color.White,
+                        fontSize=11.sp,
+                        fontWeight=FontWeight.SemiBold
+                    )
+                    Text(
+                        "  /  "+playerUiTime(durationMs),
+                        color=PlayerMuted,
+                        fontSize=10.sp
+                    )
+                }
+            }
 
             Spacer(Modifier.weight(1f))
 

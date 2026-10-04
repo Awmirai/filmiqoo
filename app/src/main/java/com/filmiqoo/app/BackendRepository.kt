@@ -18,6 +18,7 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import okio.BufferedSink
 
@@ -732,6 +733,132 @@ class BackendRepository(context: Context) {
             release=o.optString("release").ifBlank { "Auto match" },
             provider=o.optString("provider").ifBlank { "opensubtitles" },
             exactRelease=o.optBoolean("exactRelease",false)
+        )
+    }
+
+    suspend fun autoPersianSubtitleFallback(
+        target:PlaybackTarget,
+        mediaVersionId:String
+    ):AutoSubtitleMatch = withContext(Dispatchers.IO) {
+        val mediaTitleId=target.mediaTitleId
+            ?: throw IllegalStateException("اطلاعات عنوان برای جستجوی زیرنویس کامل نیست.")
+
+        val media=detail(mediaTitleId)
+        val tmdbId=media.tmdbId
+            ?: throw IllegalStateException("شناسه عنوان برای جستجوی زیرنویس پیدا نشد.")
+
+        var seasonNumber:Int?=null
+        var episodeNumber:Int?=null
+
+        media.seasons.firstNotNullOfOrNull { season ->
+            season.episodes.firstOrNull { it.mediaVersionId==mediaVersionId }
+                ?.let { episode -> season.number to episode.number }
+        }?.let { pair ->
+            seasonNumber=pair.first
+            episodeNumber=pair.second
+        }
+
+        if(media.kind!="movie" && (seasonNumber==null || episodeNumber==null)) {
+            val text=(target.subtitle+" "+target.title)
+            val se=Regex("(?i)S(\\d{1,2})E(\\d{1,3})").find(text)
+                ?: Regex("(?i)(\\d{1,2})x(\\d{1,3})").find(text)
+            if(se!=null) {
+                seasonNumber=se.groupValues.getOrNull(1)?.toIntOrNull()
+                episodeNumber=se.groupValues.getOrNull(2)?.toIntOrNull()
+            }
+        }
+
+        if(media.kind!="movie" && (seasonNumber==null || episodeNumber==null)) {
+            throw IllegalStateException("فصل و قسمت این ویدیو برای زیرنویس خودکار مشخص نیست.")
+        }
+
+        val externalPath=
+            if(media.kind=="movie") "movie/$tmdbId/external_ids"
+            else "tv/$tmdbId/external_ids"
+        val external=tmdbMetadata(externalPath)
+        val imdbId=external.optString("imdb_id").trim()
+        if(!imdbId.startsWith("tt")) {
+            throw IllegalStateException("شناسه IMDb این عنوان برای زیرنویس پیدا نشد.")
+        }
+
+        val base="https://stremio.alirostami.com/subtitles"
+        val endpoint=
+            if(media.kind=="movie") {
+                "$base/movie/$imdbId.json"
+            } else {
+                "$base/series/$imdbId:"+seasonNumber+":"+episodeNumber+".json"
+            }
+
+        val req=Request.Builder()
+            .url(endpoint)
+            .header("Accept","application/json")
+            .header("User-Agent","Filmiqoo/1.0 subtitle-client")
+            .get()
+            .build()
+
+        val raw=client.newCall(req).execute().use { res ->
+            val body=res.body?.string().orEmpty()
+            if(!res.isSuccessful) {
+                throw IllegalStateException("سرویس زیرنویس فارسی فعلاً در دسترس نیست.")
+            }
+            body
+        }
+
+        val arr=runCatching { JSONObject(raw).optJSONArray("subtitles") }
+            .getOrNull()
+            ?: throw IllegalStateException("برای این عنوان زیرنویس فارسی پیدا نشد.")
+
+        val hint=(target.subtitle+" "+target.title).lowercase(Locale.ROOT)
+        val quality=Regex("(?i)(2160p|1080p|720p|480p)").find(hint)
+            ?.groupValues?.getOrNull(1)?.lowercase(Locale.ROOT)
+        val episodeTag=
+            if(seasonNumber!=null && episodeNumber!=null)
+                "s%02de%02d".format(Locale.US,seasonNumber,episodeNumber).lowercase(Locale.ROOT)
+            else null
+
+        var bestUrl:String?=null
+        var bestTitle:String?=null
+        var bestScore=Int.MIN_VALUE
+
+        for(i in 0 until arr.length()) {
+            val item=arr.optJSONObject(i) ?: continue
+            val lang=item.optString("lang").lowercase(Locale.ROOT)
+            if(lang.isNotBlank() && lang !in setOf("fa","fas","per","persian","farsi")) continue
+
+            val rawUrl=item.optString("url").trim()
+            if(rawUrl.isBlank()) continue
+            val safeUrl=when {
+                rawUrl.startsWith("https://") -> rawUrl
+                rawUrl.startsWith("http://stremio.alirostami.com/") ->
+                    "https://"+rawUrl.removePrefix("http://")
+                else -> continue
+            }
+
+            val title=item.optString("title").trim()
+            val normalized=title.lowercase(Locale.ROOT)
+            var score=1000-i
+            if(!quality.isNullOrBlank() && normalized.contains(quality)) score+=120
+            if(!episodeTag.isNullOrBlank()) {
+                val compact=normalized.replace(Regex("[^a-z0-9]"),"")
+                if(compact.contains(episodeTag)) score+=160
+            }
+            if(score>bestScore) {
+                bestScore=score
+                bestUrl=safeUrl
+                bestTitle=title
+            }
+        }
+
+        val url=bestUrl
+            ?: throw IllegalStateException("برای این عنوان زیرنویس فارسی مناسبی پیدا نشد.")
+
+        AutoSubtitleMatch(
+            url=url,
+            mimeType="application/x-subrip",
+            language="fa",
+            release=bestTitle?.ifBlank { "Persian subtitle" } ?: "Persian subtitle",
+            provider="SubSource",
+            exactRelease=false
         )
     }
 
