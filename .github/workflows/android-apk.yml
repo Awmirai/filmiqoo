@@ -18,15 +18,14 @@ jobs:
           java-version: '17'
           cache: gradle
       - uses: gradle/actions/setup-gradle@v4
-      - uses: android-actions/setup-android@v3
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build connected debug APK
+      - name: Verify Android build
         env:
           FILMIQOO_DEBUG_API_BASE_URL: https://filmiqo.com
-        run: gradle :app:assembleDebug
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
