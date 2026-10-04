@@ -30,7 +30,7 @@ func (s *Server) playbackMoments(w http.ResponseWriter,r *http.Request) {
           FROM playback_moments pm
           JOIN profiles p ON p.user_id=pm.user_id
          WHERE pm.media_version_id=$1
-           AND pm.position_ms BETWEEN GREATEST($3-$4,0) AND $3+$4
+           AND pm.position_ms BETWEEN GREATEST($3::bigint-$4::bigint,0) AND $3::bigint+$4::bigint
            AND NOT EXISTS (
                SELECT 1 FROM blocks b
                 WHERE (b.blocker_user_id=$2 AND b.blocked_user_id=pm.user_id)

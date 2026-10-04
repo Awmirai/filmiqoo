@@ -39,6 +39,7 @@ jobs:
         working-directory: deploy/production
         env:
           FILMIQOO_API_ENV_FILE: .env.production.example
+          FILMIQOO_STREAM_ENV_FILE: fsb.env.example
         run: |
           docker compose             --env-file .env.production.example             -f docker-compose.yml             config >/tmp/filmiqoo-compose.yml
           test -s /tmp/filmiqoo-compose.yml
@@ -48,4 +49,7 @@ jobs:
 
       - name: Build pinned MinIO community container
         working-directory: deploy/production
+        env:
+          FILMIQOO_API_ENV_FILE: .env.production.example
+          FILMIQOO_STREAM_ENV_FILE: fsb.env.example
         run: docker compose --env-file .env.production.example -f docker-compose.yml build minio

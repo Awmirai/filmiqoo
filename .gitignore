@@ -22,3 +22,4 @@ captures/
 *.iml
 .DS_Store
 Thumbs.db
+fsb.env

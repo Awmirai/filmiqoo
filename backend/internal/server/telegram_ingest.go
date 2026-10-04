@@ -11,21 +11,21 @@ import (
 )
 
 type telegramIngestRequest struct {
-	ChatID int64 `json:"chatId"`
-	MessageID int64 `json:"messageId"`
-	FileID string `json:"fileId"`
-	FileUniqueID string `json:"fileUniqueId"`
-	FileNumericID int64 `json:"fileNumericId"`
-	FileName string `json:"fileName"`
-	FileSizeBytes int64 `json:"fileSizeBytes"`
-	MimeType string `json:"mimeType"`
-	Caption string `json:"caption"`
-	StreamHash string `json:"streamHash"`
+	ChatID        int64  `json:"chatId"`
+	MessageID     int64  `json:"messageId"`
+	FileID        string `json:"fileId"`
+	FileUniqueID  string `json:"fileUniqueId"`
+	FileNumericID int64  `json:"fileNumericId"`
+	FileName      string `json:"fileName"`
+	FileSizeBytes int64  `json:"fileSizeBytes"`
+	MimeType      string `json:"mimeType"`
+	Caption       string `json:"caption"`
+	StreamHash    string `json:"streamHash"`
 }
 
 func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 	if !s.validIngestSecret(r.Header.Get("X-Filmiqoo-Ingest-Secret")) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid ingest secret"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid ingest secret"})
 		return
 	}
 
@@ -35,21 +35,20 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.ChatID == 0 || body.MessageID == 0 || strings.TrimSpace(body.FileName) == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error":"chatId, messageId and fileName are required"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "chatId, messageId and fileName are required"})
 		return
 	}
 
 	body.FileUniqueID = strings.TrimSpace(body.FileUniqueID)
-	body.StreamHash = strings.TrimSpace(body.StreamHash)
-	if body.StreamHash == "" && body.FileUniqueID != "" {
-		body.StreamHash = computeTGFSBHash(body.FileUniqueID, s.cfg.TelegramStreamHashLength)
-	}
+	// StreamHash from Telegram Bot API metadata is not authoritative for TG-FileStreamBot.
+	// The resolver obtains the real MTProto file ID and hash directly from FSB.
+	body.StreamHash = ""
 
 	parsed := ingest.ParseFileName(body.FileName)
-	fingerprint:=telegramSourceFingerprint(body)
+	fingerprint := telegramSourceFingerprint(body)
 
-	var id,status string
-	err := s.db.QueryRow(r.Context(),`
+	var id, status string
+	err := s.db.QueryRow(r.Context(), `
 		INSERT INTO telegram_ingest_items (
 			telegram_chat_id,telegram_message_id,telegram_file_id,telegram_file_numeric_id,file_name,file_size_bytes,
 			mime_type,caption,stream_hash,parsed_kind,parsed_title,parsed_season,parsed_episode,
@@ -106,16 +105,16 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 			updated_at=now()
 		RETURNING id::text,status
 	`,
-		body.ChatID,body.MessageID,body.FileID,body.FileNumericID,body.FileName,body.FileSizeBytes,
-		body.MimeType,body.Caption,body.StreamHash,parsed.Kind,parsed.Title,parsed.Season,
-		parsed.Episode,parsed.Year,parsed.Quality,parsed.Source,parsed.Codec,fingerprint,
-	).Scan(&id,&status)
+		body.ChatID, body.MessageID, body.FileID, body.FileNumericID, body.FileName, body.FileSizeBytes,
+		body.MimeType, body.Caption, body.StreamHash, parsed.Kind, parsed.Title, parsed.Season,
+		parsed.Episode, parsed.Year, parsed.Quality, parsed.Source, parsed.Codec, fingerprint,
+	).Scan(&id, &status)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	if status!="ready" && s.tmdb != nil && s.tmdb.Enabled() {
+	if status != "ready" && s.tmdb != nil && s.tmdb.Enabled() {
 		if err := s.attemptTelegramResolve(r.Context(), id, false); err == nil {
 			status = "ready"
 		} else {
@@ -128,15 +127,15 @@ func (s *Server) telegramIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
-		"ingestId":id,
-		"status":status,
-		"parsed":parsed,
+		"ingestId": id,
+		"status":   status,
+		"parsed":   parsed,
 	})
 }
 
 func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 	if !s.validIngestSecret(r.Header.Get("X-Filmiqoo-Ingest-Secret")) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid ingest secret"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid ingest secret"})
 		return
 	}
 
@@ -155,54 +154,53 @@ func (s *Server) pendingTelegramIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	items := make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,fileName,kind,title,quality,source,codec,streamHash,status,errorText string
-		var chatID,messageID int64
-		var season,episode,year *int
-		var receivedAt,nextAttemptAt any
-		var lastAttemptAt,deadLetteredAt any
+		var id, fileName, kind, title, quality, source, codec, streamHash, status, errorText string
+		var chatID, messageID int64
+		var season, episode, year *int
+		var receivedAt, nextAttemptAt any
+		var lastAttemptAt, deadLetteredAt any
 		var attemptCount int
-		if err := rows.Scan(&id,&chatID,&messageID,&fileName,&kind,&title,&season,&episode,&year,
-			&quality,&source,&codec,&streamHash,&status,&errorText,&receivedAt,&attemptCount,
-			&nextAttemptAt,&lastAttemptAt,&deadLetteredAt); err != nil {
-			writeError(w,http.StatusInternalServerError,err)
+		if err := rows.Scan(&id, &chatID, &messageID, &fileName, &kind, &title, &season, &episode, &year,
+			&quality, &source, &codec, &streamHash, &status, &errorText, &receivedAt, &attemptCount,
+			&nextAttemptAt, &lastAttemptAt, &deadLetteredAt); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
-		items=append(items,map[string]any{
-			"id":id,"chatId":chatID,"messageId":messageID,"fileName":fileName,
-			"kind":kind,"title":title,"season":season,"episode":episode,"year":year,
-			"quality":quality,"source":source,"codec":codec,"hasStreamHash":streamHash!="",
-			"status":status,"error":errorText,"receivedAt":receivedAt,
-			"attemptCount":attemptCount,"nextAttemptAt":nextAttemptAt,
-			"lastAttemptAt":lastAttemptAt,"deadLetteredAt":deadLetteredAt,
+		items = append(items, map[string]any{
+			"id": id, "chatId": chatID, "messageId": messageID, "fileName": fileName,
+			"kind": kind, "title": title, "season": season, "episode": episode, "year": year,
+			"quality": quality, "source": source, "codec": codec, "hasStreamHash": streamHash != "",
+			"status": status, "error": errorText, "receivedAt": receivedAt,
+			"attemptCount": attemptCount, "nextAttemptAt": nextAttemptAt,
+			"lastAttemptAt": lastAttemptAt, "deadLetteredAt": deadLetteredAt,
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (s *Server) validIngestSecret(value string) bool {
-	return secureSecretEqual(s.cfg.TelegramIngestSecret,value)
+	return secureSecretEqual(s.cfg.TelegramIngestSecret, value)
 }
-
 
 func (s *Server) resolveTelegramIngestNow(w http.ResponseWriter, r *http.Request) {
 	if !s.validIngestSecret(r.Header.Get("X-Filmiqoo-Ingest-Secret")) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error":"invalid ingest secret"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid ingest secret"})
 		return
 	}
-	id := strings.TrimSpace(chi.URLParam(r,"id"))
-	if id=="" {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"ingest id is required"})
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "ingest id is required"})
 		return
 	}
-	if s.tmdb==nil || !s.tmdb.Enabled() {
-		writeJSON(w,http.StatusServiceUnavailable,map[string]string{"error":"TMDB token is not configured on backend"})
+	if s.tmdb == nil || !s.tmdb.Enabled() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "TMDB token is not configured on backend"})
 		return
 	}
-	if err:=s.attemptTelegramResolve(r.Context(),id,true); err!=nil {
-		writeJSON(w,http.StatusUnprocessableEntity,map[string]string{"error":err.Error()})
+	if err := s.attemptTelegramResolve(r.Context(), id, true); err != nil {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"id":id,"status":"ready"})
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "status": "ready"})
 }

@@ -45,6 +45,14 @@ services:
     volumes:
       - minio_data:/data
 
+  telegram-stream:
+    image: filmiqoo-fsb-internal:6273377
+    build:
+      context: ../tgfsb
+    restart: unless-stopped
+    env_file:
+      - ${FILMIQOO_STREAM_ENV_FILE:-./fsb.env}
+
   api:
     image: ${FILMIQOO_API_IMAGE:?FILMIQOO_API_IMAGE must be set}
     restart: unless-stopped
@@ -72,6 +80,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_started
+      telegram-stream:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]

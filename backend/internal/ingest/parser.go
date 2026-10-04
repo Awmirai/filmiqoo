@@ -10,32 +10,35 @@ import (
 
 type ParsedMedia struct {
 	RawFileName string `json:"rawFileName"`
-	Title string `json:"title"`
-	Kind string `json:"kind"`
-	Season *int `json:"season,omitempty"`
-	Episode *int `json:"episode,omitempty"`
-	Year *int `json:"year,omitempty"`
-	Quality string `json:"quality,omitempty"`
-	Source string `json:"source,omitempty"`
-	Codec string `json:"codec,omitempty"`
+	Title       string `json:"title"`
+	Kind        string `json:"kind"`
+	Season      *int   `json:"season,omitempty"`
+	Episode     *int   `json:"episode,omitempty"`
+	Year        *int   `json:"year,omitempty"`
+	Quality     string `json:"quality,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Codec       string `json:"codec,omitempty"`
 }
 
 var (
-	seasonEpisode = regexp.MustCompile(`(?i)(^|[ ._\-])S(\d{1,2})[ ._\-]*E(\d{1,3})($|[ ._\-])`)
+	seasonEpisode     = regexp.MustCompile(`(?i)(^|[ ._\-])S(\d{1,2})[ ._\-]*E(\d{1,3})($|[ ._\-])`)
 	seasonEpisodeLong = regexp.MustCompile(`(?i)(season|فصل)[ ._\-]*(\d{1,2}).*(episode|ep|قسمت)[ ._\-]*(\d{1,3})`)
-	yearPattern = regexp.MustCompile(`(^|[ ._\-(])(19\d{2}|20\d{2})($|[ ._\-)])`)
-	qualityPattern = regexp.MustCompile(`(?i)(2160p|4k|1440p|1080p|720p|576p|540p|480p|360p)`)
+	yearPattern       = regexp.MustCompile(`(^|[ ._\-(])(19\d{2}|20\d{2})($|[ ._\-)])`)
+	qualityPattern    = regexp.MustCompile(`(?i)(2160p|4k|1440p|1080p|720p|576p|540p|480p|360p)`)
 )
 
-var sourcePatterns = []struct{name, pattern string}{
-	{"WEB-DL", "web-dl"},
-	{"WEBRip", "webrip"},
-	{"BluRay", "bluray"},
-	{"HDTV", "hdtv"},
-	{"DVDRip", "dvdrip"},
+var sourcePatterns = []struct {
+	name     string
+	patterns []string
+}{
+	{"WEB-DL", []string{"web-dl", "web dl", "webdl"}},
+	{"WEBRip", []string{"webrip", "web rip"}},
+	{"BluRay", []string{"bluray", "blu-ray", "blu ray"}},
+	{"HDTV", []string{"hdtv"}},
+	{"DVDRip", []string{"dvdrip", "dvd rip"}},
 }
 
-var codecPatterns = []struct{name, pattern string}{
+var codecPatterns = []struct{ name, pattern string }{
 	{"HEVC", "hevc"},
 	{"H.265", "h265"},
 	{"x265", "x265"},
@@ -47,7 +50,8 @@ var codecPatterns = []struct{name, pattern string}{
 func ParseFileName(name string) ParsedMedia {
 	base := strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
 	normalized := normalizeSeparators(base)
-	out := ParsedMedia{RawFileName:name, Kind:"movie"}
+	titlePrefix := releaseTitlePrefix(normalized)
+	out := ParsedMedia{RawFileName: name, Kind: "movie"}
 
 	if m := seasonEpisode.FindStringSubmatch(normalized); len(m) == 5 {
 		s, _ := strconv.Atoi(m[2])
@@ -73,16 +77,25 @@ func ParseFileName(name string) ParsedMedia {
 
 	if m := qualityPattern.FindStringSubmatch(normalized); len(m) >= 2 {
 		q := strings.ToLower(m[1])
-		if q == "4k" { q = "2160p" }
+		if q == "4k" {
+			q = "2160p"
+		}
 		out.Quality = q
 		normalized = qualityPattern.ReplaceAllString(normalized, " ")
 	}
 
 	lower := strings.ToLower(normalized)
 	for _, p := range sourcePatterns {
-		if strings.Contains(lower, p.pattern) {
-			out.Source = p.name
-			normalized = replaceInsensitive(normalized, p.pattern, " ")
+		found := false
+		for _, pattern := range p.patterns {
+			if strings.Contains(lower, pattern) {
+				out.Source = p.name
+				normalized = replaceInsensitive(normalized, pattern, " ")
+				found = true
+				break
+			}
+		}
+		if found {
 			break
 		}
 	}
@@ -99,15 +112,43 @@ func ParseFileName(name string) ParsedMedia {
 		"hdr10+", "hdr10", "hdr", "dolby vision", "dovi", "dv",
 		"aac", "ac3", "eac3", "ddp5.1", "ddp", "dts", "atmos",
 		"10bit", "8bit", "remux", "proper", "repack", "extended",
-		"multi", "dual audio", "dubbed", "subbed", "farsi", "persian",
+		"multi", "dual audio", "dubbed", "subbed", "farsi", "persian", "rmt", "alphadl",
 	}
 	for _, token := range noise {
 		normalized = replaceInsensitive(normalized, token, " ")
 	}
 
-	out.Title = cleanTitle(normalized)
-	if out.Title == "" { out.Title = cleanTitle(base) }
+	out.Title = cleanTitle(titlePrefix)
+	if out.Title == "" {
+		out.Title = cleanTitle(base)
+	}
 	return out
+}
+
+// Release groups and channel branding after a release marker are not part of the
+// film name (e.g. Union.County.2026.1080p.WEBRip.YTS.AlphaDL.mp4).
+// Work on the original title so codec/noise substrings cannot damage real words.
+func releaseTitlePrefix(name string) string {
+	end := len(name)
+	for _, pattern := range []*regexp.Regexp{seasonEpisode, seasonEpisodeLong, yearPattern, qualityPattern} {
+		if loc := pattern.FindStringIndex(name); loc != nil && strings.TrimSpace(name[:loc[0]]) != "" && loc[0] < end {
+			end = loc[0]
+		}
+	}
+	var markers []string
+	for _, source := range sourcePatterns {
+		markers = append(markers, source.patterns...)
+	}
+	for _, codec := range codecPatterns {
+		markers = append(markers, codec.pattern)
+	}
+	for _, marker := range markers {
+		pattern := regexp.MustCompile(`(?i)(^|[ _\-])` + regexp.QuoteMeta(marker) + `($|[ _\-])`)
+		if loc := pattern.FindStringIndex(name); loc != nil && strings.TrimSpace(name[:loc[0]]) != "" && loc[0] < end {
+			end = loc[0]
+		}
+	}
+	return name[:end]
 }
 
 func normalizeSeparators(s string) string {
@@ -119,16 +160,22 @@ func cleanTitle(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.Trim(s, "-_. ")
 	s = strings.Join(strings.Fields(s), " ")
-	if s == "" { return "" }
+	if s == "" {
+		return ""
+	}
 	parts := strings.Fields(s)
 	for i, p := range parts {
-		if isMostlyUpper(p) || isMostlyLower(p) { parts[i] = smartTitleWord(p) }
+		if isMostlyUpper(p) || isMostlyLower(p) {
+			parts[i] = smartTitleWord(p)
+		}
 	}
 	return strings.Join(parts, " ")
 }
 
 func smartTitleWord(s string) string {
-	if len([]rune(s)) <= 3 { return s }
+	if len([]rune(s)) <= 3 {
+		return s
+	}
 	rs := []rune(strings.ToLower(s))
 	rs[0] = unicode.ToUpper(rs[0])
 	return string(rs)
@@ -137,7 +184,12 @@ func smartTitleWord(s string) string {
 func isMostlyUpper(s string) bool {
 	var letters, upper int
 	for _, r := range s {
-		if unicode.IsLetter(r) { letters++; if unicode.IsUpper(r) { upper++ } }
+		if unicode.IsLetter(r) {
+			letters++
+			if unicode.IsUpper(r) {
+				upper++
+			}
+		}
 	}
 	return letters > 2 && upper == letters
 }
@@ -145,7 +197,12 @@ func isMostlyUpper(s string) bool {
 func isMostlyLower(s string) bool {
 	var letters, lower int
 	for _, r := range s {
-		if unicode.IsLetter(r) { letters++; if unicode.IsLower(r) { lower++ } }
+		if unicode.IsLetter(r) {
+			letters++
+			if unicode.IsLower(r) {
+				lower++
+			}
+		}
 	}
 	return letters > 2 && lower == letters
 }

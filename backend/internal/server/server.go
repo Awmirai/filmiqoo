@@ -540,14 +540,17 @@ func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
 		       mv.id::text,mv.quality_label,mv.stream_ready
 		  FROM media_titles mt
 		  LEFT JOIN LATERAL (
-			SELECT id,quality_label,stream_ready
-			  FROM media_versions
-			 WHERE media_title_id=mt.id
-			 ORDER BY preferred DESC,height DESC,file_size_bytes DESC
+			SELECT v.id,v.quality_label,v.stream_ready,MAX(v.created_at) OVER () AS latest_added_at
+			  FROM media_versions v
+			  LEFT JOIN episodes e ON e.id=v.episode_id
+			  LEFT JOIN seasons sn ON sn.id=e.season_id
+			 WHERE COALESCE(v.media_title_id,sn.media_title_id)=mt.id AND v.stream_ready=true
+			 ORDER BY sn.season_number DESC NULLS LAST,e.episode_number DESC NULLS LAST,
+			          v.preferred DESC,v.height DESC,v.file_size_bytes DESC
 			 LIMIT 1
 		  ) mv ON true
 		 WHERE mt.visibility='public'
-		 ORDER BY mt.created_at DESC
+		 ORDER BY COALESCE(mv.latest_added_at,mt.created_at) DESC,mt.id
 		 LIMIT 60
 	`)
 	if err != nil {

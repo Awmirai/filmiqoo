@@ -55,9 +55,11 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -410,7 +412,7 @@ fun FilmiqooPlayerScreen(
         versionId: String,
         startPosition: Long,
         preserveTarget: Boolean = true
-    ) {
+    ) = withContext(Dispatchers.Main.immediate) {
         loading=true
         error=null
         ended=false
@@ -423,8 +425,8 @@ fun FilmiqooPlayerScreen(
             }
         }
 
-        runCatching { backend.playbackUrl(versionId) }
-            .onSuccess { url ->
+        try {
+                val url = backend.playbackUrl(versionId)
                 playUrl=url
                 currentVersionId=versionId
                 selectedVariantId=versionId
@@ -443,11 +445,13 @@ fun FilmiqooPlayerScreen(
                 if(!preserveTarget) {
                     currentTarget=currentTarget.copy(mediaVersionId=versionId)
                 }
-            }
-            .onFailure {
-                error=it.message ?: "خطا در دریافت لینک پخش"
-            }
-        loading=false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error=failure.message ?: "خطا در دریافت لینک پخش"
+        } finally {
+            loading=false
+        }
         bumpControls()
     }
 
@@ -632,10 +636,12 @@ fun FilmiqooPlayerScreen(
                 val bufferCount=telemetryBufferCountPending
                 val bufferMs=telemetryBufferMsPending+activeBufferMs
                 val switches=telemetryQualitySwitchPending
+                val versionAtExit=currentVersionId
                 CoroutineScope(Dispatchers.IO).launch {
+                  runCatching {
                     backend.endPlaybackSession(
                         sessionId=sid,
-                        currentMediaVersionId=currentVersionId,
+                        currentMediaVersionId=versionAtExit,
                         positionMs=position,
                         durationMs=duration,
                         watchedDeltaMs=watched,
@@ -646,6 +652,7 @@ fun FilmiqooPlayerScreen(
                         completed=false,
                         exitReason="back"
                     )
+                  }
                 }
             }
             activity?.requestedOrientation=
