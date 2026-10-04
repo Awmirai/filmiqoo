@@ -42,6 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.MediaMetadata
@@ -81,6 +84,7 @@ fun FilmiqooPlayerScreen(
     onDiscussion: (String) -> Unit = {}
 ) {
     val context=LocalContext.current
+    val lifecycleOwner=LocalLifecycleOwner.current
     val networkOnline=rememberNetworkOnline()
     val activity=context as? Activity
     val audioManager=remember {
@@ -406,6 +410,26 @@ fun FilmiqooPlayerScreen(
         controlsEpoch++
     }
 
+    fun persistProgress() {
+        val versionId=currentVersionId
+        val position=activePositionMs()
+        val duration=activeDurationMs()
+        val viewerId=activeViewer?.id
+        if(versionId.isBlank() || position<=0L || duration<=0L || !backend.session.isLoggedIn) return
+        // This final write must survive removal of the player from composition.
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { backend.saveProgress(versionId,position,duration,viewerId) }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner,player) {
+        val observer=LifecycleEventObserver { _,event ->
+            if(event==Lifecycle.Event.ON_STOP) persistProgress()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     suspend fun loadVersion(
         versionId: String,
         startPosition: Long,
@@ -516,6 +540,7 @@ fun FilmiqooPlayerScreen(
 
                 buffering=playbackState==Player.STATE_BUFFERING
                 ended=playbackState==Player.STATE_ENDED
+                if(ended) persistProgress()
                 if(
                     playbackState==Player.STATE_ENDED &&
                     !currentTarget.localUri.isNullOrBlank()
@@ -612,13 +637,9 @@ fun FilmiqooPlayerScreen(
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 
         onDispose {
-            val position=player.currentPosition.coerceAtLeast(0L)
-            val duration=player.duration.coerceAtLeast(0L)
-            scope.launch {
-                runCatching {
-                    backend.saveProgress(currentVersionId,position,duration)
-                }
-            }
+            val position=activePositionMs()
+            val duration=activeDurationMs()
+            persistProgress()
 
             val sid=playbackSessionId
             if(sid!=null) {

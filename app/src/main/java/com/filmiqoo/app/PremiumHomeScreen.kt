@@ -61,6 +61,15 @@ fun PremiumHomeScreen(
     val messagingRepo=remember { MessagingRepository(backend) }
     val activeViewer=if(loggedIn) backend.viewerProfiles.active() else null
     val kidsMode=activeViewer?.kidsMode==true
+    val progressRevision by backend.watchProgressRevision.collectAsState()
+
+    // Refresh the rail after the final player write completes, even if the
+    // home screen was already recreated before that request finished.
+    LaunchedEffect(reload,loggedIn,activeViewer?.id,progressRevision) {
+        continueItems=if(loggedIn) {
+            runCatching { backend.continueWatching() }.getOrDefault(emptyList())
+        } else emptyList()
+    }
 
     LaunchedEffect(badgeRefreshKey,reload,loggedIn,kidsMode) {
         unreadNotifications=if(loggedIn && !kidsMode) {
@@ -83,10 +92,6 @@ fun PremiumHomeScreen(
             }
 
             if(loggedIn) {
-                val continueRequest=async {
-                    runCatching { backend.continueWatching() }
-                        .getOrDefault(emptyList())
-                }
                 val personalizedRequest=async {
                     runCatching { personalizationRepo.load() }.getOrNull()
                 }
@@ -99,7 +104,6 @@ fun PremiumHomeScreen(
                     }
                 }
 
-                continueItems=continueRequest.await()
                 personalized=personalizedRequest.await()
                 friendsWatching=friendsRequest.await()
             } else {
