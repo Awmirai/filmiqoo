@@ -21,6 +21,7 @@ import (
 type playbackTokenRequest struct {
 	MediaVersionID string `json:"mediaVersionId"`
 	Download bool `json:"download"`
+	Remote bool `json:"remote"`
 }
 
 func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +65,12 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 
 	ttl := time.Duration(s.cfg.PlaybackTokenTTLSeconds) * time.Second
 	if ttl <= 0 { ttl = 5 * time.Minute }
+	if body.Remote {
+		remoteTTL:=time.Duration(s.cfg.CastPlaybackTokenTTLSeconds)*time.Second
+		if remoteTTL<=0 { remoteTTL=8*time.Hour }
+		if remoteTTL>24*time.Hour { remoteTTL=24*time.Hour }
+		if remoteTTL>ttl { ttl=remoteTTL }
+	}
 	exp := time.Now().Add(ttl).Unix()
 	sig := s.signPlayback(body.MediaVersionID, exp, body.Download)
 
@@ -82,6 +89,7 @@ func (s *Server) playbackToken(w http.ResponseWriter, r *http.Request) {
 		"url": playURL,
 		"expiresAt": exp,
 		"download": body.Download,
+		"remote": body.Remote,
 	})
 }
 
