@@ -65,6 +65,7 @@ private data class PlayerTrackChoice(
     val groupIndex: Int,
     val trackIndex: Int,
     val label: String,
+    val language: String? = null,
     val selected: Boolean
 )
 
@@ -117,6 +118,10 @@ fun FilmiqooPlayerScreen(
     var controlsEpoch by remember { mutableLongStateOf(0L) }
     var locked by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var toolsOpen by remember { mutableStateOf(false) }
+    var autoPersianSubtitleEnabled by remember { mutableStateOf(false) }
+    var autoSubtitleBusy by remember { mutableStateOf(false) }
+    var autoSubtitleStatus by remember { mutableStateOf<String?>(null) }
     var momentsOpen by remember { mutableStateOf(false) }
     var bookmarksOpen by remember { mutableStateOf(false) }
     var handoffOpen by remember { mutableStateOf(false) }
@@ -245,14 +250,19 @@ fun FilmiqooPlayerScreen(
         if(castConnected) castController.play() else player.play()
     }
 
+    // MediaSession is an integration enhancement, not a prerequisite for playback.
+    // Some OEM builds can reject session creation (for example while an old session
+    // is still being torn down). Never let that close the player/app.
     val mediaSession=remember(player) {
-        MediaSession.Builder(context,player)
-            .setId("filmiqoo-player")
-            .build()
+        runCatching {
+            MediaSession.Builder(context,player)
+                .setId("filmiqoo-player-"+System.identityHashCode(player))
+                .build()
+        }.getOrNull()
     }
 
     DisposableEffect(mediaSession) {
-        onDispose { mediaSession.release() }
+        onDispose { mediaSession?.release() }
     }
 
     LaunchedEffect(castController) {
@@ -606,7 +616,9 @@ fun FilmiqooPlayerScreen(
             activity?.requestedOrientation=
                 oldOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             if(oldUi!=null) activity?.window?.decorView?.systemUiVisibility=oldUi
-            player.release()
+            runCatching { player.stop() }
+            runCatching { player.clearMediaItems() }
+            runCatching { player.release() }
         }
     }
 
@@ -643,6 +655,9 @@ fun FilmiqooPlayerScreen(
         externalSubtitleUri=null
         externalSubtitleMime=null
         externalSubtitleLabel=null
+        autoPersianSubtitleEnabled=false
+        autoSubtitleBusy=false
+        autoSubtitleStatus=null
 
         selectedVariantId=currentTarget.mediaVersionId
         resumePromptPositionMs=null
@@ -872,8 +887,22 @@ fun FilmiqooPlayerScreen(
         }
     }
 
-    LaunchedEffect(controlsVisible,isPlaying,controlsEpoch,locked) {
-        if(controlsVisible && isPlaying && !locked) {
+    LaunchedEffect(
+        controlsVisible,
+        isPlaying,
+        controlsEpoch,
+        locked,
+        toolsOpen,
+        settingsOpen,
+        momentsOpen,
+        bookmarksOpen,
+        handoffOpen,
+        dialogueSearchOpen,
+        queueOpen
+    ) {
+        val overlayOpen=toolsOpen || settingsOpen || momentsOpen || bookmarksOpen ||
+            handoffOpen || dialogueSearchOpen || queueOpen
+        if(controlsVisible && isPlaying && !locked && !overlayOpen) {
             delay(3_500)
             controlsVisible=false
         }
@@ -922,6 +951,7 @@ fun FilmiqooPlayerScreen(
             dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
             queueOpen -> queueOpen=false
+            toolsOpen -> toolsOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
                 locked=false
@@ -1180,48 +1210,12 @@ fun FilmiqooPlayerScreen(
                 )
             )
 
-            PlayerTopControls(
+            PlayerChromeTopBarV2(
                 target=currentTarget,
                 currentVariant=currentTarget.variants.firstOrNull {
                     it.mediaVersionId==selectedVariantId
                 },
-                downloadQueued=downloadQueued,
                 onBack=onBack,
-                onDownload={
-                    scope.launch {
-                        if(currentTarget.localUri!=null) {
-                            downloadQueued=true
-                            return@launch
-                        }
-                        runCatching {
-                            backend.enqueueDownload(
-                                context,
-                                currentTarget.copy(mediaVersionId=currentVersionId)
-                            )
-                        }.onSuccess {
-                            downloadQueued=true
-                        }.onFailure {
-                            error=it.message
-                        }
-                    }
-                },
-                onMoments={
-                    if(backend.session.isLoggedIn) momentsOpen=true
-                    else onRequireAuth()
-                },
-                onBookmarks={
-                    if(backend.session.isLoggedIn) bookmarksOpen=true
-                    else onRequireAuth()
-                },
-                onDialogueSearch={
-                    if(backend.session.isLoggedIn) dialogueSearchOpen=true
-                    else onRequireAuth()
-                },
-                onQueue={queueOpen=true},
-                onHandoff={
-                    if(backend.session.isLoggedIn) handoffOpen=true
-                    else onRequireAuth()
-                },
                 onShare={
                     sharePlayerMoment(
                         context=context,
@@ -1230,24 +1224,14 @@ fun FilmiqooPlayerScreen(
                         positionMs=activePositionMs()
                     )
                 },
-                onPip={
-                    activity?.enterPictureInPictureMode(
-                        PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(16,9))
-                            .build()
-                    )
-                },
-                onSettings={
-                    settingsOpen=true
-                    settingsTab=PlayerSettingsTab.QUALITY
-                },
-                onLock={
-                    locked=true
-                    controlsVisible=false
+                onMore={
+                    toolsOpen=true
+                    controlsVisible=true
+                    controlsEpoch++
                 }
             )
 
-            PlayerCenterControls(
+            PlayerCenterControlsV2(
                 isPlaying=isPlaying,
                 onBack10={
                     val next=(activePositionMs()-10_000L).coerceAtLeast(0L)
@@ -1310,7 +1294,7 @@ fun FilmiqooPlayerScreen(
                     )
                 }
 
-            PlayerBottomControls(
+            PlayerBottomControlsV2(
                 positionMs=positionMs,
                 durationMs=durationMs,
                 fraction=seekFraction,
@@ -1339,9 +1323,19 @@ fun FilmiqooPlayerScreen(
                     isScrubbing=false
                     bumpControls()
                 },
-                onSettings={
+                onSpeed={
                     settingsOpen=true
                     settingsTab=PlayerSettingsTab.SPEED
+                },
+                onCaptions={
+                    toolsOpen=true
+                    controlsVisible=true
+                    controlsEpoch++
+                },
+                onMore={
+                    toolsOpen=true
+                    controlsVisible=true
+                    controlsEpoch++
                 },
                 modifier=Modifier.align(Alignment.BottomCenter)
             )
@@ -1483,6 +1477,164 @@ fun FilmiqooPlayerScreen(
         )
     }
 
+    if(toolsOpen) {
+        PlayerToolsSheetV2(
+            downloadQueued=downloadQueued,
+            hasQueue=currentTarget.previousMediaVersionId!=null || currentTarget.upNext.isNotEmpty(),
+            autoPersianSubtitleEnabled=autoPersianSubtitleEnabled,
+            autoSubtitleBusy=autoSubtitleBusy,
+            autoSubtitleStatus=autoSubtitleStatus,
+            activeSubtitleLabel=externalSubtitleLabel,
+            onDismiss={toolsOpen=false},
+            onAutoPersianSubtitle={ enabled ->
+                if(!enabled) {
+                    autoPersianSubtitleEnabled=false
+                    autoSubtitleBusy=false
+                    autoSubtitleStatus=null
+                    if(externalSubtitleLabel?.startsWith("Auto فارسی")==true) {
+                        applyExternalSubtitle(null,null,null)
+                    } else {
+                        player.trackSelectionParameters=
+                            player.trackSelectionParameters.buildUpon()
+                                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT,true)
+                                .build()
+                        trackRevision++
+                    }
+                } else {
+                    val embeddedPersian=subtitleTracks.firstOrNull { choice ->
+                        val language=choice.language
+                            ?.lowercase(Locale.ROOT)
+                            .orEmpty()
+                        language in setOf("fa","fas","per") ||
+                            choice.label.contains("فارسی",ignoreCase=true) ||
+                            choice.label.contains("persian",ignoreCase=true)
+                    }
+
+                    if(embeddedPersian!=null) {
+                        applyTrackChoice(player,C.TRACK_TYPE_TEXT,embeddedPersian)
+                        trackRevision++
+                        autoPersianSubtitleEnabled=true
+                        autoSubtitleBusy=false
+                        autoSubtitleStatus="زیرنویس فارسی داخل همین فایل فعال شد."
+                    } else if(!backend.session.isLoggedIn) {
+                        autoPersianSubtitleEnabled=false
+                        autoSubtitleBusy=false
+                        autoSubtitleStatus="برای جستجوی اینترنتی زیرنویس وارد حساب شو."
+                        toolsOpen=false
+                        onRequireAuth()
+                    } else {
+                        autoPersianSubtitleEnabled=true
+                        autoSubtitleBusy=true
+                        autoSubtitleStatus="در حال بررسی ریلیز و پیدا کردن زیرنویس فارسی..."
+                        scope.launch {
+                            runCatching {
+                                backend.autoSubtitle(currentVersionId,"fa")
+                            }.onSuccess { match ->
+                                applyExternalSubtitle(
+                                    match.url,
+                                    match.mimeType,
+                                    "Auto فارسی • "+match.release
+                                )
+                                autoSubtitleStatus=
+                                    when {
+                                        match.exactRelease ->
+                                            "مچ دقیق ریلیز پیدا شد • "+match.provider
+                                        else ->
+                                            "بهترین زیرنویس فارسی موجود فعال شد • "+match.provider
+                                    }
+                            }.onFailure {
+                                autoPersianSubtitleEnabled=false
+                                autoSubtitleStatus=
+                                    it.message?.takeIf(String::isNotBlank)
+                                        ?: "برای این نسخه زیرنویس فارسی مناسبی پیدا نشد."
+                            }
+                            autoSubtitleBusy=false
+                            bumpControls()
+                        }
+                    }
+                }
+            },
+            onSubtitleSettings={
+                toolsOpen=false
+                settingsOpen=true
+                settingsTab=PlayerSettingsTab.SUBTITLE
+            },
+            onSettings={
+                toolsOpen=false
+                settingsOpen=true
+                settingsTab=PlayerSettingsTab.QUALITY
+            },
+            onDownload={
+                toolsOpen=false
+                scope.launch {
+                    if(currentTarget.localUri!=null) {
+                        downloadQueued=true
+                        return@launch
+                    }
+                    runCatching {
+                        backend.enqueueDownload(
+                            context,
+                            currentTarget.copy(mediaVersionId=currentVersionId)
+                        )
+                    }.onSuccess {
+                        downloadQueued=true
+                    }.onFailure {
+                        error=it.message
+                    }
+                }
+            },
+            onMoments={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) momentsOpen=true else onRequireAuth()
+            },
+            onBookmarks={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) bookmarksOpen=true else onRequireAuth()
+            },
+            onDialogueSearch={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) dialogueSearchOpen=true else onRequireAuth()
+            },
+            onQueue={
+                toolsOpen=false
+                queueOpen=true
+            },
+            onHandoff={
+                toolsOpen=false
+                if(backend.session.isLoggedIn) handoffOpen=true else onRequireAuth()
+            },
+            onShare={
+                toolsOpen=false
+                sharePlayerMoment(
+                    context=context,
+                    target=currentTarget,
+                    mediaVersionId=currentVersionId,
+                    positionMs=activePositionMs()
+                )
+            },
+            onPip={
+                toolsOpen=false
+                val entered=runCatching {
+                    activity?.enterPictureInPictureMode(
+                        PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(16,9))
+                            .build()
+                    ) ?: false
+                }.getOrDefault(false)
+                if(!entered) {
+                    playerSettingsMessage="تصویر در تصویر روی این دستگاه در دسترس نیست."
+                    bumpControls()
+                }
+            },
+            onLock={
+                toolsOpen=false
+                locked=true
+                controlsVisible=false
+            }
+        )
+    }
+
     if(settingsOpen) {
         PlayerSettingsSheet(
             tab=settingsTab,
@@ -1530,6 +1682,8 @@ fun FilmiqooPlayerScreen(
                 trackRevision++
             },
             onSubtitle={ choice ->
+                autoPersianSubtitleEnabled=false
+                autoSubtitleStatus=null
                 if(choice==null) {
                     player.trackSelectionParameters=
                         player.trackSelectionParameters.buildUpon()
@@ -1551,6 +1705,8 @@ fun FilmiqooPlayerScreen(
             onSubtitleBackgroundOpacity={subtitleBackgroundOpacity=it},
             onSubtitleEdgeStyle={subtitleEdgeStyle=it},
             onPickExternalSubtitle={
+                autoPersianSubtitleEnabled=false
+                autoSubtitleStatus=null
                 externalSubtitlePicker.launch(
                     arrayOf(
                         "application/x-subrip",
@@ -1562,6 +1718,8 @@ fun FilmiqooPlayerScreen(
                 )
             },
             onClearExternalSubtitle={
+                autoPersianSubtitleEnabled=false
+                autoSubtitleStatus=null
                 applyExternalSubtitle(null,null,null)
                 playerSettingsMessage="زیرنویس خارجی حذف شد"
             },
@@ -1798,322 +1956,6 @@ private fun PlayerErrorOverlay(
                         Text("تلاش دوباره")
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlayerTopControls(
-    target:PlaybackTarget,
-    currentVariant:PlaybackVariant?,
-    downloadQueued:Boolean,
-    onBack:()->Unit,
-    onDownload:()->Unit,
-    onMoments:()->Unit,
-    onBookmarks:()->Unit,
-    onDialogueSearch:()->Unit,
-    onQueue:()->Unit,
-    onHandoff:()->Unit,
-    onShare:()->Unit,
-    onPip:()->Unit,
-    onSettings:()->Unit,
-    onLock:()->Unit
-) {
-    var moreOpen by remember { mutableStateOf(false) }
-
-    Row(
-        Modifier.fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal=12.dp,vertical=8.dp),
-        verticalAlignment=Alignment.CenterVertically
-    ) {
-        PlayerGlassIcon(
-            icon=Icons.Default.ArrowBack,
-            onClick=onBack,
-            contentDescription="بازگشت"
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                target.title,
-                color=Color.White,
-                fontSize=13.sp,
-                fontWeight=FontWeight.Black,
-                maxLines=1,
-                overflow=TextOverflow.Ellipsis
-            )
-            val meta=listOf(
-                target.subtitle,
-                currentVariant?.label.orEmpty()
-            ).filter(String::isNotBlank).distinct().joinToString(" • ")
-            if(meta.isNotBlank()) {
-                Text(
-                    meta,
-                    color=Color.White.copy(alpha=.62f),
-                    fontSize=9.sp,
-                    maxLines=1,
-                    overflow=TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        PlayerCastRouteButton()
-        Spacer(Modifier.width(6.dp))
-
-        Box {
-            PlayerGlassIcon(
-                icon=Icons.Default.MoreVert,
-                onClick={moreOpen=true},
-                contentDescription="ابزارهای پخش"
-            )
-            DropdownMenu(
-                expanded=moreOpen,
-                onDismissRequest={moreOpen=false},
-                containerColor=Color(0xF5181818),
-                shape=RoundedCornerShape(18.dp)
-            ) {
-                DropdownMenuItem(
-                    text={Text("تنظیمات پخش")},
-                    leadingIcon={Icon(Icons.Default.Tune,null,tint=FqGold)},
-                    onClick={moreOpen=false;onSettings()}
-                )
-                DropdownMenuItem(
-                    text={Text(if(downloadQueued)"دانلود در صف" else "دانلود آفلاین")},
-                    leadingIcon={
-                        Icon(
-                            if(downloadQueued)Icons.Default.DownloadDone else Icons.Default.Download,
-                            null,
-                            tint=if(downloadQueued)FqGreen else FqGold
-                        )
-                    },
-                    onClick={moreOpen=false;onDownload()}
-                )
-                HorizontalDivider(color=Color.White.copy(alpha=.07f))
-                DropdownMenuItem(
-                    text={Text("لحظه‌ها و واکنش‌ها")},
-                    leadingIcon={Icon(Icons.Default.Whatshot,null)},
-                    onClick={moreOpen=false;onMoments()}
-                )
-                DropdownMenuItem(
-                    text={Text("نشانه‌گذاری صحنه")},
-                    leadingIcon={Icon(Icons.Default.BookmarkAdd,null)},
-                    onClick={moreOpen=false;onBookmarks()}
-                )
-                DropdownMenuItem(
-                    text={Text("پیدا کردن دیالوگ")},
-                    leadingIcon={Icon(Icons.Default.ManageSearch,null)},
-                    onClick={moreOpen=false;onDialogueSearch()}
-                )
-                if(target.previousMediaVersionId!=null || target.upNext.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text={Text("قسمت‌ها")},
-                        leadingIcon={Icon(Icons.Default.QueuePlayNext,null)},
-                        onClick={moreOpen=false;onQueue()}
-                    )
-                }
-                HorizontalDivider(color=Color.White.copy(alpha=.07f))
-                DropdownMenuItem(
-                    text={Text("ادامه روی دستگاه دیگر")},
-                    leadingIcon={Icon(Icons.Default.DevicesOther,null)},
-                    onClick={moreOpen=false;onHandoff()}
-                )
-                DropdownMenuItem(
-                    text={Text("اشتراک‌گذاری")},
-                    leadingIcon={Icon(Icons.Default.Share,null)},
-                    onClick={moreOpen=false;onShare()}
-                )
-                DropdownMenuItem(
-                    text={Text("تصویر در تصویر")},
-                    leadingIcon={Icon(Icons.Default.PictureInPictureAlt,null)},
-                    onClick={moreOpen=false;onPip()}
-                )
-                DropdownMenuItem(
-                    text={Text("قفل کنترل‌ها")},
-                    leadingIcon={Icon(Icons.Default.LockOpen,null)},
-                    onClick={moreOpen=false;onLock()}
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlayerCastRouteButton() {
-    val context=LocalContext.current
-    AndroidView(
-        factory={ctx->
-            androidx.mediarouter.app.MediaRouteButton(ctx).apply {
-                com.google.android.gms.cast.framework.CastButtonFactory
-                    .setUpMediaRouteButton(ctx,this)
-            }
-        },
-        modifier=Modifier.size(40.dp)
-    )
-}
-
-@Composable
-private fun PlayerGlassIcon(
-    icon:androidx.compose.ui.graphics.vector.ImageVector,
-    onClick:()->Unit,
-    contentDescription:String?=null
-) {
-    Surface(
-        color=Color.Black.copy(alpha=.48f),
-        contentColor=Color.White,
-        shape=CircleShape,
-        border=androidx.compose.foundation.BorderStroke(
-            1.dp,
-            Color.White.copy(alpha=.10f)
-        ),
-        modifier=Modifier.size(44.dp)
-            .clickable { onClick() }
-    ) {
-        Box(contentAlignment=Alignment.Center) {
-            Icon(
-                icon,
-                contentDescription=contentDescription,
-                modifier=Modifier.size(21.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlayerCenterControls(
-    isPlaying: Boolean,
-    onBack10: () -> Unit,
-    onPlayPause: () -> Unit,
-    onForward10: () -> Unit,
-    modifier: Modifier=Modifier
-) {
-    Row(
-        modifier,
-        verticalAlignment=Alignment.CenterVertically,
-        horizontalArrangement=Arrangement.spacedBy(30.dp)
-    ) {
-        Column(
-            horizontalAlignment=Alignment.CenterHorizontally,
-            modifier=Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp)
-                .clickable { onBack10() }
-                .padding(6.dp)
-        ) {
-            Icon(Icons.Default.Replay10,null,tint=Color.White,modifier=Modifier.size(34.dp))
-            Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
-        }
-
-        Box(
-            Modifier.size(68.dp).clip(CircleShape).background(Color.White)
-                .clickable { onPlayPause() },
-            contentAlignment=Alignment.Center
-        ) {
-            Icon(
-                if(isPlaying)Icons.Default.Pause else Icons.Default.PlayArrow,
-                null,
-                tint=Color.Black,
-                modifier=Modifier.size(38.dp)
-            )
-        }
-
-        Column(
-            horizontalAlignment=Alignment.CenterHorizontally,
-            modifier=Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp)
-                .clickable { onForward10() }
-                .padding(6.dp)
-        ) {
-            Icon(Icons.Default.Forward10,null,tint=Color.White,modifier=Modifier.size(34.dp))
-            Text("10",color=Color.White.copy(alpha=.7f),fontSize=11.sp)
-        }
-    }
-}
-
-@Composable
-private fun PlayerBottomControls(
-    positionMs: Long,
-    durationMs: Long,
-    fraction: Float,
-    speed: Float,
-    hotMoments:List<PulseMoment>,
-    onHotMoment:(PulseMoment)->Unit,
-    onSeekStart: () -> Unit,
-    onFractionChanged: (Float) -> Unit,
-    onSeekFinished: () -> Unit,
-    onSettings: () -> Unit,
-    modifier: Modifier=Modifier
-) {
-    Column(
-        modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=12.dp)
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Slider(
-                value=fraction.coerceIn(0f,1f),
-                onValueChange={
-                    onSeekStart()
-                    onFractionChanged(it)
-                },
-                onValueChangeFinished=onSeekFinished,
-                colors=SliderDefaults.colors(
-                    thumbColor=FqGold,
-                    activeTrackColor=FqGold,
-                    inactiveTrackColor=Color.White.copy(alpha=.25f)
-                ),
-                modifier=Modifier.fillMaxWidth()
-            )
-
-            if(durationMs>0L) {
-                hotMoments.take(5).forEach { moment ->
-                    val momentFraction=(
-                        moment.positionMs.toFloat()/durationMs.toFloat()
-                    ).coerceIn(0f,1f)
-                    Surface(
-                        color=FqGold,
-                        contentColor=Color.Black,
-                        shape=CircleShape,
-                        modifier=Modifier.align(Alignment.CenterStart)
-                            .offset(
-                                x=(maxWidth-12.dp)*momentFraction
-                            )
-                            .size(12.dp)
-                            .clickable { onHotMoment(moment) }
-                    ) {
-                        Box(contentAlignment=Alignment.Center) {
-                            Text(
-                                moment.emoji,
-                                fontSize=7.sp,
-                                maxLines=1
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment=Alignment.CenterVertically
-        ) {
-            Text(
-                formatPlayerTime(positionMs),
-                color=Color.White,
-                fontSize=11.sp
-            )
-            Text(
-                " / "+formatPlayerTime(durationMs),
-                color=Color.White.copy(alpha=.55f),
-                fontSize=11.sp
-            )
-            Spacer(Modifier.weight(1f))
-            Surface(
-                color=Color.Black.copy(alpha=.5f),
-                shape=RoundedCornerShape(9.dp),
-                modifier=Modifier.clickable { onSettings() }
-            ) {
-                Text(
-                    formatSpeed(speed),
-                    color=Color.White,
-                    fontSize=11.sp,
-                    modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp)
-                )
             }
         }
     }
@@ -3045,6 +2887,7 @@ private fun playerTrackChoices(
                         groupIndex=groupIndex,
                         trackIndex=trackIndex,
                         label=label,
+                        language=format.language,
                         selected=group.isTrackSelected(trackIndex)
                     )
                 )

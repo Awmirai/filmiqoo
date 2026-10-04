@@ -48,7 +48,7 @@ fun DiscoverHubScreen(
         error=null
         runCatching { repository.home() }
             .onSuccess { data=it }
-            .onFailure { error=it.message ?: "بخش کشف در دسترس نیست" }
+            .onFailure { error=it.message ?: "اکسپلور فعلاً در دسترس نیست" }
         creators=runCatching { social.channels() }.getOrDefault(emptyList())
         loading=false
     }
@@ -86,7 +86,7 @@ fun DiscoverHubScreen(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "کشف",
+                            "اکسپلور",
                             fontSize=30.sp,
                             fontWeight=FontWeight.Black,
                             letterSpacing=(-0.5).sp
@@ -137,7 +137,7 @@ fun DiscoverHubScreen(
                     horizontalArrangement=Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        DiscoverFilter.ALL to "همه",
+                        DiscoverFilter.ALL to "برای تو",
                         DiscoverFilter.MOVIES to "فیلم",
                         DiscoverFilter.SERIES to "سریال"
                     ).forEach { item ->
@@ -208,7 +208,7 @@ fun DiscoverHubScreen(
         }
 
         if(filter!=DiscoverFilter.SERIES && data.popularMovies.isNotEmpty()) {
-            item { DiscoverTitle("فیلم‌ها","انتخاب‌های قوی برای امشب") }
+            item { DiscoverTitle("فیلم‌ها","انتخاب سینمایی برای امشب") }
             item {
                 DiscoverPosterRow(
                     items=data.popularMovies.take(18),
@@ -219,7 +219,7 @@ fun DiscoverHubScreen(
         }
 
         if(filter!=DiscoverFilter.MOVIES && data.popularTv.isNotEmpty()) {
-            item { DiscoverTitle("سریال‌ها","چیزهایی که ارزش ادامه دادن دارن") }
+            item { DiscoverTitle("سریال‌ها","سریال‌هایی که ارزش وقت گذاشتن دارن") }
             item {
                 DiscoverPosterRow(
                     items=data.popularTv.take(18),

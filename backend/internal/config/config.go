@@ -66,6 +66,12 @@ type Config struct {
 	PasswordResetBaseURL string
 	TelegramBotToken string
 	TelegramSourceChannel string
+	OpenSubtitlesAPIKey string
+	OpenSubtitlesToken string
+	OpenSubtitlesUsername string
+	OpenSubtitlesPassword string
+	OpenSubtitlesUserAgent string
+	PersianSubtitleAddonURL string
 }
 
 func Load() Config {
@@ -124,6 +130,15 @@ func Load() Config {
 		PasswordResetBaseURL: env("PASSWORD_RESET_BASE_URL","https://filmiqoo.com/reset-password"),
 		TelegramBotToken: strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
 		TelegramSourceChannel: env("TELEGRAM_SOURCE_CHANNEL","filmiqq1"),
+		OpenSubtitlesAPIKey: strings.TrimSpace(os.Getenv("OPENSUBTITLES_API_KEY")),
+		OpenSubtitlesToken: strings.TrimSpace(os.Getenv("OPENSUBTITLES_TOKEN")),
+		OpenSubtitlesUsername: strings.TrimSpace(os.Getenv("OPENSUBTITLES_USERNAME")),
+		OpenSubtitlesPassword: strings.TrimSpace(os.Getenv("OPENSUBTITLES_PASSWORD")),
+		OpenSubtitlesUserAgent: env("OPENSUBTITLES_USER_AGENT","Filmiqoo v1.0"),
+		PersianSubtitleAddonURL: env(
+			"PERSIAN_SUBTITLE_ADDON_URL",
+			"https://stremio.alirostami.com/subtitles",
+		),
 	}
 }
 

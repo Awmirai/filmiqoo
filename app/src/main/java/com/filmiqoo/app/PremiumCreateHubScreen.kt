@@ -284,8 +284,8 @@ fun PremiumCreateHubScreen(
                         Icon(Icons.Default.Close,null)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("ساخت محتوا",fontSize=23.sp,fontWeight=FontWeight.Black)
-                        Text("چیزی بساز که به تماشای فیلم و سریال کمک کنه",color=FqMuted,fontSize=11.sp)
+                        Text("Creator Hub",fontSize=24.sp,fontWeight=FontWeight.Black)
+                        Text("بساز، منتشر کن و هویت سینمایی خودت را شکل بده",color=FqMuted,fontSize=11.sp)
                     }
                     TextButton(
                         onClick={

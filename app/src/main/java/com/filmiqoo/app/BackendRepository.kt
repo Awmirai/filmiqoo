@@ -59,6 +59,15 @@ data class PlaybackQueueItem(
     val posterUrl: String? = null
 )
 
+data class AutoSubtitleMatch(
+    val url: String,
+    val mimeType: String,
+    val language: String,
+    val release: String,
+    val provider: String,
+    val exactRelease: Boolean
+)
+
 data class PlaybackTarget(
     val mediaVersionId: String,
     val title: String,
@@ -702,6 +711,29 @@ class BackendRepository(context: Context) {
             val obj = postJson("/v1/playback/token", body, authorized = true)
             obj.getString("url")
         }
+
+    suspend fun autoSubtitle(
+        mediaVersionId:String,
+        language:String="fa"
+    ):AutoSubtitleMatch = withContext(Dispatchers.IO) {
+        val url=(session.baseUrl+"/v1/playback/"+mediaVersionId+"/subtitles/auto")
+            .toHttpUrl()
+            .newBuilder()
+            .addQueryParameter("lang",language)
+            .build()
+        val o=executeJson(
+            Request.Builder().url(url).get(),
+            authorized=true
+        )
+        AutoSubtitleMatch(
+            url=o.getString("url"),
+            mimeType=o.optString("mimeType").ifBlank { "application/x-subrip" },
+            language=o.optString("language").ifBlank { language },
+            release=o.optString("release").ifBlank { "Auto match" },
+            provider=o.optString("provider").ifBlank { "opensubtitles" },
+            exactRelease=o.optBoolean("exactRelease",false)
+        )
+    }
 
     suspend fun playbackContext(mediaVersionId:String):PlaybackTarget =
         withContext(Dispatchers.IO) {

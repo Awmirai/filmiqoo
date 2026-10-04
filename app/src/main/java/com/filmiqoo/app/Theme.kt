@@ -16,11 +16,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val FqBg = Color(0xFF050505)
-val FqSurface = Color(0xFF101010)
-val FqSurface2 = Color(0xFF181818)
-val FqSurface3 = Color(0xFF222222)
-val FqSurface4 = Color(0xFF2B2B2B)
+val FqBg = Color(0xFF070708)
+val FqSurface = Color(0xFF111113)
+val FqSurface2 = Color(0xFF18181B)
+val FqSurface3 = Color(0xFF202024)
+val FqSurface4 = Color(0xFF29292E)
 val FqGold = Color(0xFFE50914)
 val FqGoldSoft = Color(0xFFFF5660)
 val FqText = Color(0xFFF7F8FA)
@@ -144,8 +144,8 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
         onSurface=FqText,
         surfaceVariant=FqSurface2,
         onSurfaceVariant=FqMutedStrong,
-        outline=Color.White.copy(alpha=.14f),
-        outlineVariant=Color.White.copy(alpha=.08f),
+        outline=Color.White.copy(alpha=.12f),
+        outlineVariant=Color.White.copy(alpha=.06f),
         error=FqDanger,
         onError=Color.White
     )
