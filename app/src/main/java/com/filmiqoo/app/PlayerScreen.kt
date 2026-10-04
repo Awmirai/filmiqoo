@@ -2154,7 +2154,7 @@ private fun PlayerToolsSheet(
                                     fontSize=9.sp
                                 )
                             }
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight,null,tint=FqMuted)
+                            Icon(Icons.Default.KeyboardArrowRight,null,tint=FqMuted)
                         }
                     }
                 }
@@ -2280,7 +2280,7 @@ private fun PlayerToolsRow(
             )
         }
         Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            Icons.Default.KeyboardArrowRight,
             null,
             tint=Color.White.copy(alpha=.28f)
         )
