@@ -21,6 +21,8 @@ val releaseKeyPassword =
     System.getenv("FILMIQOO_KEY_PASSWORD").orEmpty()
 val requireReleaseSigning =
     System.getenv("FILMIQOO_REQUIRE_SIGNING")?.equals("true",ignoreCase=true)==true
+val legacyServerPreview =
+    System.getenv("FILMIQOO_LEGACY_SERVER_PREVIEW")?.equals("true", ignoreCase = true) == true
 
 android {
     namespace = "com.filmiqoo.app"
@@ -32,8 +34,9 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 5
-        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.5-cinema-iran-rc"
+        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 6
+        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.5.1-cinema-preview"
+        manifestPlaceholders["appLabel"] = "Filmiqoo"
         buildConfigField(
             "String",
             "FIREBASE_API_KEY",
@@ -69,6 +72,11 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "LEGACY_SERVER_PREVIEW", legacyServerPreview.toString())
+            if (legacyServerPreview) {
+                applicationIdSuffix = ".preview"
+                manifestPlaceholders["appLabel"] = "Filmiqoo Preview"
+            }
             buildConfigField(
                 "String",
                 "FILMIQOO_API_BASE_URL",
@@ -76,6 +84,8 @@ android {
             )
         }
         release {
+            // Compatibility with an old server must never weaken a production release.
+            buildConfigField("boolean", "LEGACY_SERVER_PREVIEW", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField(

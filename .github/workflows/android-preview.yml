@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FILMIQOO_DEBUG_API_BASE_URL: https://api.filmiqo.com
+      FILMIQOO_LEGACY_SERVER_PREVIEW: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -68,6 +69,9 @@ jobs:
   experience-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      FILMIQOO_DEBUG_API_BASE_URL: https://api.filmiqo.com
+      FILMIQOO_LEGACY_SERVER_PREVIEW: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

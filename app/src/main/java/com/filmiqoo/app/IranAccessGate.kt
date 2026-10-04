@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
@@ -57,7 +56,7 @@ internal class IranAccessInterceptor : Interceptor {
     }
 }
 
-internal data class IranAccessViewState(val checking: Boolean = true, val allowed: Boolean = false, val message: String = "")
+internal data class IranAccessViewState(val checking: Boolean = true, val allowed: Boolean = false, val message: String = "", val legacyPreview: Boolean = false)
 
 @Composable
 fun IranAccessGate(content: @Composable () -> Unit) {
@@ -66,6 +65,7 @@ fun IranAccessGate(content: @Composable () -> Unit) {
     val networkOnline = rememberNetworkOnline()
     val session = remember { SessionStore(context.applicationContext) }
     val client = remember { OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).callTimeout(10, TimeUnit.SECONDS).build() }
+    val verifier = remember(client) { IranAccessVerifier(client) }
     var state by remember { mutableStateOf(IranAccessViewState()) }
     var retry by remember { mutableIntStateOf(0) }
     var validUntil by remember { mutableLongStateOf(0L) }
@@ -85,26 +85,15 @@ fun IranAccessGate(content: @Composable () -> Unit) {
                 if (SystemClock.elapsedRealtime() >= validUntil) state = IranAccessViewState()
                 try {
                     val answer = withContext(Dispatchers.IO) {
-                        val base = session.baseUrl
-                        if (!base.startsWith("https://")) throw IranAccessDeniedException("آدرس امن سرور تنظیم نشده است.")
-                        val request = Request.Builder().url(base + "/v1/access").header("Cache-Control", "no-cache, no-store").get().build()
-                        client.newCall(request).execute().use { response ->
-                            val raw = response.body?.string().orEmpty()
-                            val json = runCatching { JSONObject(raw) }.getOrNull()
-                            val allowed = response.isSuccessful && json?.optBoolean("allowed") == true &&
-                                json.optString("country") == "IR" && json.optString("policy") == "iran-only-v1" && json.optBoolean("enforced")
-                            if (!allowed) {
-                                val message = json?.optString("error")?.takeIf { it.isNotBlank() && it != "null" }
-                                    ?: "نسخهٔ سرور هنوز امکان تأیید دسترسی ایران را ندارد. فعال‌سازی سمت سرور لازم است."
-                                throw IranAccessDeniedException(message)
-                            }
-                            true
-                        }
+                        verifier.verify(session.baseUrl)
                     }
-                    if (answer) {
+                    // A legacy response cannot clear an explicit denial received by another API call.
+                    if (answer == IranAccessResult.VERIFIED_IRAN || IranAccessEvents.denial.value == null) {
                         validUntil = SystemClock.elapsedRealtime() + 60_000L
                         IranAccessEvents.denial.value = null
-                        state = IranAccessViewState(false, true)
+                        state = IranAccessViewState(false, true, legacyPreview = answer == IranAccessResult.LEGACY_PREVIEW)
+                    } else {
+                        state = IranAccessViewState(false, false, IranAccessEvents.denial.value.orEmpty())
                     }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) {
@@ -115,7 +104,17 @@ fun IranAccessGate(content: @Composable () -> Unit) {
             }
         }
     }
-    if (state.allowed && denial == null) content() else IranAccessScreen(state) { retry++ }
+    if (state.allowed && denial == null) {
+        Column(Modifier.fillMaxSize()) {
+            if (state.legacyPreview) {
+                Surface(color = CinemaInk, modifier = Modifier.fillMaxWidth().statusBarsPadding().testTag("legacy-preview-notice")) {
+                    Text("نسخهٔ آزمایشی • محدودیت ایران هنوز فعال نیست", color = CinemaSoft, fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+        }
+    } else IranAccessScreen(state) { retry++ }
 }
 
 @Composable
