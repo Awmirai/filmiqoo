@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 
 /** The social destination shares existing identity, follow, safety and messaging APIs. */
 @Composable
-fun CinemaSocialScreen(
+internal fun LegacyCinemaSocialScreen(
     social: SocialRepository, backend: BackendRepository, loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit, onOpenClip: (String) -> Unit, onOpenRoom: (SocialRoom) -> Unit,
     onCreator: (Creator) -> Unit, onSearch: () -> Unit, onInbox: () -> Unit, onCreate: () -> Unit,

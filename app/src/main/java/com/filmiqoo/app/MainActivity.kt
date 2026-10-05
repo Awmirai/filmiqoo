@@ -407,6 +407,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         }
     }
 
+    BackHandler(enabled=overlay==null && !showSearch && tab!=0) { tab=0 }
+
     if(showNotificationPrimer) {
         AlertDialog(
             onDismissRequest={showNotificationPrimer=false},
@@ -816,6 +818,62 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         pushOverlay(OverlayRoute.Room(conversation.id,conversation.title))
                     }
                 )
+                OverlayRoute.Account -> {
+                            if(backend.session.isLoggedIn) {
+                                MeScreen(
+                                    backend=backend,
+                                    repository=repository,
+                                    kidsMode=activeViewer?.kidsMode==true,
+                                    onMedia={overlay=OverlayRoute.Detail(it)},
+                                    onPlay={overlay=OverlayRoute.Player(it)},
+                                    onClips={overlay=OverlayRoute.Clips()},
+                                    onCommunity={tab=2},
+                                    onOpenPost={ postId ->
+                                        deepLinkPostId=postId
+                                        tab=2
+                                    },
+                                    onOpenClip={ clipId ->
+                                        overlay=OverlayRoute.Clips(clipId)
+                                    },
+                                    onDownloads={overlay=OverlayRoute.Downloads},
+                                    onLibrary={overlay=OverlayRoute.Library},
+                                    onSocialSaves={overlay=OverlayRoute.SocialSaves},
+                                    onHistory={overlay=OverlayRoute.History},
+                                    onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
+                                    onInbox={overlay=OverlayRoute.Inbox},
+                                    onSettings={overlay=OverlayRoute.Settings},
+                                    onViewerProfiles={
+                                        overlay=if(activeViewer?.kidsMode==true)
+                                            OverlayRoute.ParentalGate
+                                        else
+                                            OverlayRoute.ViewerProfiles
+                                    },
+                                    onParentalControls={overlay=OverlayRoute.ParentalControls},
+                                    onSecurity={overlay=OverlayRoute.Security},
+                                    onSafety={overlay=OverlayRoute.Safety},
+                                    onFollowRequests={overlay=OverlayRoute.FollowRequests},
+                                    onCloseFriends={overlay=OverlayRoute.CloseFriends},
+                                    onEditProfile={overlay=OverlayRoute.EditProfile},
+                                    onFilmDna={overlay=OverlayRoute.FilmDna},
+                                    onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
+                                    onSeriesCalendar={overlay=OverlayRoute.SeriesCalendar},
+                                    onSocialCollections={overlay=OverlayRoute.SocialCollections()},
+                                    onLoggedOut={
+                                        backend.viewerProfiles.clear()
+                                        activeViewer=null
+                                        authenticated=false
+                                        previewMode=false
+                                    }
+                                )
+                            } else {
+                                MeSignedOutScreen(
+                                    onLogin={overlay=OverlayRoute.Auth},
+                                    onClub={tab=2},
+                                    onClips={overlay=OverlayRoute.Clips()}
+                                )
+                            }
+                        }
+                OverlayRoute.Discover -> CinemaDiscoverScreen(repository,{pushOverlay(OverlayRoute.Detail(it))},{showSearch=true},onBack=closeOverlay)
                 OverlayRoute.Settings -> SettingsScreen(
                     backend=backend,
                     onBack=closeOverlay
@@ -970,22 +1028,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)}
                 )
             }
-            else -> Scaffold(
-                containerColor=FqBg,
-                contentWindowInsets=WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
-                bottomBar={
-                    FilmiqooBottomBar(
-                        selected=tab,
-                        kidsMode=activeViewer?.kidsMode==true,
-                        onSelected={ index ->
-                            overlayBackStack.clear()
-                            tab=index
-                            if(index!=2) deepLinkPostId=null
-                        }
-                    )
-                }
-            ) { padding ->
-                Box(Modifier.padding(padding)) {
+            else -> CinemaAppShell(tab,activeViewer?.kidsMode==true,{ index ->
+                overlayBackStack.clear(); tab=index; if(index!=2)deepLinkPostId=null
+            }) {
                     bottomTabStateHolder.SaveableStateProvider(
                         key="main-tab-"+tab
                     ) {
@@ -999,7 +1044,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onStory={m,i->overlay=OverlayRoute.Story(m,i)},
                             onSearch={
                                 if(activeViewer?.kidsMode!=true) {
-                                    showSearch=true
+                                    tab=1
                                 }
                             },
                             onNotifications=openNotifications,
@@ -1007,13 +1052,12 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onClips={overlay=OverlayRoute.Clips()},
                             onClub={tab=2},
                             onWatchParty={overlay=OverlayRoute.WatchParty(it)},
-                            badgeRefreshKey=socialBadgeRefresh
+                            badgeRefreshKey=socialBadgeRefresh,
+                            onAccount={overlay=OverlayRoute.Account}
                         )
-                        1 -> CinemaDiscoverScreen(
-                            repository=repository,
-                            onMedia={overlay=OverlayRoute.Detail(it)},
-                            onSearchAll={showSearch=true}
-                        )
+                        1 -> PremiumSearchScreen(repository,backend,{tab=0},{overlay=OverlayRoute.Detail(it)},
+                            {overlay=OverlayRoute.CreatorPage(it)},{deepLinkPostId=it;tab=2},{overlay=OverlayRoute.Clips(it)},
+                            onDiscover={overlay=OverlayRoute.Discover})
                         2 -> CinemaSocialScreen(
                             social=social,
                             backend=backend,
@@ -1033,71 +1077,14 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             initialPostId=deepLinkPostId,
                             onFocusedPostConsumed={deepLinkPostId=null}
                         )
-                        3 -> if (backend.session.isLoggedIn) InboxScreen(
-                            backend=backend, onBack={tab=0},
-                            onOpenRoom={conversation -> socialBadgeRefresh++; overlay=OverlayRoute.Room(conversation.id,conversation.title)}
-                        ) else Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment=Alignment.Center) {
-                            CinemaNotice("گفت‌وگو از اینجا شروع می‌شود", "برای پیام‌دادن به دوستان سینمایی‌ات وارد حساب شو.", Icons.Default.ChatBubbleOutline, "ورود", { overlay=OverlayRoute.Auth })
-                        }
-                        else -> {
-                            if(backend.session.isLoggedIn) {
-                                MeScreen(
-                                    backend=backend,
-                                    repository=repository,
-                                    kidsMode=activeViewer?.kidsMode==true,
-                                    onMedia={overlay=OverlayRoute.Detail(it)},
-                                    onPlay={overlay=OverlayRoute.Player(it)},
-                                    onClips={overlay=OverlayRoute.Clips()},
-                                    onCommunity={tab=2},
-                                    onOpenPost={ postId ->
-                                        deepLinkPostId=postId
-                                        tab=2
-                                    },
-                                    onOpenClip={ clipId ->
-                                        overlay=OverlayRoute.Clips(clipId)
-                                    },
-                                    onDownloads={overlay=OverlayRoute.Downloads},
-                                    onLibrary={overlay=OverlayRoute.Library},
-                                    onSocialSaves={overlay=OverlayRoute.SocialSaves},
-                                    onHistory={overlay=OverlayRoute.History},
-                                    onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
-                                    onInbox={overlay=OverlayRoute.Inbox},
-                                    onSettings={overlay=OverlayRoute.Settings},
-                                    onViewerProfiles={
-                                        overlay=if(activeViewer?.kidsMode==true)
-                                            OverlayRoute.ParentalGate
-                                        else
-                                            OverlayRoute.ViewerProfiles
-                                    },
-                                    onParentalControls={overlay=OverlayRoute.ParentalControls},
-                                    onSecurity={overlay=OverlayRoute.Security},
-                                    onSafety={overlay=OverlayRoute.Safety},
-                                    onFollowRequests={overlay=OverlayRoute.FollowRequests},
-                                    onCloseFriends={overlay=OverlayRoute.CloseFriends},
-                                    onEditProfile={overlay=OverlayRoute.EditProfile},
-                                    onFilmDna={overlay=OverlayRoute.FilmDna},
-                                    onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
-                                    onSeriesCalendar={overlay=OverlayRoute.SeriesCalendar},
-                                    onSocialCollections={overlay=OverlayRoute.SocialCollections()},
-                                    onLoggedOut={
-                                        backend.viewerProfiles.clear()
-                                        activeViewer=null
-                                        authenticated=false
-                                        previewMode=false
-                                    }
-                                )
-                            } else {
-                                MeSignedOutScreen(
-                                    onLogin={overlay=OverlayRoute.Auth},
-                                    onClub={tab=2},
-                                    onClips={overlay=OverlayRoute.Clips()}
-                                )
-                            }
-                        }
+                        3 -> CinemaLibraryScreen(backend,repository,{tab=0},{overlay=OverlayRoute.Detail(it)},
+                            {overlay=OverlayRoute.Player(it)},onDownloads={overlay=OverlayRoute.Downloads},
+                            onHistory={overlay=OverlayRoute.History},onFilmDna={overlay=OverlayRoute.FilmDna},
+                            onRequireAuth={overlay=OverlayRoute.Auth},showBack=false,onAccount={overlay=OverlayRoute.Account})
+
                     }
                 
                     }
-                }
             }
         }
     }

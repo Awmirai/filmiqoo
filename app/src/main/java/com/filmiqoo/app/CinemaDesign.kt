@@ -141,33 +141,7 @@ internal fun CinemaNotice(title: String, message: String, icon: ImageVector = Ic
     }
 }
 
-/** Destination labels deliberately match the existing route IDs. */
 @Composable
 internal fun CinemaBottomBar(selected: Int, kidsMode: Boolean, onSelected: (Int) -> Unit) {
-    val entries = if (kidsMode) listOf(Triple(0, "خانه", Icons.Default.Home), Triple(4, "من", Icons.Default.PersonOutline)) else listOf(
-        Triple(0, "خانه", Icons.Default.Home), Triple(1, "تماشا", Icons.Default.Explore),
-        Triple(2, "سینماکلاب", Icons.Default.Diversity3), Triple(3, "پیام‌ها", Icons.Default.ChatBubbleOutline), Triple(4, "من", Icons.Default.PersonOutline))
-    Box(Modifier.fillMaxWidth().background(CinemaInk).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-        Surface(Modifier.widthIn(max = 760.dp).fillMaxWidth(), color = CinemaSurface, shape = RoundedCornerShape(32.dp),
-            border = BorderStroke(1.dp, CinemaLine), shadowElevation = 12.dp) {
-            Row(Modifier.fillMaxWidth().selectableGroup().heightIn(min = 72.dp)) {
-                entries.forEach { (id, label, icon) ->
-                    val active = selected == id
-                    val tint by animateColorAsState(if (active) CinemaAccent else CinemaSoft, label = "navigation-tint")
-                    val indicatorWidth by animateDpAsState(if (active) 48.dp else 32.dp, label = "navigation-indicator")
-                    Column(Modifier.weight(1f).heightIn(min = 76.dp)
-                        .selectable(active, role = Role.Tab, onClick = { if (!active) onSelected(id) }).testTag("navigation-$id")
-                        .padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                        Box(Modifier.size(width = indicatorWidth, height = 30.dp).clip(RoundedCornerShape(10.dp))
-                            .background(if (active) CinemaAccent.copy(alpha = .15f) else Color.Transparent), contentAlignment = Alignment.Center) {
-                            Icon(icon, null, tint = tint, modifier = Modifier.size(23.dp))
-                        }
-                        Text(label, color = if (active) CinemaPaper else CinemaSoft, fontSize = 12.sp,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp))
-                    }
-                }
-            }
-        }
-    }
+    CinemaNavigation(selected, kidsMode, onSelected)
 }

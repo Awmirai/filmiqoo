@@ -1,17 +1,13 @@
 package com.filmiqoo.app
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -20,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,48 +25,33 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 @Composable
-internal fun CinemaSpotlight(bundle: HomeBundle, onMedia: (MediaItem) -> Unit, onStory: (MediaItem, Int) -> Unit) {
+internal fun CinemaSpotlight(bundle:HomeBundle,onMedia:(MediaItem)->Unit,onStory:(MediaItem,Int)->Unit) {
     var category by rememberSaveable { mutableIntStateOf(0) }
-    val choices = when (category) { 1 -> bundle.popularMovies; 2 -> bundle.popularTv; else -> bundle.trending }.distinctBy(::cinemaMediaKey).take(7)
-    val pager = rememberPagerState { choices.size }
-    LaunchedEffect(category) { if (choices.isNotEmpty()) pager.scrollToPage(0) }
+    val choices=(when(category){1->bundle.popularMovies;2->bundle.popularTv;else->bundle.trending}).distinctBy(::cinemaMediaKey).take(5)
+    val pager=rememberPagerState { choices.size }
+    LaunchedEffect(category){if(choices.isNotEmpty())pager.scrollToPage(0)}
+    val window=LocalConfiguration.current
     Column(Modifier.testTag("home-spotlight")) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("برای امشب", "فیلم", "سریال").forEachIndexed { index, label -> CinemaTag(label, index == category) { category = index } }
+        LazyRow(contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            listOf("این روزها","فیلم","سریال").forEachIndexed { i,label -> item { CinemaTag(label,category==i){category=i} } }
         }
-        if (choices.isNotEmpty()) HorizontalPager(pager, key = { cinemaMediaKey(choices[it]) }, modifier = Modifier.fillMaxWidth()) { index ->
-            val media = choices[index]
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val height = (maxWidth * 1.2f).coerceIn(430.dp, 620.dp)
-                Box(Modifier.fillMaxWidth().heightIn(min = height).background(CinemaInk)) {
-                    CinemaImage(media.backdropPath ?: media.posterPath, Modifier.matchParentSize(), true)
-                    Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .18f), Color.Transparent, CinemaInk.copy(alpha = .7f), CinemaInk))))
-                    Column(Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 26.dp).padding(top = 220.dp, bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(color = CinemaInk.copy(alpha = .65f), shape = RoundedCornerShape(30.dp), border = BorderStroke(1.dp, CinemaLine)) {
-                            Text("انتخاب‌های سینمایی · ${index + 1} از ${choices.size}", color = CinemaGold, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp))
-                        }
-                        Text(media.title, color = CinemaPaper, fontWeight = FontWeight.Black, fontSize = 32.sp, lineHeight = 41.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
-                        Text(listOf(media.year, if (media.type == MediaType.TV) "سریال" else "فیلم", if (media.vote > 0) "★ ${String.format(Locale.US, "%.1f", media.vote)} TMDB" else "").filter(String::isNotBlank).joinToString("  ·  "), color = CinemaSoft, fontSize = 13.sp, modifier = Modifier.padding(vertical = 12.dp))
-                        CinemaAction(Icons.Default.PlayCircleOutline, "کشف این عنوان", { onMedia(media) }, Modifier.widthIn(min = 210.dp), primary = true)
+        if(choices.isNotEmpty()) HorizontalPager(pager,key={cinemaMediaKey(choices[it])},contentPadding=PaddingValues(horizontal=20.dp),pageSpacing=12.dp) { index ->
+            val media=choices[index]
+            Surface(shape=RoundedCornerShape(20.dp),color=CinemaSurface,modifier=Modifier.fillMaxWidth()) {
+                Column {
+                    Box(Modifier.fillMaxWidth().height((window.screenHeightDp.dp*.25f).coerceIn(128.dp,230.dp))) {
+                        CinemaImage(media.backdropPath?:media.posterPath,Modifier.fillMaxSize(),true)
+                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent,CinemaSurface))))
+                        Text("${index+1} / ${choices.size}",color=CinemaPaper,style=MaterialTheme.typography.labelMedium,
+                            modifier=Modifier.align(Alignment.TopEnd).padding(14.dp).background(CinemaInk.copy(alpha=.8f),RoundedCornerShape(8.dp)).padding(8.dp))
+                    }
+                    Column(Modifier.padding(horizontal=20.dp).padding(bottom=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(media.title,color=CinemaPaper,fontWeight=FontWeight.Bold,fontSize=24.sp,lineHeight=32.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        Text(listOf(media.year,if(media.type==MediaType.TV)"سریال" else "فیلم",if(media.vote>0)"TMDB ${String.format(Locale.US,"%.1f",media.vote)}" else "").filter(String::isNotBlank).joinToString(" · "),color=CinemaSoft,fontSize=12.sp)
+                        CinemaAction(Icons.Outlined.ArrowBack,"کشف این عنوان",{onMedia(media)},Modifier.fillMaxWidth(),primary=true)
                     }
                 }
             }
-        }
-        Row(Modifier.fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.Center) {
-            repeat(choices.size) { index -> Box(Modifier.padding(3.dp).size(if (index == pager.currentPage) 22.dp else 6.dp, 6.dp).clip(CircleShape).background(if (index == pager.currentPage) CinemaAccent else CinemaLine)) }
-        }
-        CinemaHeading("در یک نگاه", "قصهٔ بعدی‌ات را پیدا کن")
-        LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            itemsIndexed(bundle.trending.take(10), key = { _, it -> cinemaMediaKey(it) }) { index, media ->
-                Column(Modifier.width(80.dp).clickable { onStory(media, index) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(shape = CircleShape, border = BorderStroke(2.dp, CinemaAccent), modifier = Modifier.size(78.dp)) {
-                        CinemaImage(media.posterPath, Modifier.padding(4.dp).clip(CircleShape))
-                    }
-                    Text(media.title, color = CinemaPaper, fontSize = 11.sp, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
-                }
-            }
-        }
+        } else Box(Modifier.padding(20.dp)) { CinemaNotice("هنوز عنوانی در این بخش نیست","از جست‌وجو برای پیدا کردن فیلم یا سریال استفاده کن.") }
     }
 }

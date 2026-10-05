@@ -23,68 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun CinemaLibraryScreen(
-    backend: BackendRepository,
-    repository: TmdbRepository,
-    onBack: () -> Unit,
-    onMedia: (MediaItem) -> Unit,
-    onPlay: (PlaybackTarget) -> Unit,
-    onDownloads: () -> Unit = {},
-    onHistory: () -> Unit = {},
-    onFilmDna: () -> Unit = {},
-    onRequireAuth: () -> Unit = {},
-    showBack: Boolean = true
-) {
-    val context = LocalContext.current
-    val profile = backend.viewerProfiles.activeId()
-    val personal = remember(profile) { CinemaPersonalStore(context, profile) }
-    var mode by rememberSaveable { mutableIntStateOf(0) }
-    var favorites by rememberSaveable { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
-    val localItems = remember(personal, favorites) { if (favorites) personal.favorites() else personal.saved() }
-    val items = localItems.filter { cinemaSearchKey(it.title).contains(cinemaSearchKey(query)) || cinemaSearchKey(it.originalTitle).contains(cinemaSearchKey(query)) }
-    if (showBack) BackHandler { if (mode == 1) mode = 0 else onBack() }
-    Column(Modifier.fillMaxSize().background(CinemaInk).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (showBack) IconButton(onBack) { Icon(Icons.Default.ArrowForward, "بازگشت", tint = CinemaPaper) }
-            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                Text("کتابخانهٔ من", fontSize = 25.sp, fontWeight = FontWeight.Black, color = CinemaPaper)
-                Text("فهرست‌ها، خاطره‌ها و ادامهٔ تماشا", fontSize = 12.sp, color = CinemaSoft)
-            }
-            IconButton(onDownloads) { Icon(Icons.Default.DownloadDone, "دانلودهای من", tint = CinemaPaper) }
-            IconButton(onHistory) { Icon(Icons.Default.History, "تاریخچهٔ تماشا", tint = CinemaPaper) }
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CinemaTag("فهرست‌های من", mode == 0) { mode = 0 }
-            CinemaTag("مدیریت تماشا", mode == 1) { mode = 1 }
-        }
-        if (mode == 1) {
-            Box(Modifier.weight(1f)) {
-                LibraryScreen(backend, repository, onBack, onMedia, onPlay, onDownloads, onHistory, onFilmDna, onRequireAuth, showBack = false)
-            }
-        } else {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CinemaTag("بعداً می‌بینم", !favorites) { favorites = false }
-                CinemaTag("پسندیده‌ها", favorites) { favorites = true }
-            }
-            OutlinedTextField(query, { query = it.take(100) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                singleLine = true, label = { Text("جستجو در فهرست من") }, leadingIcon = { Icon(Icons.Default.Search, null) })
-            LazyVerticalGrid(GridCells.Adaptive(128.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text("این فهرست روی همین دستگاه ذخیره می‌شود. برای فهرست‌های حساب، کالکشن‌ها و صحنه‌ها به «مدیریت تماشا» برو.", color = CinemaSoft, fontSize = 12.sp, lineHeight = 20.sp)
-                }
-                if (items.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-                    CinemaNotice(if (query.isBlank()) "داستان بعدی‌ات را انتخاب کن" else "نتیجه‌ای پیدا نشد",
-                        if (query.isBlank()) "در صفحهٔ هر فیلم یا سریال، «فهرست من» یا «پسندیدم» را بزن؛ حتی اگر هنوز فایل پخش نداشته باشد." else "نام کوتاه‌تر یا نام انگلیسی عنوان را امتحان کن.", Icons.Default.Bookmarks)
-                }
-                items(items, key = ::cinemaMediaKey) { media -> CinemaPoster(media, { onMedia(media) }, Modifier.fillMaxWidth()) }
-            }
-        }
-    }
-}
-
-@Composable
 fun CinemaCreateScreen(
     social: SocialRepository, backend: BackendRepository, repository: TmdbRepository,
     loggedIn: Boolean, onRequireAuth: () -> Unit, onOpenClub: () -> Unit, onOpenClips: () -> Unit,

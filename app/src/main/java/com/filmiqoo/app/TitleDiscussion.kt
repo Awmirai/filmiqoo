@@ -38,7 +38,8 @@ import java.util.UUID
 internal data class TitleComment(
     val id: String, val body: String, val spoiler: Boolean, val sticker: String, val gif: String,
     val authorId: String, val author: String, val avatar: String, val own: Boolean,
-    val likes: Int, val liked: Boolean, val replies: Int, val deleted: Boolean, val created: String
+    val likes: Int, val liked: Boolean, val replies: Int, val deleted: Boolean, val created: String,
+    val scope: String = "", val title: String = "", val poster: String = ""
 )
 internal data class DiscussionPage(val items: List<TitleComment>, val next: String?)
 internal fun discussionKey(media: MediaItem): String = if (media.id > 0)
@@ -54,14 +55,16 @@ internal class TitleDiscussionRepository(private val backend: BackendRepository)
                 val x = arr.getJSONObject(i)
                 add(TitleComment(x.getString("id"), x.optString("body"), x.optBoolean("spoiler"), x.optString("sticker"), x.optString("gifUrl"),
                     x.optString("authorId"), x.optString("authorName"), x.optString("avatarUrl"), x.optBoolean("own"), x.optInt("likes"),
-                    x.optBoolean("liked"), x.optInt("replies"), x.optBoolean("deleted"), x.optString("createdAt")))
+                    x.optBoolean("liked"), x.optInt("replies"), x.optBoolean("deleted"), x.optString("createdAt"),x.optString("scope"),x.optString("title"),x.optString("poster")))
             }
         }, root.optString("nextCursor").takeUnless { it.isBlank() || it == "null" })
     }
-    suspend fun send(key: String, client: String, text: String, parent: String?, spoiler: Boolean, sticker: String, upload: String) =
+    suspend fun send(key: String, client: String, text: String, parent: String?, spoiler: Boolean, sticker: String, upload: String, media: MediaItem? = null) =
         backend.postJson("/v1/discussions/${Uri.encode(key)}", JSONObject().put("clientId", client).put("body", text)
+            .put("title",media?.title.orEmpty().take(240)).put("poster",media?.posterPath.orEmpty().takeIf { it.startsWith("/") || it.startsWith("https://image.tmdb.org/") }.orEmpty())
             .put("parentId", parent.orEmpty()).put("spoiler", spoiler).put("sticker", sticker).put("uploadId", upload), true)
     suspend fun like(id: String, liked: Boolean) = backend.postJson("/v1/discussion-comments/$id/like", JSONObject().put("liked", liked), true)
+    suspend fun edit(id:String, body:String, spoiler:Boolean)=backend.postJson("/v1/discussion-comments/$id/edit",JSONObject().put("body",body).put("spoiler",spoiler),true)
     suspend fun remove(id: String) = backend.postJson("/v1/discussion-comments/$id/remove", JSONObject(), true)
     suspend fun report(id: String, reason: String) = backend.postJson("/v1/moderation/report", JSONObject().put("targetType", "discussion").put("targetId", id).put("reason", reason), true)
 }
@@ -88,13 +91,20 @@ internal fun CinemaReactionSticker(id: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun TitleDiscussion(media: MediaItem, backend: BackendRepository, onRequireAuth: () -> Unit) {
-    val key = discussionKey(media)
+internal fun TitleDiscussion(media: MediaItem, backend: BackendRepository, onRequireAuth: () -> Unit, episodes:List<DiscussionEpisode> = emptyList(), initialScope:String?=null) {
+    var selectedScope by rememberSaveable(media.key,initialScope) { mutableStateOf(initialScope ?: discussionKey(media)) }
+    val key = selectedScope
     var reply by remember(key) { mutableStateOf<TitleComment?>(null) }
     var refresh by remember(key) { mutableIntStateOf(0) }
     Column(Modifier.fillMaxWidth().testTag("title-discussion")) {
-        CinemaHeading("بعد از تماشا، حرف بزنیم", "دیدگاه‌ها، واکنش‌ها و گفت‌وگوی این عنوان")
-        DiscussionThread(key, null, backend, onRequireAuth, refresh, { reply = it })
+        CinemaHeading("دیدگاه‌ها", if(key.contains(":s"))"گفت‌وگوی همین قسمت؛ مراقب اسپویل باشید" else "نظر کلی دربارهٔ این اثر")
+        if(episodes.isNotEmpty()) LazyRow(contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            item { CinemaTag("کل سریال",key==discussionKey(media)){selectedScope=discussionKey(media)} }
+            items(episodes.distinct()) { episode -> val target=discussionKey(media)+":s${episode.season}:e${episode.episode}"
+                CinemaTag("فصل ${episode.season} · قسمت ${episode.episode}",key==target){selectedScope=target}
+            }
+        }
+        DiscussionThread(key, null, backend, onRequireAuth, refresh, { reply = it },media)
     }
     reply?.let { root ->
         ModalBottomSheet(onDismissRequest = { reply = null; refresh++ }, containerColor = CinemaInk,
@@ -104,14 +114,14 @@ internal fun TitleDiscussion(media: MediaItem, backend: BackendRepository, onReq
                     Text("پاسخ به ${root.author}", color = CinemaPaper, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton({ reply = null; refresh++ }) { Icon(Icons.Default.Close, "بستن پاسخ‌ها") }
                 }
-                DiscussionThread(key, root.id, backend, onRequireAuth, 0, {})
+                DiscussionThread(key, root.id, backend, onRequireAuth, 0, {},media)
             }
         }
     }
 }
 
 @Composable
-private fun DiscussionThread(key: String, parent: String?, backend: BackendRepository, onRequireAuth: () -> Unit, externalRefresh: Int, onReply: (TitleComment) -> Unit) {
+private fun DiscussionThread(key: String, parent: String?, backend: BackendRepository, onRequireAuth: () -> Unit, externalRefresh: Int, onReply: (TitleComment) -> Unit, media:MediaItem) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repository = remember(backend) { TitleDiscussionRepository(backend) }
@@ -136,6 +146,9 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
     var pickSticker by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<TitleComment?>(null) }
     var reporting by remember { mutableStateOf<TitleComment?>(null) }
+    var editing by remember { mutableStateOf<TitleComment?>(null) }
+    var editBody by rememberSaveable { mutableStateOf("") }
+    var editSpoiler by rememberSaveable { mutableStateOf(false) }
     val gifLoader = remember(context) { ImageLoader.Builder(context).components {
         if (android.os.Build.VERSION.SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory())
     }.build() }
@@ -197,7 +210,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
                     TextButton({ gifPicker.launch("image/gif") }, enabled = !busy) { Text("GIF", color = CinemaGold) }
                     Spacer(Modifier.weight(1f))
                     Button(onClick = { action {
-                        repository.send(key, client, draft, parent, spoiler, sticker, upload)
+                        repository.send(key, client, draft, parent, spoiler, sticker, upload,media)
                         draft = ""; sticker = ""; upload = ""; gif = ""; spoiler = false; client = UUID.randomUUID().toString()
                         cursor = null; refresh++; notice = "دیدگاهت منتشر شد."
                     } }, enabled = !busy && (draft.isNotBlank() || sticker.isNotBlank() || upload.isNotBlank()),
@@ -242,6 +255,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
                         if (comment.gif.isNotBlank()) AsyncImage(comment.gif, "GIF دیدگاه", imageLoader = gifLoader, modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp)))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if(comment.own && !comment.deleted) IconButton({editing=comment;editBody=comment.body;editSpoiler=comment.spoiler}){Icon(Icons.Default.Edit,"ویرایش دیدگاه",tint=CinemaSoft)}
                         if (!comment.deleted) TextButton({ action {
                             repository.like(comment.id, !comment.liked)
                             page = page?.copy(items = page!!.items.map { if (it.id == comment.id) it.copy(liked = !it.liked, likes = (it.likes + if (it.liked) -1 else 1).coerceAtLeast(0)) else it })
@@ -259,11 +273,18 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
             page?.next?.let { next -> TextButton({ cursor = next }, enabled = !loading) { Text("دیدگاه‌های قدیمی‌تر") } }
         }
     }
+    editing?.let { comment -> AlertDialog(onDismissRequest={editing=null},title={Text("ویرایش دیدگاه")},
+        text={Column { OutlinedTextField(editBody,{editBody=it.take(3000)},modifier=Modifier.fillMaxWidth(),minLines=2,maxLines=6)
+            Row(verticalAlignment=Alignment.CenterVertically){Checkbox(editSpoiler,{editSpoiler=it});Text("داستان را لو می‌دهد")} }},
+        confirmButton={TextButton({action {repository.edit(comment.id,editBody,editSpoiler);editing=null;refresh++}},enabled=!busy){Text("ذخیره")}},
+        dismissButton={TextButton({editing=null}){Text("انصراف")}}) }
     deleting?.let { comment -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("دیدگاه حذف شود؟") },
         text = { Text("پاسخ‌های دیگران باقی می‌ماند؛ متن و پیوست تو حذف می‌شود.") }, confirmButton = { TextButton({ deleting = null; action { repository.remove(comment.id); refresh++ } }) { Text("حذف") } },
         dismissButton = { TextButton({ deleting = null }) { Text("انصراف") } }) }
     reporting?.let { comment -> AlertDialog(onDismissRequest = { reporting = null }, title = { Text("گزارش دیدگاه") },
         text = { Column { listOf("spam" to "هرزنامه", "harassment" to "توهین و آزار", "spoiler" to "اسپویل بدون هشدار").forEach { (reason, label) ->
             TextButton({ reporting = null; action { repository.report(comment.id, reason); notice = "گزارش برای بررسی ثبت شد." } }) { Text(label) }
-        } } }, confirmButton = { TextButton({ reporting = null }) { Text("انصراف") } }) }
+        }; TextButton({ reporting=null;action{SafetyRepository(backend).toggleBlock(comment.authorId);refresh++;notice="کاربر مسدود شد."} }){Text("مسدودکردن نویسنده")} } }, confirmButton = { TextButton({ reporting = null }) { Text("انصراف") } }) }
 }
+
+internal data class DiscussionEpisode(val season:Int,val episode:Int)

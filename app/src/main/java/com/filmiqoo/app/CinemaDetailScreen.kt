@@ -169,11 +169,7 @@ fun CinemaDetailScreen(
                 ),
                 community = {
                     Column {
-                        if (id != null) Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CinemaAction(Icons.Default.Forum, "اتاق این عنوان", { onChat(title) }, Modifier.weight(1f))
-                            CinemaAction(Icons.Default.Groups, "با هم ببینیم", { onWatchParty(title) }, Modifier.weight(1f))
-                        }
-                        if (backend.viewerProfiles.active()?.kidsMode != true) TitleDiscussion(title, backend, onRequireAuth)
+                        if (backend.viewerProfiles.active()?.kidsMode != true) TitleDiscussion(title, backend, onRequireAuth, episodes=current.platform?.seasons.orEmpty().flatMap { season -> season.episodes.map { DiscussionEpisode(season.number,it.number) } })
                     }
                 }
             )

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 internal data class CinemaDetailActions(
     val back: () -> Unit = {}, val share: () -> Unit = {}, val save: () -> Unit = {},
@@ -64,6 +65,7 @@ internal fun CinemaDetailContent(
     val media = d.media
     val isSeries = media.type == MediaType.TV
     val listState = rememberLazyListState()
+    val uiScope = rememberCoroutineScope()
     val showToolbarTitle by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     var tab by rememberSaveable(media.key) { mutableStateOf(if (isSeries) "episodes" else "about") }
     var selectedSeason by rememberSaveable(media.key) { mutableIntStateOf(data.platform?.seasons?.firstOrNull { it.number > 0 }?.number ?: 1) }
@@ -104,10 +106,10 @@ internal fun CinemaDetailContent(
                     HorizontalDivider(color = CinemaLine)
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         CinemaAction(if (busy) Icons.Default.HourglassTop else Icons.Default.PlayArrow,
-                            when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "هنوز قابل پخش نیست"; isSeries && progress?.episodes?.values?.any { it.positionMs > 0 || it.completed } == true -> "ادامهٔ سریال"; isSeries -> "شروع تماشا"; else -> "پخش فیلم" },
+                            when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "هنوز قابل پخش نیست"; isSeries && progress?.episodes?.values?.any { it.positionMs > 0 || it.completed } == true -> "ادامهٔ سریال"; isSeries -> "پخش قسمت "+(resumable?.second?.number?.toString() ?: ""); else -> "پخش فیلم" },
                             { primaryId?.let(actions.play) }, Modifier.weight(1f).testTag("detail-primary"), primary = true, enabled = !busy && primaryId != null)
                         if (isSeries) {
-                            OutlinedIconButton({ tab = "episodes" }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
+                            OutlinedIconButton({ tab = "episodes"; uiScope.launch { listState.animateScrollToItem(2) } }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
                                 Icon(Icons.Default.FormatListNumbered, "انتخاب قسمت", tint = CinemaPaper)
                             }
                         } else {
@@ -120,7 +122,7 @@ internal fun CinemaDetailContent(
             }
         }
     ) { padding ->
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(padding).testTag("detail-scroll"), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(padding).imePadding().testTag("detail-scroll"), contentPadding = PaddingValues(bottom = 24.dp)) {
             item("hero") { CinemaTitleHero(data) }
             item("quick-actions") {
                 LazyRow(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -275,28 +277,26 @@ internal fun CinemaDetailContent(
 }
 
 @Composable
-private fun CinemaTitleHero(data: CinemaTitleData) {
-    val media = data.detail.media
+private fun CinemaTitleHero(data:CinemaTitleData) {
+    val media=data.detail.media
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val minHeight = (maxWidth * 1.15f).coerceIn(390.dp, 580.dp)
-        Box(Modifier.fillMaxWidth().heightIn(min = minHeight)) {
-            CinemaImage(media.backdropPath ?: media.posterPath, Modifier.matchParentSize(), backdrop = true)
-            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .12f), Color.Transparent, CinemaInk.copy(alpha = .7f), CinemaInk))))
-            Column(Modifier.fillMaxWidth().padding(horizontal = 26.dp).padding(top = 240.dp, bottom = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Surface(color = CinemaInk.copy(alpha = .8f), shape = RoundedCornerShape(30.dp), border = BorderStroke(1.dp, CinemaLine)) {
-                    Text(if (media.type == MediaType.MOVIE) "فیلم سینمایی" else "دنیای یک سریال", color = CinemaGold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp))
-                }
-                Text(media.title, color = CinemaPaper, fontSize = 34.sp, lineHeight = 44.sp, fontWeight = FontWeight.Black,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
-                Text(listOf(media.year, if (data.detail.runtime > 0) cinemaDuration(data.detail.runtime) else "").filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                if (media.vote > 0) Text("★ " + String.format(Locale.US, "%.1f", media.vote) + "  TMDB", color = CinemaGold, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                if (data.detail.tagline.isNotBlank()) Text(data.detail.tagline, color = CinemaSoft, fontSize = 13.sp, lineHeight = 22.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
+        val wide=maxWidth>=600.dp
+        Column {
+            Box(Modifier.fillMaxWidth().height(if(wide)220.dp else 180.dp)) {
+                CinemaImage(media.backdropPath?:media.posterPath,Modifier.fillMaxSize(),true)
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent,CinemaInk))))
             }
+            Row(Modifier.padding(horizontal=20.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
+                if(wide){CinemaImage(media.posterPath,Modifier.width(100.dp).height(150.dp).clip(RoundedCornerShape(12.dp)));Spacer(Modifier.width(20.dp))}
+                Column(Modifier.weight(1f)) {
+                    Text(if(media.type==MediaType.TV)"سریال" else "فیلم",color=CinemaAccent,style=MaterialTheme.typography.labelLarge)
+                    Text(media.title,color=CinemaPaper,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(top=4.dp))
+                    Text(listOf(media.year,if(data.detail.runtime>0)cinemaDuration(data.detail.runtime)else "").filter(String::isNotBlank).joinToString(" · "),color=CinemaSoft,modifier=Modifier.padding(top=8.dp))
+                    if(media.vote>0)Text("TMDB  ★ "+String.format(Locale.US,"%.1f",media.vote),color=CinemaPaper,style=MaterialTheme.typography.labelLarge,modifier=Modifier.padding(top=8.dp))
+                }
+            }
+            if(data.detail.genres.isNotEmpty())LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){items(data.detail.genres.distinct()){CinemaTag(it)}}
         }
-    }
-    if (data.detail.genres.isNotEmpty()) LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        items(data.detail.genres.distinct()) { CinemaTag(it) }
     }
 }
 

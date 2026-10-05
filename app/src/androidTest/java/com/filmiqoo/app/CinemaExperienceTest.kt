@@ -86,9 +86,9 @@ class CinemaExperienceTest {
             }
         }
         compose.onNodeWithTag("navigation-3").performClick().assertIsSelected()
-        compose.onNodeWithTag("navigation-3").assert(hasText("پیام‌ها"))
+        compose.onNodeWithTag("navigation-3").assert(hasText("کتابخانه"))
         compose.onNodeWithTag("navigation-2").performClick().assertIsSelected()
-        compose.onNodeWithTag("navigation-2").assert(hasText("سینماکلاب"))
+        compose.onNodeWithTag("navigation-2").assert(hasText("باشگاه فیلم"))
     }
 
     @Test fun kidsNavigationDoesNotExposeSocialAndDiscoveryRoutes() {

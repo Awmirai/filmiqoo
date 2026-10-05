@@ -128,12 +128,14 @@ fun AuthScreen(
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()
+                .widthIn(max=520.dp)
                 .padding(horizontal=20.dp),
             horizontalAlignment=Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(42.dp))
+            Spacer(Modifier.height(24.dp))
 
-            FilmiqooBrandMark(size=68.dp)
+            FilmiqooBrandMark(size=48.dp)
 
             Text(
                 "FILMIQOO",

@@ -124,7 +124,7 @@ fun CinemaHomeScreen(
     repository: TmdbRepository, backend: BackendRepository, loggedIn: Boolean,
     onMedia: (MediaItem) -> Unit, onPlay: (PlaybackTarget) -> Unit, onStory: (MediaItem, Int) -> Unit,
     onSearch: () -> Unit, onNotifications: () -> Unit, onReleases: () -> Unit, onClips: () -> Unit,
-    onClub: () -> Unit, onWatchParty: (MediaItem?) -> Unit, badgeRefreshKey: Int = 0
+    onClub: () -> Unit, onWatchParty: (MediaItem?) -> Unit, badgeRefreshKey: Int = 0, onAccount: () -> Unit = {}
 ) {
     if (loggedIn && backend.viewerProfiles.active()?.kidsMode == true) {
         PremiumHomeScreen(repository, backend, loggedIn, onMedia, onPlay, onStory, onSearch, onNotifications, onReleases, onClips, onClub, onWatchParty, badgeRefreshKey)
@@ -160,30 +160,12 @@ fun CinemaHomeScreen(
                     Text("FILMIQOO", color = CinemaPaper, fontSize = 21.sp, fontWeight = FontWeight.Black)
                     Text("خانهٔ فیلم‌بازها", color = CinemaSoft, fontSize = 12.sp)
                 }
-                IconButton(onSearch) { Icon(Icons.Default.Search, "جستجو", tint = CinemaPaper) }
+                IconButton(onAccount) { Icon(Icons.Default.AccountCircle, "حساب و تنظیمات", tint = CinemaPaper) }
                 IconButton(onNotifications) { Icon(Icons.Default.NotificationsNone, "اعلان‌ها", tint = CinemaPaper) }
             }
         }
         if (data == null && error == null) item("loading") { LinearProgressIndicator(color = CinemaAccent, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) }
         error?.let { message -> item("error") { Box(Modifier.padding(horizontal = 20.dp)) { CinemaNotice("خانه آماده نشد", message, Icons.Default.CloudOff, "تلاش دوباره", { retry++ }) } } }
-        data?.let { bundle -> item("hero") { CinemaSpotlight(bundle, onMedia, onStory) } }
-        item("latest-catalog") {
-            RecentCatalogShelf(latest, onMedia)
-        }
-        item("regions") {
-            CinemaHeading("جهانِ سلیقهٔ تو", "از سینمای ایران تا قصه‌های آن سوی دنیا")
-            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                items(CinemaRegion.entries) { entry ->
-                    val code = when (entry) { CinemaRegion.IRAN -> "IR"; CinemaRegion.KOREA -> "KR"; CinemaRegion.INDIA -> "IN"; CinemaRegion.BOLLYWOOD -> "HI"; CinemaRegion.WORLD -> "WORLD" }
-                    Surface(Modifier.width(118.dp).heightIn(min = 108.dp).clickable { region = entry.name }, color = CinemaSurface, shape = RoundedCornerShape(20.dp), border = androidx.compose.foundation.BorderStroke(1.dp, CinemaLine)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                            Text(code, color = CinemaAccent, fontSize = if (code.length > 2) 17.sp else 25.sp, fontWeight = FontWeight.Black)
-                            Text(entry.label, color = CinemaPaper, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                        }
-                    }
-                }
-            }
-        }
         if (continued.isNotEmpty()) item("continue") {
             CinemaHeading("از همان‌جا ادامه بده", "موقعیت ذخیره‌شدهٔ تماشای تو")
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -200,26 +182,18 @@ fun CinemaHomeScreen(
                 }
             }
         }
+        data?.let { bundle -> item("hero") { CinemaSpotlight(bundle, onMedia, onStory) } }
+        item("latest-catalog") {
+            RecentCatalogShelf(latest, onMedia)
+        }
         data?.let { bundle ->
             item("iran") { CinemaShelf("ایران؛ خاطره و امروز", "فیلم و سریال ایرانی، قدیمی و تازه", bundle.iranian, onMedia) { region = CinemaRegion.IRAN.name } }
             item("korea") { CinemaShelf("قرار بعدی با K-drama", "نام عنوان‌های کره‌ای به انگلیسی", bundle.korean, onMedia) { region = CinemaRegion.KOREA.name } }
             item("india") { CinemaShelf("رنگ‌های سینمای هند", "هند، بالیوود و سینمای زبان‌های دیگر", bundle.bollywood, onMedia) { region = CinemaRegion.INDIA.name } }
-            item("world") { CinemaShelf("روی پردهٔ جهان", "انتخاب‌های محبوب سینما", bundle.popularMovies, onMedia) { region = CinemaRegion.WORLD.name } }
-            item("series") { CinemaShelf("یک قسمت دیگر…", "سریال‌های محبوب جهان", bundle.popularTv, onMedia) { region = CinemaRegion.WORLD.name } }
+            item("world") { CinemaShelf("روی پردهٔ جهان", "فیلم‌های پرطرفدار در TMDB", bundle.popularMovies, onMedia) { region = CinemaRegion.WORLD.name } }
+            item("series") { CinemaShelf("یک قسمت دیگر…", "سریال‌های پرطرفدار در TMDB", bundle.popularTv, onMedia) { region = CinemaRegion.WORLD.name } }
         }
-        item("fan-tools") {
-            CinemaHeading("فراتر از تماشا", "برای کسی که با فیلم زندگی می‌کند")
-            Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CinemaAction(Icons.Default.CalendarMonth, "تقویم انتشار", onReleases, Modifier.weight(1f))
-                    CinemaAction(Icons.Default.Forum, "کلاب فیلم‌بازها", onClub, Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CinemaAction(Icons.Default.MovieFilter, "کلیپ‌ها", onClips, Modifier.weight(1f))
-                    CinemaAction(Icons.Default.Groups, "تماشای گروهی", { onWatchParty(null) }, Modifier.weight(1f))
-                }
-            }
-        }
+        item("calendar") { Box(Modifier.padding(horizontal=20.dp)) { CinemaAction(Icons.Default.CalendarMonth,"تقویم قسمت‌های جدید",onReleases,Modifier.fillMaxWidth()) } }
         item("notice") { Text("اطلاعات عنوان‌ها از بانک‌های فراداده دریافت می‌شود. امکان پخش و دانلود به موجود بودن فایل مجاز در کاتالوگ فیلمیکو بستگی دارد.", color = CinemaSoft, fontSize = 12.sp, lineHeight = 20.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) }
     }
 }

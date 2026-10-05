@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-var discussionScope = regexp.MustCompile(`^(movie|series):[1-9][0-9]{0,10}$|^catalog:[a-f0-9-]{36}$`)
+var discussionScope = regexp.MustCompile(`^movie:[1-9][0-9]{0,10}$|^series:[1-9][0-9]{0,10}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$|^catalog:[a-f0-9-]{36}$`)
 var discussionUUID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 var discussionStickers = map[string]bool{"popcorn": true, "masterpiece": true, "mindblown": true, "tears": true, "applause": true, "rewatch": true, "boring": true, "heart": true}
 
@@ -35,12 +35,12 @@ func discussionCursor(raw string) (time.Time, string, bool) {
 func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 	scope, viewer, parent := chi.URLParam(r, "scope"), userIDFromContext(r.Context()), r.URL.Query().Get("parent")
 	before, beforeID, valid := discussionCursor(r.URL.Query().Get("cursor"))
-	if !discussionScope.MatchString(scope) || !valid || (parent != "" && !discussionUUID.MatchString(parent)) {
+	if (scope != "feed" && !discussionScope.MatchString(scope)) || !valid || (parent != "" && !discussionUUID.MatchString(parent)) {
 		writeJSON(w, 400, map[string]string{"error": "invalid discussion or cursor"})
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `
-	 SELECT c.id::text,c.body,c.spoiler,c.sticker,c.deleted,c.created_at,
+	 SELECT c.id::text,c.body,c.spoiler,c.sticker,c.deleted,c.created_at,c.scope,c.title_label,c.poster_path,
 	 p.user_id::text,p.display_name,p.avatar_url,COALESCE(u.object_key,''),
 	 (SELECT count(*) FROM title_comment_likes l WHERE l.comment_id=c.id),
 	 EXISTS(SELECT 1 FROM title_comment_likes l WHERE l.comment_id=c.id AND l.user_id::text=$2),
@@ -48,7 +48,7 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 	   AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_user_id::text=$2 AND b.blocked_user_id=ch.user_id) OR (b.blocked_user_id::text=$2 AND b.blocker_user_id=ch.user_id)))
 	 FROM title_comments c JOIN profiles p ON p.user_id=c.user_id JOIN users a ON a.id=c.user_id
 	 LEFT JOIN ugc_uploads u ON u.id=c.upload_id AND u.status='uploaded'
-	 WHERE c.scope=$1 AND COALESCE(c.parent_id::text,'')=$3 AND (c.created_at,c.id)<($4,$5::uuid)
+	 WHERE (($1='feed' AND c.parent_id IS NULL AND NOT c.deleted) OR (c.scope=$1 AND COALESCE(c.parent_id::text,'')=$3)) AND (c.created_at,c.id)<($4,$5::uuid)
 	 AND a.status='active'
 	 AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_user_id::text=$2 AND b.blocked_user_id=c.user_id) OR (b.blocked_user_id::text=$2 AND b.blocker_user_id=c.user_id))
 	 ORDER BY c.created_at DESC,c.id DESC LIMIT 21`, scope, viewer, parent, before, beforeID)
@@ -60,11 +60,11 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 	items := make([]map[string]any, 0)
 	var next any
 	for rows.Next() {
-		var id, body, sticker, author, name, avatar, key string
+		var id, body, sticker, author, name, avatar, key, itemScope, titleLabel, posterPath string
 		var spoiler, deleted, liked bool
 		var created time.Time
 		var likes, replies int64
-		if err = rows.Scan(&id, &body, &spoiler, &sticker, &deleted, &created, &author, &name, &avatar, &key, &likes, &liked, &replies); err != nil {
+		if err = rows.Scan(&id, &body, &spoiler, &sticker, &deleted, &created, &itemScope, &titleLabel, &posterPath, &author, &name, &avatar, &key, &likes, &liked, &replies); err != nil {
 			writeError(w, 500, err)
 			return
 		}
@@ -83,7 +83,7 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 			url = ""
 			spoiler = false
 		}
-		items = append(items, map[string]any{"id": id, "body": body, "spoiler": spoiler, "sticker": sticker, "gifUrl": url, "deleted": deleted, "createdAt": created, "authorId": author, "authorName": name, "avatarUrl": avatar, "own": viewer == author, "liked": liked, "likes": likes, "replies": replies})
+		items = append(items, map[string]any{"id": id, "scope": itemScope, "title": titleLabel, "poster": posterPath, "body": body, "spoiler": spoiler, "sticker": sticker, "gifUrl": url, "deleted": deleted, "createdAt": created, "authorId": author, "authorName": name, "avatarUrl": avatar, "own": viewer == author, "liked": liked, "likes": likes, "replies": replies})
 	}
 	if err = rows.Err(); err != nil {
 		writeError(w, 500, err)
@@ -101,12 +101,19 @@ func (s *Server) addTitleComment(w http.ResponseWriter, r *http.Request) {
 		Spoiler  bool   `json:"spoiler"`
 		Sticker  string `json:"sticker"`
 		UploadID string `json:"uploadId"`
+		Title    string `json:"title"`
+		Poster   string `json:"poster"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 20000)).Decode(&b); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid comment"})
 		return
 	}
 	b.Body = strings.TrimSpace(b.Body)
+	b.Title = strings.TrimSpace(b.Title)
+	if len([]rune(b.Title)) > 240 || len(b.Poster) > 500 || (b.Poster != "" && !strings.HasPrefix(b.Poster, "/") && !strings.HasPrefix(b.Poster, "https://image.tmdb.org/")) {
+		writeJSON(w, 400, map[string]string{"error": "invalid title context"})
+		return
+	}
 	if !discussionScope.MatchString(scope) || !discussionUUID.MatchString(b.ClientID) || len([]rune(b.Body)) > 3000 ||
 		(b.ParentID != "" && !discussionUUID.MatchString(b.ParentID)) || (b.UploadID != "" && !discussionUUID.MatchString(b.UploadID)) ||
 		(b.Sticker != "" && !discussionStickers[b.Sticker]) || (b.Body == "" && b.Sticker == "" && b.UploadID == "") || (b.Sticker != "" && b.UploadID != "") {
@@ -155,9 +162,9 @@ func (s *Server) addTitleComment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var id string
-	err = tx.QueryRow(r.Context(), `INSERT INTO title_comments(scope,user_id,client_id,body,parent_id,spoiler,sticker,upload_id)
-	 SELECT $1,$2,$3,$4,NULLIF($5,'')::uuid,$6,$7,NULLIF($8,'')::uuid WHERE EXISTS(SELECT 1 FROM users WHERE id=$2 AND status='active')
-	 ON CONFLICT(user_id,client_id) DO UPDATE SET client_id=EXCLUDED.client_id WHERE title_comments.scope=EXCLUDED.scope RETURNING id::text`, scope, user, b.ClientID, b.Body, b.ParentID, b.Spoiler, b.Sticker, b.UploadID).Scan(&id)
+	err = tx.QueryRow(r.Context(), `INSERT INTO title_comments(scope,user_id,client_id,body,parent_id,spoiler,sticker,upload_id,title_label,poster_path)
+	 SELECT $1,$2,$3,$4,NULLIF($5,'')::uuid,$6,$7,NULLIF($8,'')::uuid,$9,$10 WHERE EXISTS(SELECT 1 FROM users WHERE id=$2 AND status='active')
+	 ON CONFLICT(user_id,client_id) DO UPDATE SET client_id=EXCLUDED.client_id WHERE title_comments.scope=EXCLUDED.scope RETURNING id::text`, scope, user, b.ClientID, b.Body, b.ParentID, b.Spoiler, b.Sticker, b.UploadID, b.Title, b.Poster).Scan(&id)
 	if err != nil {
 		writeError(w, 409, err)
 		return
@@ -173,6 +180,27 @@ func (s *Server) titleCommentAction(w http.ResponseWriter, r *http.Request) {
 	id, user, action := chi.URLParam(r, "id"), userIDFromContext(r.Context()), chi.URLParam(r, "action")
 	if !discussionUUID.MatchString(id) {
 		writeJSON(w, 400, map[string]string{"error": "invalid comment"})
+		return
+	}
+	if action == "edit" {
+		var b struct {
+			Body    string `json:"body"`
+			Spoiler bool   `json:"spoiler"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 20000)).Decode(&b) != nil || len([]rune(strings.TrimSpace(b.Body))) > 3000 {
+			writeJSON(w, 400, map[string]string{"error": "invalid edit"})
+			return
+		}
+		tag, err := s.db.Exec(r.Context(), `UPDATE title_comments SET body=$3,spoiler=$4,edited_at=now() WHERE id=$1 AND user_id=$2 AND NOT deleted AND ($3<>'' OR sticker<>'' OR upload_id IS NOT NULL)`, id, user, strings.TrimSpace(b.Body), b.Spoiler)
+		if err != nil {
+			writeError(w, 500, err)
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			writeJSON(w, 404, map[string]string{"error": "editable comment not found"})
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"edited": true})
 		return
 	}
 	if action == "remove" {

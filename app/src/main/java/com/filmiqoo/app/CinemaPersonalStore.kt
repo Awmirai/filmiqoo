@@ -27,7 +27,8 @@ class CinemaPersonalStore(context: Context, profileId: String?) {
     fun note(media: MediaItem): String = prefs.getString(prefix + "note:" + cinemaMediaKey(media), "").orEmpty()
     fun saveNote(media: MediaItem, text: String) { prefs.edit().putString(prefix + "note:" + cinemaMediaKey(media), text.take(2000)).apply() }
     fun seen(media: MediaItem): Boolean = prefs.getBoolean(prefix + "seen:" + cinemaMediaKey(media), false)
-    fun markSeen(media: MediaItem, value: Boolean) { prefs.edit().putBoolean(prefix + "seen:" + cinemaMediaKey(media), value).apply() }
+    fun markSeen(media: MediaItem, value: Boolean) { prefs.edit().putBoolean(prefix + "seen:" + cinemaMediaKey(media), value).apply(); setSaved("seenItems",media,value) }
+    fun seenItems():List<MediaItem> = (readItems("seenItems") + saved() + favorites()).distinctBy(::cinemaMediaKey).filter(::seen)
     fun hideSpoilers(): Boolean = prefs.getBoolean(prefix + "hideSpoilers", true)
     fun setHideSpoilers(value: Boolean) { prefs.edit().putBoolean(prefix + "hideSpoilers", value).apply() }
 

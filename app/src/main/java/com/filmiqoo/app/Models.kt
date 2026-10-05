@@ -108,6 +108,8 @@ sealed interface OverlayRoute {
     data object Library : OverlayRoute
     data object SocialSaves : OverlayRoute
     data object History : OverlayRoute
+    data object Account : OverlayRoute
+    data object Discover : OverlayRoute
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
     data object ViewerProfiles : OverlayRoute
