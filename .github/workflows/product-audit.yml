@@ -1,0 +1,60 @@
+name: Product visual audit
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['app/**', '.github/workflows/product-audit.yml']
+concurrency:
+  group: product-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [before, after]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      FILMIQOO_DEBUG_API_BASE_URL: https://api.filmiqo.com
+      FILMIQOO_LEGACY_SERVER_PREVIEW: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve identical baseline harness
+        if: matrix.stage == 'before'
+        run: |
+          cp app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt /tmp/ProductAuditTest.kt
+          git checkout e7bc1446ab254c5cb6b0e4ef8dbdcb12b271f2b9 -- app
+          cp /tmp/ProductAuditTest.kt app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb shell settings put secure immersive_mode_confirmations confirmed
+            mkdir -p audit-evidence
+            for spec in 320x800:1.0 360x800:1.0 393x852:1.0 412x915:1.0 480x960:1.0 600x960:1.0 840x1100:1.0 840x393:1.0 393x852:2.0; do size=${spec%:*}; scale=${spec#*:}; label=${size}-font${scale}; adb shell wm density 160; adb shell wm size "$size"; adb shell settings put system font_scale "$scale"; gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.filmiqoo.app.ProductAuditTest -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" --stacktrace || exit 1; cp -r app/build/outputs/connected_android_test_additional_output audit-evidence/"$label"; done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: product-audit-${{ matrix.stage }}
+          path: |
+            audit-evidence/
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
