@@ -133,3 +133,11 @@ sealed interface OverlayRoute {
     data object Create : OverlayRoute
     data object Notifications : OverlayRoute
 }
+
+/** A title appears in one catalogue shelf; featured picks remain a separate entry point. */
+internal fun HomeBundle.withUniqueHomeShelves(recent:List<MediaItem>):HomeBundle {
+    val used=recent.map(::cinemaMediaKey).toMutableSet()
+    fun unique(items:List<MediaItem>)=items.filter { used.add(cinemaMediaKey(it)) }
+    return copy(iranian=unique(iranian),korean=unique(korean),bollywood=unique(bollywood),
+        popularMovies=unique(popularMovies),popularTv=unique(popularTv),anime=unique(anime))
+}

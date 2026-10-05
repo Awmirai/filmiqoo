@@ -79,6 +79,39 @@ func TestTitleDiscussionPersistenceAndAuthorization(t *testing.T) {
 	var created map[string]string
 	json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"]
+	// The club is a projection of the same records, not a second comment store.
+	w = call(s.titleComments, bob, "feed", "", "", "", "")
+	if w.Code != 200 || !strings.Contains(w.Body.String(), id) || !strings.Contains(w.Body.String(), scope) {
+		t.Fatalf("shared club identity %d %s", w.Code, w.Body)
+	}
+	if w = call(s.titleCommentAction, bob, "", id, "edit", "", `{"body":"not mine"}`); w.Code != 404 {
+		t.Fatalf("other user edited %d %s", w.Code, w.Body)
+	}
+	if w = call(s.titleCommentAction, alice, "", id, "edit", "", `{"body":"ویرایش مالک","spoiler":true}`); w.Code != 200 {
+		t.Fatalf("owner edit %d %s", w.Code, w.Body)
+	}
+	w = call(s.titleComments, alice, "feed", "", "", "", "")
+	if !strings.Contains(w.Body.String(), "ویرایش مالک") || !strings.Contains(w.Body.String(), `"spoiler":true`) {
+		t.Fatal("club edit did not update shared content", w.Body)
+	}
+	episodeScope := "series:90407:s1:e2"
+	w = post(alice, episodeScope, uuid(501), "", "episode-specific", "", "")
+	if w.Code != 201 {
+		t.Fatalf("episode create %d %s", w.Code, w.Body)
+	}
+	var episodeComment map[string]string
+	json.Unmarshal(w.Body.Bytes(), &episodeComment)
+	w = call(s.titleComments, alice, "series:90407", "", "", "", "")
+	if strings.Contains(w.Body.String(), episodeComment["id"]) {
+		t.Fatal("episode leaked into series overview")
+	}
+	w = call(s.titleComments, alice, episodeScope, "", "", "", "")
+	if !strings.Contains(w.Body.String(), episodeComment["id"]) {
+		t.Fatal("episode discussion missing")
+	}
+	if w = post(bob, "series:90407", uuid(502), episodeComment["id"], "wrong scope", "", ""); w.Code != 404 {
+		t.Fatal("cross episode reply accepted", w.Code)
+	}
 	w = post(alice, scope, uuid(1), "", "دوستش داشتم", "popcorn", "")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), id) {
 		t.Fatalf("retry: %d %s", w.Code, w.Body)
@@ -110,6 +143,10 @@ func TestTitleDiscussionPersistenceAndAuthorization(t *testing.T) {
 	w = call(s.titleComments, bob, scope, "", "", "", "")
 	if w.Code != 200 || strings.Contains(w.Body.String(), id) {
 		t.Fatalf("blocked comment visible %s", w.Body)
+	}
+	w = call(s.titleComments, bob, "feed", "", "", "", "")
+	if w.Code != 200 || strings.Contains(w.Body.String(), id) || strings.Contains(w.Body.String(), episodeComment["id"]) {
+		t.Fatalf("block bypass through club %d %s", w.Code, w.Body)
 	}
 	if w = post(bob, scope, uuid(4), id, "blocked reply", "", ""); w.Code != 404 {
 		t.Fatalf("block bypass %d %s", w.Code, w.Body)
@@ -173,4 +210,17 @@ func TestTitleDiscussionPersistenceAndAuthorization(t *testing.T) {
 	}
 	defer db.Exec(context.Background(), "DELETE FROM moderation_actions WHERE target_type='discussion' AND target_id=$1", target)
 	defer db.Exec(context.Background(), "DELETE FROM reports WHERE target_type='discussion' AND target_id=$1", target)
+}
+
+func TestDiscussionScopeIncludesCatalogEpisodes(t *testing.T) {
+	for _, scope := range []string{"movie:77", "series:100", "series:100:s0:e2", "catalog:12345678-1234-4234-8234-000000000001:s1:e2"} {
+		if !discussionScope.MatchString(scope) {
+			t.Fatal("valid scope rejected", scope)
+		}
+	}
+	for _, scope := range []string{"feed", "series:0", "series:100:s1:e0", "movie:77:s1:e2", "series:100:s1:e2:extra"} {
+		if discussionScope.MatchString(scope) {
+			t.Fatal("invalid mutation scope accepted", scope)
+		}
+	}
 }

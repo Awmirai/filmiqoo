@@ -76,8 +76,8 @@ class ProductAuditTest {
                 "series" -> CinemaDetailContent(data(series))
                 "auth" -> AuthScreen(backend,{},{})
                 "comments" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { TitleDiscussion(movie,backend,{}) }
-                else -> Scaffold(bottomBar={CinemaBottomBar(when(page){"search"->1;"club"->2;"library"->3;else->0},false,{})}) { padding ->
-                    Box(Modifier.fillMaxSize().padding(padding)) { when(page) {
+                else -> AuditShell(when(page){"search"->1;"club"->2;"library"->3;else->0}) {
+                    Box(Modifier.fillMaxSize()) { when(page) {
                         "home" -> CinemaHomeScreen(repository,backend,false,{},{},{_,_->},{},{},{},{},{},{})
                         "search" -> PremiumSearchScreen(repository,backend,{},{},{},{},{})
                         "library" -> CinemaLibraryScreen(backend,repository,{},{},{},showBack=false)
@@ -88,12 +88,28 @@ class ProductAuditTest {
         } }
         val args=InstrumentationRegistry.getArguments()
         val label=args.getString("auditLabel")?:"default"
+        val metrics=org.json.JSONArray()
         for(name in listOf("home","search","movie","series","club","comments","library","auth")) {
             compose.runOnIdle { page=name }
             // Wait for bounded HTTP/image work and a complete frame; this is screenshot stabilization, not a benchmark.
             compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
+            if(label.contains("keyboard") && name in listOf("search","auth")) {
+                compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
+                compose.waitForIdle(); Thread.sleep(300)
+            }
             val screenshot=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
             PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-$name.png").use { Assert.assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG,100,it)) }
+            val config=compose.activity.resources.configuration
+            val memory=android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
+            metrics.put(org.json.JSONObject().put("page",name).put("widthDp",config.screenWidthDp).put("heightDp",config.screenHeightDp)
+                .put("fontScale",config.fontScale).put("screenshotWidthPx",screenshot.width).put("screenshotHeightPx",screenshot.height).put("totalPssKb",memory.totalPss))
+            if(label.contains("keyboard")) androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         }
+        PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-metrics.json").use { it.write(metrics.toString(2).toByteArray()) }
     }
+}
+
+@Composable
+private fun AuditShell(selected:Int,content:@Composable ()->Unit) {
+    CinemaAppShell(selected,false,{},content)
 }

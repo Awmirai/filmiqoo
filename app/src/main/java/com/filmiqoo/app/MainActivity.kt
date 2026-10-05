@@ -84,8 +84,9 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val bottomTabStateHolder=rememberSaveableStateHolder()
-    var overlay by remember { mutableStateOf<OverlayRoute?>(null) }
-    val overlayBackStack=remember { mutableStateListOf<OverlayRoute>() }
+    val navigation=remember(context) { androidx.lifecycle.ViewModelProvider(context as androidx.lifecycle.ViewModelStoreOwner)[CinemaNavigationState::class.java] }
+    var overlay by navigation.overlay
+    val overlayBackStack=navigation.backStack
     var showSearch by rememberSaveable { mutableStateOf(false) }
     var activeViewer by remember { mutableStateOf(viewerStore.active()) }
     var viewerReady by remember { mutableStateOf(!authenticated) }
@@ -821,42 +822,43 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 OverlayRoute.Account -> {
                             if(backend.session.isLoggedIn) {
                                 MeScreen(
+                                    onBack=closeOverlay,
                                     backend=backend,
                                     repository=repository,
                                     kidsMode=activeViewer?.kidsMode==true,
                                     onMedia={overlay=OverlayRoute.Detail(it)},
                                     onPlay={overlay=OverlayRoute.Player(it)},
                                     onClips={overlay=OverlayRoute.Clips()},
-                                    onCommunity={tab=2},
+                                    onCommunity={overlay=null;tab=2},
                                     onOpenPost={ postId ->
                                         deepLinkPostId=postId
-                                        tab=2
+                                        overlay=null;tab=2
                                     },
                                     onOpenClip={ clipId ->
                                         overlay=OverlayRoute.Clips(clipId)
                                     },
-                                    onDownloads={overlay=OverlayRoute.Downloads},
-                                    onLibrary={overlay=OverlayRoute.Library},
-                                    onSocialSaves={overlay=OverlayRoute.SocialSaves},
-                                    onHistory={overlay=OverlayRoute.History},
-                                    onCreatorStudio={overlay=OverlayRoute.CreatorStudio},
-                                    onInbox={overlay=OverlayRoute.Inbox},
-                                    onSettings={overlay=OverlayRoute.Settings},
+                                    onDownloads={pushOverlay(OverlayRoute.Downloads)},
+                                    onLibrary={pushOverlay(OverlayRoute.Library)},
+                                    onSocialSaves={pushOverlay(OverlayRoute.SocialSaves)},
+                                    onHistory={pushOverlay(OverlayRoute.History)},
+                                    onCreatorStudio={pushOverlay(OverlayRoute.CreatorStudio)},
+                                    onInbox={pushOverlay(OverlayRoute.Inbox)},
+                                    onSettings={pushOverlay(OverlayRoute.Settings)},
                                     onViewerProfiles={
                                         overlay=if(activeViewer?.kidsMode==true)
                                             OverlayRoute.ParentalGate
                                         else
                                             OverlayRoute.ViewerProfiles
                                     },
-                                    onParentalControls={overlay=OverlayRoute.ParentalControls},
-                                    onSecurity={overlay=OverlayRoute.Security},
-                                    onSafety={overlay=OverlayRoute.Safety},
-                                    onFollowRequests={overlay=OverlayRoute.FollowRequests},
-                                    onCloseFriends={overlay=OverlayRoute.CloseFriends},
-                                    onEditProfile={overlay=OverlayRoute.EditProfile},
-                                    onFilmDna={overlay=OverlayRoute.FilmDna},
+                                    onParentalControls={pushOverlay(OverlayRoute.ParentalControls)},
+                                    onSecurity={pushOverlay(OverlayRoute.Security)},
+                                    onSafety={pushOverlay(OverlayRoute.Safety)},
+                                    onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)},
+                                    onCloseFriends={pushOverlay(OverlayRoute.CloseFriends)},
+                                    onEditProfile={pushOverlay(OverlayRoute.EditProfile)},
+                                    onFilmDna={pushOverlay(OverlayRoute.FilmDna)},
                                     onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
-                                    onSeriesCalendar={overlay=OverlayRoute.SeriesCalendar},
+                                    onSeriesCalendar={pushOverlay(OverlayRoute.SeriesCalendar)},
                                     onSocialCollections={overlay=OverlayRoute.SocialCollections()},
                                     onLoggedOut={
                                         backend.viewerProfiles.clear()
@@ -867,7 +869,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                 )
                             } else {
                                 MeSignedOutScreen(
-                                    onLogin={overlay=OverlayRoute.Auth},
+                                    onLogin={pushOverlay(OverlayRoute.Auth)},
                                     onClub={tab=2},
                                     onClips={overlay=OverlayRoute.Clips()}
                                 )

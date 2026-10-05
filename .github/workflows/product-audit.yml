@@ -25,8 +25,14 @@ jobs:
         if: matrix.stage == 'before'
         run: |
           cp app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt /tmp/ProductAuditTest.kt
-          git checkout e7bc1446ab254c5cb6b0e4ef8dbdcb12b271f2b9 -- app
+          git restore --source=e7bc1446ab254c5cb6b0e4ef8dbdcb12b271f2b9 --staged --worktree -- app
           cp /tmp/ProductAuditTest.kt app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt')
+          s = p.read_text().replace('CinemaAppShell(selected,false,{},content)', 'Scaffold(bottomBar={CinemaBottomBar(selected,false,{})}) { padding -> Box(Modifier.padding(padding)) { content() } }')
+          p.write_text(s)
+          PY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -49,7 +55,7 @@ jobs:
           script: |
             adb shell settings put secure immersive_mode_confirmations confirmed
             mkdir -p audit-evidence
-            for spec in 320x800:1.0 360x800:1.0 393x852:1.0 412x915:1.0 480x960:1.0 600x960:1.0 840x1100:1.0 840x393:1.0 393x852:2.0; do size=${spec%:*}; scale=${spec#*:}; label=${size}-font${scale}; adb shell wm density 160; adb shell wm size "$size"; adb shell settings put system font_scale "$scale"; gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.filmiqoo.app.ProductAuditTest -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" --stacktrace || exit 1; cp -r app/build/outputs/connected_android_test_additional_output audit-evidence/"$label"; done
+            bash scripts/run-product-audit.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

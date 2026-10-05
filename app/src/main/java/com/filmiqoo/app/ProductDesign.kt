@@ -32,7 +32,7 @@ internal object CinemaTokens {
 internal data class CinemaDestination(val id:Int,val label:String,val icon:ImageVector)
 internal fun cinemaDestinations(kids:Boolean)=listOf(
     CinemaDestination(0,"خانه",Icons.Outlined.Home),
-    CinemaDestination(1,"جست‌وجو",Icons.Outlined.Search),
+    CinemaDestination(1,"جستجو",Icons.Outlined.Search),
     CinemaDestination(2,"باشگاه فیلم",Icons.Outlined.Forum),
     CinemaDestination(3,"کتابخانه",Icons.Outlined.VideoLibrary)
 ).filter { !kids || it.id==0 || it.id==3 }

@@ -29,7 +29,7 @@ internal fun CinemaSplash(content: @Composable () -> Unit) {
     LaunchedEffect(Unit) {
         if (!finished) {
             if (!reduced) entrance.animateTo(1f, tween(850))
-            delay(if (reduced) 250 else 850)
+            if (reduced) delay(100)
             finished = true
         }
     }

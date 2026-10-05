@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-var discussionScope = regexp.MustCompile(`^movie:[1-9][0-9]{0,10}$|^series:[1-9][0-9]{0,10}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$|^catalog:[a-f0-9-]{36}$`)
+var discussionScope = regexp.MustCompile(`^movie:[1-9][0-9]{0,10}$|^series:[1-9][0-9]{0,10}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$|^catalog:[a-f0-9-]{36}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$`)
 var discussionUUID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 var discussionStickers = map[string]bool{"popcorn": true, "masterpiece": true, "mindblown": true, "tears": true, "applause": true, "rewatch": true, "boring": true, "heart": true}
 

@@ -930,6 +930,7 @@ fun FilmiqooPlayerScreen(
         }
     }
 
+    val accessibilityTimeout=androidx.compose.ui.platform.LocalAccessibilityManager.current
     LaunchedEffect(
         controlsVisible,
         isPlaying,
@@ -947,7 +948,7 @@ fun FilmiqooPlayerScreen(
         val overlayOpen=toolsOpen || settingsOpen || momentsOpen || bookmarksOpen ||
             handoffOpen || dialogueSearchOpen || queueOpen
         if(controlsVisible && isPlaying && !locked && !overlayOpen && !isScrubbing) {
-            delay(3_500)
+            delay(accessibilityTimeout?.calculateRecommendedTimeoutMillis(3_500,containsIcons=true,containsText=true,containsControls=true) ?: 3_500)
             controlsVisible=false
         }
     }

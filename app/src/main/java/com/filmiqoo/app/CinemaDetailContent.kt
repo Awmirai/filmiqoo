@@ -61,6 +61,8 @@ internal fun CinemaDetailContent(
     actions: CinemaDetailActions = CinemaDetailActions(),
     community: @Composable () -> Unit = {}
 ) {
+    val window=androidx.compose.ui.platform.LocalConfiguration.current
+    val episodeColumns=if(window.screenWidthDp>=700 && window.fontScale<1.6f)2 else 1
     val d = data.detail
     val media = d.media
     val isSeries = media.type == MediaType.TV
@@ -137,7 +139,9 @@ internal fun CinemaDetailContent(
                 Text("اطلاعات تکمیلی فعلاً دریافت نشد؛ فایل‌های موجود همچنان در دسترس‌اند.", color = CinemaSoft, fontSize = 12.sp,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             }
-            item("availability") {
+            if(isSeries && primaryId!=null) item("available-episodes") {
+                Text("${data.playableEpisodes.size} قسمت آمادهٔ پخش",color=CinemaSoft,modifier=Modifier.padding(horizontal=20.dp,vertical=8.dp))
+            } else item("availability") {
                 CinemaCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(if (primaryId != null) Icons.Default.Verified else Icons.Default.Info, null, tint = if (primaryId != null) FqGreen else CinemaSoft)
@@ -238,8 +242,11 @@ internal fun CinemaDetailContent(
                         if (episodes.isEmpty()) item("empty-episodes") {
                             Box(Modifier.padding(20.dp)) { CinemaNotice("قسمتی با این فیلتر پیدا نشد", "فیلتر یا عبارت جستجو را تغییر بده.") }
                         }
-                        items(episodes, key = { "episode:${it.id}" }) { ep ->
-                            CinemaEpisodeRow(ep, season?.number ?: 1, progress?.episodes?.get(ep.id), hideSpoilers, busy, actions)
+                        items(episodes.chunked(episodeColumns), key = { "episode:"+it.first().id }) { row ->
+                            Row(Modifier.fillMaxWidth()) {
+                                row.forEach { ep -> Box(Modifier.weight(1f)) { CinemaEpisodeRow(ep, season?.number ?: 1, progress?.episodes?.get(ep.id), hideSpoilers, busy, actions) } }
+                                if(row.size<episodeColumns)Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
                 }

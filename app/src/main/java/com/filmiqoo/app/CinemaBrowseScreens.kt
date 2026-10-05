@@ -79,7 +79,7 @@ fun CinemaDiscoverScreen(
                 Text("جهان فیلم و سریال", fontSize = 24.sp, fontWeight = FontWeight.Black, color = CinemaPaper)
                 Text(region.caption, fontSize = 12.sp, lineHeight = 20.sp, color = CinemaSoft)
             }
-            IconButton(onSearchAll) { Icon(Icons.Default.Search, "جستجوی نام، بازیگر و عنوان", tint = CinemaPaper) }
+            IconButton(onSearchAll) { Icon(Icons.Default.Search, "جستجوی نام فیلم و سریال", tint = CinemaPaper) }
         }
         LazyRow(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(CinemaRegion.entries) { entry -> CinemaTag(entry.label, region == entry) { regionName = entry.name; genre = 0; if (entry == CinemaRegion.BOLLYWOOD) typeName = MediaType.MOVIE.name } }
@@ -134,6 +134,7 @@ fun CinemaHomeScreen(
     val catalog = remember(backend) { CinemaDataRepository(context, backend) }
     var data by remember { mutableStateOf<HomeBundle?>(null) }
     var continued by remember { mutableStateOf<List<ContinueWatchingItem>>(emptyList()) }
+    var continueFailed by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
     var region by rememberSaveable { mutableStateOf<String?>(null) }
@@ -144,7 +145,10 @@ fun CinemaHomeScreen(
         catch (failure: Exception) { error = failure.message ?: "دریافت خانه ناموفق بود." }
     }
     LaunchedEffect(loggedIn, badgeRefreshKey, retry) {
-        continued = if (loggedIn) cinemaUiOptional { backend.continueWatching() }.orEmpty() else emptyList()
+        if(!loggedIn) { continued=emptyList();continueFailed=false }
+        else try { continued=backend.continueWatching();continueFailed=false }
+        catch(cancelled:CancellationException){throw cancelled}
+        catch(_:Exception){continueFailed=true}
     }
     val opened = region
     if (opened != null) {
@@ -166,6 +170,7 @@ fun CinemaHomeScreen(
         }
         if (data == null && error == null) item("loading") { LinearProgressIndicator(color = CinemaAccent, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) }
         error?.let { message -> item("error") { Box(Modifier.padding(horizontal = 20.dp)) { CinemaNotice("خانه آماده نشد", message, Icons.Default.CloudOff, "تلاش دوباره", { retry++ }) } } }
+        if(continueFailed)item("continue-error"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("ادامهٔ تماشا به‌روز نشد","موقعیت قبلی حفظ شده؛ دوباره تلاش کن.",Icons.Default.CloudOff,"تلاش دوباره",{retry++})}}
         if (continued.isNotEmpty()) item("continue") {
             CinemaHeading("از همان‌جا ادامه بده", "موقعیت ذخیره‌شدهٔ تماشای تو")
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -186,7 +191,8 @@ fun CinemaHomeScreen(
         item("latest-catalog") {
             RecentCatalogShelf(latest, onMedia)
         }
-        data?.let { bundle ->
+        data?.let { original ->
+            val bundle=original.withUniqueHomeShelves(latest.items)
             item("iran") { CinemaShelf("ایران؛ خاطره و امروز", "فیلم و سریال ایرانی، قدیمی و تازه", bundle.iranian, onMedia) { region = CinemaRegion.IRAN.name } }
             item("korea") { CinemaShelf("قرار بعدی با K-drama", "نام عنوان‌های کره‌ای به انگلیسی", bundle.korean, onMedia) { region = CinemaRegion.KOREA.name } }
             item("india") { CinemaShelf("رنگ‌های سینمای هند", "هند، بالیوود و سینمای زبان‌های دیگر", bundle.bollywood, onMedia) { region = CinemaRegion.INDIA.name } }
@@ -244,16 +250,3 @@ internal fun RecentCatalogShelf(state: RecentCatalogState, onMedia: (MediaItem) 
     }
 }
 
-@Composable
-private fun CinemaHomeHero(media: MediaItem, onClick: () -> Unit) {
-    Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().heightIn(min = 350.dp).clip(RoundedCornerShape(27.dp)).background(CinemaSurface)) {
-        CinemaImage(media.backdropPath ?: media.posterPath, Modifier.matchParentSize(), true)
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, CinemaInk.copy(alpha = .85f), CinemaInk))))
-        Column(Modifier.fillMaxWidth().padding(22.dp).padding(top = 150.dp)) {
-            Text("انتخاب امروز", color = CinemaAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(media.title, color = CinemaPaper, fontSize = 29.sp, lineHeight = 37.sp, fontWeight = FontWeight.Black, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 7.dp))
-            Text(listOf(media.year, if (media.type == MediaType.MOVIE) "فیلم" else "سریال").filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp))
-            CinemaAction(Icons.Default.ArrowBack, "جزئیات و گزینه‌های تماشا", onClick, Modifier.padding(top = 18.dp), primary = true)
-        }
-    }
-}
