@@ -20,6 +20,7 @@ done
 adb shell wm size 393x852
 adb shell settings put system font_scale 1.0
 package=com.filmiqoo.previewfix.preview
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 for n in 1 2 3 4 5; do
   adb shell am force-stop "$package"
   adb shell am start -W -n "$package/com.filmiqoo.app.MainActivity" > "audit-evidence/startup-$n.txt"

@@ -45,17 +45,17 @@ fun CinemaLibraryScreen(backend:BackendRepository,repository:TmdbRepository,onBa
         .distinctBy(::cinemaMediaKey).filter{cinemaSearchKey(it.title+" "+it.originalTitle).contains(cinemaSearchKey(query))}
     Column(Modifier.fillMaxSize().background(CinemaInk).imePadding().testTag("cinema-library")){
         CinemaPageHeader("کتابخانه","فهرست تماشا و آثار دیده‌شده",if(showBack)onBack else null){IconButton(onAccount){Icon(Icons.Outlined.AccountCircle,"حساب و تنظیمات")}}
-        Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            CinemaAction(Icons.Outlined.Download,"دانلودها",onDownloads,Modifier.weight(1f))
-            CinemaAction(Icons.Outlined.History,"سابقهٔ پخش",onHistory,Modifier.weight(1f))
-        }
-        LazyRow(contentPadding=PaddingValues(20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            listOf("برای تماشا","دیده‌شده","پسندیده‌ها").forEachIndexed{i,label->item{CinemaTag(label,selected==i){selected=i}}}
-        }
-        OutlinedTextField(query,{query=it.take(120)},modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp),singleLine=true,
-            label={Text("جست‌وجو در کتابخانه")},leadingIcon={Icon(Icons.Outlined.Search,null)},shape=MaterialTheme.shapes.large)
         if(loading)LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=8.dp),color=CinemaAccent)
         LazyVerticalGrid(GridCells.Adaptive(136.dp),modifier=Modifier.weight(1f),contentPadding=PaddingValues(20.dp),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
+            item(span={GridItemSpan(maxLineSpan)}){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            CinemaAction(Icons.Outlined.Download,"دانلودها",onDownloads,Modifier.weight(1f))
+            CinemaAction(Icons.Outlined.History,"سابقهٔ پخش",onHistory,Modifier.weight(1f))
+        }}
+        item(span={GridItemSpan(maxLineSpan)}){LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            listOf("برای تماشا","دیده‌شده","پسندیده‌ها").forEachIndexed{i,label->item{CinemaTag(label,selected==i){selected=i}}}
+        }}
+        item(span={GridItemSpan(maxLineSpan)}){OutlinedTextField(query,{query=it.take(120)},modifier=Modifier.fillMaxWidth(),singleLine=true,
+            label={Text("جست‌وجو در کتابخانه")},leadingIcon={Icon(Icons.Outlined.Search,null)},shape=MaterialTheme.shapes.large)}
             item(span={GridItemSpan(maxLineSpan)}){Text(if(selected==1)"آثاری که خودت «دیده‌ام» علامت زده‌ای؛ سابقهٔ پخش مسیر جدا دارد." else "فهرست حساب و ذخیره‌های این دستگاه، کنار هم. عنوان بدون فایل هم قابل ذخیره است.",color=CinemaSoft,style=MaterialTheme.typography.bodySmall)}
             if(error)item(span={GridItemSpan(maxLineSpan)}){CinemaNotice("فهرست حساب به‌روز نشد","ذخیره‌های دستگاه باقی مانده‌اند؛ برای دریافت فهرست حساب دوباره تلاش کن.",Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}
             if(entries.isEmpty()&&!loading)item(span={GridItemSpan(maxLineSpan)}){CinemaNotice(if(query.isBlank())"این فهرست هنوز خالی است"else "نتیجه‌ای پیدا نشد",if(query.isBlank())"در صفحهٔ اثر، فهرست تماشا یا دیده‌ام را انتخاب کن؛ اینجا پیدایش می‌کنی."else "نام کوتاه‌تر یا نام انگلیسی را امتحان کن.",Icons.Outlined.Bookmarks)}

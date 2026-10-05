@@ -100,6 +100,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var showNotificationPrimer by rememberSaveable { mutableStateOf(false) }
     var socialBadgeRefresh by rememberSaveable { mutableIntStateOf(0) }
 
+    fun resetNavigation() {
+        (0..3).forEach { bottomTabStateHolder.removeState("main-tab-"+(activeViewer?.id ?: "guest")+"-"+it) }
+        (overlayBackStack.toList()+listOfNotNull(overlay)).forEach { overlayStateHolder.removeState(it.javaClass.name+":"+it.hashCode()) }
+        overlayBackStack.clear();overlay=null;tab=0;showSearch=false
+        deepLinkPostId=null;deepLinkReelId=null;pendingHandoff=null
+    }
+
     DisposableEffect(backend,context) {
         val prefs=context.applicationContext.getSharedPreferences(
             "filmiqoo_session_v1",
@@ -107,6 +114,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         )
         val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,key ->
             if(key=="access_token" || key=="refresh_token") {
+                if(authenticated && !backend.session.isLoggedIn) resetNavigation()
                 authenticated=backend.session.isLoggedIn
             }
         }
@@ -863,6 +871,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                     onSeriesCalendar={pushOverlay(OverlayRoute.SeriesCalendar)},
                                     onSocialCollections={overlay=OverlayRoute.SocialCollections()},
                                     onLoggedOut={
+                                        resetNavigation()
                                         backend.viewerProfiles.clear()
                                         activeViewer=null
                                         authenticated=false
@@ -886,6 +895,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     backend=backend,
                     onBack=closeOverlay,
                     onActivated={ profile->
+                        resetNavigation()
                         viewerStore.activate(profile)
                         activeViewer=profile
                         tab=0
@@ -1037,7 +1047,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 overlayBackStack.clear(); tab=index; if(index!=2)deepLinkPostId=null
             }) {
                     bottomTabStateHolder.SaveableStateProvider(
-                        key="main-tab-"+tab
+                        key="main-tab-"+(activeViewer?.id ?: "guest")+"-"+tab
                     ) {
                     when(tab) {
                         0 -> CinemaHomeScreen(

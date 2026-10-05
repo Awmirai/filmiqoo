@@ -111,7 +111,7 @@ class ProductJourneyTest {
             if(r.method=="POST")MockResponse().setResponseCode(503).setBody("{}")
             else MockResponse().setBody("""{"autoplayNext":false}""")}
         compose.setContent{FilmiqooTheme{SettingsScreen(backend,{})}}
-        compose.waitUntil(10000){compose.onAllNodes(isToggleable() and isOff()).fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){runCatching { compose.onAllNodes(isToggleable()).onFirst().assertIsOff();true }.getOrDefault(false)}
         compose.onAllNodes(isToggleable()).onFirst().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("ذخیره نشد؛ تنظیم قبلی حفظ شد.",substring=true).fetchSemanticsNodes().isNotEmpty()}
         compose.onAllNodes(isToggleable()).onFirst().assertIsOff()

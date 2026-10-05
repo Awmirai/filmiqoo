@@ -110,6 +110,15 @@ class ProductAuditTest {
             val memory=android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
             metrics.put(org.json.JSONObject().put("page",name).put("widthDp",config.screenWidthDp).put("heightDp",config.screenHeightDp)
                 .put("fontScale",config.fontScale).put("screenshotWidthPx",screenshot.width).put("screenshotHeightPx",screenshot.height).put("totalPssKb",memory.totalPss))
+            if(name=="home" && label=="393x852-font1.0-gesture") {
+                val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
+                val packageName=compose.activity.packageName
+                fun shell(command:String):ByteArray = android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+                shell("dumpsys gfxinfo $packageName reset")
+                repeat(3){compose.onNodeWithTag("cinema-home").performTouchInput{swipeUp()};compose.waitForIdle()}
+                repeat(3){compose.onNodeWithTag("cinema-home").performTouchInput{swipeDown()};compose.waitForIdle()}
+                PlatformTestStorageRegistry.getInstance().openOutputFile("home-scroll-frames.txt").use{it.write(shell("dumpsys gfxinfo $packageName framestats"))}
+            }
             if(label.contains("keyboard")) androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         }
         PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-metrics.json").use { it.write(metrics.toString(2).toByteArray()) }

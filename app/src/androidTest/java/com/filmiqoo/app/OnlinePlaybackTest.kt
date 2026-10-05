@@ -86,6 +86,7 @@ class OnlinePlaybackTest {
         // Verify the theme supports the native Cast widget, even on a device without Cast services.
         compose.runOnUiThread { MediaRouteButton(compose.activity) }
         val repository = backend()
+        val launchAt=android.os.SystemClock.elapsedRealtime()
         compose.setContent {
             var open by remember { mutableStateOf(true) }
             FilmiqooTheme {
@@ -103,6 +104,11 @@ class OnlinePlaybackTest {
         }
         assertTrue("Online token endpoint was used", tokens.get() > 0)
         assertTrue("Video was actually fetched over HTTP", mediaRequests.get() > 0)
+        // Includes the required 2 s of advancing playback and polling; this is not first-frame latency.
+        PlatformTestStorageRegistry.getInstance().openOutputFile("online-playback-observation.json").use {
+            it.write(JSONObject().put("setupToPlayingAt2SecondsMs",android.os.SystemClock.elapsedRealtime()-launchAt)
+                .put("videoWidth",320).put("httpMediaRequests",mediaRequests.get()).put("tokenRequests",tokens.get()).toString(2).toByteArray())
+        }
         // Controls auto-hide during real decoding, and video taps still reach Compose
         // above the native PlayerView. Tools must dismiss before leaving playback.
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("پنهان‌کردن کنترل‌ها").fetchSemanticsNodes().isEmpty() }

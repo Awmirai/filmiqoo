@@ -218,7 +218,7 @@ func TestDiscussionScopeIncludesCatalogEpisodes(t *testing.T) {
 			t.Fatal("valid scope rejected", scope)
 		}
 	}
-	for _, scope := range []string{"feed", "series:0", "series:100:s1:e0", "movie:77:s1:e2", "series:100:s1:e2:extra"} {
+	for _, scope := range []string{"feed", "series:0", "series:100:s1:e0", "movie:77:s1:e2", "series:100:s1:e2:extra", "catalog:------------------------------------"} {
 		if discussionScope.MatchString(scope) {
 			t.Fatal("invalid mutation scope accepted", scope)
 		}

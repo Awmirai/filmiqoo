@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-var discussionScope = regexp.MustCompile(`^movie:[1-9][0-9]{0,10}$|^series:[1-9][0-9]{0,10}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$|^catalog:[a-f0-9-]{36}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$`)
+var discussionScope = regexp.MustCompile(`^movie:[1-9][0-9]{0,10}$|^series:[1-9][0-9]{0,10}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$|^catalog:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}(:s[0-9]{1,3}:e[1-9][0-9]{0,3})?$`)
 var discussionUUID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 var discussionStickers = map[string]bool{"popcorn": true, "masterpiece": true, "mindblown": true, "tears": true, "applause": true, "rewatch": true, "boring": true, "heart": true}
 
@@ -42,7 +42,9 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(), `
      SELECT c.id::text,c.body,c.spoiler,c.sticker,c.deleted,c.created_at,c.scope,c.title_label,c.poster_path,
      CASE WHEN c.scope LIKE 'series:%' THEN 'series' WHEN c.scope LIKE 'movie:%' THEN 'movie'
-       ELSE COALESCE((SELECT m.kind::text FROM media_titles m WHERE m.id=split_part(c.scope,':',2)::uuid),'movie') END,
+       ELSE COALESCE((SELECT m.kind::text FROM media_titles m WHERE m.id=CASE
+         WHEN split_part(c.scope,':',2) ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+         THEN split_part(c.scope,':',2)::uuid END),'movie') END,
 	 p.user_id::text,p.display_name,p.avatar_url,COALESCE(u.object_key,''),
 	 (SELECT count(*) FROM title_comment_likes l WHERE l.comment_id=c.id),
 	 EXISTS(SELECT 1 FROM title_comment_likes l WHERE l.comment_id=c.id AND l.user_id::text=$2),
