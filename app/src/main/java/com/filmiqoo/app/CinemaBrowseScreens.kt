@@ -249,4 +249,3 @@ internal fun RecentCatalogShelf(state: RecentCatalogState, onMedia: (MediaItem) 
         }
     }
 }
-

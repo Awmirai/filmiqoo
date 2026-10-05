@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,14 +48,14 @@ fun CinemaDetailScreen(
     var seen by remember(media.key, profileId) { mutableStateOf(personal.seen(media)) }
     var hideSpoilers by remember(profileId) { mutableStateOf(personal.hideSpoilers()) }
     var hasNote by remember(media.key, profileId) { mutableStateOf(personal.note(media).isNotBlank()) }
-    var noteEditor by remember(media.key) { mutableStateOf(false) }
-    var noteDraft by remember(media.key) { mutableStateOf("") }
+    var noteEditor by rememberSaveable(media.key) { mutableStateOf(false) }
+    var noteDraft by rememberSaveable(media.key) { mutableStateOf("") }
     var collectionsOpen by remember(media.key) { mutableStateOf(false) }
     var availabilityOpen by remember(media.key) { mutableStateOf(false) }
     var following by remember(media.key) { mutableStateOf(false) }
     var progress by remember(media.key) { mutableStateOf<SeriesWatchProgress?>(null) }
     var progressRefresh by remember(media.key) { mutableIntStateOf(0) }
-    var clips by remember(media.key) { mutableStateOf<List<ReelFeedItem>>(emptyList()) }
+    var resumeVersions by remember(media.key) { mutableStateOf<Set<String>>(emptySet()) }
 
     fun action(block: suspend () -> String?) {
         if (busy) return
@@ -80,8 +81,10 @@ fun CinemaDetailScreen(
         val id = current.platform?.id ?: return@LaunchedEffect
         if (!backend.session.isLoggedIn) return@LaunchedEffect
         if (current.detail.media.type == MediaType.TV) {
-            progress = cinemaUiOptional { series.load(id) }
+            cinemaUiOptional { series.load(id) }?.let { progress=it }
             following = cinemaUiOptional { subscriptions.status(id).following } ?: following
+        } else {
+            cinemaUiOptional { backend.continueWatching() }?.let { items -> resumeVersions=items.filter { it.progress>0f }.map { it.target.mediaVersionId }.toSet() }
         }
     }
     LaunchedEffect(data?.platform?.id, backend.session.isLoggedIn) {
@@ -90,7 +93,6 @@ fun CinemaDetailScreen(
             cinemaUiOptional { library.watchlist() }?.let { items -> saved = saved || items.any { it.backendId == id } }
             cinemaUiOptional { library.favorites() }?.let { items -> favorite = favorite || items.any { it.backendId == id } }
         }
-        clips = cinemaUiOptional { SocialRepository(backend).mediaClips(id) }.orEmpty()
     }
     BackHandler(onBack = onBack)
 
@@ -111,6 +113,7 @@ fun CinemaDetailScreen(
             val id = current.platform?.id
             CinemaDetailContent(
                 current, saved, favorite, seen, hideSpoilers, hasNote, following, busy, progress,
+                resumeVersions=resumeVersions,
                 actions = CinemaDetailActions(
                     back = onBack,
                     share = {

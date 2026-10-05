@@ -25,6 +25,8 @@ internal object CinemaTokens {
     val section = 24.dp
     val page = 20.dp
     val radius = 16.dp
+    val cardRadius = 22.dp
+    val icon = 24.dp
     val touch = 48.dp
     val contentMax = 1120.dp
     const val motionMs = 180
@@ -46,7 +48,7 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
             .testTag("navigation-${entry.id}").padding(horizontal=2.dp,vertical=10.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
             Surface(color=if(active)CinemaAccent.copy(alpha=.14f)else CinemaSurface,shape=MaterialTheme.shapes.medium) {
-                Icon(entry.icon,null,tint=if(active)CinemaAccent else CinemaSoft,modifier=Modifier.padding(horizontal=14.dp,vertical=5.dp).size(24.dp))
+                Icon(entry.icon,null,tint=if(active)CinemaAccent else CinemaSoft,modifier=Modifier.padding(horizontal=14.dp,vertical=5.dp).size(CinemaTokens.icon))
             }
             Text(entry.label,fontSize=12.sp,lineHeight=18.sp,color=if(active)CinemaPaper else CinemaSoft,
                 fontWeight=if(active)FontWeight.Bold else FontWeight.Normal,textAlign=androidx.compose.ui.text.style.TextAlign.Center,

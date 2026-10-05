@@ -73,7 +73,10 @@ class ProductAuditTest {
         compose.setContent { FilmiqooTheme {
             when(page) {
                 "movie" -> CinemaDetailContent(data(movie))
-                "series" -> CinemaDetailContent(data(series))
+                "series", "episodes" -> CinemaDetailContent(data(series))
+                "settings" -> SettingsScreen(backend,{})
+                "inbox" -> InboxScreen(backend,{},{})
+                "notifications" -> ConnectedNotificationsScreen(backend,{},{_,_->},{},{},{},{},{},{},{},{})
                 "auth" -> AuthScreen(backend,{},{})
                 "comments" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { TitleDiscussion(movie,backend,{}) }
                 else -> AuditShell(when(page){"search"->1;"club"->2;"library"->3;else->0}) {
@@ -89,10 +92,14 @@ class ProductAuditTest {
         val args=InstrumentationRegistry.getArguments()
         val label=args.getString("auditLabel")?:"default"
         val metrics=org.json.JSONArray()
-        for(name in listOf("home","search","movie","series","club","comments","library","auth")) {
+        for(name in listOf("home","search","movie","series","club","comments","library","auth","episodes","settings","inbox","notifications")) {
             compose.runOnIdle { page=name }
             // Wait for bounded HTTP/image work and a complete frame; this is screenshot stabilization, not a benchmark.
             compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
+            if(name=="episodes") {
+                compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e1"))
+                compose.waitForIdle()
+            }
             if(label.contains("keyboard") && name in listOf("search","auth")) {
                 compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
                 compose.waitForIdle(); Thread.sleep(300)

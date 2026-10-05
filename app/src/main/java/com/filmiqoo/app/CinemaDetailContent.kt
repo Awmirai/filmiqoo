@@ -58,6 +58,7 @@ internal fun CinemaDetailContent(
     following: Boolean = false,
     busy: Boolean = false,
     progress: SeriesWatchProgress? = null,
+    resumeVersions: Set<String> = emptySet(),
     actions: CinemaDetailActions = CinemaDetailActions(),
     community: @Composable () -> Unit = {}
 ) {
@@ -108,10 +109,10 @@ internal fun CinemaDetailContent(
                     HorizontalDivider(color = CinemaLine)
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         CinemaAction(if (busy) Icons.Default.HourglassTop else Icons.Default.PlayArrow,
-                            when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "هنوز قابل پخش نیست"; isSeries && progress?.episodes?.values?.any { it.positionMs > 0 || it.completed } == true -> "ادامهٔ سریال"; isSeries -> "پخش قسمت "+(resumable?.second?.number?.toString() ?: ""); else -> "پخش فیلم" },
+                            when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "هنوز قابل پخش نیست"; isSeries && progress?.episodes?.values?.any { it.positionMs > 0 || it.completed } == true -> "ادامهٔ سریال"; isSeries -> "پخش قسمت "+(resumable?.second?.number?.toString() ?: ""); primaryId in resumeVersions -> "ادامهٔ فیلم"; else -> "پخش فیلم" },
                             { primaryId?.let(actions.play) }, Modifier.weight(1f).testTag("detail-primary"), primary = true, enabled = !busy && primaryId != null)
                         if (isSeries) {
-                            OutlinedIconButton({ tab = "episodes"; uiScope.launch { listState.animateScrollToItem(2) } }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
+                            OutlinedIconButton({ tab = "episodes"; uiScope.launch { listState.animateScrollToItem(if(data.metadataAvailable)4 else 5) } }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
                                 Icon(Icons.Default.FormatListNumbered, "انتخاب قسمت", tint = CinemaPaper)
                             }
                         } else {

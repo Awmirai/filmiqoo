@@ -13,7 +13,7 @@ class CinemaPersonalStore(context: Context, profileId: String?) {
     fun favorites(): List<MediaItem> = readItems("favorites")
     fun contains(bucket: String, media: MediaItem): Boolean = readItems(bucket).any { cinemaMediaKey(it) == cinemaMediaKey(media) }
     fun setSaved(bucket: String, media: MediaItem, saved: Boolean) {
-        require(bucket in setOf("watchlist", "favorites"))
+        require(bucket in setOf("watchlist", "favorites", "seenItems"))
         val items = readItems(bucket).filterNot { cinemaMediaKey(it) == cinemaMediaKey(media) }.toMutableList()
         if (saved) items.add(0, media)
         val array = JSONArray()

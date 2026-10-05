@@ -105,4 +105,15 @@ class ProductJourneyTest {
         } finally {first.setSaved("watchlist",media,false);first.markSeen(media,false)}
         compose.setContent{FilmiqooTheme{Text("فهرست بازیابی شد")}}
     }
+    @Test fun failedSettingsSaveRestoresPreviousValue(){
+        val backend=backend(true)
+        server.dispatcher=object:Dispatcher(){override fun dispatch(r:RecordedRequest)=
+            if(r.method=="POST")MockResponse().setResponseCode(503).setBody("{}")
+            else MockResponse().setBody("""{"autoplayNext":false}""")}
+        compose.setContent{FilmiqooTheme{SettingsScreen(backend,{})}}
+        compose.waitUntil(10000){compose.onAllNodes(isToggleable() and isOff()).fetchSemanticsNodes().isNotEmpty()}
+        compose.onAllNodes(isToggleable()).onFirst().performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithText("ذخیره نشد؛ تنظیم قبلی حفظ شد.",substring=true).fetchSemanticsNodes().isNotEmpty()}
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOff()
+    }
 }

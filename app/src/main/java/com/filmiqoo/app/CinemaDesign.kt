@@ -56,7 +56,7 @@ internal fun CinemaImage(path: String?, modifier: Modifier = Modifier, backdrop:
 
 @Composable
 internal fun CinemaCard(modifier: Modifier = Modifier, accent: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier, color = CinemaSurface, shape = RoundedCornerShape(22.dp),
+    Surface(modifier, color = CinemaSurface, shape = RoundedCornerShape(CinemaTokens.cardRadius),
         border = BorderStroke(1.dp, if (accent) CinemaAccent.copy(alpha = .34f) else CinemaLine)) {
         Column(Modifier.padding(18.dp), content = content)
     }
@@ -64,7 +64,7 @@ internal fun CinemaCard(modifier: Modifier = Modifier, accent: Boolean = false, 
 
 @Composable
 internal fun CinemaHeading(title: String, subtitle: String? = null, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = CinemaTokens.page, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, color = CinemaPaper)
             if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 12.sp, lineHeight = 19.sp, color = CinemaSoft, modifier = Modifier.padding(top = 3.dp))
@@ -75,7 +75,7 @@ internal fun CinemaHeading(title: String, subtitle: String? = null, action: Stri
 
 @Composable
 internal fun CinemaTag(label: String, selected: Boolean = false, onClick: (() -> Unit)? = null) {
-    val touch = if (onClick != null) Modifier.heightIn(min = 48.dp).selectable(selected = selected, role = Role.Tab, onClick = onClick) else Modifier
+    val touch = if (onClick != null) Modifier.heightIn(min = CinemaTokens.touch).selectable(selected = selected, role = Role.Tab, onClick = onClick) else Modifier
     Surface(modifier = touch, color = if (selected) CinemaAccent.copy(alpha = .14f) else CinemaSurface,
         contentColor = if (selected) CinemaAccent else CinemaSoft, shape = RoundedCornerShape(13.dp),
         border = BorderStroke(1.dp, if (selected) CinemaAccent.copy(alpha = .4f) else CinemaLine)) {
@@ -87,13 +87,13 @@ internal fun CinemaTag(label: String, selected: Boolean = false, onClick: (() ->
 
 @Composable
 internal fun CinemaAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false, enabled: Boolean = true) {
-    Button(onClick, modifier.heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(16.dp),
+    Button(onClick, modifier.heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(CinemaTokens.radius),
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) CinemaAccent else CinemaSurface,
             contentColor = if (primary) CinemaInk else CinemaPaper),
         border = if (primary) null else BorderStroke(1.dp, CinemaLine), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
         Icon(icon, null, modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 

@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 
 internal fun TitleComment.media():MediaItem {
     val parts=scope.split(':')
-    return MediaItem(parts.getOrNull(1)?.toIntOrNull()?:0,if(parts.firstOrNull()=="series")MediaType.TV else MediaType.MOVIE,
+    return MediaItem(parts.getOrNull(1)?.toIntOrNull()?:0,if(kind=="series" || parts.firstOrNull()=="series" || scope.contains(":s"))MediaType.TV else MediaType.MOVIE,
         title.ifBlank { if(parts.firstOrNull()=="series")"گفت‌وگوی سریال"else "گفت‌وگوی فیلم" },
         posterPath=poster.takeIf(String::isNotBlank),backendId=if(parts.firstOrNull()=="catalog")parts.getOrNull(1)else null)
 }
@@ -74,7 +74,7 @@ fun CinemaSocialScreen(social:SocialRepository,backend:BackendRepository,loggedI
             if(loading)item("loading"){LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=20.dp),color=CinemaAccent)}
             error?.let{message->item("error"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("ارتباط کامل نشد",message,Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}}}
             if(!loading&&error==null&&page?.items.isNullOrEmpty())item("empty"){Box(Modifier.padding(horizontal=20.dp)){
-                CinemaNotice("هنوز گفت‌وگویی شروع نشده","اولین نظر می‌تواند به انتخاب فیلم نفر بعد کمک کند. هیچ فعالیت ساختگی در این بخش نمایش داده نمی‌شود.",Icons.Outlined.Forum)
+                CinemaNotice("هنوز گفت‌وگویی شروع نشده","اولین نظر می‌تواند به انتخاب فیلم نفر بعد کمک کند. از صفحهٔ اثر، تجربهٔ تماشایت را بنویس.",Icons.Outlined.Forum)
             }}
             items(page?.items.orEmpty(),key={it.id}){comment->
                 val media=comment.media()

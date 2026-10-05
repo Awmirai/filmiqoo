@@ -39,7 +39,7 @@ internal data class TitleComment(
     val id: String, val body: String, val spoiler: Boolean, val sticker: String, val gif: String,
     val authorId: String, val author: String, val avatar: String, val own: Boolean,
     val likes: Int, val liked: Boolean, val replies: Int, val deleted: Boolean, val created: String,
-    val scope: String = "", val title: String = "", val poster: String = ""
+    val scope: String = "", val title: String = "", val poster: String = "", val kind: String = ""
 )
 internal data class DiscussionPage(val items: List<TitleComment>, val next: String?)
 internal fun discussionKey(media: MediaItem): String = if (media.id > 0)
@@ -55,7 +55,7 @@ internal class TitleDiscussionRepository(private val backend: BackendRepository)
                 val x = arr.getJSONObject(i)
                 add(TitleComment(x.getString("id"), x.optString("body"), x.optBoolean("spoiler"), x.optString("sticker"), x.optString("gifUrl"),
                     x.optString("authorId"), x.optString("authorName"), x.optString("avatarUrl"), x.optBoolean("own"), x.optInt("likes"),
-                    x.optBoolean("liked"), x.optInt("replies"), x.optBoolean("deleted"), x.optString("createdAt"),x.optString("scope"),x.optString("title"),x.optString("poster")))
+                    x.optBoolean("liked"), x.optInt("replies"), x.optBoolean("deleted"), x.optString("createdAt"),x.optString("scope"),x.optString("title"),x.optString("poster"),x.optString("kind")))
             }
         }, root.optString("nextCursor").takeUnless { it.isBlank() || it == "null" })
     }
@@ -284,7 +284,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
     reporting?.let { comment -> AlertDialog(onDismissRequest = { reporting = null }, title = { Text("گزارش دیدگاه") },
         text = { Column { listOf("spam" to "هرزنامه", "harassment" to "توهین و آزار", "spoiler" to "اسپویل بدون هشدار").forEach { (reason, label) ->
             TextButton({ reporting = null; action { repository.report(comment.id, reason); notice = "گزارش برای بررسی ثبت شد." } }) { Text(label) }
-        }; TextButton({ reporting=null;action{SafetyRepository(backend).toggleBlock(comment.authorId);refresh++;notice="کاربر مسدود شد."} }){Text("مسدودکردن نویسنده")} } }, confirmButton = { TextButton({ reporting = null }) { Text("انصراف") } }) }
+        }; TextButton({ reporting=null;action{SafetyRepository(backend).ensureBlocked(comment.authorId);refresh++;notice="کاربر مسدود شد."} }){Text("مسدودکردن نویسنده")} } }, confirmButton = { TextButton({ reporting = null }) { Text("انصراف") } }) }
 }
 
 internal data class DiscussionEpisode(val season:Int,val episode:Int)

@@ -124,12 +124,11 @@ fun AuthScreen(
         )
 
         Column(
-            Modifier.fillMaxSize()
+            Modifier.align(Alignment.TopCenter).widthIn(max=520.dp).fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .imePadding()
-                .widthIn(max=520.dp)
                 .padding(horizontal=20.dp),
             horizontalAlignment=Alignment.CenterHorizontally
         ) {

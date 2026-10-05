@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 import java.time.Duration
 
@@ -63,13 +64,13 @@ fun InboxScreen(
     LaunchedEffect(refresh,archivedView) {
         loading=true
         error=null
-        runCatching { repo.inbox(archived=archivedView) }
-            .onSuccess { items=it }
-            .onFailure { error=it.message ?: "خطا در دریافت پیام‌ها" }
-        loading=false
+        try { items=repo.inbox(archived=archivedView) }
+        catch(cancelled:CancellationException){throw cancelled}
+        catch(failure:Exception){error=failure.message ?: "خطا در دریافت پیام‌ها"}
+        finally{loading=false}
     }
 
-    Column(Modifier.fillMaxSize().background(FqBg)) {
+    Column(Modifier.fillMaxSize().background(CinemaInk).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).navigationBarsPadding().imePadding()) {
         Column(
             Modifier.fillMaxWidth()
                 .background(
@@ -91,7 +92,7 @@ fun InboxScreen(
                 )
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "پیام‌ها",
+                        "پیام‌های خصوصی",
                         fontSize=26.sp,
                         fontWeight=FontWeight.Black
                     )
@@ -130,7 +131,7 @@ fun InboxScreen(
                         contentColor=if(active) Color.Black else FqMuted,
                         shape=RoundedCornerShape(13.dp),
                         modifier=Modifier.weight(1f)
-                            .height(38.dp)
+                            .heightIn(min=48.dp)
                             .clickable { archivedView=archived }
                     ) {
                         Box(contentAlignment=Alignment.Center) {
@@ -155,7 +156,7 @@ fun InboxScreen(
                 trailingIcon={
                     if(query.isNotBlank()) {
                         IconButton(onClick={query=""}) {
-                            Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                            Icon(Icons.Default.Close,"پاک‌کردن جستجو",modifier=Modifier.size(18.dp))
                         }
                     }
                 },
@@ -598,71 +599,21 @@ fun ConnectedNotificationsScreen(
     LaunchedEffect(refresh) {
         loading=true
         error=null
-        runCatching { repo.notifications() }
-            .onSuccess {
-                items=it.first
-                unread=it.second
-            }
-            .onFailure { error=it.message ?: "خطا در دریافت اعلان‌ها" }
-        loading=false
+        try { val result=repo.notifications();items=result.first;unread=result.second }
+        catch(cancelled:CancellationException){throw cancelled}
+        catch(failure:Exception){error=failure.message ?: "خطا در دریافت اعلان‌ها"}
+        finally{loading=false}
     }
 
-    Column(Modifier.fillMaxSize().background(FqBg)) {
-        Box(
-            Modifier.fillMaxWidth().height(170.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF220609),Color(0xFF100708),FqBg)
-                    )
-                )
-        ) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal=10.dp,vertical=8.dp),
-                verticalAlignment=Alignment.CenterVertically
-            ) {
-                FqIconButton(
-                    icon=Icons.Default.ArrowBack,
-                    contentDescription="بازگشت",
-                    onClick=onBack
-                )
-                Spacer(Modifier.weight(1f))
-                if(unread>0) {
-                    TextButton(onClick={
-                        scope.launch {
-                            runCatching { repo.markAllNotificationsRead() }
-                                .onSuccess { refresh++ }
-                        }
-                    }) {
-                        Text("خواندن همه",fontSize=10.sp)
-                    }
-                }
-                FqIconButton(
-                    icon=Icons.Default.Refresh,
-                    contentDescription="تازه‌سازی",
-                    onClick={refresh++}
-                )
-            }
-
-            Column(
-                Modifier.align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(horizontal=18.dp)
-                    .padding(bottom=18.dp)
-            ) {
-                Text("اعلان‌ها",fontSize=30.sp,fontWeight=FontWeight.Black)
-                Text(
-                    if(unread>0)
-                        compactInboxCount(unread)+" اعلان خوانده‌نشده"
-                    else
-                        "چیزی از دست ندادی",
-                    color=if(unread>0)FqGoldSoft else FqMuted,
-                    fontSize=10.sp,
-                    modifier=Modifier.padding(top=3.dp)
-                )
-            }
+    Column(Modifier.fillMaxSize().background(CinemaInk).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).navigationBarsPadding().imePadding()) {
+        CinemaPageHeader("اعلان‌ها",if(loading)"در حال دریافت…" else if(error!=null)"دریافت اعلان‌ها کامل نشد" else if(unread>0)"$unread اعلان خوانده‌نشده" else "اعلان‌های حساب و انتشار قسمت‌ها",onBack) {
+            IconButton({refresh++},enabled=!loading){Icon(Icons.Default.Refresh,"تازه‌سازی")}
         }
+        if(unread>0)TextButton({scope.launch {
+            try{repo.markAllNotificationsRead();refresh++}
+            catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){error="علامت خوانده‌شده ثبت نشد؛ دوباره تلاش کن."}
+        }},modifier=Modifier.padding(horizontal=20.dp)){Text("علامت‌زدن همه به‌عنوان خوانده‌شده")}
 
         LazyRow(
             contentPadding=PaddingValues(horizontal=12.dp),
@@ -679,7 +630,7 @@ fun ConnectedNotificationsScreen(
                 FilterChip(
                     selected=filter==NotificationFilter.SOCIAL,
                     onClick={filterName=NotificationFilter.SOCIAL.name},
-                    label={Text("نبض",fontSize=10.sp)}
+                    label={Text("اجتماعی",fontSize=12.sp)}
                 )
             }
             item {

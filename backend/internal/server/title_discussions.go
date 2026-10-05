@@ -40,7 +40,9 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `
-	 SELECT c.id::text,c.body,c.spoiler,c.sticker,c.deleted,c.created_at,c.scope,c.title_label,c.poster_path,
+     SELECT c.id::text,c.body,c.spoiler,c.sticker,c.deleted,c.created_at,c.scope,c.title_label,c.poster_path,
+     CASE WHEN c.scope LIKE 'series:%' THEN 'series' WHEN c.scope LIKE 'movie:%' THEN 'movie'
+       ELSE COALESCE((SELECT m.kind::text FROM media_titles m WHERE m.id=split_part(c.scope,':',2)::uuid),'movie') END,
 	 p.user_id::text,p.display_name,p.avatar_url,COALESCE(u.object_key,''),
 	 (SELECT count(*) FROM title_comment_likes l WHERE l.comment_id=c.id),
 	 EXISTS(SELECT 1 FROM title_comment_likes l WHERE l.comment_id=c.id AND l.user_id::text=$2),
@@ -60,11 +62,11 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 	items := make([]map[string]any, 0)
 	var next any
 	for rows.Next() {
-		var id, body, sticker, author, name, avatar, key, itemScope, titleLabel, posterPath string
+		var id, body, sticker, author, name, avatar, key, itemScope, titleLabel, posterPath, mediaKind string
 		var spoiler, deleted, liked bool
 		var created time.Time
 		var likes, replies int64
-		if err = rows.Scan(&id, &body, &spoiler, &sticker, &deleted, &created, &itemScope, &titleLabel, &posterPath, &author, &name, &avatar, &key, &likes, &liked, &replies); err != nil {
+		if err = rows.Scan(&id, &body, &spoiler, &sticker, &deleted, &created, &itemScope, &titleLabel, &posterPath, &mediaKind, &author, &name, &avatar, &key, &likes, &liked, &replies); err != nil {
 			writeError(w, 500, err)
 			return
 		}
@@ -83,7 +85,7 @@ func (s *Server) titleComments(w http.ResponseWriter, r *http.Request) {
 			url = ""
 			spoiler = false
 		}
-		items = append(items, map[string]any{"id": id, "scope": itemScope, "title": titleLabel, "poster": posterPath, "body": body, "spoiler": spoiler, "sticker": sticker, "gifUrl": url, "deleted": deleted, "createdAt": created, "authorId": author, "authorName": name, "avatarUrl": avatar, "own": viewer == author, "liked": liked, "likes": likes, "replies": replies})
+		items = append(items, map[string]any{"id": id, "scope": itemScope, "title": titleLabel, "poster": posterPath, "kind": mediaKind, "body": body, "spoiler": spoiler, "sticker": sticker, "gifUrl": url, "deleted": deleted, "createdAt": created, "authorId": author, "authorName": name, "avatarUrl": avatar, "own": viewer == author, "liked": liked, "likes": likes, "replies": replies})
 	}
 	if err = rows.Err(); err != nil {
 		writeError(w, 500, err)

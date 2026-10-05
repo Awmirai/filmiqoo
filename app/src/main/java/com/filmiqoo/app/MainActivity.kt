@@ -84,6 +84,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val bottomTabStateHolder=rememberSaveableStateHolder()
+    val overlayStateHolder=rememberSaveableStateHolder()
     val navigation=remember(context) { androidx.lifecycle.ViewModelProvider(context as androidx.lifecycle.ViewModelStoreOwner)[CinemaNavigationState::class.java] }
     var overlay by navigation.overlay
     val overlayBackStack=navigation.backStack
@@ -339,6 +340,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     }
 
     val closeOverlay:()->Unit = {
+        overlay?.let { overlayStateHolder.removeState(it.javaClass.name+":"+it.hashCode()) }
         overlay=if(overlayBackStack.isNotEmpty()) {
             overlayBackStack.removeAt(overlayBackStack.lastIndex)
         } else {
@@ -591,7 +593,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     overlay=OverlayRoute.Clips(clipId)
                 }
             )
-            overlay != null -> when(val route=overlay!!) {
+            overlay != null -> overlayStateHolder.SaveableStateProvider(overlay!!.javaClass.name+":"+overlay.hashCode()) { when(val route=overlay!!) {
                 is OverlayRoute.Detail -> CinemaDetailScreen(
                     media=route.media,
                     repository=repository,
@@ -1029,6 +1031,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onOpenLive={pushOverlay(OverlayRoute.LiveHub(it))},
                     onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)}
                 )
+            }
             }
             else -> CinemaAppShell(tab,activeViewer?.kidsMode==true,{ index ->
                 overlayBackStack.clear(); tab=index; if(index!=2)deepLinkPostId=null
