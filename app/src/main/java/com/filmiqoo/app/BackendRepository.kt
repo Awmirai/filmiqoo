@@ -219,6 +219,7 @@ data class PlatformSeason(
 )
 
 class SessionStore(context: Context) {
+    private val viewerProfiles = ViewerProfileStore(context.applicationContext)
     private val prefs = context.getSharedPreferences("filmiqoo_session_v1", Context.MODE_PRIVATE)
 
     var baseUrl: String
@@ -248,6 +249,9 @@ class SessionStore(context: Context) {
     }
 
     fun clear() {
+        // An expired account must not supply its viewer ID to a subsequent login.
+        // Personal lists remain scoped to their profile; only the active selection is cleared.
+        viewerProfiles.clear()
         prefs.edit()
             .remove("access_token")
             .remove("refresh_token")
@@ -1153,7 +1157,8 @@ class BackendRepository(context: Context) {
                     .build()
                 client.newCall(req).execute().use { res ->
                     if (!res.isSuccessful) {
-                        if (session.refreshToken == refresh) {
+                        // A temporary server/rate-limit failure is not session revocation.
+                        if (res.code == 401 && session.refreshToken == refresh) {
                             session.clear()
                         }
                         return@use false

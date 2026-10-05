@@ -22,6 +22,8 @@ class ProductJourneyTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private val server=MockWebServer()
     private var original:Triple<String,String?,String?>?=null
+    private var originalViewer:ViewerProfile?=null
+    private var restoreViewer=false
     private fun backend(logged:Boolean=false):BackendRepository {
         server.start();return BackendRepository(compose.activity).also {
             original=Triple(it.session.baseUrl,it.session.accessToken,it.session.refreshToken)
@@ -31,6 +33,7 @@ class ProductJourneyTest {
     @After fun cleanup(){
         compose.runOnUiThread{compose.activity.setContentView(android.widget.FrameLayout(compose.activity))}
         original?.let{v->SessionStore(compose.activity).apply{baseUrl=v.first;accessToken=v.second;refreshToken=v.third}}
+        if(restoreViewer)ViewerProfileStore(compose.activity).apply { originalViewer?.let(::activate) ?: clear() }
         server.shutdown()
     }
     @Test fun searchNormalizesRequestAndLateResponseCannotReplaceLatest(){
@@ -115,5 +118,36 @@ class ProductJourneyTest {
         compose.onAllNodes(isToggleable()).onFirst().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("ذخیره نشد؛ تنظیم قبلی حفظ شد.",substring=true).fetchSemanticsNodes().isNotEmpty()}
         compose.onAllNodes(isToggleable()).onFirst().assertIsOff()
+    }
+    @Test fun expiredSessionClearsActiveViewerWithoutDeletingPersonalLists() = kotlinx.coroutines.runBlocking {
+        val backend=backend(true)
+        originalViewer=backend.viewerProfiles.active();restoreViewer=true
+        val profile=ViewerProfile("expired-profile","آزمایش","",false,"all","fa","fa",true,false)
+        val media=MediaItem(777702,MediaType.MOVIE,"فهرست محفوظ")
+        val personal=CinemaPersonalStore(compose.activity,profile.id)
+        backend.viewerProfiles.activate(profile);personal.setSaved("watchlist",media,true)
+        val requests=CopyOnWriteArrayList<RecordedRequest>()
+        server.dispatcher=object:Dispatcher(){override fun dispatch(r:RecordedRequest):MockResponse {
+            requests+=r
+            return if(requests.size<=2)MockResponse().setResponseCode(401).setBody("{}") else MockResponse().setBody("{}")
+        }}
+        try {
+            assertTrue(runCatching { backend.getJson("/v1/library/watchlist",true) }.isFailure)
+            assertFalse(backend.session.isLoggedIn)
+            assertNull(backend.viewerProfiles.activeId())
+            assertTrue(personal.saved().any { it.id==media.id })
+            backend.session.accessToken="new-account";backend.session.refreshToken="new-refresh"
+            backend.getJson("/v1/library/watchlist",true)
+            assertEquals("/v1/auth/refresh",requests[1].requestUrl!!.encodedPath)
+            assertNull(requests.last().getHeader("X-Filmiqoo-Viewer-Profile"))
+        } finally { personal.setSaved("watchlist",media,false) }
+    }
+    @Test fun temporaryRefreshFailureKeepsSessionForRetry() = kotlinx.coroutines.runBlocking {
+        val backend=backend(true)
+        server.dispatcher=object:Dispatcher(){override fun dispatch(r:RecordedRequest)=MockResponse()
+            .setResponseCode(if(r.requestUrl!!.encodedPath=="/v1/auth/refresh")503 else 401).setBody("{}")}
+        assertTrue(runCatching { backend.getJson("/v1/library/watchlist",true) }.isFailure)
+        assertTrue(backend.session.isLoggedIn)
+        assertEquals("test",backend.session.refreshToken)
     }
 }
