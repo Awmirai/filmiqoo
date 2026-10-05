@@ -119,7 +119,15 @@ class ProductAuditTest {
                 repeat(3){compose.onNodeWithTag("cinema-home").performTouchInput{swipeDown()};compose.waitForIdle()}
                 PlatformTestStorageRegistry.getInstance().openOutputFile("home-scroll-frames.txt").use{it.write(shell("dumpsys gfxinfo $packageName framestats"))}
             }
-            if(label.contains("keyboard")) androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+            if(label.contains("keyboard") && name in listOf("search","auth")) {
+                // Hide only the IME; Back on a page without a keyboard would finish the test Activity.
+                compose.runOnUiThread {
+                    val activity=compose.activity
+                    androidx.core.view.WindowCompat.getInsetsController(activity.window,activity.window.decorView)
+                        .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+                }
+                compose.waitForIdle()
+            }
         }
         PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-metrics.json").use { it.write(metrics.toString(2).toByteArray()) }
     }
