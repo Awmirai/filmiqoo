@@ -55,7 +55,7 @@ fun PremiumSearchScreen(repository:TmdbRepository,backend:BackendRepository,onBa
     Column(Modifier.fillMaxSize().background(CinemaInk).imePadding().testTag("cinema-search")) {
         CinemaPageHeader("جست‌وجو","نام فارسی یا انگلیسی فیلم و سریال",onBack)
         OutlinedTextField(query,{query=it.take(120)},singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp).testTag("search-input"),
-            label={Text("چه چیزی می‌خواهی ببینی؟")},leadingIcon={Icon(Icons.Outlined.Search,null)},
+            label={Text("نام فیلم یا سریال")},leadingIcon={Icon(Icons.Outlined.Search,null)},
             trailingIcon={if(query.isNotEmpty())IconButton({query=""}){Icon(Icons.Outlined.Close,"پاک‌کردن جست‌وجو")}},
             shape=MaterialTheme.shapes.large,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
         LazyRow(contentPadding=PaddingValues(20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {

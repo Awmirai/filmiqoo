@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,7 @@ internal fun cinemaDestinations(kids:Boolean)=listOf(
 @Composable
 internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,rail:Boolean=false) {
     val entries=cinemaDestinations(kids)
+    val window=LocalConfiguration.current
     @Composable fun Item(entry:CinemaDestination,modifier:Modifier) {
         val active=entry.id==selected
         Column(modifier.heightIn(min=72.dp).selectable(active,role=Role.Tab,onClick={onSelected(entry.id)})
@@ -57,13 +59,16 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
     }
     if(rail) Surface(color=CinemaSurface,modifier=Modifier.width(112.dp).fillMaxHeight().testTag("navigation-rail")) {
         Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).selectableGroup()) {
-            Box(Modifier.fillMaxWidth().padding(vertical=24.dp),contentAlignment=Alignment.Center) { FilmiqooBrandMark(32.dp) }
+            if(window.screenHeightDp>=480)Box(Modifier.fillMaxWidth().padding(vertical=24.dp),contentAlignment=Alignment.Center) { FilmiqooBrandMark(32.dp) }
             entries.forEach { Item(it,Modifier.fillMaxWidth()) }
         }
     } else Surface(color=CinemaSurface,modifier=Modifier.testTag("navigation-bar")) {
         Column(Modifier.navigationBarsPadding()) {
             HorizontalDivider(color=CinemaLine)
-            Row(Modifier.fillMaxWidth().selectableGroup()) { entries.forEach { Item(it,Modifier.weight(1f)) } }
+            Row(Modifier.fillMaxWidth().selectableGroup()) { entries.forEach {
+                val weight=if(window.fontScale>=1.6f && window.screenWidthDp<400 && !kids)when(it.id){0->.8f;1->1f;else->1.2f}else 1f
+                Item(it,Modifier.weight(weight))
+            } }
         }
     }
 }
@@ -78,7 +83,8 @@ internal fun CinemaAppShell(selected:Int,kids:Boolean,onSelected:(Int)->Unit,con
             Scaffold(modifier=Modifier.weight(1f),containerColor=CinemaInk,
                 contentWindowInsets=WindowInsets(0,0,0,0),
                 bottomBar={if(!rail) CinemaNavigation(selected,kids,onSelected)}) { padding ->
-                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),contentAlignment=Alignment.TopCenter) {
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
+                    .windowInsetsPadding(if(rail)WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)else WindowInsets(0,0,0,0)),contentAlignment=Alignment.TopCenter) {
                     Box(Modifier.widthIn(max=CinemaTokens.contentMax).fillMaxSize()) { content() }
                 }
             }

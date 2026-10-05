@@ -91,8 +91,10 @@ internal fun CinemaAction(icon: ImageVector, label: String, onClick: () -> Unit,
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) CinemaAccent else CinemaSurface,
             contentColor = if (primary) CinemaInk else CinemaPaper),
         border = if (primary) null else BorderStroke(1.dp, CinemaLine), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
-        Icon(icon, null, modifier = Modifier.size(21.dp))
-        Spacer(Modifier.width(8.dp))
+        if(androidx.compose.ui.platform.LocalDensity.current.fontScale<1.6f) {
+            Icon(icon, null, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(8.dp))
+        }
         Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }

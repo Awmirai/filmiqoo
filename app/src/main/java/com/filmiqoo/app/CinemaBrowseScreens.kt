@@ -161,7 +161,7 @@ fun CinemaHomeScreen(
                 FilmiqooBrandMark(38.dp)
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("FILMIQOO", color = CinemaPaper, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                    Text(if(androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.6f)"خانه"else "FILMIQOO", color = CinemaPaper, fontSize = 21.sp, fontWeight = FontWeight.Black)
                     Text("خانهٔ فیلم‌بازها", color = CinemaSoft, fontSize = 12.sp)
                 }
                 IconButton(onAccount) { Icon(Icons.Default.AccountCircle, "حساب و تنظیمات", tint = CinemaPaper) }
