@@ -26,6 +26,8 @@ import okhttp3.mockwebserver.*
 import org.junit.*
 import org.junit.Assert.*
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class WatchPartyJourneyTest {
@@ -53,6 +55,18 @@ class WatchPartyJourneyTest {
         val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         try { PlatformTestStorageRegistry.getInstance().openOutputFile(file).use{assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,it))} }
         finally { bitmap.recycle() }
+    }
+    private fun waitForNativeFrame() {
+        val committed=CountDownLatch(1)
+        compose.runOnUiThread {
+            val view=compose.activity.window.decorView
+            if(android.os.Build.VERSION.SDK_INT>=29 && view.isHardwareAccelerated) {
+                view.viewTreeObserver.registerFrameCommitCallback{committed.countDown()}
+                view.invalidate()
+            } else view.postOnAnimation{view.postOnAnimation{committed.countDown()}}
+        }
+        assertTrue("chat frame must commit before pixel capture",committed.await(5,TimeUnit.SECONDS))
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(250,5000)
     }
     private fun findPlayer(view:View):PlayerView? {
         if(view is PlayerView)return view
@@ -245,6 +259,13 @@ class WatchPartyJourneyTest {
         snapshot("watch-party-connected-stage.png")
         compose.onNodeWithTag("party-stage").performScrollToNode(hasTestTag("party-message-hello"))
         compose.onNodeWithTag("party-message-hello").assertIsDisplayed()
+        val chat=compose.onNodeWithText("همه آماده‌ایم؛ شروع کنیم!")
+        chat.performScrollTo().assertIsDisplayed()
+        val viewport=compose.onNodeWithTag("party-stage").fetchSemanticsNode().boundsInRoot
+        val bounds=chat.fetchSemanticsNode().boundsInRoot
+        assertTrue("specific chat body must be inside conversation viewport",
+            bounds.height>0 && bounds.top>=viewport.top && bounds.bottom<=viewport.bottom)
+        waitForNativeFrame()
         snapshot("watch-party-connected-chat.png")
     }
 }

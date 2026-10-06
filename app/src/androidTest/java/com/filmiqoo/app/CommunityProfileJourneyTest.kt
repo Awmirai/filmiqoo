@@ -233,7 +233,7 @@ class CommunityProfileJourneyTest {
         stage.set(1)
         compose.waitUntil(10000){feedCalls.get()>initialCalls}
         scrollCommunityTo("community-new-posts")
-        compose.onNodeWithTag("community-new-posts").assertTextContains("1 پست تازه")
+        compose.onNodeWithTag("community-new-posts").assertTextEquals("1 پست تازه · ببین")
         // Polling announces unseen IDs; it never injects a post while someone is reading.
         compose.onNodeWithTag("community-post-new").assertDoesNotExist()
         stage.set(2)

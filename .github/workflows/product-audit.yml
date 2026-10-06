@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         stage: [before, after]
-        batch: [core, large, access]
+        batch: [core, large, landscape, access]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -56,6 +56,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: |
             adb shell settings put secure immersive_mode_confirmations confirmed
             mkdir -p audit-evidence
