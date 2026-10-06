@@ -9,7 +9,7 @@
 - ساختار واقعی: Android/Kotlin 2.0.21، Compose BOM 2024.12.01، AGP 8.7.3، minSdk 26/targetSdk 35؛ بک‌اند Go 1.24 و PostgreSQL/Redis. تغییر چارچوب یا ارتقای غیرضروری وابستگی انجام نشده است.
 - ویندوز محلی فضای کم و شبیه‌ساز آماده ندارد؛ adb محلی در ساخت پوشهٔ کاربر خطای مجوز داشت. این محدودیت محیط است. اجرای اندروید در CI روی emulator x86_64 Android 35 / Google APIs / Pixel 2 انجام می‌شود. این دستگاه فیزیکی Samsung نیست.
 - harness تصویری ابتدا روی کد مبنا اجرا شد. ایرادهای بازطراحی از خطای مبنا جدا نگه داشته می‌شوند: در توسعهٔ فهرست «دیده‌شده»، پذیرش نام مخزن جدید جا افتاده بود؛ مسیر با آزمون ذخیره/بازیابی پوشش داده و اصلاح شد. این خطا مربوط به کد جدید بود، نه کرش قدیمی پلیر.
-- نسخهٔ تحویل `0.7.0-product-preview`، versionCode 9، نوع debug Preview، شناسهٔ `com.filmiqoo.previewfix.preview`. کلید مجاز Preview قبلی حفظ می‌شود؛ کلید انتشار عمومی جایگزین نشده است. R8 release smoke تنها آزمون ساخت است، نه release منتشرشده.
+- نسخهٔ تحویل `0.7.1-product-preview`، versionCode 10، نوع debug Preview، شناسهٔ `com.filmiqoo.previewfix.preview`. کلید مجاز Preview قبلی حفظ می‌شود؛ کلید انتشار عمومی جایگزین نشده است. R8 release smoke تنها آزمون ساخت است، نه release منتشرشده.
 
 ## تصمیم محصول و ناوبری
 
@@ -152,3 +152,7 @@ parser ورودی Telegram ترکیب نام فایل و caption فارسی/ان
 زمان `am start -W` پنج مرتبه جمع‌آوری می‌شود؛ TTID اولین frame اسپلش است، نه آماده‌شدن شبکه/ورود. PSS صفحه‌ها، meminfo و gfxinfo نیز خام نگه داشته می‌شوند. benchmark کنترل‌شدهٔ startup، اسکرول یا آغاز پخش و درصد بهبود ادعا نمی‌شود. ارزیابی وظیفه توسط آزمون‌ خودکار، مطالعهٔ کاربر نیست.
 
 فایل‌های اصلی تغییر: ProductDesign، MainActivity/Models/CinemaNavigationState، CinemaBrowseScreens/Spotlight، PremiumSearchScreen، FilmClubScreen/TitleDiscussion، PersonalLibraryScreen/CinemaPersonalStore، CinemaDetailContent/Screen، AccountScreen، Auth/Settings/InboxNotifications، Player/Splash؛ server/title_discussions و migration 053؛ ProductAuditTest/ProductJourneyTest، workflow و اسکریپت audit. فهرست دقیق diff از commit مبنا تا commit تحویل کنار خروجی ارائه می‌شود.
+
+## اصلاح تکمیلی 0.7.1 — جهت زمانی پلیر
+
+در بازبینی تصویر واقعی 0.7.0 مشخص شد فقط متن زمان LTR بود و Slider و ترتیب دکمه‌های عقب/جلو از RTL ارث می‌بردند. 0.7.1 جهت مستقل LTR برای همین دو بخش و نشانگرهای نوار زمان تعریف می‌کند؛ منوها و متن فارسی همچنان RTL هستند. PlayerTimelineTest جای فیزیکی عقب/جلو، callback هر دکمه، لمس چپ برای ابتدای ویدئو و لمس راست برای انتهای ویدئو را در میزبان RTL بررسی می‌کند. نتیجهٔ اجرای commit تازه در گزارش تحویل ثبت می‌شود. نسخهٔ 0.7.0 نگه داشته می‌شود اما 0.7.1 جایگزین پیشنهادی آن است.

@@ -34,8 +34,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 9
-        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.7.0-product-preview"
+        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 10
+        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.7.1-product-preview"
         manifestPlaceholders["appLabel"] = "Filmiqoo"
         buildConfigField(
             "String",
