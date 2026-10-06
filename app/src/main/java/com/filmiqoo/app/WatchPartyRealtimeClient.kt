@@ -15,6 +15,7 @@ class WatchPartyRealtimeClient(
         .readTimeout(0,TimeUnit.MILLISECONDS)
         .build()
 
+    /** Callbacks arrive on OkHttp's worker; consumers must enqueue them for UI ownership. */
     fun connect(
         partyId:String,
         onConnected:()->Unit,
@@ -38,6 +39,10 @@ class WatchPartyRealtimeClient(
 
             override fun onMessage(webSocket:WebSocket,text:String) {
                 onEvent(text)
+            }
+
+            override fun onClosing(webSocket:WebSocket,code:Int,reason:String) {
+                webSocket.close(code,reason)
             }
 
             override fun onClosed(webSocket:WebSocket,code:Int,reason:String) {

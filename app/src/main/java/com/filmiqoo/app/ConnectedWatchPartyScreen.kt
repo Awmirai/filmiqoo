@@ -33,13 +33,38 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.WebSocket
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import kotlin.math.abs
+
+private sealed interface PartySocketSignal {
+    data object Connected:PartySocketSignal
+    data class Message(val raw:String):PartySocketSignal
+    data object Disconnected:PartySocketSignal
+}
+
+@Composable
+private fun WatchPartyMainEffect(vararg keys:Any?,block:suspend CoroutineScope.()->Unit) {
+    LaunchedEffect(*keys) { withContext(Dispatchers.Main.immediate,block) }
+}
+
+private inline fun <T> watchPartyAttempt(block:()->T):Result<T> = try {
+    Result.success(block())
+} catch(cancelled:CancellationException) {
+    throw cancelled
+} catch(failure:Throwable) {
+    Result.failure(failure)
+}
 
 @Composable
 fun ConnectedWatchPartyScreen(
@@ -96,7 +121,7 @@ fun ConnectedWatchPartyScreen(
     var selectedEpisodeId by rememberSaveable(media?.key) { mutableStateOf<String?>(null) }
 
     val player=remember {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context).setLooper(android.os.Looper.getMainLooper()).build().apply {
             repeatMode=Player.REPEAT_MODE_OFF
             playWhenReady=false
         }
@@ -110,30 +135,48 @@ fun ConnectedWatchPartyScreen(
         onDispose { player.removeListener(listener);player.release() }
     }
 
-    LaunchedEffect(partyId,lobby!=null,privateJoinRequired,backend.session.isLoggedIn,party?.state,party?.serverTimed) {
-        val id=partyId ?: return@LaunchedEffect
-        if(!backend.session.isLoggedIn || lobby==null || privateJoinRequired || party?.serverTimed!=true || party?.state in setOf("ended","cancelled"))return@LaunchedEffect
+    WatchPartyMainEffect(partyId,lobby!=null,privateJoinRequired,backend.session.isLoggedIn,party?.state,party?.serverTimed) {
+        val id=partyId ?: return@WatchPartyMainEffect
+        if(!backend.session.isLoggedIn || lobby==null || privateJoinRequired || party?.serverTimed!=true || party?.state in setOf("ended","cancelled"))return@WatchPartyMainEffect
         var retryMs=1000L
-        var accepting=true
-        var socket:WebSocket?=null
         try { while(isActive) {
+            // Intermediate packets may coalesce; polling supplies an authoritative
+            // snapshot. Terminal signals are separate and cannot be dropped.
+            val messages=Channel<String>(64,BufferOverflow.DROP_OLDEST)
+            val connected=CompletableDeferred<Unit>()
             val disconnected=CompletableDeferred<Unit>()
-            socket=realtime.connect(
+            var reactionRefresh:Job?=null
+            var queueRefresh:Job?=null
+            var reactionsDirty=false
+            var queueDirty=false
+            val socket=realtime.connect(
                 partyId=id,
-                onConnected={
-                    scope.launch { if(accepting && !disconnected.isCompleted){realtimeConnected=true;retryMs=1000L} }
-                },
-                onEvent={raw->
-                    scope.launch {
-                        if(!accepting || disconnected.isCompleted)return@launch
-                        val event=runCatching { JSONObject(raw) }.getOrNull() ?: return@launch
+                onConnected={connected.complete(Unit)},
+                onEvent={raw->messages.trySend(raw)},
+                onDisconnected={disconnected.complete(Unit)}
+            )
+            if(socket==null) { messages.cancel();break }
+            try {
+                var opened=false
+                signalLoop@ while(isActive) {
+                val signal=select<PartySocketSignal> {
+                    // Biased select gives a ready terminal event priority over packets.
+                    disconnected.onAwait { PartySocketSignal.Disconnected }
+                    if(!opened)connected.onAwait { PartySocketSignal.Connected }
+                    messages.onReceive { PartySocketSignal.Message(it) }
+                }
+                when(signal) {
+                    PartySocketSignal.Connected -> { opened=true;realtimeConnected=true;retryMs=1000L }
+                    PartySocketSignal.Disconnected -> break@signalLoop
+                    is PartySocketSignal.Message -> {
+                        val event=watchPartyAttempt { JSONObject(signal.raw) }.getOrNull() ?: continue@signalLoop
                         when(event.optString("type")) {
                             "watchparty.state" -> {
                                 val position=event.optLong("positionMs")
                                 val playing=event.optBoolean("isPlaying")
                                 val state=event.optString("state").ifBlank { "live" }
                                 val revision=event.optLong("revision")
-                                if(revision>0 && revision<(party?.revision ?: 0))return@launch
+                                if(revision>0 && revision<(party?.revision ?: 0))continue@signalLoop
                                 val controller=event.optString("controllerUserId").takeIf{it.isNotBlank() && it!="null"}
                                 partyReceivedAt=android.os.SystemClock.elapsedRealtime()
                                 party=party?.copy(
@@ -151,68 +194,79 @@ fun ConnectedWatchPartyScreen(
                                 }
                             }
                             "watchparty.reaction" -> {
-                                reactions=runCatching {
-                                    partyRepo.reactions(id)
-                                }.getOrDefault(reactions)
+                                reactionsDirty=true
+                                if(reactionRefresh?.isActive!=true)reactionRefresh=launch(Dispatchers.Main.immediate) {
+                                    while(reactionsDirty && !disconnected.isCompleted) {
+                                        reactionsDirty=false
+                                        val fresh=watchPartyAttempt { partyRepo.reactions(id) }.getOrNull()
+                                        if(fresh!=null && !disconnected.isCompleted)reactions=fresh
+                                    }
+                                }
                             }
                             "watchparty.queue.play" -> {
-                                runCatching { partyRepo.detail(id) }
-                                    .onSuccess { fresh->
-                                        party=fresh;partyReceivedAt=android.os.SystemClock.elapsedRealtime()
-                                        val version=fresh.media.mediaVersionId
-                                        if(!version.isNullOrBlank() && loadedVersion!=version) {
-                                            runCatching { backend.playbackUrl(version) }
-                                                .onSuccess { url->
-                                                    loadedVersion=version
-                                                    player.setMediaItem(ExoMediaItem.fromUri(url))
-                                                    player.prepare()
-                                                    player.seekTo(fresh.positionMs)
-                                                    player.playWhenReady=fresh.isPlaying && fresh.state=="live"
+                                queueDirty=true
+                                if(queueRefresh?.isActive!=true)queueRefresh=launch(Dispatchers.Main.immediate) {
+                                    while(queueDirty && !disconnected.isCompleted) {
+                                        queueDirty=false
+                                        watchPartyAttempt { partyRepo.detail(id) }
+                                            .onSuccess { fresh->
+                                                if(disconnected.isCompleted || fresh.revision<(party?.revision ?: 0))return@onSuccess
+                                                party=fresh;partyReceivedAt=android.os.SystemClock.elapsedRealtime()
+                                                val version=fresh.media.mediaVersionId
+                                                if(!version.isNullOrBlank() && loadedVersion!=version) {
+                                                    val url=watchPartyAttempt { backend.playbackUrl(version) }.getOrNull()
+                                                    val current=party
+                                                    if(url!=null && !disconnected.isCompleted && current!=null && current.media.mediaVersionId==version) {
+                                                        loadedVersion=version
+                                                        player.setMediaItem(ExoMediaItem.fromUri(url))
+                                                        player.prepare()
+                                                        player.seekTo(watchPartyTargetPosition(current,partyReceivedAt,android.os.SystemClock.elapsedRealtime()))
+                                                        player.playWhenReady=current.isPlaying && current.state=="live"
+                                                    }
                                                 }
-                                        }
+                                            }
                                     }
+                                }
                             }
                         }
                     }
-                },
-                onDisconnected={
-                    disconnected.complete(Unit)
                 }
-            )
-            if(socket==null)break
-            disconnected.await()
-            realtimeConnected=false
-            socket?.cancel();socket=null
+            } } finally {
+                // Cancelling before the socket discards already queued/late callbacks
+                // and prevents slow HTTP refresh work from updating the next attempt.
+                messages.cancel()
+                reactionRefresh?.cancel();queueRefresh?.cancel()
+                socket.cancel()
+                realtimeConnected=false
+            }
             delay(retryMs);retryMs=(retryMs*2).coerceAtMost(15_000L)
         } } finally {
-            accepting=false
-            socket?.cancel()
             realtimeConnected=false
         }
     }
 
     BackHandler { onBack() }
 
-    LaunchedEffect(media?.key,partyId) {
-        if(partyId!=null) return@LaunchedEffect
+    WatchPartyMainEffect(media?.key,partyId) {
+        if(partyId!=null) return@WatchPartyMainEffect
         val source=media
         if(source==null) {
             resolvingStartMedia=false
             resolvedStartMedia=null
             startPlatformDetail=null
             selectedEpisodeId=null
-            return@LaunchedEffect
+            return@WatchPartyMainEffect
         }
 
         resolvingStartMedia=true
-        val resolved=runCatching { repository.resolveCatalogMedia(source) }.getOrNull()
+        val resolved=watchPartyAttempt { repository.resolveCatalogMedia(source) }.getOrNull()
         resolvedStartMedia=resolved
         startPlatformDetail=null
         selectedEpisodeId=null
 
         val backendId=resolved?.backendId
         if(!backendId.isNullOrBlank()) {
-            val detail=runCatching { backend.detail(backendId) }.getOrNull()
+            val detail=watchPartyAttempt { backend.detail(backendId) }.getOrNull()
             startPlatformDetail=detail
             if(detail!=null) {
                 resolvedStartMedia=detail.asMediaItem()
@@ -228,20 +282,20 @@ fun ConnectedWatchPartyScreen(
         resolvingStartMedia=false
     }
 
-    LaunchedEffect(Unit) {
+    WatchPartyMainEffect(Unit) {
         if(backend.session.isLoggedIn) {
-            meId=runCatching { backend.me().id }.getOrNull()
+            meId=watchPartyAttempt { backend.me().id }.getOrNull()
         }
     }
 
 
-    LaunchedEffect(partyId,party?.state,party?.host?.id,meId,lobby?.myRole) {
-        val id=partyId ?: return@LaunchedEffect
-        val p=party ?: return@LaunchedEffect
-        if(!backend.session.isLoggedIn) return@LaunchedEffect
+    WatchPartyMainEffect(partyId,party?.state,party?.host?.id,meId,lobby?.myRole) {
+        val id=partyId ?: return@WatchPartyMainEffect
+        val p=party ?: return@WatchPartyMainEffect
+        if(!backend.session.isLoggedIn) return@WatchPartyMainEffect
 
         if(p.state=="scheduled") {
-            reminderEnabled=runCatching {
+            reminderEnabled=watchPartyAttempt {
                 partyRepo.reminderEnabled(id)
             }.getOrDefault(false)
         } else {
@@ -249,14 +303,14 @@ fun ConnectedWatchPartyScreen(
         }
 
         inviteInfo=if(p.host.id==meId || lobby?.myRole=="cohost") {
-            runCatching { partyRepo.inviteInfo(id) }.getOrNull()
+            watchPartyAttempt { partyRepo.inviteInfo(id) }.getOrNull()
         } else null
     }
 
-    LaunchedEffect(partyId,retryConnection) {
-        val id=partyId ?: return@LaunchedEffect
+    WatchPartyMainEffect(partyId,retryConnection) {
+        val id=partyId ?: return@WatchPartyMainEffect
         if(backend.session.isLoggedIn) {
-            runCatching { partyRepo.join(id,initialInviteCode) }
+            watchPartyAttempt { partyRepo.join(id,initialInviteCode) }
                 .onSuccess {
                     joinSucceeded=true
                     privateJoinRequired=false
@@ -269,7 +323,7 @@ fun ConnectedWatchPartyScreen(
                 }
         }
         while(isActive && partyId==id) {
-            val fresh=runCatching { partyRepo.detail(id) }
+            val fresh=watchPartyAttempt { partyRepo.detail(id) }
                 .onFailure { error=it.message }
                 .getOrNull()
             if(fresh!=null) {
@@ -279,7 +333,7 @@ fun ConnectedWatchPartyScreen(
                 if(joinSucceeded)error=null
                 val version=fresh.media.mediaVersionId
                 if(joinSucceeded && fresh.serverTimed && !version.isNullOrBlank() && loadedVersion!=version) {
-                    runCatching { backend.playbackUrl(version) }
+                    watchPartyAttempt { backend.playbackUrl(version) }
                         .onSuccess { url ->
                             loadedVersion=version
                             playbackError=null
@@ -300,13 +354,13 @@ fun ConnectedWatchPartyScreen(
 
                 if(fresh.state=="ended" || fresh.state=="cancelled")player.pause()
                 if(joinSucceeded && fresh.roomId.isNotBlank()) {
-                    runCatching { social.roomMessages(fresh.roomId) }
+                    watchPartyAttempt { social.roomMessages(fresh.roomId) }
                         .onSuccess {
                             val changed=it.size!=messages.size && messages.isNotEmpty() &&
                                 (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0)>=messages.size
                             messages=it
                             if(changed && it.isNotEmpty()) {
-                                scope.launch { listState.animateScrollToItem(it.size) }
+                                scope.launch(Dispatchers.Main.immediate) { listState.animateScrollToItem(it.size) }
                             }
                         }
                 }
@@ -315,29 +369,29 @@ fun ConnectedWatchPartyScreen(
         }
     }
 
-    LaunchedEffect(partyId,backend.session.isLoggedIn) {
-        val id=partyId ?: return@LaunchedEffect
-        if(!backend.session.isLoggedIn) return@LaunchedEffect
+    WatchPartyMainEffect(partyId,backend.session.isLoggedIn) {
+        val id=partyId ?: return@WatchPartyMainEffect
+        if(!backend.session.isLoggedIn) return@WatchPartyMainEffect
         while(isActive && partyId==id) {
-            runCatching { partyRepo.lobby(id) }
+            watchPartyAttempt { partyRepo.lobby(id) }
                 .onSuccess {
                     lobby=it
                     joinSucceeded=true
                     privateJoinRequired=false
                 }
-            reactions=runCatching { partyRepo.reactions(id) }.getOrDefault(emptyList())
+            reactions=watchPartyAttempt { partyRepo.reactions(id) }.getOrDefault(emptyList())
             delay(2000)
         }
     }
 
-    LaunchedEffect(partyId,party?.host?.id,meId,lobby?.myRole) {
-        val id=partyId ?: return@LaunchedEffect
+    WatchPartyMainEffect(partyId,party?.host?.id,meId,lobby?.myRole) {
+        val id=partyId ?: return@WatchPartyMainEffect
         while(isActive && partyId==id) {
             delay(1000)
             val p=party ?: continue
             if(p.serverTimed && (p.controllerUserId ?: p.host.id)==meId && p.state=="live" && player.duration>0 && !stateWriteBusy) {
                 syncing=true
-                runCatching {
+                watchPartyAttempt {
                     val event=partyRepo.updateState(
                         id=id,
                         positionMs=player.currentPosition.coerceAtLeast(0),
@@ -405,8 +459,8 @@ fun ConnectedWatchPartyScreen(
                         "نسخه قابل پخش این فیلم هنوز آماده نشده."
                 } else {
                     creating=true
-                    scope.launch {
-                        runCatching {
+                    scope.launch(Dispatchers.Main.immediate) {
+                        watchPartyAttempt {
                             partyRepo.create(
                                 mediaTitleId=backendId,
                                 title="Watch Party • "+(resolved?.title ?: media?.title.orEmpty()),
@@ -456,7 +510,7 @@ fun ConnectedWatchPartyScreen(
         val previousPlaying=player.playWhenReady
         stateWriteBusy=true
         player.seekTo(position.coerceAtLeast(0));player.playWhenReady=playing
-        scope.launch {
+        scope.launch(Dispatchers.Main.immediate) {
             try {
                 val event=partyRepo.updateState(p.id,position.coerceAtLeast(0),playing,state,p.revision.takeIf{p.serverTimed})
                 partyReceivedAt=android.os.SystemClock.elapsedRealtime()
@@ -516,8 +570,8 @@ fun ConnectedWatchPartyScreen(
                 onRequireAuth()
             } else {
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.requestJoin(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.requestJoin(p.id) }
                         .onSuccess { joinRequestPending=it=="pending" }
                         .onFailure { error=it.message }
                     lobbyBusy=false
@@ -529,8 +583,8 @@ fun ConnectedWatchPartyScreen(
                 onRequireAuth()
             } else {
                 reminderBusy=true
-                scope.launch {
-                    runCatching { partyRepo.toggleReminder(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.toggleReminder(p.id) }
                         .onSuccess { reminderEnabled=it }
                         .onFailure { error=it.message }
                     reminderBusy=false
@@ -539,8 +593,8 @@ fun ConnectedWatchPartyScreen(
         },
         onToggleReady={
             lobbyBusy=true
-            scope.launch {
-                runCatching { partyRepo.toggleReady(p.id) }
+            scope.launch(Dispatchers.Main.immediate) {
+                watchPartyAttempt { partyRepo.toggleReady(p.id) }
                     .onSuccess { ready->
                         val before=lobby?.myReady ?: false
                         val delta=when {
@@ -558,8 +612,8 @@ fun ConnectedWatchPartyScreen(
             }
         },
         onReact={emoji->
-            scope.launch {
-                runCatching { partyRepo.react(p.id,emoji) }
+            scope.launch(Dispatchers.Main.immediate) {
+                watchPartyAttempt { partyRepo.react(p.id,emoji) }
                     .onFailure { error=it.message }
             }
         },
@@ -576,8 +630,8 @@ fun ConnectedWatchPartyScreen(
                 val sending=text.trim()
                 text=""
                 sendingMessage=true
-                scope.launch {
-                    runCatching { social.sendMessage(p.roomId,sending,false) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { social.sendMessage(p.roomId,sending,false) }
                         .onFailure {
                             error=it.message
                             if(text.isBlank()) text=sending
@@ -593,8 +647,8 @@ fun ConnectedWatchPartyScreen(
             busy=lobbyBusy,
             onToggleReadyCheck={enabled->
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.setReadyCheck(p.id,enabled) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.setReadyCheck(p.id,enabled) }
                         .onSuccess {
                             lobby=lobby?.copy(readyCheckEnabled=it)
                         }
@@ -604,8 +658,8 @@ fun ConnectedWatchPartyScreen(
             },
             onReady={
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.toggleReady(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.toggleReady(p.id) }
                         .onSuccess { ready->
                             val before=lobby?.myReady ?: false
                             val delta=when {
@@ -624,10 +678,10 @@ fun ConnectedWatchPartyScreen(
             },
             onResolve={userId,accept->
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.resolveJoinRequest(p.id,userId,accept) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.resolveJoinRequest(p.id,userId,accept) }
                         .onSuccess {
-                            lobby=runCatching { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
+                            lobby=watchPartyAttempt { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
                         }
                         .onFailure { error=it.message }
                     lobbyBusy=false
@@ -635,10 +689,10 @@ fun ConnectedWatchPartyScreen(
             },
             onRole={userId,role->
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.setMemberRole(p.id,userId,role) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.setMemberRole(p.id,userId,role) }
                         .onSuccess {
-                            lobby=runCatching { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
+                            lobby=watchPartyAttempt { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
                         }
                         .onFailure { error=it.message }
                     lobbyBusy=false
@@ -646,9 +700,9 @@ fun ConnectedWatchPartyScreen(
             },
             onLeaveOrEnd={
                 lobbyBusy=true
-                scope.launch {
+                scope.launch(Dispatchers.Main.immediate) {
                     if(canHostControl) {
-                        runCatching {
+                        watchPartyAttempt {
                             partyRepo.updateState(
                                 p.id,
                                 player.currentPosition.coerceAtLeast(0),
@@ -660,7 +714,7 @@ fun ConnectedWatchPartyScreen(
                             onBack()
                         }.onFailure { error=it.message }
                     } else {
-                        runCatching { partyRepo.leave(p.id) }
+                        watchPartyAttempt { partyRepo.leave(p.id) }
                             .onSuccess {
                                 showLobby=false
                                 onBack()
@@ -712,8 +766,8 @@ fun ConnectedWatchPartyScreen(
             },
             onRegenerate={
                 reminderBusy=true
-                scope.launch {
-                    runCatching { partyRepo.regenerateInvite(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.regenerateInvite(p.id) }
                         .onSuccess { code->
                             inviteInfo=inviteInfo?.copy(inviteCode=code)
                         }
@@ -1185,7 +1239,7 @@ private fun partyStateLabel(state:String):String=when(state.lowercase()) {
 }
 
 private fun formatPartySchedule(value:String):String =
-    runCatching {
+    watchPartyAttempt {
         val instant=java.time.Instant.parse(value)
         val formatter=java.time.format.DateTimeFormatter.ofPattern(
             "yyyy/MM/dd • HH:mm",

@@ -102,8 +102,13 @@ class ProductAuditTest {
             if(name=="search" && args.getString("auditStage")=="after") {
                 // Await the real fixture response rather than capture a transient empty catalog.
                 compose.waitUntil(10_000) {
-                    compose.onAllNodesWithTag("poster-MOVIE:77").fetchSemanticsNodes().isNotEmpty()
+                    // The thumbnail can be below a short window's lazy-grid viewport.
+                    compose.onAllNodesWithTag("search-poster-atmosphere",useUnmergedTree=true)
+                        .fetchSemanticsNodes().isNotEmpty()
                 }
+                // Semantics can become ready before the asynchronously loaded artwork
+                // has been drawn by the native renderer used by takeScreenshot().
+                compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
             }
             if(name=="episodes") {
                 compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e1"))

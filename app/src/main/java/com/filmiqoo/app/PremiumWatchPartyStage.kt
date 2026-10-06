@@ -23,7 +23,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 /** All room actions scroll, so the conversation and composer survive large fonts/landscape. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -47,7 +49,9 @@ fun PremiumWatchPartyStage(
     var position by remember(player){mutableLongStateOf(0)}
     var duration by remember(player){mutableLongStateOf(0)}
     var seekFraction by remember{mutableStateOf<Float?>(null)}
-    LaunchedEffect(player){while(isActive){position=player.currentPosition.coerceAtLeast(0);duration=player.duration.coerceAtLeast(0);delay(500)}}
+    LaunchedEffect(player){withContext(Dispatchers.Main.immediate){while(isActive){
+        position=player.currentPosition.coerceAtLeast(0);duration=player.duration.coerceAtLeast(0);delay(500)
+    }}}
     Column(Modifier.fillMaxSize().background(CinemaInk).safeDrawingPadding().imePadding()) {
         LazyColumn(state=listState,modifier=Modifier.weight(1f).testTag("party-stage"),
             contentPadding=PaddingValues(bottom=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {

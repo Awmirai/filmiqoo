@@ -196,7 +196,7 @@ class CommunityProfileJourneyTest {
         val backend=backend(false)
         val feedCalls=AtomicInteger();val stage=AtomicInteger(0)
         dispatch{r->
-            if(r.requestUrl!!.encodedPath.contains("/feed/")) {
+            if(r.requestUrl!!.encodedPath in setOf("/v1/social/feed","/v1/social/feed/personalized")) {
                 feedCalls.incrementAndGet()
                 when(stage.get()) {
                     0->json("""{"items":[${post("old")}],"scope":"discovery"}""")
@@ -208,6 +208,8 @@ class CommunityProfileJourneyTest {
         }
         community(backend,false,refreshInterval=1000L)
         scrollCommunityTo("community-post-old")
+        assertTrue(requests.any{it.requestUrl?.encodedPath=="/v1/social/feed"})
+        assertTrue(feedCalls.get()>0)
         compose.onNodeWithTag("community-post-new").assertDoesNotExist()
         val initialCalls=feedCalls.get()
         stage.set(1)

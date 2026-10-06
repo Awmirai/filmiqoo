@@ -237,23 +237,29 @@ fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, 
 @Composable
 private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, searching: Boolean) {
     val context = LocalContext.current
-    val columns = minOf(4, artwork.size)
-    Box(Modifier.fillMaxWidth().height(if (compact) 280.dp else 460.dp).clip(RoundedCornerShape(0.dp))
+    BoxWithConstraints(Modifier.fillMaxWidth().height(if (compact) 280.dp else 460.dp).clip(RoundedCornerShape(0.dp))
         .testTag(if (artwork.isEmpty()) "search-poster-empty" else "search-poster-atmosphere")) {
-        if (columns > 0) Row(Modifier.fillMaxSize().clearAndSetSemantics {}.graphicsLayer { rotationZ = -9f; scaleX = 1.15f; scaleY = 1.15f; alpha = if (searching) .24f else .72f },
-            horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            repeat(columns) { column ->
-                val columnArtwork = artwork.filterIndexed { index, _ -> index % columns == column }
-                Column(Modifier.weight(1f).wrapContentHeight(Alignment.Top, unbounded = true)
-                    .graphicsLayer { translationY = if (column % 2 == 0) -58.dp.toPx() else -20.dp.toPx() }, verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    // A small catalog still covers the viewport, using only its actual returned images.
-                    repeat(3) { row ->
-                        val url = columnArtwork[row % columnArtwork.size]
-                        val request = remember(context, url) { ImageRequest.Builder(context).data(url).size(240, 360).crossfade(false).build() }
-                        AsyncImage(request, contentDescription = null, contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(CinemaSurface))
-                    }
-                }
+        // The only transformed layer is the bounded viewport. Never measure a full-height poster
+        // column: sparse catalogs and wide tablets must not allocate a many-thousand-pixel layer.
+        val wallWidth = maxWidth.coerceAtMost(760.dp)
+        val columns = if (wallWidth < 480.dp) 3 else 4
+        val gap = 7.dp
+        val tileWidth = ((wallWidth - gap * (columns - 1)) / columns).coerceAtLeast(1.dp)
+        val tileHeight = (tileWidth * 1.5f).coerceAtMost(280.dp)
+        val rows = if ((tileHeight + gap) * 2 >= maxHeight) 2 else 3
+        if (artwork.isNotEmpty()) Box(Modifier.width(wallWidth).height(maxHeight).align(Alignment.TopCenter)
+            .clearAndSetSemantics {}.graphicsLayer {
+                clip = true; rotationZ = -9f; scaleX = 1.1f; scaleY = 1.1f; alpha = if (searching) .24f else .72f
+            }) {
+            repeat(columns * rows) { index ->
+                val column = index % columns
+                val row = index / columns
+                val url = artwork[index % artwork.size]
+                val request = remember(context, url) { ImageRequest.Builder(context).data(url).size(240, 360).crossfade(false).build() }
+                AsyncImage(request, contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.offset(x = (tileWidth + gap) * column,
+                        y = (tileHeight + gap) * row - if (column % 2 == 0) 18.dp else 0.dp)
+                        .size(tileWidth, tileHeight).clip(RoundedCornerShape(12.dp)).background(CinemaSurface))
             }
         }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .66f), CinemaInk.copy(alpha = .4f), CinemaInk.copy(alpha = .88f), CinemaInk))))
