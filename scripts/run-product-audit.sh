@@ -17,6 +17,9 @@ capture_audit_failure() {
   local audit_diagnostics="audit-evidence/native-$audit_label"
   local audit_crash_root=/tmp/android-runner
   mkdir -p "$audit_diagnostics"
+  if [[ -f /tmp/filmiqoo-qemu.log ]]; then
+    tail -n 600 /tmp/filmiqoo-qemu.log > "$audit_diagnostics/qemu-output-tail.txt"
+  fi
   free -m > "audit-evidence/host-memory-$audit_label-failure.txt" || true
   # Command names and RSS only; never retain process arguments or environment values.
   ps -eo pid,comm,rss --sort=-rss | head -n 81 > "audit-evidence/host-processes-$audit_label-failure.txt" || true
@@ -63,7 +66,7 @@ for spec in $audit_specs; do
   audit_monitor_pid=$!
   audit_trace_pid=''
   if [[ "$audit_batch" == landscape ]] && command -v strace >/dev/null 2>&1; then
-    audit_emulator_pid=$(ps -eo pid,comm | awk '$2 ~ /^qemu-system/ {print $1; exit}')
+    audit_emulator_pid=$(ps -eo pid,comm | awk '$2 ~ /^qemu-system/ && !found {print $1; found=1}')
     if [[ -n "$audit_emulator_pid" ]]; then
       # Observe terminal native signals/exit only; do not capture calls, arguments,
       # memory contents or environment. Diagnostic failure must not fail the test.
@@ -84,6 +87,9 @@ for spec in $audit_specs; do
   kill "$audit_monitor_pid" 2>/dev/null || true
   wait "$audit_monitor_pid" 2>/dev/null || true
   if [[ -n "$audit_trace_pid" ]]; then kill "$audit_trace_pid" 2>/dev/null || true; wait "$audit_trace_pid" 2>/dev/null || true; fi
+  if [[ -f /tmp/filmiqoo-qemu.log ]]; then
+    tail -n 600 /tmp/filmiqoo-qemu.log > "audit-evidence/qemu-output-$label-tail.txt"
+  fi
   cp -r app/build/outputs/connected_android_test_additional_output "audit-evidence/$label"
   adb shell settings get secure navigation_mode > "audit-evidence/$label/navigation-mode.txt"
 done

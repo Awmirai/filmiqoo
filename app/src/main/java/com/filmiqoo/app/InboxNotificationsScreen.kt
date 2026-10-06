@@ -229,7 +229,7 @@ fun InboxScreen(
 
         if(initialLoading) {
             InboxLoadingState()
-        } else if(filteredItems.isEmpty()) {
+        } else if(filteredItems.isEmpty() && error==null) {
             val searching=query.isNotBlank()
             val filteringUnread=unreadOnly && !searching
             PremiumEmptyState(
