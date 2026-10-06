@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,8 +38,9 @@ internal data class CinemaDestination(val id:Int,val label:String,val icon:Image
 internal fun cinemaDestinations(kids:Boolean)=listOf(
     CinemaDestination(0,"خانه",Icons.Outlined.Home),
     CinemaDestination(1,"جستجو",Icons.Outlined.Search),
-    CinemaDestination(2,"باشگاه فیلم",Icons.Outlined.Forum),
-    CinemaDestination(3,"کتابخانه",Icons.Outlined.VideoLibrary)
+    CinemaDestination(2,"شبکه",Icons.Outlined.Forum),
+    CinemaDestination(4,"هم‌تماشا",Icons.Outlined.Groups),
+    CinemaDestination(3,"پروفایل",Icons.Outlined.AccountCircle)
 ).filter { !kids || it.id==0 || it.id==3 }
 
 @Composable
@@ -46,13 +49,15 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
     val window=LocalConfiguration.current
     @Composable fun Item(entry:CinemaDestination,modifier:Modifier) {
         val active=entry.id==selected
+        val largeLabels=window.fontScale>=1.6f && !rail
+        val label=when {largeLabels && entry.id==3->"حساب";largeLabels && entry.id==4->"هم\nتماشا";else->entry.label}
         Column(modifier.heightIn(min=72.dp).selectable(active,role=Role.Tab,onClick={onSelected(entry.id)})
-            .testTag("navigation-${entry.id}").padding(horizontal=2.dp,vertical=10.dp),
+            .testTag("navigation-${entry.id}").semantics { contentDescription=entry.label }.padding(horizontal=2.dp,vertical=10.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
             Surface(color=if(active)CinemaAccent.copy(alpha=.14f)else CinemaSurface,shape=MaterialTheme.shapes.medium) {
                 Icon(entry.icon,null,tint=if(active)CinemaAccent else CinemaSoft,modifier=Modifier.padding(horizontal=14.dp,vertical=5.dp).size(CinemaTokens.icon))
             }
-            Text(entry.label,fontSize=12.sp,lineHeight=18.sp,color=if(active)CinemaPaper else CinemaSoft,
+            Text(label,fontSize=12.sp,lineHeight=18.sp,color=if(active)CinemaPaper else CinemaSoft,
                 fontWeight=if(active)FontWeight.Bold else FontWeight.Normal,textAlign=androidx.compose.ui.text.style.TextAlign.Center,
                 modifier=Modifier.padding(top=4.dp))
         }
@@ -66,7 +71,7 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
         Column(Modifier.navigationBarsPadding()) {
             HorizontalDivider(color=CinemaLine)
             Row(Modifier.fillMaxWidth().selectableGroup()) { entries.forEach {
-                val weight=if(window.fontScale>=1.6f && window.screenWidthDp<400 && !kids)when(it.id){0->.8f;1->1f;else->1.2f}else 1f
+                val weight=if(window.fontScale>=1.6f && window.screenWidthDp<400 && !kids)when(it.id){0,2->.85f;4->1.3f;else->1f}else 1f
                 Item(it,Modifier.weight(weight))
             } }
         }

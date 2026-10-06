@@ -188,6 +188,16 @@ fun CinemaHomeScreen(
             }
         }
         data?.let { bundle -> item("hero") { CinemaSpotlight(bundle, onMedia, onStory) } }
+        item("watch-together") { CinemaTogetherCard({onWatchParty(null)},Modifier.padding(horizontal=20.dp).fillMaxWidth()) }
+        item("discover-shortcuts") {
+            CinemaHeading("حال‌وهوای امشب", "از یک مسیر روشن شروع کن")
+            LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                item { CinemaTag("سینمای ایران",false){region=CinemaRegion.IRAN.name} }
+                item { CinemaTag("K-drama",false){region=CinemaRegion.KOREA.name} }
+                item { CinemaTag("سینمای هند",false){region=CinemaRegion.INDIA.name} }
+                    item { CinemaTag("جهان",false){region=CinemaRegion.WORLD.name} }
+            }
+        }
         item("latest-catalog") {
             RecentCatalogShelf(latest, onMedia)
         }
@@ -199,7 +209,11 @@ fun CinemaHomeScreen(
             item("world") { CinemaShelf("روی پردهٔ جهان", "فیلم‌های پرطرفدار در TMDB", bundle.popularMovies, onMedia) { region = CinemaRegion.WORLD.name } }
             item("series") { CinemaShelf("یک قسمت دیگر…", "سریال‌های پرطرفدار در TMDB", bundle.popularTv, onMedia) { region = CinemaRegion.WORLD.name } }
         }
-        item("calendar") { Box(Modifier.padding(horizontal=20.dp)) { CinemaAction(Icons.Default.CalendarMonth,"تقویم قسمت‌های جدید",onReleases,Modifier.fillMaxWidth()) } }
+        item("explore-more") { Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            CinemaAction(Icons.Default.MovieFilter,"کلیپ‌ها و پیشنهادهای کوتاه",onClips,Modifier.fillMaxWidth())
+            CinemaAction(Icons.Default.Forum,"نظر فیلم‌بازها؛ شبکهٔ فیلم",onClub,Modifier.fillMaxWidth())
+            CinemaAction(Icons.Default.CalendarMonth,"تقویم قسمت‌های جدید",onReleases,Modifier.fillMaxWidth())
+        } }
         item("notice") { Text("اطلاعات عنوان‌ها از بانک‌های فراداده دریافت می‌شود. امکان پخش و دانلود به موجود بودن فایل مجاز در کاتالوگ فیلمیکو بستگی دارد.", color = CinemaSoft, fontSize = 12.sp, lineHeight = 20.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) }
     }
 }

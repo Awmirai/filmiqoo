@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,13 +40,12 @@ fun WatchPartyFriendsInviteSheet(
     var error by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
-        val following=runCatching { partyRepo.followingUsers() }
-            .onFailure { error=it.message }
-            .getOrDefault(emptyList())
-        val invites=runCatching { partyRepo.directInvites(partyId) }
-            .getOrDefault(emptyMap())
-        users=following
-        statuses=invites
+        try {
+            val following=partyRepo.followingUsers()
+            val invites=partyRepo.directInvites(partyId)
+            users=following;statuses=invites;error=null
+        } catch(cancelled:CancellationException){throw cancelled}
+        catch(failure:Exception){error=failure.message}
     }
 
     LaunchedEffect(partyId) {
@@ -65,8 +65,8 @@ fun WatchPartyFriendsInviteSheet(
                 Column(Modifier.weight(1f)) {
                     Text("دعوت دوست‌ها",fontSize=21.sp,fontWeight=FontWeight.Black)
                     Text(
-                        "از Following مستقیم Invite بفرست؛ لازم نیست لینک رو جدا بفرستی.",
-                        color=FqMuted,fontSize=11.sp
+                        "برای افرادی که دنبال می‌کنی دعوت مستقیم بفرست.",
+                        color=FqMuted,fontSize=16.sp
                     )
                 }
                 IconButton(
@@ -87,11 +87,11 @@ fun WatchPartyFriendsInviteSheet(
                 )
             }
 
-            if(!loading && users.isEmpty()) {
+            if(!loading && error==null && users.isEmpty()) {
                 PremiumEmptyState(
                     Icons.Default.GroupAdd,
-                    "Following خالیه",
-                    "اول چند Creator یا کاربر رو Follow کن تا از اینجا مستقیم دعوتشون کنی."
+                    "هنوز کسی را دنبال نمی‌کنی",
+                    "از پروفایل کاربران آن‌ها را دنبال کن تا اینجا بتوانی دعوتشان کنی."
                 )
             } else {
                 LazyColumn(
@@ -144,7 +144,7 @@ fun WatchPartyFriendsInviteSheet(
                                             )
                                         }
                                     }
-                                    Text("@"+user.username,color=FqMuted,fontSize=11.sp)
+                                    Text("@"+user.username,color=FqMuted,fontSize=16.sp)
                                     if(user.watchingNow) {
                                         Text(
                                             "الان آنلاین و در حال تماشا",
@@ -159,7 +159,7 @@ fun WatchPartyFriendsInviteSheet(
                                     "accepted" -> {
                                         AssistChip(
                                             onClick={},
-                                            label={Text("عضو شده",fontSize=11.sp)},
+                                            label={Text("عضو شده",fontSize=16.sp)},
                                             leadingIcon={
                                                 Icon(
                                                     Icons.Default.Check,
@@ -173,7 +173,7 @@ fun WatchPartyFriendsInviteSheet(
                                     "pending" -> {
                                         AssistChip(
                                             onClick={},
-                                            label={Text("دعوت شد",fontSize=11.sp)},
+                                            label={Text("دعوت شد",fontSize=16.sp)},
                                             leadingIcon={
                                                 Icon(
                                                     Icons.Default.HourglassTop,
@@ -218,7 +218,7 @@ fun WatchPartyFriendsInviteSheet(
                                                 )
                                             }
                                             Spacer(Modifier.width(4.dp))
-                                            Text("دعوت",color=Color.Black,fontSize=11.sp)
+                                            Text("دعوت",color=Color.Black,fontSize=16.sp)
                                         }
                                     }
                                 }
@@ -232,7 +232,7 @@ fun WatchPartyFriendsInviteSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=11.sp,
+                    fontSize=16.sp,
                     modifier=Modifier.fillMaxWidth().padding(top=9.dp)
                 )
             }

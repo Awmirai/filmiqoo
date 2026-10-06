@@ -91,7 +91,7 @@ data class Creator(
 )
 
 sealed interface OverlayRoute {
-    data class Detail(val media: MediaItem) : OverlayRoute
+    data class Detail(val media: MediaItem,val discussionScope:String?=null) : OverlayRoute
     data class Story(val media: MediaItem, val index: Int = 0) : OverlayRoute
     data class SocialStories(val stories: List<SocialStory>, val index: Int = 0) : OverlayRoute
     data class CreatorPage(val creator: Creator) : OverlayRoute

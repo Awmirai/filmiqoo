@@ -174,9 +174,9 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		r.Get("/social/posts/{id}/poll", s.postPoll)
 		r.Get("/social/reels/{id}/comments", s.reelComments)
 		r.Get("/rooms", s.roomsList)
-		r.Get("/rooms/{id}/messages", s.roomMessages)
-		r.Get("/watch-parties", s.watchParties)
-		r.Get("/watch-parties/{id}", s.watchPartyDetail)
+		r.With(s.optionalAuth).Get("/rooms/{id}/messages", s.roomMessages)
+		r.With(s.optionalAuth).Get("/watch-parties", s.watchParties)
+		r.With(s.optionalAuth).Get("/watch-parties/{id}", s.watchPartyDetail)
 		r.Get("/live-events", s.liveEvents)
 		r.Get("/live-events/{id}", s.liveEventDetail)
 		r.Get("/playback/{versionID}", s.playback)
@@ -209,6 +209,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Get("/social/reels/saved", s.savedReels)
 			r.Post("/social/posts/viewer-states", s.postViewerStates)
 			r.Get("/social/posts/{id}/viewer", s.viewerPostDetail)
+			r.Get("/social/posts/{id}/comments/viewer", s.viewerPostComments)
 			r.Get("/social/posts/{id}/viewer-state", s.postViewerState)
 			r.Post("/social/posts/{id}/remove", s.removePost)
 			r.Post("/social/posts/{id}/like", s.togglePostLike)
@@ -748,6 +749,17 @@ func (s *Server) saveProgress(w http.ResponseWriter, r *http.Request) {
 type ctxKey string
 
 const userKey ctxKey = "userID"
+
+// Anonymous browsing remains available; a supplied credential is always validated.
+func (s *Server) optionalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.TrimSpace(r.Header.Get("Authorization")) == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		s.auth(next).ServeHTTP(w, r)
+	})
+}
 
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

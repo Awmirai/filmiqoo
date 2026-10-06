@@ -28,7 +28,8 @@ fun CinemaDetailScreen(
     onClip: (String) -> Unit,
     onPlay: (PlaybackTarget) -> Unit,
     onPerson: (CastMember) -> Unit,
-    onRequireAuth: () -> Unit
+    onRequireAuth: () -> Unit,
+    initialDiscussionScope:String?=null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -114,6 +115,8 @@ fun CinemaDetailScreen(
             CinemaDetailContent(
                 current, saved, favorite, seen, hideSpoilers, hasNote, following, busy, progress,
                 resumeVersions=resumeVersions,
+                allowTogether=backend.viewerProfiles.active()?.kidsMode!=true,
+                startAtDiscussion=initialDiscussionScope!=null,
                 actions = CinemaDetailActions(
                     back = onBack,
                     share = {
@@ -147,6 +150,7 @@ fun CinemaDetailScreen(
                         }
                     },
                     trailer = { current.detail.trailerKey?.let { openYoutube(context, it) } },
+                    watchParty = { if(!backend.session.isLoggedIn)onRequireAuth() else onWatchParty(title) },
                     play = { version ->
                         if (!backend.session.isLoggedIn) onRequireAuth()
                         else action {
@@ -160,7 +164,7 @@ fun CinemaDetailScreen(
                         else action {
                             val target = backend.playbackContext(version)
                             backend.enqueueDownload(context, target.copy(mediaTitleId = id ?: target.mediaTitleId))
-                            "دانلود به صف اضافه شد؛ از کتابخانه → دانلودها پیگیری کن."
+                            "دانلود به صف اضافه شد؛ از پروفایل → دانلودها پیگیری کن."
                         }
                     },
                     episodeSeen = { episode, watched ->
@@ -172,7 +176,7 @@ fun CinemaDetailScreen(
                 ),
                 community = {
                     Column {
-                        if (backend.viewerProfiles.active()?.kidsMode != true) TitleDiscussion(title, backend, onRequireAuth, episodes=current.platform?.seasons.orEmpty().flatMap { season -> season.episodes.map { DiscussionEpisode(season.number,it.number) } })
+                        if (backend.viewerProfiles.active()?.kidsMode != true) TitleDiscussion(title, backend, onRequireAuth, episodes=current.platform?.seasons.orEmpty().flatMap { season -> season.episodes.map { DiscussionEpisode(season.number,it.number) } },initialScope=initialDiscussionScope)
                     }
                 }
             )

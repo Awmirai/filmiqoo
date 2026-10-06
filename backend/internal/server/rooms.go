@@ -9,8 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (s *Server) roomsList(w http.ResponseWriter,r *http.Request) {
-	rows,err:=s.db.Query(r.Context(),`
+func (s *Server) roomsList(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.db.Query(r.Context(), `
 		SELECT rm.id::text,rm.name,rm.topic,rm.room_type,rm.visibility,rm.member_count,
 		       mt.id::text,mt.title,mt.poster_url
 		  FROM rooms rm
@@ -19,27 +19,42 @@ func (s *Server) roomsList(w http.ResponseWriter,r *http.Request) {
 		 ORDER BY rm.member_count DESC,rm.created_at DESC
 		 LIMIT 100
 	`)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
-	items:=make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,name,topic,typ,visibility string
+		var id, name, topic, typ, visibility string
 		var members int64
-		var mediaID,title,poster *string
-		if err:=rows.Scan(&id,&name,&topic,&typ,&visibility,&members,&mediaID,&title,&poster); err!=nil { continue }
-		items=append(items,map[string]any{
-			"id":id,"name":name,"topic":topic,"type":typ,"visibility":visibility,"members":members,
-			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
+		var mediaID, title, poster *string
+		if err := rows.Scan(&id, &name, &topic, &typ, &visibility, &members, &mediaID, &title, &poster); err != nil {
+			continue
+		}
+		items = append(items, map[string]any{
+			"id": id, "name": name, "topic": topic, "type": typ, "visibility": visibility, "members": members,
+			"media": map[string]any{"id": mediaID, "title": title, "posterUrl": poster},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
+func (s *Server) roomMessages(w http.ResponseWriter, r *http.Request) {
 	_ = s.processDueScheduledRoomMessages(r.Context())
-	roomID:=chi.URLParam(r,"id")
-	items,err:=s.queryRoomMessages(
+	roomID := chi.URLParam(r, "id")
+	var roomType, visibility string
+	var member bool
+	if err := s.db.QueryRow(r.Context(), `SELECT room_type,visibility,EXISTS(SELECT 1 FROM room_members WHERE room_id=rooms.id AND user_id=NULLIF($2,'')::uuid) FROM rooms WHERE id=$1`, roomID, userIDFromContext(r.Context())).Scan(&roomType, &visibility, &member); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "room not found"})
+		return
+	}
+	if (roomType == "watch_party" || visibility != "public") && !member {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "room membership required"})
+		return
+	}
+	items, err := s.queryRoomMessages(
 		r.Context(),
 		`
 		WHERE m.room_id=$1 AND m.deleted_at IS NULL
@@ -48,74 +63,89 @@ func (s *Server) roomMessages(w http.ResponseWriter,r *http.Request) {
 		`,
 		roomID,
 	)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	// queryRoomMessages returns newest -> oldest for efficient SQL; UI expects oldest -> newest.
-	for i,j:=0,len(items)-1;i<j;i,j=i+1,j-1 {
-		items[i],items[j]=items[j],items[i]
+	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+		items[i], items[j] = items[j], items[i]
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	roomID:=chi.URLParam(r,"id")
+func (s *Server) sendRoomMessage(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	roomID := chi.URLParam(r, "id")
 	var body struct {
-		Body string `json:"body"`
-		Type string `json:"type"`
-		Spoiler bool `json:"spoiler"`
-		Attachment map[string]any `json:"attachment"`
-		ReplyToMessageID *string `json:"replyToMessageId"`
+		Body             string         `json:"body"`
+		Type             string         `json:"type"`
+		Spoiler          bool           `json:"spoiler"`
+		Attachment       map[string]any `json:"attachment"`
+		ReplyToMessageID *string        `json:"replyToMessageId"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
-	body.Body=strings.TrimSpace(body.Body)
-	if body.Type=="" { body.Type="text" }
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	body.Body = strings.TrimSpace(body.Body)
+	if body.Type == "" {
+		body.Type = "text"
+	}
 	switch body.Type {
-	case "text","image","video","voice","document","location","contact","reel","movie","episode":
+	case "text", "image", "video", "voice", "document", "location", "contact", "reel", "movie", "episode":
 	default:
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"unsupported message type"}); return
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported message type"})
+		return
 	}
-	if body.Type=="text" && body.Body=="" {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is empty"}); return
+	if body.Type == "text" && body.Body == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "message is empty"})
+		return
 	}
-	if len([]rune(body.Body))>4000 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"message is too long"}); return
+	if len([]rune(body.Body)) > 4000 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "message is too long"})
+		return
 	}
-	if err:=validateRoomMessagePayloadV6(roomMessagePayloadV6{
-		Body:body.Body,
-		Type:body.Type,
-		Attachment:body.Attachment,
-		Spoiler:body.Spoiler,
-		ReplyToMessageID:body.ReplyToMessageID,
-	}); err!=nil {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":err.Error()}); return
+	if err := validateRoomMessagePayloadV6(roomMessagePayloadV6{
+		Body:             body.Body,
+		Type:             body.Type,
+		Attachment:       body.Attachment,
+		Spoiler:          body.Spoiler,
+		ReplyToMessageID: body.ReplyToMessageID,
+	}); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
 	}
 
-	var roomType,visibility,memberRole string
+	var roomType, visibility, memberRole string
 	var slowModeSeconds int
 	var mutedUntil *time.Time
-	if err:=s.db.QueryRow(r.Context(),`
+	if err := s.db.QueryRow(r.Context(), `
 		SELECT rm.room_type,rm.visibility,rm.slow_mode_seconds,
 		       COALESCE(member.role,''),member.muted_until
 		  FROM rooms rm
 		  LEFT JOIN room_members member
 		    ON member.room_id=rm.id AND member.user_id=$2
 		 WHERE rm.id=$1
-	`,roomID,userID).Scan(
-		&roomType,&visibility,&slowModeSeconds,&memberRole,&mutedUntil,
-	); err!=nil {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"room not found"}); return
+	`, roomID, userID).Scan(
+		&roomType, &visibility, &slowModeSeconds, &memberRole, &mutedUntil,
+	); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "room not found"})
+		return
 	}
 
-	if (roomType=="group" || visibility!="public") && memberRole=="" {
-		writeJSON(w,http.StatusForbidden,map[string]string{"error":"room membership required"}); return
+	if (roomType == "group" || roomType == "watch_party" || visibility != "public") && memberRole == "" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "room membership required"})
+		return
 	}
-	if mutedUntil!=nil && mutedUntil.After(time.Now()) {
-		writeJSON(w,http.StatusForbidden,map[string]string{"error":"you are temporarily muted in this room"}); return
+	if mutedUntil != nil && mutedUntil.After(time.Now()) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "you are temporarily muted in this room"})
+		return
 	}
-	if roomType=="group" && slowModeSeconds>0 && memberRole=="member" {
+	if roomType == "group" && slowModeSeconds > 0 && memberRole == "member" {
 		var elapsedSeconds float64
-		_=s.db.QueryRow(r.Context(),`
+		_ = s.db.QueryRow(r.Context(), `
 			SELECT COALESCE(
 				EXTRACT(EPOCH FROM (now()-MAX(created_at))),
 				999999
@@ -124,20 +154,22 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 			 WHERE room_id=$1
 			   AND author_user_id=$2
 			   AND deleted_at IS NULL
-		`,roomID,userID).Scan(&elapsedSeconds)
-		if elapsedSeconds<float64(slowModeSeconds) {
-			remaining:=slowModeSeconds-int(elapsedSeconds)
-			if remaining<1 { remaining=1 }
-			writeJSON(w,http.StatusTooManyRequests,map[string]any{
-				"error":"slow mode is active",
-				"retryAfterSeconds":remaining,
+		`, roomID, userID).Scan(&elapsedSeconds)
+		if elapsedSeconds < float64(slowModeSeconds) {
+			remaining := slowModeSeconds - int(elapsedSeconds)
+			if remaining < 1 {
+				remaining = 1
+			}
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{
+				"error":             "slow mode is active",
+				"retryAfterSeconds": remaining,
 			})
 			return
 		}
 	}
 
 	var dmBlocked bool
-	_=s.db.QueryRow(r.Context(),`
+	_ = s.db.QueryRow(r.Context(), `
 		SELECT EXISTS(
 			SELECT 1
 			  FROM rooms rm
@@ -148,120 +180,153 @@ func (s *Server) sendRoomMessage(w http.ResponseWriter,r *http.Request) {
 			  )
 			 WHERE rm.id=$1 AND rm.room_type='dm'
 		)
-	`,roomID,userID).Scan(&dmBlocked)
+	`, roomID, userID).Scan(&dmBlocked)
 	if dmBlocked {
-		writeJSON(w,http.StatusForbidden,map[string]string{"error":"direct messages are unavailable because one of these accounts has blocked the other"}); return
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "direct messages are unavailable because one of these accounts has blocked the other"})
+		return
 	}
 
-	id,created,err:=s.insertRoomMessageV6(
+	id, created, err := s.insertRoomMessageV6(
 		r.Context(),
 		roomID,
 		userID,
 		roomMessagePayloadV6{
-			Body:body.Body,
-			Type:body.Type,
-			Attachment:body.Attachment,
-			Spoiler:body.Spoiler,
-			ReplyToMessageID:body.ReplyToMessageID,
+			Body:             body.Body,
+			Type:             body.Type,
+			Attachment:       body.Attachment,
+			Spoiler:          body.Spoiler,
+			ReplyToMessageID: body.ReplyToMessageID,
 		},
 		nil,
 	)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	writeJSON(w,http.StatusCreated,map[string]any{
-		"id":id,
-		"body":body.Body,
-		"messageType":body.Type,
-		"attachment":body.Attachment,
-		"spoiler":body.Spoiler,
-		"authorUserId":userID,
-		"replyToMessageId":body.ReplyToMessageID,
-		"createdAt":created,
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"id":               id,
+		"body":             body.Body,
+		"messageType":      body.Type,
+		"attachment":       body.Attachment,
+		"spoiler":          body.Spoiler,
+		"authorUserId":     userID,
+		"replyToMessageId": body.ReplyToMessageID,
+		"createdAt":        created,
 	})
 }
 
-func (s *Server) createRoom(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
+func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
 	var body struct {
-		Name string `json:"name"`
-		Topic string `json:"topic"`
-		Type string `json:"type"`
-		Visibility string `json:"visibility"`
-		ChannelID *string `json:"channelId"`
+		Name         string  `json:"name"`
+		Topic        string  `json:"topic"`
+		Type         string  `json:"type"`
+		Visibility   string  `json:"visibility"`
+		ChannelID    *string `json:"channelId"`
 		MediaTitleID *string `json:"mediaTitleId"`
-		EpisodeID *string `json:"episodeId"`
+		EpisodeID    *string `json:"episodeId"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
-	body.Name=strings.TrimSpace(body.Name)
-	if len([]rune(body.Name))<2 || len([]rune(body.Name))>100 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"room name must be 2-100 characters"}); return
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
-	if body.Type=="" { body.Type="group" }
-	if body.Visibility=="" { body.Visibility="public" }
+	body.Name = strings.TrimSpace(body.Name)
+	if len([]rune(body.Name)) < 2 || len([]rune(body.Name)) > 100 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "room name must be 2-100 characters"})
+		return
+	}
+	if body.Type == "" {
+		body.Type = "group"
+	}
+	if body.Visibility == "" {
+		body.Visibility = "public"
+	}
 
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 	var id string
-	err=tx.QueryRow(r.Context(),`
+	err = tx.QueryRow(r.Context(), `
 		INSERT INTO rooms (owner_user_id,channel_id,media_title_id,episode_id,name,topic,room_type,visibility,member_count)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1)
 		RETURNING id::text
-	`,userID,body.ChannelID,body.MediaTitleID,body.EpisodeID,body.Name,body.Topic,body.Type,body.Visibility).Scan(&id)
-	if err!=nil { writeError(w,http.StatusBadRequest,err); return }
-	_,err=tx.Exec(r.Context(),"INSERT INTO room_members (room_id,user_id,role) VALUES ($1,$2,'owner')",id,userID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	writeJSON(w,http.StatusCreated,map[string]any{"id":id})
+	`, userID, body.ChannelID, body.MediaTitleID, body.EpisodeID, body.Name, body.Topic, body.Type, body.Visibility).Scan(&id)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	_, err = tx.Exec(r.Context(), "INSERT INTO room_members (room_id,user_id,role) VALUES ($1,$2,'owner')", id, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
 
 func decodeJSONOrEmptyObject(raw []byte) any {
-	if len(raw)==0 { return map[string]any{} }
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
 	var value any
-	if err:=json.Unmarshal(raw,&value); err!=nil { return map[string]any{} }
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return map[string]any{}
+	}
 	return value
 }
 
-
-func (s *Server) toggleMessageReaction(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	roomID:=chi.URLParam(r,"id")
-	messageID:=chi.URLParam(r,"messageID")
+func (s *Server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	roomID := chi.URLParam(r, "id")
+	messageID := chi.URLParam(r, "messageID")
 	var body struct {
 		Reaction string `json:"reaction"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-		writeError(w,http.StatusBadRequest,err); return
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
-	body.Reaction=strings.TrimSpace(body.Reaction)
-	if body.Reaction=="" || len([]rune(body.Reaction))>16 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid reaction"}); return
+	body.Reaction = strings.TrimSpace(body.Reaction)
+	if body.Reaction == "" || len([]rune(body.Reaction)) > 16 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid reaction"})
+		return
 	}
 
 	var belongs bool
-	_=s.db.QueryRow(r.Context(),
+	_ = s.db.QueryRow(r.Context(),
 		"SELECT EXISTS(SELECT 1 FROM messages WHERE id=$1 AND room_id=$2 AND deleted_at IS NULL)",
-		messageID,roomID).Scan(&belongs)
+		messageID, roomID).Scan(&belongs)
 	if !belongs {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"message not found"}); return
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "message not found"})
+		return
 	}
 
 	var exists bool
-	_=s.db.QueryRow(r.Context(),
+	_ = s.db.QueryRow(r.Context(),
 		"SELECT EXISTS(SELECT 1 FROM message_reactions WHERE message_id=$1 AND user_id=$2 AND reaction=$3)",
-		messageID,userID,body.Reaction).Scan(&exists)
+		messageID, userID, body.Reaction).Scan(&exists)
 
 	var err error
 	if exists {
-		_,err=s.db.Exec(r.Context(),
+		_, err = s.db.Exec(r.Context(),
 			"DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2 AND reaction=$3",
-			messageID,userID,body.Reaction)
+			messageID, userID, body.Reaction)
 	} else {
-		_,err=s.db.Exec(r.Context(),
+		_, err = s.db.Exec(r.Context(),
 			"INSERT INTO message_reactions (message_id,user_id,reaction) VALUES ($1,$2,$3)",
-			messageID,userID,body.Reaction)
+			messageID, userID, body.Reaction)
 	}
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	writeJSON(w,http.StatusOK,map[string]any{"active":!exists,"reaction":body.Reaction})
+	writeJSON(w, http.StatusOK, map[string]any{"active": !exists, "reaction": body.Reaction})
 }

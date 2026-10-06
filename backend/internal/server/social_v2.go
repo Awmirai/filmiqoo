@@ -11,15 +11,16 @@ import (
 )
 
 var channelSlugPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]{3,40}$`)
+var socialResourceUUID = regexp.MustCompile(`(?i)^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 
 func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 	_ = s.processScheduledContent(r.Context())
-	limit,offset:=socialPageParams(r,30,50)
-	rows,err:=s.db.Query(r.Context(),`
+	limit, offset := socialPageParams(r, 30, 50)
+	rows, err := s.db.Query(r.Context(), `
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
 		       p.save_count,p.share_count,p.published_at,
 		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
-		       mt.id::text,mt.title,mt.poster_url
+		       mt.id::text,mt.title,mt.poster_url,mt.tmdb_id,mt.kind,mt.original_title,mt.backdrop_url,mt.year,mt.rating
 		  FROM posts p
 		  JOIN profiles pr ON pr.user_id=p.author_user_id
 		  LEFT JOIN channels ch ON ch.id=p.channel_id
@@ -32,55 +33,68 @@ func (s *Server) socialFeed(w http.ResponseWriter, r *http.Request) {
 		   )
 		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
 		 LIMIT $1 OFFSET $2
-	`,limit,offset)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
-	items:=make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,postType,body,authorID,username,displayName,avatar string
-		var spoiler,verified bool
-		var likes,comments,saves,shares int64
+		var id, postType, body, authorID, username, displayName, avatar string
+		var spoiler, verified bool
+		var likes, comments, saves, shares int64
 		var publishedAt *time.Time
-		var mediaID,title,poster *string
-		if err:=rows.Scan(&id,&postType,&body,&spoiler,&likes,&comments,&saves,&shares,&publishedAt,
-			&authorID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster); err!=nil {
+		var mediaID, title, poster *string
+		var tmdbID *int64
+		var mediaKind, originalTitle, backdrop *string
+		var mediaYear *int
+		var mediaRating *float64
+		if err := rows.Scan(&id, &postType, &body, &spoiler, &likes, &comments, &saves, &shares, &publishedAt,
+			&authorID, &username, &displayName, &avatar, &verified, &mediaID, &title, &poster, &tmdbID, &mediaKind, &originalTitle, &backdrop, &mediaYear, &mediaRating); err != nil {
 			continue
 		}
-		items=append(items,map[string]any{
-			"id":id,"type":postType,"body":body,"spoiler":spoiler,
-			"likes":likes,"comments":comments,"saves":saves,"shares":shares,"publishedAt":publishedAt,
-			"author":map[string]any{"id":authorID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
-			"media":map[string]any{"id":mediaID,"title":title,"posterUrl":poster},
+		items = append(items, map[string]any{
+			"id": id, "type": postType, "body": body, "spoiler": spoiler,
+			"likes": likes, "comments": comments, "saves": saves, "shares": shares, "publishedAt": publishedAt,
+			"author": map[string]any{"id": authorID, "username": username, "displayName": displayName, "avatarUrl": avatar, "verified": verified},
+			"media":  map[string]any{"id": mediaID, "title": title, "posterUrl": poster, "tmdbId": tmdbID, "kind": mediaKind, "originalTitle": originalTitle, "backdropUrl": backdrop, "year": mediaYear, "rating": mediaRating},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{
-		"items":items,
-		"nextCursor":nextSocialCursor(offset,len(items),limit),
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items":      items,
+		"nextCursor": nextSocialCursor(offset, len(items), limit),
 	})
 }
 
-func (s *Server) postDetail(w http.ResponseWriter,r *http.Request) {
-	postID:=chi.URLParam(r,"id")
-	allowed,exists,err:=s.canViewPost(r.Context(),"",postID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if !exists || !allowed {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"post not found"})
+func (s *Server) postDetail(w http.ResponseWriter, r *http.Request) {
+	postID := chi.URLParam(r, "id")
+	allowed, exists, err := s.canViewPost(r.Context(), "", postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	s.postDetailByID(w,r,postID)
+	if !exists || !allowed {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
+		return
+	}
+	s.postDetailByID(w, r, postID)
 }
 
-func (s *Server) viewerPostDetail(w http.ResponseWriter,r *http.Request) {
-	postID:=chi.URLParam(r,"id")
-	userID:=userIDFromContext(r.Context())
-	allowed,exists,err:=s.canViewPost(r.Context(),userID,postID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if !exists || !allowed {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"post not found"})
+func (s *Server) viewerPostDetail(w http.ResponseWriter, r *http.Request) {
+	postID := chi.URLParam(r, "id")
+	userID := userIDFromContext(r.Context())
+	allowed, exists, err := s.canViewPost(r.Context(), userID, postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	s.postDetailByID(w,r,postID)
+	if !exists || !allowed {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
+		return
+	}
+	s.postDetailByID(w, r, postID)
 }
 
 func (s *Server) postDetailByID(
@@ -88,162 +102,188 @@ func (s *Server) postDetailByID(
 	r *http.Request,
 	postID string,
 ) {
-	var id,postType,body,authorID,username,displayName,avatar string
-	var spoiler,verified bool
-	var likes,comments,saves,shares int64
+	var id, postType, body, authorID, username, displayName, avatar string
+	var spoiler, verified bool
+	var likes, comments, saves, shares int64
 	var publishedAt *time.Time
-	var mediaID,title,poster *string
+	var mediaID, title, poster *string
+	var tmdbID *int64
+	var mediaKind, originalTitle, backdrop *string
+	var mediaYear *int
+	var mediaRating *float64
 
-	err:=s.db.QueryRow(r.Context(),`
+	err := s.db.QueryRow(r.Context(), `
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,p.like_count,p.comment_count,
 		       p.save_count,p.share_count,p.published_at,
 		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
-		       mt.id::text,mt.title,mt.poster_url
+		       mt.id::text,mt.title,mt.poster_url,mt.tmdb_id,mt.kind,mt.original_title,mt.backdrop_url,mt.year,mt.rating
 		  FROM posts p
 		  JOIN profiles pr ON pr.user_id=p.author_user_id
 		  LEFT JOIN media_titles mt ON mt.id=p.media_title_id
 		 WHERE p.id=$1 AND p.status='published'
-	`,postID).Scan(
-		&id,&postType,&body,&spoiler,&likes,&comments,&saves,&shares,&publishedAt,
-		&authorID,&username,&displayName,&avatar,&verified,&mediaID,&title,&poster,
+	`, postID).Scan(
+		&id, &postType, &body, &spoiler, &likes, &comments, &saves, &shares, &publishedAt,
+		&authorID, &username, &displayName, &avatar, &verified, &mediaID, &title, &poster, &tmdbID, &mediaKind, &originalTitle, &backdrop, &mediaYear, &mediaRating,
 	)
-	if err!=nil {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"post not found"})
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
 		return
 	}
 
-	writeJSON(w,http.StatusOK,map[string]any{
-		"id":id,
-		"type":postType,
-		"body":body,
-		"spoiler":spoiler,
-		"likes":likes,
-		"comments":comments,
-		"saves":saves,
-		"shares":shares,
-		"publishedAt":publishedAt,
-		"author":map[string]any{
-			"id":authorID,
-			"username":username,
-			"displayName":displayName,
-			"avatarUrl":avatar,
-			"verified":verified,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":          id,
+		"type":        postType,
+		"body":        body,
+		"spoiler":     spoiler,
+		"likes":       likes,
+		"comments":    comments,
+		"saves":       saves,
+		"shares":      shares,
+		"publishedAt": publishedAt,
+		"author": map[string]any{
+			"id":          authorID,
+			"username":    username,
+			"displayName": displayName,
+			"avatarUrl":   avatar,
+			"verified":    verified,
 		},
-		"media":map[string]any{
-			"id":mediaID,
-			"title":title,
-			"posterUrl":poster,
+		"media": map[string]any{
+			"id":        mediaID,
+			"title":     title,
+			"posterUrl": poster,
+			"tmdbId":    tmdbID, "kind": mediaKind, "originalTitle": originalTitle, "backdropUrl": backdrop, "year": mediaYear, "rating": mediaRating,
 		},
 	})
 }
 
-func (s *Server) createPost(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
+func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
 	var body struct {
-		Type string `json:"type"`
-		Body string `json:"body"`
-		ChannelID *string `json:"channelId"`
-		MediaTitleID *string `json:"mediaTitleId"`
-		EpisodeID *string `json:"episodeId"`
-		Spoiler bool `json:"spoiler"`
-		PollOptions []string `json:"pollOptions"`
-		ScheduledAt *time.Time `json:"scheduledAt"`
+		Type         string     `json:"type"`
+		Body         string     `json:"body"`
+		ChannelID    *string    `json:"channelId"`
+		MediaTitleID *string    `json:"mediaTitleId"`
+		EpisodeID    *string    `json:"episodeId"`
+		Spoiler      bool       `json:"spoiler"`
+		PollOptions  []string   `json:"pollOptions"`
+		ScheduledAt  *time.Time `json:"scheduledAt"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-		writeError(w,http.StatusBadRequest,err); return
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
-	body.Body=strings.TrimSpace(body.Body)
-	if body.Type=="" { body.Type="post" }
-	if body.Body=="" || len([]rune(body.Body))>5000 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"post body must be 1-5000 characters"}); return
+	body.Body = strings.TrimSpace(body.Body)
+	if body.Type == "" {
+		body.Type = "post"
+	}
+	if body.Body == "" || len([]rune(body.Body)) > 5000 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "post body must be 1-5000 characters"})
+		return
 	}
 	switch body.Type {
-	case "post","review","poll","announcement":
+	case "post", "review", "poll", "announcement":
 	default:
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid post type"}); return
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid post type"})
+		return
 	}
 
-	if body.Type=="poll" {
-		clean:=make([]string,0,len(body.PollOptions))
-		seen:=map[string]bool{}
-		for _,option:=range body.PollOptions {
-			option=strings.TrimSpace(option)
-			if option=="" || len([]rune(option))>120 { continue }
-			key:=strings.ToLower(option)
-			if seen[key] { continue }
-			seen[key]=true
-			clean=append(clean,option)
+	if body.Type == "poll" {
+		clean := make([]string, 0, len(body.PollOptions))
+		seen := map[string]bool{}
+		for _, option := range body.PollOptions {
+			option = strings.TrimSpace(option)
+			if option == "" || len([]rune(option)) > 120 {
+				continue
+			}
+			key := strings.ToLower(option)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			clean = append(clean, option)
 		}
-		if len(clean)<2 || len(clean)>6 {
-			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"poll requires 2-6 unique options"}); return
+		if len(clean) < 2 || len(clean) > 6 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "poll requires 2-6 unique options"})
+			return
 		}
-		body.PollOptions=clean
+		body.PollOptions = clean
 	}
 
-	status:="published"
-	publishedAt:=time.Now()
-	if body.ScheduledAt!=nil && body.ScheduledAt.After(time.Now().Add(2*time.Minute)) {
-		if body.ScheduledAt.After(time.Now().Add(365*24*time.Hour)) {
-			writeJSON(w,http.StatusBadRequest,map[string]string{"error":"scheduledAt is too far in the future"}); return
+	status := "published"
+	publishedAt := time.Now()
+	if body.ScheduledAt != nil && body.ScheduledAt.After(time.Now().Add(2*time.Minute)) {
+		if body.ScheduledAt.After(time.Now().Add(365 * 24 * time.Hour)) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "scheduledAt is too far in the future"})
+			return
 		}
-		status="scheduled"
-		publishedAt=*body.ScheduledAt
+		status = "scheduled"
+		publishedAt = *body.ScheduledAt
 	}
 
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 
 	var id string
-	err=tx.QueryRow(r.Context(),`
+	err = tx.QueryRow(r.Context(), `
 		INSERT INTO posts (
 			author_user_id,channel_id,media_title_id,episode_id,post_type,body,spoiler,status,published_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		RETURNING id::text
-	`,userID,body.ChannelID,body.MediaTitleID,body.EpisodeID,body.Type,body.Body,body.Spoiler,status,publishedAt).Scan(&id)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, userID, body.ChannelID, body.MediaTitleID, body.EpisodeID, body.Type, body.Body, body.Spoiler, status, publishedAt).Scan(&id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	if body.Type=="poll" {
-		for i,option:=range body.PollOptions {
-			if _,err:=tx.Exec(r.Context(),`
+	if body.Type == "poll" {
+		for i, option := range body.PollOptions {
+			if _, err := tx.Exec(r.Context(), `
 				INSERT INTO poll_options (post_id,label,sort_order)
 				VALUES ($1,$2,$3)
-			`,id,option,i); err!=nil {
-				writeError(w,http.StatusInternalServerError,err); return
+			`, id, option, i); err != nil {
+				writeError(w, http.StatusInternalServerError, err)
+				return
 			}
 		}
 	}
 
-	if status=="published" {
-		if _,err=tx.Exec(r.Context(),
+	if status == "published" {
+		if _, err = tx.Exec(r.Context(),
 			"UPDATE profiles SET post_count=post_count+1,updated_at=now() WHERE user_id=$1",
-			userID); err!=nil {
-			writeError(w,http.StatusInternalServerError,err); return
+			userID); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
 		}
-		if body.ChannelID!=nil {
-			if _,err=tx.Exec(r.Context(),
+		if body.ChannelID != nil {
+			if _, err = tx.Exec(r.Context(),
 				"UPDATE channels SET post_count=post_count+1,updated_at=now() WHERE id=$1",
-				*body.ChannelID); err!=nil {
-				writeError(w,http.StatusInternalServerError,err); return
+				*body.ChannelID); err != nil {
+				writeError(w, http.StatusInternalServerError, err)
+				return
 			}
 		}
 	}
 
-	if err:=tx.Commit(r.Context()); err!=nil {
-		writeError(w,http.StatusInternalServerError,err); return
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
 	}
-	writeJSON(w,http.StatusCreated,map[string]any{
-		"id":id,
-		"status":status,
-		"publishedAt":publishedAt,
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"id":          id,
+		"status":      status,
+		"publishedAt": publishedAt,
 	})
 }
-func (s *Server) removePost(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	postID:=chi.URLParam(r,"id")
+func (s *Server) removePost(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	postID := chi.URLParam(r, "id")
 
 	var removedID string
-	err:=s.db.QueryRow(r.Context(),`
+	err := s.db.QueryRow(r.Context(), `
 		UPDATE posts
 		   SET status='removed',
 		       updated_at=now()
@@ -251,42 +291,44 @@ func (s *Server) removePost(w http.ResponseWriter,r *http.Request) {
 		   AND author_user_id=$2
 		   AND status<>'removed'
 		RETURNING id::text
-	`,postID,userID).Scan(&removedID)
-	if err!=nil {
-		writeJSON(w,http.StatusNotFound,map[string]string{
-			"error":"post not found or not owned by user",
+	`, postID, userID).Scan(&removedID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "post not found or not owned by user",
 		})
 		return
 	}
 
-	writeJSON(w,http.StatusOK,map[string]any{
-		"id":removedID,
-		"removed":true,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":      removedID,
+		"removed": true,
 	})
 }
 
-func (s *Server) postViewerStates(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
+func (s *Server) postViewerStates(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
 	var body struct {
 		IDs []string `json:"ids"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-		writeError(w,http.StatusBadRequest,err)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if len(body.IDs)>100 {
-		body.IDs=body.IDs[:100]
+	if len(body.IDs) > 100 {
+		body.IDs = body.IDs[:100]
 	}
 
-	items:=make([]map[string]any,0,len(body.IDs))
-	seen:=map[string]bool{}
-	for _,postID:=range body.IDs {
-		postID=strings.TrimSpace(postID)
-		if postID=="" || seen[postID] { continue }
-		seen[postID]=true
+	items := make([]map[string]any, 0, len(body.IDs))
+	seen := map[string]bool{}
+	for _, postID := range body.IDs {
+		postID = strings.TrimSpace(postID)
+		if postID == "" || seen[postID] {
+			continue
+		}
+		seen[postID] = true
 
-		var liked,saved bool
-		err:=s.db.QueryRow(r.Context(),`
+		var liked, saved bool
+		err := s.db.QueryRow(r.Context(), `
 			SELECT EXISTS(
 			         SELECT 1 FROM post_reactions
 			          WHERE post_id=$1 AND user_id=$2
@@ -295,23 +337,25 @@ func (s *Server) postViewerStates(w http.ResponseWriter,r *http.Request) {
 			         SELECT 1 FROM post_saves
 			          WHERE post_id=$1 AND user_id=$2
 			       )
-		`,postID,userID).Scan(&liked,&saved)
-		if err!=nil { continue }
+		`, postID, userID).Scan(&liked, &saved)
+		if err != nil {
+			continue
+		}
 
-		items=append(items,map[string]any{
-			"id":postID,
-			"likedByMe":liked,
-			"savedByMe":saved,
+		items = append(items, map[string]any{
+			"id":        postID,
+			"likedByMe": liked,
+			"savedByMe": saved,
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) postViewerState(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	postID:=chi.URLParam(r,"id")
-	var liked,saved bool
-	err:=s.db.QueryRow(r.Context(),`
+func (s *Server) postViewerState(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	postID := chi.URLParam(r, "id")
+	var liked, saved bool
+	err := s.db.QueryRow(r.Context(), `
 		SELECT EXISTS(
 		         SELECT 1 FROM post_reactions
 		          WHERE post_id=$1 AND user_id=$2
@@ -320,42 +364,55 @@ func (s *Server) postViewerState(w http.ResponseWriter,r *http.Request) {
 		         SELECT 1 FROM post_saves
 		          WHERE post_id=$1 AND user_id=$2
 		       )
-	`,postID,userID).Scan(&liked,&saved)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	writeJSON(w,http.StatusOK,map[string]any{
-		"likedByMe":liked,
-		"savedByMe":saved,
+	`, postID, userID).Scan(&liked, &saved)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"likedByMe": liked,
+		"savedByMe": saved,
 	})
 }
 
-func (s *Server) togglePostLike(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	postID:=chi.URLParam(r,"id")
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+func (s *Server) togglePostLike(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	postID := chi.URLParam(r, "id")
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 
 	var exists bool
 	_ = tx.QueryRow(r.Context(),
 		"SELECT EXISTS(SELECT 1 FROM post_reactions WHERE post_id=$1 AND user_id=$2)",
-		postID,userID).Scan(&exists)
+		postID, userID).Scan(&exists)
 	if exists {
-		_,err=tx.Exec(r.Context(),"DELETE FROM post_reactions WHERE post_id=$1 AND user_id=$2",postID,userID)
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE posts SET like_count=GREATEST(like_count-1,0) WHERE id=$1",postID) }
+		_, err = tx.Exec(r.Context(), "DELETE FROM post_reactions WHERE post_id=$1 AND user_id=$2", postID, userID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), "UPDATE posts SET like_count=GREATEST(like_count-1,0) WHERE id=$1", postID)
+		}
 	} else {
-		_,err=tx.Exec(r.Context(),"INSERT INTO post_reactions (post_id,user_id,reaction) VALUES ($1,$2,'like')",postID,userID)
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE posts SET like_count=like_count+1 WHERE id=$1",postID) }
+		_, err = tx.Exec(r.Context(), "INSERT INTO post_reactions (post_id,user_id,reaction) VALUES ($1,$2,'like')", postID, userID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), "UPDATE posts SET like_count=like_count+1 WHERE id=$1", postID)
+		}
 	}
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	if !exists {
 		var authorID string
-		if scanErr:=tx.QueryRow(
+		if scanErr := tx.QueryRow(
 			r.Context(),
 			"SELECT author_user_id::text FROM posts WHERE id=$1",
 			postID,
-		).Scan(&authorID); scanErr==nil && authorID!=userID {
-			_,_=tx.Exec(r.Context(),`
+		).Scan(&authorID); scanErr == nil && authorID != userID {
+			_, _ = tx.Exec(r.Context(), `
 				INSERT INTO notifications (
 					user_id,actor_user_id,notification_type,entity_type,entity_id,title
 				)
@@ -368,42 +425,91 @@ func (s *Server) togglePostLike(w http.ResponseWriter,r *http.Request) {
 					   AND entity_id=$3
 					   AND created_at>now()-interval '12 hours'
 				)
-			`,authorID,userID,postID)
+			`, authorID, userID, postID)
 		}
 	}
 
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	writeJSON(w,http.StatusOK,map[string]any{"liked":!exists})
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"liked": !exists})
 }
 
-func (s *Server) addPostComment(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	postID:=chi.URLParam(r,"id")
+func (s *Server) addPostComment(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	postID := chi.URLParam(r, "id")
+	if !socialResourceUUID.MatchString(postID) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid post id"})
+		return
+	}
+	allowed, exists, accessErr := s.canViewPost(r.Context(), userID, postID)
+	if accessErr != nil {
+		writeError(w, http.StatusInternalServerError, accessErr)
+		return
+	}
+	if !exists || !allowed {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
+		return
+	}
 	var body struct {
-		Body string `json:"body"`
-		Spoiler bool `json:"spoiler"`
+		Body            string  `json:"body"`
+		Spoiler         bool    `json:"spoiler"`
 		ParentCommentID *string `json:"parentCommentId"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
-	body.Body=strings.TrimSpace(body.Body)
-	if body.Body=="" || len([]rune(body.Body))>2000 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"comment must be 1-2000 characters"}); return
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	body.Body = strings.TrimSpace(body.Body)
+	if body.Body == "" || len([]rune(body.Body)) > 2000 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "comment must be 1-2000 characters"})
+		return
+	}
+	if body.ParentCommentID != nil && *body.ParentCommentID != "" {
+		if !socialResourceUUID.MatchString(*body.ParentCommentID) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid parent comment"})
+			return
+		}
+		var parentAllowed bool
+		if err := s.db.QueryRow(r.Context(), `SELECT EXISTS(
+		  SELECT 1 FROM comments c WHERE c.id=$1 AND c.post_id=$2
+		    AND NOT EXISTS(SELECT 1 FROM blocks b WHERE
+		      (b.blocker_user_id=$3 AND b.blocked_user_id=c.author_user_id)
+		      OR (b.blocker_user_id=c.author_user_id AND b.blocked_user_id=$3)))`, *body.ParentCommentID, postID, userID).Scan(&parentAllowed); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		if !parentAllowed {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "parent comment is unavailable for this post"})
+			return
+		}
+	} else {
+		body.ParentCommentID = nil
 	}
 
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 
 	var id string
-	err=tx.QueryRow(r.Context(),`
+	err = tx.QueryRow(r.Context(), `
 		INSERT INTO comments (post_id,parent_comment_id,author_user_id,body,spoiler)
 		VALUES ($1,$2,$3,$4,$5) RETURNING id::text
-	`,postID,body.ParentCommentID,userID,body.Body,body.Spoiler).Scan(&id)
-	if err==nil { _,err=tx.Exec(r.Context(),"UPDATE posts SET comment_count=comment_count+1 WHERE id=$1",postID) }
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, postID, body.ParentCommentID, userID, body.Body, body.Spoiler).Scan(&id)
+	if err == nil {
+		_, err = tx.Exec(r.Context(), "UPDATE posts SET comment_count=comment_count+1 WHERE id=$1", postID)
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	var recipientID string
-	if scanErr:=tx.QueryRow(r.Context(),`
+	if scanErr := tx.QueryRow(r.Context(), `
 		SELECT COALESCE(
 			(
 				SELECT author_user_id::text
@@ -414,118 +520,164 @@ func (s *Server) addPostComment(w http.ResponseWriter,r *http.Request) {
 		)
 		  FROM posts p
 		 WHERE p.id=$2
-	`,body.ParentCommentID,postID).Scan(&recipientID); scanErr==nil && recipientID!=userID {
-		preview:=normalizeMessagePreview(body.Body)
-		if body.Spoiler { preview="کامنت اسپویلردار" }
-		_,_=tx.Exec(r.Context(),`
+	`, body.ParentCommentID, postID).Scan(&recipientID); scanErr == nil && recipientID != userID {
+		preview := normalizeMessagePreview(body.Body)
+		if body.Spoiler {
+			preview = "کامنت اسپویلردار"
+		}
+		_, _ = tx.Exec(r.Context(), `
 			INSERT INTO notifications (
 				user_id,actor_user_id,notification_type,entity_type,entity_id,title,body
 			) VALUES ($1,$2,'post_comment','post',$3,'کامنت جدید روی پست',$4)
-		`,recipientID,userID,postID,preview)
+		`, recipientID, userID, postID, preview)
 	}
 
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	writeJSON(w,http.StatusCreated,map[string]any{"id":id})
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
 
-func (s *Server) commentViewerStates(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
+func (s *Server) commentViewerStates(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
 	var body struct {
 		IDs []string `json:"ids"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-		writeError(w,http.StatusBadRequest,err)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if len(body.IDs)>200 { body.IDs=body.IDs[:200] }
+	if len(body.IDs) > 200 {
+		body.IDs = body.IDs[:200]
+	}
 
-	items:=make([]map[string]any,0,len(body.IDs))
-	seen:=map[string]bool{}
-	for _,commentID:=range body.IDs {
-		commentID=strings.TrimSpace(commentID)
-		if commentID=="" || seen[commentID] { continue }
-		seen[commentID]=true
+	items := make([]map[string]any, 0, len(body.IDs))
+	seen := map[string]bool{}
+	for _, commentID := range body.IDs {
+		commentID = strings.TrimSpace(commentID)
+		if commentID == "" || seen[commentID] {
+			continue
+		}
+		seen[commentID] = true
 
 		var liked bool
-		err:=s.db.QueryRow(r.Context(),`
+		err := s.db.QueryRow(r.Context(), `
 			SELECT EXISTS(
 				SELECT 1 FROM comment_reactions
 				 WHERE comment_id=$1 AND user_id=$2
 			)
-		`,commentID,userID).Scan(&liked)
-		if err!=nil { continue }
-		items=append(items,map[string]any{
-			"id":commentID,
-			"likedByMe":liked,
+		`, commentID, userID).Scan(&liked)
+		if err != nil {
+			continue
+		}
+		items = append(items, map[string]any{
+			"id":        commentID,
+			"likedByMe": liked,
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) toggleCommentLike(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	commentID:=chi.URLParam(r,"id")
+func (s *Server) toggleCommentLike(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	commentID := chi.URLParam(r, "id")
+	if !socialResourceUUID.MatchString(commentID) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid comment id"})
+		return
+	}
+	var commentPost, commentReel *string
+	var authorAllowed bool
+	if err := s.db.QueryRow(r.Context(), `SELECT c.post_id::text,c.reel_id::text,
+	  NOT EXISTS(SELECT 1 FROM blocks b WHERE
+	    (b.blocker_user_id=$2 AND b.blocked_user_id=c.author_user_id)
+	    OR (b.blocker_user_id=c.author_user_id AND b.blocked_user_id=$2))
+	  FROM comments c WHERE c.id=$1`, commentID, userID).Scan(&commentPost, &commentReel, &authorAllowed); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "comment not found"})
+		return
+	}
+	var allowed, accessExists bool
+	var accessErr error
+	if commentPost != nil {
+		allowed, accessExists, accessErr = s.canViewPost(r.Context(), userID, *commentPost)
+	} else if commentReel != nil {
+		allowed, accessExists, accessErr = s.canViewReel(r.Context(), userID, *commentReel)
+	}
+	if accessErr != nil {
+		writeError(w, http.StatusInternalServerError, accessErr)
+		return
+	}
+	if !authorAllowed || !allowed || !accessExists {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "comment not found"})
+		return
+	}
 
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 
 	var exists bool
-	_ = tx.QueryRow(r.Context(),`
+	_ = tx.QueryRow(r.Context(), `
 		SELECT EXISTS(
 			SELECT 1 FROM comment_reactions
 			 WHERE comment_id=$1 AND user_id=$2
 		)
-	`,commentID,userID).Scan(&exists)
+	`, commentID, userID).Scan(&exists)
 
 	if exists {
-		_,err=tx.Exec(r.Context(),`
+		_, err = tx.Exec(r.Context(), `
 			DELETE FROM comment_reactions
 			 WHERE comment_id=$1 AND user_id=$2
-		`,commentID,userID)
-		if err==nil {
-			_,err=tx.Exec(r.Context(),`
+		`, commentID, userID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), `
 				UPDATE comments
 				   SET like_count=GREATEST(like_count-1,0)
 				 WHERE id=$1
-			`,commentID)
+			`, commentID)
 		}
 	} else {
-		_,err=tx.Exec(r.Context(),`
+		_, err = tx.Exec(r.Context(), `
 			INSERT INTO comment_reactions (comment_id,user_id,reaction)
 			VALUES ($1,$2,'like')
-		`,commentID,userID)
-		if err==nil {
-			_,err=tx.Exec(r.Context(),`
+		`, commentID, userID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), `
 				UPDATE comments
 				   SET like_count=like_count+1
 				 WHERE id=$1
-			`,commentID)
+			`, commentID)
 		}
 	}
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	if !exists {
 		var authorID string
-		var postID,reelID *string
-		if scanErr:=tx.QueryRow(r.Context(),`
+		var postID, reelID *string
+		if scanErr := tx.QueryRow(r.Context(), `
 			SELECT author_user_id::text,post_id::text,reel_id::text
 			  FROM comments
 			 WHERE id=$1
-		`,commentID).Scan(&authorID,&postID,&reelID); scanErr==nil && authorID!=userID {
-			entityType:=""
-			entityID:=""
+		`, commentID).Scan(&authorID, &postID, &reelID); scanErr == nil && authorID != userID {
+			entityType := ""
+			entityID := ""
 			switch {
-			case postID!=nil && *postID!="":
-				entityType="post"
-				entityID=*postID
-			case reelID!=nil && *reelID!="":
-				entityType="reel"
-				entityID=*reelID
+			case postID != nil && *postID != "":
+				entityType = "post"
+				entityID = *postID
+			case reelID != nil && *reelID != "":
+				entityType = "reel"
+				entityID = *reelID
 			}
-			if entityID!="" {
-				_,_=tx.Exec(r.Context(),`
+			if entityID != "" {
+				_, _ = tx.Exec(r.Context(), `
 					INSERT INTO notifications (
 						user_id,actor_user_id,notification_type,
 						entity_type,entity_id,title
@@ -540,7 +692,7 @@ func (s *Server) toggleCommentLike(w http.ResponseWriter,r *http.Request) {
 						   AND entity_id=$4
 						   AND created_at>now()-interval '12 hours'
 					)
-				`,authorID,userID,entityType,entityID)
+				`, authorID, userID, entityType, entityID)
 			}
 		}
 	}
@@ -551,134 +703,194 @@ func (s *Server) toggleCommentLike(w http.ResponseWriter,r *http.Request) {
 		commentID,
 	).Scan(&likes)
 
-	if err:=tx.Commit(r.Context()); err!=nil {
-		writeError(w,http.StatusInternalServerError,err)
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w,http.StatusOK,map[string]any{
-		"liked":!exists,
-		"likes":likes,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"liked": !exists,
+		"likes": likes,
 	})
 }
 
-func (s *Server) postComments(w http.ResponseWriter,r *http.Request) {
-	postID:=chi.URLParam(r,"id")
-	rows,err:=s.db.Query(r.Context(),`
+func (s *Server) postComments(w http.ResponseWriter, r *http.Request) {
+	s.visiblePostComments(w, r, "")
+}
+
+func (s *Server) viewerPostComments(w http.ResponseWriter, r *http.Request) {
+	s.visiblePostComments(w, r, userIDFromContext(r.Context()))
+}
+
+func (s *Server) visiblePostComments(w http.ResponseWriter, r *http.Request, viewerID string) {
+	postID := chi.URLParam(r, "id")
+	if !socialResourceUUID.MatchString(postID) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid post id"})
+		return
+	}
+	allowed, exists, accessErr := s.canViewPost(r.Context(), viewerID, postID)
+	if accessErr != nil {
+		writeError(w, http.StatusInternalServerError, accessErr)
+		return
+	}
+	if !allowed || !exists {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
+		return
+	}
+	rows, err := s.db.Query(r.Context(), `
 		SELECT c.id::text,c.parent_comment_id::text,c.body,c.spoiler,c.like_count,c.created_at,
 		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified
 		  FROM comments c JOIN profiles p ON p.user_id=c.author_user_id
 		 WHERE c.post_id=$1
+		   AND NOT EXISTS(SELECT 1 FROM blocks b WHERE
+		     (b.blocker_user_id::text=$2 AND b.blocked_user_id=c.author_user_id)
+		     OR (b.blocker_user_id=c.author_user_id AND b.blocked_user_id::text=$2))
+		   AND NOT EXISTS(SELECT 1 FROM user_mutes m WHERE m.muter_user_id::text=$2 AND m.muted_user_id=c.author_user_id)
 		 ORDER BY c.created_at ASC
 		 LIMIT 200
-	`,postID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, postID, viewerID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
-	items:=make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,body,userID,username,displayName,avatar string
+		var id, body, userID, username, displayName, avatar string
 		var parent *string
-		var spoiler,verified bool
+		var spoiler, verified bool
 		var likes int64
 		var created time.Time
-		if err:=rows.Scan(&id,&parent,&body,&spoiler,&likes,&created,&userID,&username,&displayName,&avatar,&verified); err!=nil { continue }
-		items=append(items,map[string]any{
-			"id":id,"parentCommentId":parent,"body":body,"spoiler":spoiler,"likes":likes,"createdAt":created,
-			"author":map[string]any{"id":userID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
+		if err := rows.Scan(&id, &parent, &body, &spoiler, &likes, &created, &userID, &username, &displayName, &avatar, &verified); err != nil {
+			continue
+		}
+		items = append(items, map[string]any{
+			"id": id, "parentCommentId": parent, "body": body, "spoiler": spoiler, "likes": likes, "createdAt": created,
+			"author": map[string]any{"id": userID, "username": username, "displayName": displayName, "avatarUrl": avatar, "verified": verified},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) createChannel(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
+func (s *Server) createChannel(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
 	var body struct {
-		Slug string `json:"slug"`
-		Name string `json:"name"`
-		Bio string `json:"bio"`
+		Slug       string `json:"slug"`
+		Name       string `json:"name"`
+		Bio        string `json:"bio"`
 		Visibility string `json:"visibility"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
-	body.Slug=strings.ToLower(strings.TrimSpace(body.Slug))
-	body.Name=strings.TrimSpace(body.Name)
-	body.Bio=strings.TrimSpace(body.Bio)
-	if !channelSlugPattern.MatchString(body.Slug) || len([]rune(body.Name))<2 || len([]rune(body.Name))>80 {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid channel slug or name"}); return
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
-	if body.Visibility=="" { body.Visibility="public" }
-	switch body.Visibility { case "public","private","invite": default:
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid visibility"}); return
+	body.Slug = strings.ToLower(strings.TrimSpace(body.Slug))
+	body.Name = strings.TrimSpace(body.Name)
+	body.Bio = strings.TrimSpace(body.Bio)
+	if !channelSlugPattern.MatchString(body.Slug) || len([]rune(body.Name)) < 2 || len([]rune(body.Name)) > 80 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid channel slug or name"})
+		return
+	}
+	if body.Visibility == "" {
+		body.Visibility = "public"
+	}
+	switch body.Visibility {
+	case "public", "private", "invite":
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid visibility"})
+		return
 	}
 
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 	var id string
-	err=tx.QueryRow(r.Context(),`
+	err = tx.QueryRow(r.Context(), `
 		INSERT INTO channels (owner_user_id,slug,name,bio,visibility)
 		VALUES ($1,$2,$3,$4,$5) RETURNING id::text
-	`,userID,body.Slug,body.Name,body.Bio,body.Visibility).Scan(&id)
-	if err!=nil { writeJSON(w,http.StatusConflict,map[string]string{"error":"channel slug already exists"}); return }
-	_,err=tx.Exec(r.Context(),"INSERT INTO channel_members (channel_id,user_id,role) VALUES ($1,$2,'owner')",id,userID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, userID, body.Slug, body.Name, body.Bio, body.Visibility).Scan(&id)
+	if err != nil {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "channel slug already exists"})
+		return
+	}
+	_, err = tx.Exec(r.Context(), "INSERT INTO channel_members (channel_id,user_id,role) VALUES ($1,$2,'owner')", id, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	writeJSON(w,http.StatusCreated,map[string]any{"id":id,"slug":body.Slug})
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "slug": body.Slug})
 }
 
-func (s *Server) channelDetail(w http.ResponseWriter,r *http.Request) {
-	id:=chi.URLParam(r,"id")
-	var ownerID,slug,name,bio,avatar,cover,visibility string
+func (s *Server) channelDetail(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var ownerID, slug, name, bio, avatar, cover, visibility string
 	var verified bool
-	var followers,posts,reels int64
-	err:=s.db.QueryRow(r.Context(),`
+	var followers, posts, reels int64
+	err := s.db.QueryRow(r.Context(), `
 		SELECT owner_user_id::text,slug::text,name,bio,avatar_url,cover_url,visibility,verified,
 		       follower_count,post_count,reel_count
 		  FROM channels WHERE id=$1
-	`,id).Scan(&ownerID,&slug,&name,&bio,&avatar,&cover,&visibility,&verified,&followers,&posts,&reels)
-	if err!=nil { writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"}); return }
-	writeJSON(w,http.StatusOK,map[string]any{
-		"id":id,"ownerUserId":ownerID,"slug":slug,"name":name,"bio":bio,"avatarUrl":avatar,
-		"coverUrl":cover,"visibility":visibility,"verified":verified,"followers":followers,"posts":posts,"reels":reels,
+	`, id).Scan(&ownerID, &slug, &name, &bio, &avatar, &cover, &visibility, &verified, &followers, &posts, &reels)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "channel not found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id": id, "ownerUserId": ownerID, "slug": slug, "name": name, "bio": bio, "avatarUrl": avatar,
+		"coverUrl": cover, "visibility": visibility, "verified": verified, "followers": followers, "posts": posts, "reels": reels,
 	})
 }
 
-func (s *Server) channelPosts(w http.ResponseWriter,r *http.Request) {
-	channelID:=chi.URLParam(r,"id")
-	allowed,exists,_,_,err:=
-		s.canViewChannelSocialContent(r.Context(),"",channelID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+func (s *Server) channelPosts(w http.ResponseWriter, r *http.Request) {
+	channelID := chi.URLParam(r, "id")
+	allowed, exists, _, _, err :=
+		s.canViewChannelSocialContent(r.Context(), "", channelID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	if !exists {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "channel not found"})
 		return
 	}
 	if !allowed {
-		writeJSON(w,http.StatusOK,map[string]any{
-			"items":[]map[string]any{},
-			"locked":true,
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":  []map[string]any{},
+			"locked": true,
 		})
 		return
 	}
-	s.channelPostsByID(w,r,channelID)
+	s.channelPostsByID(w, r, channelID)
 }
 
-func (s *Server) viewerChannelPosts(w http.ResponseWriter,r *http.Request) {
-	channelID:=chi.URLParam(r,"id")
-	viewerID:=userIDFromContext(r.Context())
-	allowed,exists,_,_,err:=
-		s.canViewChannelSocialContent(r.Context(),viewerID,channelID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+func (s *Server) viewerChannelPosts(w http.ResponseWriter, r *http.Request) {
+	channelID := chi.URLParam(r, "id")
+	viewerID := userIDFromContext(r.Context())
+	allowed, exists, _, _, err :=
+		s.canViewChannelSocialContent(r.Context(), viewerID, channelID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	if !exists {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"channel not found"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "channel not found"})
 		return
 	}
 	if !allowed {
-		writeJSON(w,http.StatusOK,map[string]any{
-			"items":[]map[string]any{},
-			"locked":true,
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":  []map[string]any{},
+			"locked": true,
 		})
 		return
 	}
-	s.channelPostsByID(w,r,channelID)
+	s.channelPostsByID(w, r, channelID)
 }
 
 func (s *Server) channelPostsByID(
@@ -686,7 +898,7 @@ func (s *Server) channelPostsByID(
 	r *http.Request,
 	channelID string,
 ) {
-	rows,err:=s.db.Query(r.Context(),`
+	rows, err := s.db.Query(r.Context(), `
 		SELECT p.id::text,p.post_type,p.body,p.spoiler,
 		       p.like_count,p.comment_count,p.save_count,p.share_count,p.published_at,
 		       pr.user_id::text,pr.username::text,pr.display_name,pr.avatar_url,pr.verified,
@@ -697,75 +909,84 @@ func (s *Server) channelPostsByID(
 		 WHERE p.channel_id=$1 AND p.status='published'
 		 ORDER BY p.published_at DESC NULLS LAST,p.created_at DESC
 		 LIMIT 100
-	`,channelID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, channelID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
-	items:=make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var postID,typ,body,userID,username,displayName,avatar string
-		var spoiler,verified bool
-		var likes,comments,saves,shares int64
+		var postID, typ, body, userID, username, displayName, avatar string
+		var spoiler, verified bool
+		var likes, comments, saves, shares int64
 		var published *time.Time
-		var mediaID,title,poster *string
-		if err:=rows.Scan(
-			&postID,&typ,&body,&spoiler,
-			&likes,&comments,&saves,&shares,&published,
-			&userID,&username,&displayName,&avatar,&verified,
-			&mediaID,&title,&poster,
-		); err!=nil { continue }
+		var mediaID, title, poster *string
+		if err := rows.Scan(
+			&postID, &typ, &body, &spoiler,
+			&likes, &comments, &saves, &shares, &published,
+			&userID, &username, &displayName, &avatar, &verified,
+			&mediaID, &title, &poster,
+		); err != nil {
+			continue
+		}
 
-		items=append(items,map[string]any{
-			"id":postID,
-			"type":typ,
-			"body":body,
-			"spoiler":spoiler,
-			"likes":likes,
-			"comments":comments,
-			"saves":saves,
-			"shares":shares,
-			"publishedAt":published,
-			"author":map[string]any{
-				"id":userID,
-				"username":username,
-				"displayName":displayName,
-				"avatarUrl":avatar,
-				"verified":verified,
+		items = append(items, map[string]any{
+			"id":          postID,
+			"type":        typ,
+			"body":        body,
+			"spoiler":     spoiler,
+			"likes":       likes,
+			"comments":    comments,
+			"saves":       saves,
+			"shares":      shares,
+			"publishedAt": published,
+			"author": map[string]any{
+				"id":          userID,
+				"username":    username,
+				"displayName": displayName,
+				"avatarUrl":   avatar,
+				"verified":    verified,
 			},
-			"media":map[string]any{
-				"id":mediaID,
-				"title":title,
-				"posterUrl":poster,
+			"media": map[string]any{
+				"id":        mediaID,
+				"title":     title,
+				"posterUrl": poster,
 			},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) channelViewerStates(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	raw:=strings.TrimSpace(r.URL.Query().Get("ids"))
-	if raw=="" {
-		writeJSON(w,http.StatusOK,map[string]any{"items":[]map[string]any{}})
+func (s *Server) channelViewerStates(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	raw := strings.TrimSpace(r.URL.Query().Get("ids"))
+	if raw == "" {
+		writeJSON(w, http.StatusOK, map[string]any{"items": []map[string]any{}})
 		return
 	}
 
-	parts:=strings.Split(raw,",")
-	if len(parts)>100 { parts=parts[:100] }
-	clean:=make([]string,0,len(parts))
-	seen:=map[string]bool{}
-	for _,id:=range parts {
-		id=strings.TrimSpace(id)
-		if id=="" || seen[id] { continue }
-		seen[id]=true
-		clean=append(clean,id)
+	parts := strings.Split(raw, ",")
+	if len(parts) > 100 {
+		parts = parts[:100]
 	}
-	if len(clean)==0 {
-		writeJSON(w,http.StatusOK,map[string]any{"items":[]map[string]any{}})
+	clean := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, id := range parts {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		clean = append(clean, id)
+	}
+	if len(clean) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"items": []map[string]any{}})
 		return
 	}
 
-	rows,err:=s.db.Query(r.Context(),`
+	rows, err := s.db.Query(r.Context(), `
 		WITH target AS (
 			SELECT unnest(string_to_array($1,',')::uuid[]) AS id
 		)
@@ -775,46 +996,62 @@ func (s *Server) channelViewerStates(w http.ResponseWriter,r *http.Request) {
 		          WHERE cf.channel_id=t.id AND cf.user_id=$2
 		       )
 		  FROM target t
-	`,strings.Join(clean,","),userID)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	`, strings.Join(clean, ","), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
 
-	items:=make([]map[string]any,0,len(clean))
+	items := make([]map[string]any, 0, len(clean))
 	for rows.Next() {
 		var id string
 		var following bool
-		if rows.Scan(&id,&following)==nil {
-			items=append(items,map[string]any{
-				"id":id,
-				"followingByMe":following,
+		if rows.Scan(&id, &following) == nil {
+			items = append(items, map[string]any{
+				"id":            id,
+				"followingByMe": following,
 			})
 		}
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) toggleChannelFollow(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	channelID:=chi.URLParam(r,"id")
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+func (s *Server) toggleChannelFollow(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	channelID := chi.URLParam(r, "id")
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 	var exists bool
-	_ = tx.QueryRow(r.Context(),"SELECT EXISTS(SELECT 1 FROM channel_followers WHERE channel_id=$1 AND user_id=$2)",channelID,userID).Scan(&exists)
+	_ = tx.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM channel_followers WHERE channel_id=$1 AND user_id=$2)", channelID, userID).Scan(&exists)
 	if exists {
-		_,err=tx.Exec(r.Context(),"DELETE FROM channel_followers WHERE channel_id=$1 AND user_id=$2",channelID,userID)
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE channels SET follower_count=GREATEST(follower_count-1,0) WHERE id=$1",channelID) }
+		_, err = tx.Exec(r.Context(), "DELETE FROM channel_followers WHERE channel_id=$1 AND user_id=$2", channelID, userID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), "UPDATE channels SET follower_count=GREATEST(follower_count-1,0) WHERE id=$1", channelID)
+		}
 	} else {
-		_,err=tx.Exec(r.Context(),"INSERT INTO channel_followers (channel_id,user_id) VALUES ($1,$2)",channelID,userID)
-		if err==nil { _,err=tx.Exec(r.Context(),"UPDATE channels SET follower_count=follower_count+1 WHERE id=$1",channelID) }
+		_, err = tx.Exec(r.Context(), "INSERT INTO channel_followers (channel_id,user_id) VALUES ($1,$2)", channelID, userID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), "UPDATE channels SET follower_count=follower_count+1 WHERE id=$1", channelID)
+		}
 	}
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	writeJSON(w,http.StatusOK,map[string]any{"following":!exists})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"following": !exists})
 }
 
-func (s *Server) stories(w http.ResponseWriter,r *http.Request) {
-	rows,err:=s.db.Query(r.Context(),`
+func (s *Server) stories(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.db.Query(r.Context(), `
 		SELECT st.id::text,st.story_type,st.media_url,st.thumbnail_url,st.caption,st.spoiler,
 		       st.view_count,st.created_at,st.expires_at,
 		       p.user_id::text,p.username::text,p.display_name,p.avatar_url,p.verified,
@@ -834,231 +1071,285 @@ func (s *Server) stories(w http.ResponseWriter,r *http.Request) {
 		 ORDER BY st.created_at DESC
 		 LIMIT 100
 	`)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer rows.Close()
-	items:=make([]map[string]any,0)
+	items := make([]map[string]any, 0)
 	for rows.Next() {
-		var id,typ,mediaURL,thumb,caption,userID,username,displayName,avatar string
-		var spoiler,verified bool
+		var id, typ, mediaURL, thumb, caption, userID, username, displayName, avatar string
+		var spoiler, verified bool
 		var views int64
-		var created,expires time.Time
-		var mediaID,kind,title,originalTitle,poster,backdrop *string
+		var created, expires time.Time
+		var mediaID, kind, title, originalTitle, poster, backdrop *string
 		var tmdbID *int64
 		var year *int
 		var rating *float64
-		if err:=rows.Scan(&id,&typ,&mediaURL,&thumb,&caption,&spoiler,&views,&created,&expires,
-			&userID,&username,&displayName,&avatar,&verified,
-			&mediaID,&tmdbID,&kind,&title,&originalTitle,&poster,&backdrop,&year,&rating); err!=nil { continue }
-		items=append(items,map[string]any{
-			"id":id,"type":typ,"mediaUrl":mediaURL,"thumbnailUrl":thumb,"caption":caption,
-			"spoiler":spoiler,"views":views,"createdAt":created,"expiresAt":expires,
-			"author":map[string]any{"id":userID,"username":username,"displayName":displayName,"avatarUrl":avatar,"verified":verified},
-			"media":map[string]any{
-				"id":mediaID,"tmdbId":tmdbID,"kind":kind,"title":title,
-				"originalTitle":originalTitle,"posterUrl":poster,"backdropUrl":backdrop,
-				"year":year,"rating":rating,
+		if err := rows.Scan(&id, &typ, &mediaURL, &thumb, &caption, &spoiler, &views, &created, &expires,
+			&userID, &username, &displayName, &avatar, &verified,
+			&mediaID, &tmdbID, &kind, &title, &originalTitle, &poster, &backdrop, &year, &rating); err != nil {
+			continue
+		}
+		items = append(items, map[string]any{
+			"id": id, "type": typ, "mediaUrl": mediaURL, "thumbnailUrl": thumb, "caption": caption,
+			"spoiler": spoiler, "views": views, "createdAt": created, "expiresAt": expires,
+			"author": map[string]any{"id": userID, "username": username, "displayName": displayName, "avatarUrl": avatar, "verified": verified},
+			"media": map[string]any{
+				"id": mediaID, "tmdbId": tmdbID, "kind": kind, "title": title,
+				"originalTitle": originalTitle, "posterUrl": poster, "backdropUrl": backdrop,
+				"year": year, "rating": rating,
 			},
 		})
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"items":items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) createStory(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
+func (s *Server) createStory(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
 	var body struct {
-		Type string `json:"type"`
-		MediaURL string `json:"mediaUrl"`
-		ThumbnailURL string `json:"thumbnailUrl"`
-		Caption string `json:"caption"`
-		MediaTitleID *string `json:"mediaTitleId"`
-		ChannelID *string `json:"channelId"`
-		Spoiler bool `json:"spoiler"`
-		CloseFriendsOnly bool `json:"closeFriendsOnly"`
+		Type             string  `json:"type"`
+		MediaURL         string  `json:"mediaUrl"`
+		ThumbnailURL     string  `json:"thumbnailUrl"`
+		Caption          string  `json:"caption"`
+		MediaTitleID     *string `json:"mediaTitleId"`
+		ChannelID        *string `json:"channelId"`
+		Spoiler          bool    `json:"spoiler"`
+		CloseFriendsOnly bool    `json:"closeFriendsOnly"`
 	}
-	if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil { writeError(w,http.StatusBadRequest,err); return }
-	if body.Type=="" { body.Type="text" }
-	switch body.Type { case "image","video","text": default:
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid story type"}); return
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
-	if body.Type!="text" && strings.TrimSpace(body.MediaURL)=="" {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"mediaUrl is required"}); return
+	if body.Type == "" {
+		body.Type = "text"
+	}
+	switch body.Type {
+	case "image", "video", "text":
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid story type"})
+		return
+	}
+	if body.Type != "text" && strings.TrimSpace(body.MediaURL) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "mediaUrl is required"})
+		return
 	}
 	var id string
-	expires:=time.Now().Add(24*time.Hour)
-	err:=s.db.QueryRow(r.Context(),`
+	expires := time.Now().Add(24 * time.Hour)
+	err := s.db.QueryRow(r.Context(), `
 		INSERT INTO stories (
 			author_user_id,channel_id,media_title_id,story_type,media_url,thumbnail_url,
 			caption,spoiler,close_friends_only,expires_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		RETURNING id::text
-	`,userID,body.ChannelID,body.MediaTitleID,body.Type,body.MediaURL,body.ThumbnailURL,
-		body.Caption,body.Spoiler,body.CloseFriendsOnly,expires).Scan(&id)
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	writeJSON(w,http.StatusCreated,map[string]any{"id":id,"expiresAt":expires})
-}
-
-func (s *Server) markStoryView(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	storyID:=chi.URLParam(r,"id")
-	if _,allowed:=s.storyAuthorIfAccessible(r.Context(),storyID,userID); !allowed {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"story not found"})
+	`, userID, body.ChannelID, body.MediaTitleID, body.Type, body.MediaURL, body.ThumbnailURL,
+		body.Caption, body.Spoiler, body.CloseFriendsOnly, expires).Scan(&id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "expiresAt": expires})
+}
+
+func (s *Server) markStoryView(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	storyID := chi.URLParam(r, "id")
+	if _, allowed := s.storyAuthorIfAccessible(r.Context(), storyID, userID); !allowed {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "story not found"})
+		return
+	}
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
-	tag,err:=tx.Exec(r.Context(),`
+	tag, err := tx.Exec(r.Context(), `
 		INSERT INTO story_views (story_id,viewer_user_id) VALUES ($1,$2)
 		ON CONFLICT DO NOTHING
-	`,storyID,userID)
-	if err==nil && tag.RowsAffected()>0 {
-		_,err=tx.Exec(r.Context(),"UPDATE stories SET view_count=view_count+1 WHERE id=$1",storyID)
+	`, storyID, userID)
+	if err == nil && tag.RowsAffected() > 0 {
+		_, err = tx.Exec(r.Context(), "UPDATE stories SET view_count=view_count+1 WHERE id=$1", storyID)
 	}
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-	if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) toggleUserFollow(w http.ResponseWriter,r *http.Request) {
-	userID:=userIDFromContext(r.Context())
-	targetID:=chi.URLParam(r,"id")
-	if userID==targetID {
-		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"cannot follow yourself"}); return
+func (s *Server) toggleUserFollow(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromContext(r.Context())
+	targetID := chi.URLParam(r, "id")
+	if userID == targetID {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cannot follow yourself"})
+		return
 	}
 
 	var blocked bool
-	_ = s.db.QueryRow(r.Context(),`
+	_ = s.db.QueryRow(r.Context(), `
 		SELECT EXISTS(
 			SELECT 1 FROM blocks
 			 WHERE (blocker_user_id=$1 AND blocked_user_id=$2)
 			    OR (blocker_user_id=$2 AND blocked_user_id=$1)
 		)
-	`,userID,targetID).Scan(&blocked)
+	`, userID, targetID).Scan(&blocked)
 	if blocked {
-		writeJSON(w,http.StatusForbidden,map[string]string{"error":"follow unavailable because one of these accounts has blocked the other"}); return
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "follow unavailable because one of these accounts has blocked the other"})
+		return
 	}
 
-	tx,err:=s.db.Begin(r.Context())
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	defer tx.Rollback(r.Context())
 
 	var targetPrivate bool
-	if err:=tx.QueryRow(r.Context(),`
+	if err := tx.QueryRow(r.Context(), `
 		SELECT private_account FROM profiles WHERE user_id=$1
-	`,targetID).Scan(&targetPrivate); err!=nil {
-		writeJSON(w,http.StatusNotFound,map[string]string{"error":"user not found"}); return
+	`, targetID).Scan(&targetPrivate); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+		return
 	}
 
 	var exists bool
-	_ = tx.QueryRow(r.Context(),`
+	_ = tx.QueryRow(r.Context(), `
 		SELECT EXISTS(
 			SELECT 1 FROM user_follows
 			 WHERE follower_user_id=$1 AND followed_user_id=$2
 		)
-	`,userID,targetID).Scan(&exists)
+	`, userID, targetID).Scan(&exists)
 
 	if exists {
-		_,err=tx.Exec(r.Context(),`
+		_, err = tx.Exec(r.Context(), `
 			DELETE FROM user_follows
 			 WHERE follower_user_id=$1 AND followed_user_id=$2
-		`,userID,targetID)
-		if err==nil {
-			_,err=tx.Exec(r.Context(),`
+		`, userID, targetID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), `
 				UPDATE profiles
 				   SET following_count=GREATEST(following_count-1,0),updated_at=now()
 				 WHERE user_id=$1
-			`,userID)
+			`, userID)
 		}
-		if err==nil {
-			_,err=tx.Exec(r.Context(),`
+		if err == nil {
+			_, err = tx.Exec(r.Context(), `
 				UPDATE profiles
 				   SET follower_count=GREATEST(follower_count-1,0),updated_at=now()
 				 WHERE user_id=$1
-			`,targetID)
+			`, targetID)
 		}
-		if err==nil {
-			_,_=tx.Exec(r.Context(),`
+		if err == nil {
+			_, _ = tx.Exec(r.Context(), `
 				UPDATE follow_requests
 				   SET status='cancelled',updated_at=now()
 				 WHERE requester_user_id=$1 AND target_user_id=$2
-			`,userID,targetID)
+			`, userID, targetID)
 		}
-		if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-		if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-		writeJSON(w,http.StatusOK,map[string]any{"following":false,"pending":false})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"following": false, "pending": false})
 		return
 	}
 
 	if targetPrivate {
 		var pending bool
-		_ = tx.QueryRow(r.Context(),`
+		_ = tx.QueryRow(r.Context(), `
 			SELECT EXISTS(
 				SELECT 1 FROM follow_requests
 				 WHERE requester_user_id=$1 AND target_user_id=$2 AND status='pending'
 			)
-		`,userID,targetID).Scan(&pending)
+		`, userID, targetID).Scan(&pending)
 
 		if pending {
-			_,err=tx.Exec(r.Context(),`
+			_, err = tx.Exec(r.Context(), `
 				UPDATE follow_requests
 				   SET status='cancelled',updated_at=now()
 				 WHERE requester_user_id=$1 AND target_user_id=$2
-			`,userID,targetID)
-			if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-			if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-			writeJSON(w,http.StatusOK,map[string]any{"following":false,"pending":false})
+			`, userID, targetID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+			if err := tx.Commit(r.Context()); err != nil {
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"following": false, "pending": false})
 			return
 		}
 
-		_,err=tx.Exec(r.Context(),`
+		_, err = tx.Exec(r.Context(), `
 			INSERT INTO follow_requests (
 				requester_user_id,target_user_id,status,created_at,updated_at
 			) VALUES ($1,$2,'pending',now(),now())
 			ON CONFLICT (requester_user_id,target_user_id)
 			DO UPDATE SET status='pending',updated_at=now()
-		`,userID,targetID)
-		if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+		`, userID, targetID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
 
-		_,_=tx.Exec(r.Context(),`
+		_, _ = tx.Exec(r.Context(), `
 			INSERT INTO notifications (
 				user_id,actor_user_id,notification_type,entity_type,entity_id,title
 			) VALUES ($1,$2,'follow_request','user',$2,'درخواست دنبال‌کردن جدید')
-		`,targetID,userID)
+		`, targetID, userID)
 
-		if err:=tx.Commit(r.Context()); err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-		writeJSON(w,http.StatusOK,map[string]any{"following":false,"pending":true})
+		if err := tx.Commit(r.Context()); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"following": false, "pending": true})
 		return
 	}
 
-	_,err=tx.Exec(r.Context(),`
+	_, err = tx.Exec(r.Context(), `
 		INSERT INTO user_follows (follower_user_id,followed_user_id)
 		VALUES ($1,$2)
-	`,userID,targetID)
-	if err==nil {
-		_,err=tx.Exec(r.Context(),`
+	`, userID, targetID)
+	if err == nil {
+		_, err = tx.Exec(r.Context(), `
 			UPDATE profiles
 			   SET following_count=following_count+1,updated_at=now()
 			 WHERE user_id=$1
-		`,userID)
+		`, userID)
 	}
-	if err==nil {
-		_,err=tx.Exec(r.Context(),`
+	if err == nil {
+		_, err = tx.Exec(r.Context(), `
 			UPDATE profiles
 			   SET follower_count=follower_count+1,updated_at=now()
 			 WHERE user_id=$1
-		`,targetID)
+		`, targetID)
 	}
-	if err==nil {
-		_,_=tx.Exec(r.Context(),`
+	if err == nil {
+		_, _ = tx.Exec(r.Context(), `
 			INSERT INTO notifications (
 				user_id,actor_user_id,notification_type,entity_type,entity_id,title
 			) VALUES ($1,$2,'follow','user',$2,'دنبال‌کننده جدید')
-		`,targetID,userID)
+		`, targetID, userID)
 	}
-	if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	if err:=tx.Commit(r.Context()); err!=nil {
-		writeError(w,http.StatusInternalServerError,err); return
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
 	}
-	writeJSON(w,http.StatusOK,map[string]any{"following":true,"pending":false})
+	writeJSON(w, http.StatusOK, map[string]any{"following": true, "pending": false})
 }

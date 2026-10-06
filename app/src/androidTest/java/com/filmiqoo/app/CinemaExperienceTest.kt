@@ -8,9 +8,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.platform.io.PlatformTestStorageRegistry
@@ -86,15 +88,17 @@ class CinemaExperienceTest {
             }
         }
         compose.onNodeWithTag("navigation-3").performClick().assertIsSelected()
-        compose.onNodeWithTag("navigation-3").assert(hasText("کتابخانه"))
+        compose.onNodeWithTag("navigation-3").assert(hasContentDescription("پروفایل"))
         compose.onNodeWithTag("navigation-2").performClick().assertIsSelected()
-        compose.onNodeWithTag("navigation-2").assert(hasText("باشگاه فیلم"))
+        compose.onNodeWithTag("navigation-2").assert(hasContentDescription("شبکه"))
+        compose.onNodeWithTag("navigation-4").performClick().assertIsSelected().assert(hasContentDescription("هم‌تماشا"))
     }
 
     @Test fun kidsNavigationDoesNotExposeSocialAndDiscoveryRoutes() {
         compose.setContent { FilmiqooTheme { CinemaBottomBar(0, true) {} } }
         compose.onNodeWithTag("navigation-1").assertDoesNotExist()
         compose.onNodeWithTag("navigation-2").assertDoesNotExist()
+        compose.onNodeWithTag("navigation-4").assertDoesNotExist()
         compose.onNodeWithTag("navigation-0").assertExists()
     }
 
@@ -118,6 +122,34 @@ class CinemaExperienceTest {
         }
         compose.onNodeWithText("بررسی دوباره").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(retried) }
+    }
+
+    @Test fun togetherEntryUsesRealAvailabilityAndRespectsChildProfile() {
+        var opened=false
+        var child by mutableStateOf(false)
+        var available by mutableStateOf(true)
+        compose.setContent { FilmiqooTheme { CinemaDetailContent(if(available)movie()else movie().copy(platform=null),
+            allowTogether=!child,actions=CinemaDetailActions(watchParty={opened=true})) } }
+        compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("together-entry"))
+        compose.onNodeWithText("تماشای این اثر با دوستان").performScrollTo().assertIsEnabled().performClick()
+        compose.runOnIdle{assertTrue(opened);opened=false;available=false}
+        compose.onNodeWithText("تماشای این اثر با دوستان").assertIsNotEnabled()
+        compose.runOnIdle{assertFalse(opened);child=true}
+        compose.onNodeWithTag("together-entry").assertDoesNotExist()
+    }
+
+    @Test fun fiveNavigationDestinationsRemainDistinctWithTwoHundredPercentText() {
+        var minimumPixels=0f
+        compose.setContent { val density=LocalDensity.current
+            val configuration=android.content.res.Configuration(LocalConfiguration.current).apply{fontScale=2f;screenWidthDp=320}
+            minimumPixels=with(density){48.dp.toPx()}
+            CompositionLocalProvider(LocalDensity provides Density(density.density,2f),LocalConfiguration provides configuration) {
+                FilmiqooTheme { Column(Modifier.width(320.dp)){CinemaBottomBar(4,false){}} }
+            }
+        }
+        val nodes=listOf(0,1,2,4,3).map{compose.onNodeWithTag("navigation-$it").assertIsDisplayed().fetchSemanticsNode().boundsInRoot}
+        nodes.forEach{assertTrue(it.width>=minimumPixels);assertTrue(it.height>=minimumPixels)}
+        nodes.zipWithNext().forEach{(a,b)->assertFalse("Navigation hit areas overlap",a.overlaps(b))}
     }
 
     @Test fun versionTracksUseOnlyMetadataProvidedByTheServer() {

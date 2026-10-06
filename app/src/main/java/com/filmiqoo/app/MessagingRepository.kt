@@ -90,7 +90,8 @@ data class FilmiqooNotification(
     val read: Boolean,
     val createdAt: String,
     val actor: SocialAuthor?,
-    val media: MediaItem?
+    val media: MediaItem?,
+    val discussionScope:String?=null
 )
 
 class MessagingRepository(
@@ -343,6 +344,7 @@ class MessagingRepository(
         ).optString("ownerId")
 
     suspend fun notifications(): Pair<List<FilmiqooNotification>,Long> {
+        fun org.json.JSONObject.cleanString(name:String):String=if(isNull(name))""else optString(name).takeUnless{it=="null"}.orEmpty()
         val root=backend.getJson("/v1/notifications",authorized=true)
         val arr=root.optJSONArray("items")
         val items=buildList {
@@ -361,21 +363,21 @@ class MessagingRepository(
                 }
                 val m=x.optJSONObject("media")
                 val media=m?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else MediaItem(
+                    val backendId=if(it.isNull("id"))null else it.optString("id").takeIf(String::isNotBlank)
+                    if(backendId==null && it.optInt("tmdbId",0)<=0) null else MediaItem(
                         id=if(it.isNull("tmdbId"))0 else it.optInt("tmdbId"),
                         type=if(it.optString("kind")=="movie")MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title").ifBlank{it.optString("originalTitle")},
-                        originalTitle=it.optString("originalTitle"),
-                        overview=it.optString("overview"),
-                        posterPath=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropPath=it.optString("backdropUrl").takeIf(String::isNotBlank),
+                        title=it.cleanString("title").ifBlank{it.cleanString("originalTitle")},
+                        originalTitle=it.cleanString("originalTitle"),
+                        overview=it.cleanString("overview"),
+                        posterPath=it.cleanString("posterUrl").takeIf(String::isNotBlank),
+                        backdropPath=it.cleanString("backdropUrl").takeIf(String::isNotBlank),
                         vote=it.optDouble("rating",0.0),
                         date=if(it.isNull("year"))"" else it.optInt("year").toString(),
                         backendId=backendId,
-                        mediaVersionId=it.optString("mediaVersionId").takeIf(String::isNotBlank),
+                        mediaVersionId=it.cleanString("mediaVersionId").takeIf(String::isNotBlank),
                         streamReady=it.optBoolean("streamReady"),
-                        quality=it.optString("quality")
+                        quality=it.cleanString("quality")
                     )
                 }
                 add(
@@ -383,13 +385,14 @@ class MessagingRepository(
                         id=x.optString("id"),
                         type=x.optString("type"),
                         entityType=x.optString("entityType"),
-                        entityId=x.optString("entityId").takeIf(String::isNotBlank),
+                        entityId=x.cleanString("entityId").takeIf(String::isNotBlank),
                         title=x.optString("title"),
                         body=x.optString("body"),
                         read=x.optBoolean("read"),
                         createdAt=x.optString("createdAt"),
                         actor=actor,
-                        media=media
+                        media=media,
+                        discussionScope=x.cleanString("discussionScope").takeIf(String::isNotBlank)
                     )
                 )
             }

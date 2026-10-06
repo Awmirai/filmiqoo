@@ -10,6 +10,7 @@ deploy/production/backups/
 
 # Android / Gradle
 .gradle/
+.kotlin/
 build/
 **/build/
 local.properties

@@ -41,7 +41,8 @@ data class WatchPartyMember(
     val avatarUrl:String,
     val verified:Boolean,
     val role:String,
-    val ready:Boolean
+    val ready:Boolean,
+    val online:Boolean=false
 )
 
 data class WatchPartyJoinRequest(
@@ -60,7 +61,9 @@ data class WatchPartyLobby(
     val participantCount:Long,
     val state:String,
     val members:List<WatchPartyMember>,
-    val requests:List<WatchPartyJoinRequest>
+    val requests:List<WatchPartyJoinRequest>,
+    val onlineCount:Long=0,
+    val presenceKnown:Boolean=false
 )
 
 data class WatchPartyReaction(
@@ -103,14 +106,17 @@ data class WatchPartyInfo(
     val participants: Long,
     val roomId: String,
     val host: WatchPartyHost,
-    val media: WatchPartyMedia
+    val media: WatchPartyMedia,
+    val revision:Long=0,
+    val controllerUserId:String?=null,
+    val serverTimed:Boolean=false
 )
 
 class WatchPartyRepository(
     private val backend: BackendRepository
 ) {
     suspend fun list(): List<WatchPartyInfo> {
-        val root=backend.getJson("/v1/watch-parties",authorized=false)
+        val root=backend.getJson("/v1/watch-parties",authorized=backend.session.isLoggedIn)
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
@@ -121,7 +127,7 @@ class WatchPartyRepository(
     }
 
     suspend fun detail(id: String): WatchPartyInfo =
-        parse(backend.getJson("/v1/watch-parties/"+id,authorized=false))
+        parse(backend.getJson("/v1/watch-parties/"+id,authorized=backend.session.isLoggedIn))
 
     suspend fun create(
         mediaTitleId: String,
@@ -210,7 +216,8 @@ class WatchPartyRepository(
                         avatarUrl=x.optString("avatarUrl"),
                         verified=x.optBoolean("verified"),
                         role=x.optString("role"),
-                        ready=x.optBoolean("ready")
+                        ready=x.optBoolean("ready"),
+                        online=x.optBoolean("online")
                     )
                 )
             }
@@ -239,7 +246,9 @@ class WatchPartyRepository(
             participantCount=root.optLong("participantCount"),
             state=root.optString("state"),
             members=members,
-            requests=requests
+            requests=requests,
+            onlineCount=root.optLong("onlineCount"),
+            presenceKnown=root.has("onlineCount")
         )
     }
 
@@ -437,14 +446,14 @@ class WatchPartyRepository(
         id: String,
         positionMs: Long,
         isPlaying: Boolean,
-        state: String="live"
-    ) {
-        backend.postJson(
+        state: String="live",
+        expectedRevision:Long?=null
+    ):JSONObject {
+        val body=JSONObject().put("positionMs",positionMs).put("isPlaying",isPlaying).put("state",state)
+        if(expectedRevision!=null)body.put("expectedRevision",expectedRevision)
+        return backend.postJson(
             "/v1/watch-parties/"+id+"/state",
-            JSONObject()
-                .put("positionMs",positionMs)
-                .put("isPlaying",isPlaying)
-                .put("state",state),
+            body,
             authorized=true
         )
     }
@@ -457,7 +466,7 @@ class WatchPartyRepository(
             title=o.optString("title"),
             state=o.optString("state"),
             visibility=o.optString("visibility"),
-            scheduledAt=o.optString("scheduledAt").takeIf(String::isNotBlank),
+            scheduledAt=o.optionalPartyString("scheduledAt"),
             positionMs=o.optLong("positionMs"),
             isPlaying=o.optBoolean("isPlaying"),
             participants=o.optLong("participants"),
@@ -469,14 +478,25 @@ class WatchPartyRepository(
                 avatarUrl=h.optString("avatarUrl"),
                 verified=h.optBoolean("verified")
             ),
+            revision=o.optLong("revision"),
+            controllerUserId=o.optionalPartyString("controllerUserId"),
+            serverTimed=!o.optionalPartyString("serverTime").isNullOrBlank(),
             media=WatchPartyMedia(
-                id=m.optString("id").takeIf(String::isNotBlank),
+                id=m.optionalPartyString("id"),
                 title=m.optString("title"),
-                posterUrl=m.optString("posterUrl").takeIf(String::isNotBlank),
-                backdropUrl=m.optString("backdropUrl").takeIf(String::isNotBlank),
-                mediaVersionId=m.optString("mediaVersionId").takeIf(String::isNotBlank),
-                quality=m.optString("quality").takeIf(String::isNotBlank)
+                posterUrl=m.optionalPartyString("posterUrl"),
+                backdropUrl=m.optionalPartyString("backdropUrl"),
+                mediaVersionId=m.optionalPartyString("mediaVersionId"),
+                quality=m.optionalPartyString("quality")
             )
         )
     }
 }
+
+private fun JSONObject.optionalPartyString(key:String):String? =
+    if(isNull(key))null else optString(key).takeIf { it.isNotBlank() && it!="null" }
+
+/** Monotonic receipt time avoids wall-clock differences between two phones. */
+internal fun watchPartyTargetPosition(party:WatchPartyInfo,receivedAt:Long,now:Long):Long =
+    (party.positionMs + if(party.serverTimed && party.state=="live" && party.isPlaying)
+        (now-receivedAt).coerceAtLeast(0) else 0).coerceAtLeast(0)

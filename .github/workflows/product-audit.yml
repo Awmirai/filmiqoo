@@ -25,12 +25,14 @@ jobs:
         if: matrix.stage == 'before'
         run: |
           cp app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt /tmp/ProductAuditTest.kt
-          git restore --source=e7bc1446ab254c5cb6b0e4ef8dbdcb12b271f2b9 --staged --worktree -- app
+          git restore --source=cdaa9feb816547feee90c874af6b821e445bdf33 --staged --worktree -- app
           cp /tmp/ProductAuditTest.kt app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt')
-          s = p.read_text().replace('CinemaAppShell(selected,false,{},content)', 'Scaffold(bottomBar={CinemaBottomBar(selected,false,{})}) { padding -> Box(Modifier.padding(padding)) { content() } }')
+          s = p.read_text().replace('PartyLobbyScreen(backend,{_,_->},{},{})', 'ConnectedWatchPartyScreen(null,backend=backend,social=SocialRepository(backend),repository=repository,onBack={},onRequireAuth={})')
+          s = s.replace('"profile" -> AuditProfile(backend,repository)', '"profile" -> CinemaLibraryScreen(backend,repository,{},{},{},showBack=false)')
+          s = s.replace('onLoggedOut={},loggedIn=false)', 'onLoggedOut={})')
           p.write_text(s)
           PY
       - uses: actions/setup-java@v4

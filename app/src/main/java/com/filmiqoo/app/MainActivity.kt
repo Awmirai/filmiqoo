@@ -101,7 +101,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var socialBadgeRefresh by rememberSaveable { mutableIntStateOf(0) }
 
     fun resetNavigation() {
-        (0..3).forEach { bottomTabStateHolder.removeState("main-tab-"+(activeViewer?.id ?: "guest")+"-"+it) }
+        (0..4).forEach { bottomTabStateHolder.removeState("main-tab-"+(activeViewer?.id ?: "guest")+"-"+it) }
         (overlayBackStack.toList()+listOfNotNull(overlay)).forEach { overlayStateHolder.removeState(it.javaClass.name+":"+it.hashCode()) }
         overlayBackStack.clear();overlay=null;tab=0;showSearch=false
         deepLinkPostId=null;deepLinkReelId=null;pendingHandoff=null
@@ -212,7 +212,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             val id=uri.pathSegments.firstOrNull().orEmpty()
             val kidsMode=activeViewer?.kidsMode==true
             val socialHost=host in setOf(
-                "creator","channel","collection","party","room","room-invite","reel","post","live"
+                "creator","channel","collection","party","room","room-invite","reel","post","live","notifications"
             )
 
             if(kidsMode && socialHost) {
@@ -225,6 +225,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
             runCatching {
                 when(host) {
+                    "notifications" -> overlay=OverlayRoute.Notifications
                     "play" -> {
                         require(id.isNotBlank())
                         val position=uri.getQueryParameter("t")
@@ -360,16 +361,20 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     }
 
     val openNotifications = {
-        overlay=OverlayRoute.Notifications
-        if(
+        if(activeViewer?.kidsMode==true)overlay=OverlayRoute.ParentalGate
+        else if(!backend.session.isLoggedIn)overlay=OverlayRoute.Auth
+        else {
+          overlay=OverlayRoute.Notifications
+          if(
             Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU &&
             FilmiqooPush.isConfigured() &&
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
             )!=PackageManager.PERMISSION_GRANTED
-        ) {
+          ) {
             showNotificationPrimer=true
+          }
         }
     }
 
@@ -604,6 +609,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
             overlay != null -> overlayStateHolder.SaveableStateProvider(overlay!!.javaClass.name+":"+overlay.hashCode()) { when(val route=overlay!!) {
                 is OverlayRoute.Detail -> CinemaDetailScreen(
                     media=route.media,
+                    initialDiscussionScope=route.discussionScope,
                     repository=repository,
                     backend=backend,
                     store=store,
@@ -683,7 +689,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onDownloads={pushOverlay(OverlayRoute.Downloads)},
                     onHistory={pushOverlay(OverlayRoute.History)},
                     onFilmDna={pushOverlay(OverlayRoute.FilmDna)},
-                    onRequireAuth={pushOverlay(OverlayRoute.Auth)}
+                    onRequireAuth={pushOverlay(OverlayRoute.Auth)},
+                    onAccount={overlayBackStack.clear();overlay=null;tab=3}
                 )
                 OverlayRoute.SocialSaves -> SavedSocialScreen(
                     social=social,
@@ -1039,7 +1046,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onOpenCollection={pushOverlay(OverlayRoute.SocialCollections(it))},
                     onOpenWatchParty={pushOverlay(OverlayRoute.WatchParty(partyId=it))},
                     onOpenLive={pushOverlay(OverlayRoute.LiveHub(it))},
-                    onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)}
+                    onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)},
+                    onOpenDiscussion={media,scope->socialBadgeRefresh++;pushOverlay(OverlayRoute.Detail(media,scope))}
                 )
             }
             }
@@ -1064,11 +1072,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             },
                             onNotifications=openNotifications,
                             onReleases={overlay=OverlayRoute.Releases},
-                            onClips={overlay=OverlayRoute.Clips()},
-                            onClub={tab=2},
-                            onWatchParty={overlay=OverlayRoute.WatchParty(it)},
+                            onClips={overlay=if(activeViewer?.kidsMode==true)OverlayRoute.ParentalGate else OverlayRoute.Clips()},
+                            onClub={if(activeViewer?.kidsMode==true)overlay=OverlayRoute.ParentalGate else tab=2},
+                            onWatchParty={media->if(activeViewer?.kidsMode==true)overlay=OverlayRoute.ParentalGate else if(media==null)tab=4 else overlay=OverlayRoute.WatchParty(media)},
                             badgeRefreshKey=socialBadgeRefresh,
-                            onAccount={overlay=OverlayRoute.Account}
+                            onAccount={tab=3}
                         )
                         1 -> PremiumSearchScreen(repository,backend,{tab=0},{overlay=OverlayRoute.Detail(it)},
                             {overlay=OverlayRoute.CreatorPage(it)},{deepLinkPostId=it;tab=2},{overlay=OverlayRoute.Clips(it)},
@@ -1090,12 +1098,33 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onCollection={overlay=OverlayRoute.SocialCollections(it)},
                             onStories={stories,index -> overlay=OverlayRoute.SocialStories(stories,index)},
                             initialPostId=deepLinkPostId,
-                            onFocusedPostConsumed={deepLinkPostId=null}
+                            onFocusedPostConsumed={deepLinkPostId=null},
+                            onWatchParty={tab=4},
+                            onNotifications=openNotifications,
+                            onClips={overlay=OverlayRoute.Clips()}
                         )
-                        3 -> CinemaLibraryScreen(backend,repository,{tab=0},{overlay=OverlayRoute.Detail(it)},
-                            {overlay=OverlayRoute.Player(it)},onDownloads={overlay=OverlayRoute.Downloads},
-                            onHistory={overlay=OverlayRoute.History},onFilmDna={overlay=OverlayRoute.FilmDna},
-                            onRequireAuth={overlay=OverlayRoute.Auth},showBack=false,onAccount={overlay=OverlayRoute.Account})
+                        3 -> ConnectedProfileScreen(
+                            backend=backend,repository=repository,kidsMode=activeViewer?.kidsMode==true,
+                            onMedia={overlay=OverlayRoute.Detail(it)},onPlay={overlay=OverlayRoute.Player(it)},
+                            onCommunity={tab=2},onDownloads={pushOverlay(OverlayRoute.Downloads)},
+                            onLibrary={pushOverlay(OverlayRoute.Library)},onSocialSaves={pushOverlay(OverlayRoute.SocialSaves)},
+                            onHistory={pushOverlay(OverlayRoute.History)},onCreatorStudio={pushOverlay(OverlayRoute.CreatorStudio)},
+                            onInbox={pushOverlay(OverlayRoute.Inbox)},onSettings={pushOverlay(OverlayRoute.Settings)},
+                            onViewerProfiles={overlay=if(activeViewer?.kidsMode==true)OverlayRoute.ParentalGate else OverlayRoute.ViewerProfiles},
+                            onParentalControls={pushOverlay(OverlayRoute.ParentalControls)},onSecurity={pushOverlay(OverlayRoute.Security)},
+                            onSafety={pushOverlay(OverlayRoute.Safety)},onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)},
+                            onCloseFriends={pushOverlay(OverlayRoute.CloseFriends)},onEditProfile={pushOverlay(OverlayRoute.EditProfile)},
+                            onFilmDna={pushOverlay(OverlayRoute.FilmDna)},onReputation={overlay=OverlayRoute.Reputation(it)},
+                            onSeriesCalendar={pushOverlay(OverlayRoute.SeriesCalendar)},onSocialCollections={overlay=OverlayRoute.SocialCollections()},
+                            onLoggedOut={resetNavigation();backend.viewerProfiles.clear();activeViewer=null;authenticated=false;previewMode=false},
+                            loggedIn=backend.session.isLoggedIn,onRequireAuth={overlay=OverlayRoute.Auth},
+                            onClips={overlay=OverlayRoute.Clips()},onCreate={overlay=OverlayRoute.Create},
+                            onNotifications=openNotifications,onWatchParty={tab=4},
+                            onOpenPost={deepLinkPostId=it;tab=2},onOpenClip={overlay=OverlayRoute.Clips(it)}
+                        )
+                        4 -> PartyLobbyScreen(backend,
+                            onOpenParty={id,invite->pushOverlay(OverlayRoute.WatchParty(partyId=id,inviteCode=invite))},
+                            onChooseTitle={tab=1},onRequireAuth={overlay=OverlayRoute.Auth})
 
                     }
                 

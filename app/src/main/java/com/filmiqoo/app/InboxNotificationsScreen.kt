@@ -26,6 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.time.Instant
 import java.time.Duration
 
@@ -580,8 +584,10 @@ fun ConnectedNotificationsScreen(
     onOpenCollection: (String) -> Unit,
     onOpenWatchParty: (String) -> Unit,
     onOpenLive: (String) -> Unit,
-    onFollowRequests: () -> Unit
+    onFollowRequests: () -> Unit,
+    onOpenDiscussion:(MediaItem,String)->Unit={media,_->onOpenMedia(media)}
 ) {
+    val lifecycleOwner=LocalLifecycleOwner.current
     val repo=remember { MessagingRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
@@ -591,19 +597,29 @@ fun ConnectedNotificationsScreen(
     var items by remember { mutableStateOf<List<FilmiqooNotification>>(emptyList()) }
     var filterName by rememberSaveable { mutableStateOf(NotificationFilter.ALL.name) }
     var unreadOnlyNotifications by rememberSaveable { mutableStateOf(false) }
+    var unavailableTarget by remember { mutableStateOf(false) }
     val filter=runCatching { NotificationFilter.valueOf(filterName) }
         .getOrDefault(NotificationFilter.ALL)
 
     BackHandler { onBack() }
 
-    LaunchedEffect(refresh) {
-        loading=true
-        error=null
-        try { val result=repo.notifications();items=result.first;unread=result.second }
-        catch(cancelled:CancellationException){throw cancelled}
-        catch(failure:Exception){error=failure.message ?: "خطا در دریافت اعلان‌ها"}
-        finally{loading=false}
+    LaunchedEffect(refresh,lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            loading=items.isEmpty()
+            while(true) {
+                try { val result=repo.notifications();items=result.first;unread=result.second;error=null }
+                catch(cancelled:CancellationException){throw cancelled}
+                catch(failure:Exception){error=failure.message ?: "خطا در دریافت اعلان‌ها"}
+                finally{loading=false}
+                delay(20_000)
+            }
+        }
     }
+
+    if(unavailableTarget)AlertDialog(onDismissRequest={unavailableTarget=false},
+        title={Text("محتوا در دسترس نیست")},
+        text={Text("محتوای این اعلان حذف شده یا دسترسی به آن تغییر کرده است.")},
+        confirmButton={TextButton({unavailableTarget=false}){Text("متوجه شدم")}})
 
     Column(Modifier.fillMaxSize().background(CinemaInk).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).navigationBarsPadding().imePadding()) {
         CinemaPageHeader("اعلان‌ها",if(loading)"در حال دریافت…" else if(error!=null)"دریافت اعلان‌ها کامل نشد" else if(unread>0)"$unread اعلان خوانده‌نشده" else "اعلان‌های حساب و انتشار قسمت‌ها",onBack) {
@@ -724,6 +740,8 @@ fun ConnectedNotificationsScreen(
 
                             when {
                                 item.type=="follow_request" -> onFollowRequests()
+                                item.entityType=="title_comment" && item.media!=null && !item.discussionScope.isNullOrBlank() ->
+                                    onOpenDiscussion(item.media,item.discussionScope)
                                 item.entityType=="collection" && !item.entityId.isNullOrBlank() ->
                                     onOpenCollection(item.entityId)
                                 item.entityType=="watch_party" && !item.entityId.isNullOrBlank() ->
@@ -752,7 +770,7 @@ fun ConnectedNotificationsScreen(
                                             avatarUrl=item.actor.avatarUrl
                                         )
                                     )
-                                else -> refresh++
+                                else -> unavailableTarget=true
                             }
 
                             if(wasUnread) {
@@ -846,6 +864,7 @@ private fun notificationMatchesFilter(
         type.startsWith("post_") ||
         type.startsWith("reel_") ||
         type.startsWith("review_") ||
+        type.startsWith("discussion_") ||
         type.startsWith("live_") ||
         type=="comment_like" ||
         type=="collection_update"
@@ -863,6 +882,9 @@ private fun notificationMatchesFilter(
 }
 
 private fun notificationIcon(type:String)=when(type) {
+    "post_published","reel_published" -> Icons.Default.NewReleases
+    "discussion_reply" -> Icons.Default.Reply
+    "discussion_like" -> Icons.Default.Favorite
     "follow" -> Icons.Default.PersonAdd
     "follow_request" -> Icons.Default.PersonAddAlt1
     "follow_accepted" -> Icons.Default.HowToReg
@@ -892,6 +914,10 @@ private fun notificationIcon(type:String)=when(type) {
 }
 
 private fun notificationTypeLabel(type:String)=when(type) {
+    "post_published" -> "پست تازه"
+    "reel_published" -> "کلیپ تازه"
+    "discussion_reply" -> "پاسخ به دیدگاه"
+    "discussion_like" -> "پسندیدن دیدگاه"
     "follow" -> "دنبال‌کردن"
     "follow_request" -> "درخواست دنبال‌کردن"
     "follow_accepted" -> "درخواست پذیرفته شد"

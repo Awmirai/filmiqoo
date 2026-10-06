@@ -21,7 +21,7 @@ import okio.Buffer
 import org.junit.*
 import java.io.ByteArrayOutputStream
 
-/** Runs unchanged against the original and redesigned source. Test data never ships in the APK. */
+/** Deterministic visual fixtures; the baseline maps the new lobby to its previous party screen. */
 class ProductAuditTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val server = MockWebServer()
@@ -78,13 +78,15 @@ class ProductAuditTest {
                 "inbox" -> InboxScreen(backend,{},{})
                 "notifications" -> ConnectedNotificationsScreen(backend,{},{_,_->},{},{},{},{},{},{},{},{})
                 "auth" -> AuthScreen(backend,{},{})
-                "comments" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { TitleDiscussion(movie,backend,{}) }
-                else -> AuditShell(when(page){"search"->1;"club"->2;"library"->3;else->0}) {
+                "comments" -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) { TitleDiscussion(movie,backend,{}) }
+                else -> AuditShell(when(page){"search"->1;"club"->2;"library","profile"->3;"party"->4;else->0}) {
                     Box(Modifier.fillMaxSize()) { when(page) {
                         "home" -> CinemaHomeScreen(repository,backend,false,{},{},{_,_->},{},{},{},{},{},{})
                         "search" -> PremiumSearchScreen(repository,backend,{},{},{},{},{})
                         "library" -> CinemaLibraryScreen(backend,repository,{},{},{},showBack=false)
                         "club" -> CinemaSocialScreen(SocialRepository(backend),backend,false,{},{},{},{},{},{},{},{},{},{_,_->})
+                        "profile" -> AuditProfile(backend,repository)
+                        "party" -> PartyLobbyScreen(backend,{_,_->},{},{})
                     } }
                 }
             }
@@ -92,7 +94,7 @@ class ProductAuditTest {
         val args=InstrumentationRegistry.getArguments()
         val label=args.getString("auditLabel")?:"default"
         val metrics=org.json.JSONArray()
-        for(name in listOf("home","search","movie","series","club","comments","library","auth","episodes","settings","inbox","notifications")) {
+        for(name in listOf("home","search","movie","series","club","comments","library","profile","party","auth","episodes","settings","inbox","notifications")) {
             compose.runOnIdle { page=name }
             // Wait for bounded HTTP/image work and a complete frame; this is screenshot stabilization, not a benchmark.
             compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
@@ -136,4 +138,12 @@ class ProductAuditTest {
 @Composable
 private fun AuditShell(selected:Int,content:@Composable ()->Unit) {
     CinemaAppShell(selected,false,{},content)
+}
+
+@Composable
+private fun AuditProfile(backend:BackendRepository,repository:TmdbRepository) {
+    ConnectedProfileScreen(backend,repository,
+        onMedia={},onPlay={},onCommunity={},onDownloads={},onLibrary={},onSocialSaves={},onHistory={},
+        onCreatorStudio={},onInbox={},onSettings={},onViewerProfiles={},onParentalControls={},onSecurity={},onSafety={},
+        onFollowRequests={},onCloseFriends={},onEditProfile={},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={},loggedIn=false)
 }

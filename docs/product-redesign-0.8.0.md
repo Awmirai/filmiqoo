@@ -1,0 +1,32 @@
+# FILMIQOO 0.8.0 — discovery, community and shared viewing
+
+This iteration builds on 0.7.1. It is a preview delivery, with no production deployment or database migration authorized. It does not claim to be the first Iranian watch-party service or to provide zero-latency synchronization.
+
+## Product changes
+
+- Five independent destinations: Home, Search, Network, Watch Together and Profile. The old library destination ID remains assigned to Profile so saved navigation state is stable. Lists, downloads, history and settings remain reachable from Profile. Children have only Home and their account/library routes.
+- Home uses a larger cinematic artwork card, real metadata scores, category browsing, region shortcuts, continued viewing, recent available files and a prominent shared-viewing entry. No invented presence counts or playable titles.
+- Search uses artwork actually returned by the catalog/TMDB service. Static poster requests are bounded to twelve distinct 240×360 decodes; dark scrims preserve text contrast. Search retains Persian/English normalization, debounce, cancellation and restored state. Rating/year sorting applies to returned results; ready-to-play filtering requires real backend/version IDs and availability.
+- Network combines real posts, followed accounts/channels, title discussions and explicitly opened clips. Reactions, saves, follows, threaded replies, spoiler concealment, owner deletion, retry/error states and preserved drafts connect to existing repositories. Following requires an explicit server scope acknowledgement, so an old server cannot mislabel a global feed as followed posts.
+- Profile combines account identity with actual viewing history, lists, personal posts/clips, downloads, creation, notifications, privacy and security. Account and activity requests fail independently so an unavailable statistics endpoint does not hide useful routes.
+- Shared viewing has a dedicated lobby, real room discovery, live/scheduled filters, validated invitations, privacy-first creation and accessible room controls/chat. Title-page entry requires a real playable file. Rooms preserve invitations and chat on an old backend, but coordinated playback explicitly requires the upgraded server.
+
+## Engineering and privacy
+
+- Migration 054 emits publication notifications for actual accepted followers/channel followers, and discussion reply/like notifications. It respects social notification preferences, inactive recipients, both-direction blocks, author mutes and private channel membership. Generic notification text does not reveal spoiler bodies. Publication/like events are deduplicated; each genuine new reply gets its own event. Existing push-outbox retry infrastructure is reused.
+- Migration 055 adds authoritative playback timestamps, revisions and controller identity. Late joiners project the current position, compare-and-swap prevents competing host/cohost commands, polling avoids repeated rewind, and websocket reconnects begin with a server snapshot. Readiness and authorization are enforced server-side.
+- Private/invite/watch-party chat now requires membership for reads and watch-party writes. Optional authentication validates supplied credentials while retaining anonymous public discovery.
+- Public/private post comment reads, replies, parent IDs and comment reactions are checked against actual post/reel visibility. Authenticated comment reads use a protected viewer route; an unavailable old server does not trigger an insecure public fallback.
+- In-app notifications refresh while the screen is foregrounded. Actual phone push delivery still requires configured Firebase client/server credentials and a deployed server; no claim of live delivery is made from emulator tests alone.
+
+## Validation and evidence
+
+The checked-in tests cover normalized/cancelled search, real availability/sorting, saved state, old-server responses, reaction/reply failure retries, ownership, spoilers, partial account failures, navigation at 200% text, child-route isolation and title-page shared-viewing availability. Watch-party tests cover invitations, room-list retry and old-server playback blocking. PostgreSQL/Redis tests cover two persisted users, websocket reconnect snapshots, playback revisions, readiness, unauthorized room chat, private comments, notification audiences and push-outbox records.
+
+CI runs JVM tests, Android lint, debug APK and R8 release compilation, Android 35 instrumentation, all backend tests with the race detector, migrations and Go vet. The visual audit captures fourteen pages across twelve screen/font/navigation/IME profiles (168 images per revision). Its baseline is 0.7.1; the new lobby is compared with that version's previous party screen. All screenshot artwork/accounts are labelled deterministic test fixtures and never ship as catalog content. Capture stabilization timings and small emulator frame samples are not performance benchmarks.
+
+The Profile audit baseline is the prior Library destination. Discussion notifications preserve the title/episode scope and open the discussion tab directly. The final delivery report records the exact source commit, test results, APK version/hash/signature and inspected screenshots. Physical-device playback, TalkBack, live FCM delivery and production migration verification require their corresponding real device/server environment and must not be inferred from build success.
+
+## Activation boundary
+
+APK-only delivery preserves ordinary browsing against the current server. The new followed-feed contract, protected social comment reads, notifications and authoritative shared playback require the accompanying backend. Apply migrations 054/055 only as part of a separately authorized server upgrade; keep the existing production branch and running services unchanged during files-only delivery. Existing region-access policy and preview bypass behavior are unchanged.

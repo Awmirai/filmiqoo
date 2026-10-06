@@ -39,7 +39,7 @@ internal data class CinemaDetailActions(
     val back: () -> Unit = {}, val share: () -> Unit = {}, val save: () -> Unit = {},
     val favorite: () -> Unit = {}, val notes: () -> Unit = {}, val seen: () -> Unit = {},
     val collection: () -> Unit = {}, val availability: () -> Unit = {}, val follow: () -> Unit = {},
-    val trailer: () -> Unit = {}, val spoiler: (Boolean) -> Unit = {},
+    val trailer: () -> Unit = {}, val spoiler: (Boolean) -> Unit = {}, val watchParty: () -> Unit = {},
     val play: (String) -> Unit = {}, val download: (String) -> Unit = {},
     val episodeSeen: (PlatformEpisode, Boolean) -> Unit = { _, _ -> },
     val person: (CastMember) -> Unit = {}, val media: (MediaItem) -> Unit = {}
@@ -60,7 +60,9 @@ internal fun CinemaDetailContent(
     progress: SeriesWatchProgress? = null,
     resumeVersions: Set<String> = emptySet(),
     actions: CinemaDetailActions = CinemaDetailActions(),
-    community: @Composable () -> Unit = {}
+    community: @Composable () -> Unit = {},
+    allowTogether: Boolean = true,
+    startAtDiscussion: Boolean = false
 ) {
     val window=androidx.compose.ui.platform.LocalConfiguration.current
     val episodeColumns=if(window.screenWidthDp>=700 && window.fontScale<1.6f)2 else 1
@@ -70,7 +72,7 @@ internal fun CinemaDetailContent(
     val listState = rememberLazyListState()
     val uiScope = rememberCoroutineScope()
     val showToolbarTitle by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
-    var tab by rememberSaveable(media.key) { mutableStateOf(if (isSeries) "episodes" else "about") }
+    var tab by rememberSaveable(media.key,startAtDiscussion) { mutableStateOf(if(startAtDiscussion)"club"else if (isSeries) "episodes" else "about") }
     var selectedSeason by rememberSaveable(media.key) { mutableIntStateOf(data.platform?.seasons?.firstOrNull { it.number > 0 }?.number ?: 1) }
     var episodeFilter by rememberSaveable(media.key) { mutableIntStateOf(0) }
     var episodeSearch by rememberSaveable(media.key) { mutableStateOf("") }
@@ -89,6 +91,9 @@ internal fun CinemaDetailContent(
             when (episodeFilter) { 1 -> ep.streamReady && !ep.mediaVersionId.isNullOrBlank(); 2 -> progress?.episodes?.get(ep.id)?.completed != true; else -> true }
     }
     val tabs = buildList { add("about" to "درباره"); if (isSeries) add("episodes" to "قسمت‌ها"); add("cast" to "بازیگران"); add("club" to "دیدگاه‌ها") }
+    LaunchedEffect(media.key,startAtDiscussion) {
+        if(startAtDiscussion)listState.scrollToItem(4+(if(data.metadataAvailable)0 else 1)+(if(allowTogether)1 else 0))
+    }
     BackHandler { if (versionsOpen) versionsOpen = false else actions.back() }
 
     Scaffold(
@@ -112,7 +117,7 @@ internal fun CinemaDetailContent(
                             when { busy -> "در حال آماده‌سازی…"; primaryId == null -> "هنوز قابل پخش نیست"; isSeries && progress?.episodes?.values?.any { it.positionMs > 0 || it.completed } == true -> "ادامهٔ سریال"; isSeries -> "پخش قسمت "+(resumable?.second?.number?.toString() ?: ""); primaryId in resumeVersions -> "ادامهٔ فیلم"; else -> "پخش فیلم" },
                             { primaryId?.let(actions.play) }, Modifier.weight(1f).testTag("detail-primary"), primary = true, enabled = !busy && primaryId != null)
                         if (isSeries) {
-                            OutlinedIconButton({ tab = "episodes"; uiScope.launch { listState.animateScrollToItem(if(data.metadataAvailable)4 else 5) } }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
+                            OutlinedIconButton({ tab = "episodes"; uiScope.launch { listState.animateScrollToItem(4+(if(data.metadataAvailable)0 else 1)+(if(allowTogether)1 else 0)) } }, modifier = Modifier.size(52.dp).testTag("detail-episodes-shortcut"), shape = RoundedCornerShape(16.dp)) {
                                 Icon(Icons.Default.FormatListNumbered, "انتخاب قسمت", tint = CinemaPaper)
                             }
                         } else {
@@ -139,6 +144,9 @@ internal fun CinemaDetailContent(
             if (!data.metadataAvailable) item("metadata-warning") {
                 Text("اطلاعات تکمیلی فعلاً دریافت نشد؛ فایل‌های موجود همچنان در دسترس‌اند.", color = CinemaSoft, fontSize = 12.sp,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            }
+            if(allowTogether) item("together") {
+                CinemaTogetherCard(actions.watchParty,Modifier.padding(horizontal=20.dp),title=media.title,enabled=primaryId!=null && !busy)
             }
             if(isSeries && primaryId!=null) item("available-episodes") {
                 Text("${data.playableEpisodes.size} قسمت آمادهٔ پخش",color=CinemaSoft,modifier=Modifier.padding(horizontal=20.dp,vertical=8.dp))
