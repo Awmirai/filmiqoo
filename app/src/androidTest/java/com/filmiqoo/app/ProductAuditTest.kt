@@ -26,12 +26,47 @@ class ProductAuditTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val server = MockWebServer()
     private var original: Triple<String,String?,String?>? = null
+    private var auditLabel = "uninitialized"
+    private var auditViewport = "unavailable"
+
+    // These markers only read cached viewport text: requesting compose.activity while the
+    // main thread is stalled would itself synchronize and obscure the blocked phase.
+    private fun auditPhase(page: String, phase: String, detail: String = "") {
+        android.util.Log.i("FilmiqooProductAudit",
+            "label=$auditLabel page=$page phase=$phase uptimeMs=${android.os.SystemClock.uptimeMillis()} " +
+                "thread=${Thread.currentThread().name} $auditViewport $detail")
+    }
+    private inline fun <T> auditStep(page: String, phase: String, action: () -> T): T {
+        auditPhase(page, "$phase:begin")
+        return try {
+            action().also { auditPhase(page, "$phase:end") }
+        } catch (failure: Throwable) {
+            android.util.Log.e("FilmiqooProductAudit", "label=$auditLabel page=$page phase=$phase:failed", failure)
+            throw failure
+        }
+    }
+    private fun describeViewport(activity: ComponentActivity): String {
+        val config = activity.resources.configuration
+        val display = activity.resources.displayMetrics
+        val decor = activity.window.decorView
+        return "dp=${config.screenWidthDp}x${config.screenHeightDp} font=${config.fontScale} " +
+            "orientation=${config.orientation} displayPx=${display.widthPixels}x${display.heightPixels} " +
+            "density=${display.density} densityDpi=${display.densityDpi} decorPx=${decor.width}x${decor.height}"
+    }
     @After fun cleanup() {
-        compose.runOnUiThread { compose.activity.setContentView(android.widget.FrameLayout(compose.activity)) }
+        auditStep("cleanup", "remove-content") {
+            compose.runOnUiThread { compose.activity.setContentView(android.widget.FrameLayout(compose.activity)) }
+        }
         original?.let { SessionStore(compose.activity).apply { baseUrl=it.first; accessToken=it.second; refreshToken=it.third } }
-        server.shutdown()
+        auditStep("cleanup", "server-shutdown") { server.shutdown() }
     }
     @Test fun captureProductPages() {
+        val args=InstrumentationRegistry.getArguments()
+        val label=args.getString("auditLabel")?:"default"
+        auditLabel=label.take(120)
+        val activity=compose.activity
+        auditViewport=describeViewport(activity)
+        auditPhase("setup", "initial-configuration")
         server.start()
         val art = Bitmap.createBitmap(720,1080,Bitmap.Config.ARGB_8888)
         Canvas(art).apply {
@@ -71,6 +106,7 @@ class ProductAuditTest {
             return CinemaTitleData(MediaDetail(m,"",listOf("درام"),123,"Released",emptyList(),null,emptyList(),emptyList()),p)
         }
         var page by mutableStateOf("home")
+        auditPhase("setup", "set-content:begin")
         compose.setContent { FilmiqooTheme {
             when(page) {
                 "movie" -> CinemaDetailContent(data(movie))
@@ -92,61 +128,97 @@ class ProductAuditTest {
                 }
             }
         } }
-        val args=InstrumentationRegistry.getArguments()
-        val label=args.getString("auditLabel")?:"default"
+        auditPhase("setup", "set-content:end")
+        auditStep("setup", "measure-viewport") { auditViewport=describeViewport(activity) }
         val metrics=org.json.JSONArray()
         for(name in listOf("home","search","movie","series","club","comments","library","profile","party","auth","episodes","settings","inbox","notifications")) {
-            compose.runOnIdle { page=name }
+            auditStep(name, "page-change") {
+                compose.runOnIdle { page=name; auditPhase(name, "page-assigned") }
+            }
             // Wait for bounded HTTP/image work and a complete frame; this is screenshot stabilization, not a benchmark.
-            compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
+            auditStep(name, "initial-idle") { compose.waitForIdle() }
+            auditStep(name, "initial-stabilization") { Thread.sleep(900) }
+            auditStep(name, "stabilized-idle") { compose.waitForIdle() }
             if(name=="search" && args.getString("auditStage")=="after") {
                 // Await the real fixture response rather than capture a transient empty catalog.
-                compose.waitUntil(10_000) {
-                    // The thumbnail can be below a short window's lazy-grid viewport.
-                    compose.onAllNodesWithTag("search-poster-atmosphere",useUnmergedTree=true)
-                        .fetchSemanticsNodes().isNotEmpty()
+                var tagQueries=0
+                auditStep(name, "poster-tag-wait") {
+                    compose.waitUntil(10_000) {
+                        // Log at most three queries; each query implicitly waits for layout/draw.
+                        // The thumbnail can be below a short window's lazy-grid viewport.
+                        tagQueries++
+                        fun ready() = compose.onAllNodesWithTag("search-poster-atmosphere",useUnmergedTree=true)
+                            .fetchSemanticsNodes().isNotEmpty()
+                        if(tagQueries<=3) auditStep(name, "poster-tag-query-$tagQueries") { ready() } else ready()
+                    }
                 }
                 // Semantics can become ready before the asynchronously loaded artwork
                 // has been drawn by the native renderer used by takeScreenshot().
-                compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
+                auditStep(name, "artwork-idle") { compose.waitForIdle() }
+                auditStep(name, "artwork-stabilization") { Thread.sleep(900) }
+                auditStep(name, "artwork-stabilized-idle") { compose.waitForIdle() }
             }
             if(name=="episodes") {
-                compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e1"))
-                compose.waitForIdle()
+                auditStep(name, "episode-scroll") { compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e1")) }
+                auditStep(name, "episode-scroll-idle") { compose.waitForIdle() }
             }
             if(label.contains("keyboard") && name in listOf("search","auth")) {
-                compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
-                compose.waitForIdle(); Thread.sleep(300)
+                auditStep(name, "keyboard-open") { compose.onAllNodes(hasSetTextAction()).onFirst().performClick() }
+                auditStep(name, "keyboard-open-idle") { compose.waitForIdle() }
+                auditStep(name, "keyboard-stabilization") { Thread.sleep(300) }
             }
-            val screenshot=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-            PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-$name.png").use { Assert.assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG,100,it)) }
-            val config=compose.activity.resources.configuration
-            val memory=android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
-            metrics.put(org.json.JSONObject().put("page",name).put("widthDp",config.screenWidthDp).put("heightDp",config.screenHeightDp)
-                .put("fontScale",config.fontScale).put("screenshotWidthPx",screenshot.width).put("screenshotHeightPx",screenshot.height).put("totalPssKb",memory.totalPss))
+            val screenshot=auditStep(name, "take-screenshot") {
+                requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            }
+            auditPhase(name, "screenshot-dimensions", "bitmapPx=${screenshot.width}x${screenshot.height}")
+            auditStep(name, "compress-screenshot") {
+                PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-$name.png").use { Assert.assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG,100,it)) }
+            }
+            val pageMetrics=auditStep(name, "collect-metrics") {
+                val config=compose.activity.resources.configuration
+                val memory=android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
+                org.json.JSONObject().put("page",name).put("widthDp",config.screenWidthDp).put("heightDp",config.screenHeightDp)
+                    .put("fontScale",config.fontScale).put("screenshotWidthPx",screenshot.width).put("screenshotHeightPx",screenshot.height).put("totalPssKb",memory.totalPss)
+            }
+            metrics.put(pageMetrics)
+            auditPhase(name, "capture-metrics", pageMetrics.toString())
+            // Retain completed-page evidence even if a later page never returns.
+            auditStep(name, "write-page-metrics") {
+                PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-$name-observation.json").use { it.write(pageMetrics.toString(2).toByteArray()) }
+            }
             if(name=="home" && label=="393x852-font1.0-gesture") {
                 val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
                 val packageName=compose.activity.packageName
                 fun shell(command:String):ByteArray = android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
                 shell("dumpsys gfxinfo $packageName reset")
-                repeat(3){compose.onNodeWithTag("cinema-home").performTouchInput{swipeUp()};compose.waitForIdle()}
-                repeat(3){compose.onNodeWithTag("cinema-home").performTouchInput{swipeDown()};compose.waitForIdle()}
+                repeat(3){index->
+                    auditStep(name,"scroll-up-$index"){compose.onNodeWithTag("cinema-home").performTouchInput{swipeUp()}}
+                    auditStep(name,"scroll-up-idle-$index"){compose.waitForIdle()}
+                }
+                repeat(3){index->
+                    auditStep(name,"scroll-down-$index"){compose.onNodeWithTag("cinema-home").performTouchInput{swipeDown()}}
+                    auditStep(name,"scroll-down-idle-$index"){compose.waitForIdle()}
+                }
                 PlatformTestStorageRegistry.getInstance().openOutputFile("home-scroll-frames.txt").use{it.write(shell("dumpsys gfxinfo $packageName framestats"))}
             }
             if(label.contains("keyboard") && name in listOf("search","auth")) {
                 // Hide only the IME; Back on a page without a keyboard would finish the test Activity.
-                compose.runOnUiThread {
-                    val activity=compose.activity
-                    androidx.core.view.WindowCompat.getInsetsController(activity.window,activity.window.decorView)
-                        .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+                auditStep(name, "keyboard-hide") {
+                    compose.runOnUiThread {
+                        val activity=compose.activity
+                        androidx.core.view.WindowCompat.getInsetsController(activity.window,activity.window.decorView)
+                            .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+                    }
                 }
-                compose.waitForIdle()
+                auditStep(name, "keyboard-hidden-idle") { compose.waitForIdle() }
             }
             // A tablet screenshot owns several MiB of native memory; release each capture
             // before advancing through the fourteen-page matrix.
-            screenshot.recycle()
+            auditStep(name, "recycle-screenshot") { screenshot.recycle() }
         }
-        PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-metrics.json").use { it.write(metrics.toString(2).toByteArray()) }
+        auditStep("complete", "write-metrics") {
+            PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-metrics.json").use { it.write(metrics.toString(2).toByteArray()) }
+        }
     }
 }
 

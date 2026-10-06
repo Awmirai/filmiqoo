@@ -49,10 +49,41 @@ for spec in $audit_specs; do
     adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
   fi
   free -m > "audit-evidence/host-memory-$label-before.txt"
+  # Preserve timing and process state while the device is still connected. A lost
+  # emulator cannot report its display configuration during failure cleanup.
+  { adb shell wm size; adb shell wm density; } > "audit-evidence/display-$label-before.txt"
+  (
+    for audit_sample in $(seq 1 600); do
+      date -u '+%Y-%m-%dT%H:%M:%SZ'
+      ps -eo pid,comm,state,rss | awk 'NR == 1 || $2 ~ /qemu|emulator|java/'
+      timeout 2s adb get-state 2>&1 || true
+      sleep 2
+    done
+  ) > "audit-evidence/host-timeline-$label.txt" &
+  audit_monitor_pid=$!
+  audit_trace_pid=''
+  if [[ "$audit_batch" == landscape ]] && command -v strace >/dev/null 2>&1; then
+    audit_emulator_pid=$(ps -eo pid,comm | awk '$2 ~ /^qemu-system/ {print $1; exit}')
+    if [[ -n "$audit_emulator_pid" ]]; then
+      # Observe terminal native signals/exit only; do not capture calls, arguments,
+      # memory contents or environment. Diagnostic failure must not fail the test.
+      sudo -n timeout 1800s strace -f -p "$audit_emulator_pid" -e trace=exit,exit_group \
+        -e signal=SIGSEGV,SIGABRT,SIGBUS,SIGTERM,SIGKILL \
+        -o "audit-evidence/emulator-exit-$label.txt" \
+        2> "audit-evidence/emulator-trace-$label-status.txt" &
+      audit_trace_pid=$!
+    fi
+  fi
   if ! gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.filmiqoo.app.ProductAuditTest -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" -Pandroid.testInstrumentationRunnerArguments.auditStage="${FILMIQOO_AUDIT_STAGE:-after}" --stacktrace; then
+    kill "$audit_monitor_pid" 2>/dev/null || true
+    wait "$audit_monitor_pid" 2>/dev/null || true
+    if [[ -n "$audit_trace_pid" ]]; then kill "$audit_trace_pid" 2>/dev/null || true; wait "$audit_trace_pid" 2>/dev/null || true; fi
     capture_audit_failure "$label"
     exit 1
   fi
+  kill "$audit_monitor_pid" 2>/dev/null || true
+  wait "$audit_monitor_pid" 2>/dev/null || true
+  if [[ -n "$audit_trace_pid" ]]; then kill "$audit_trace_pid" 2>/dev/null || true; wait "$audit_trace_pid" 2>/dev/null || true; fi
   cp -r app/build/outputs/connected_android_test_additional_output "audit-evidence/$label"
   adb shell settings get secure navigation_mode > "audit-evidence/$label/navigation-mode.txt"
 done
