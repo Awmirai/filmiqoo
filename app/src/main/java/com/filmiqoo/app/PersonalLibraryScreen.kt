@@ -58,7 +58,7 @@ fun CinemaLibraryScreen(backend:BackendRepository,repository:TmdbRepository,onBa
             label={Text("جست‌وجو در کتابخانه")},leadingIcon={Icon(Icons.Outlined.Search,null)},shape=MaterialTheme.shapes.large)}
             item(span={GridItemSpan(maxLineSpan)}){Text(if(selected==1)"آثاری که خودت «دیده‌ام» علامت زده‌ای؛ سابقهٔ پخش مسیر جدا دارد." else "فهرست حساب و ذخیره‌های این دستگاه، کنار هم. عنوان بدون فایل هم قابل ذخیره است.",color=CinemaSoft,style=MaterialTheme.typography.bodySmall)}
             if(error)item(span={GridItemSpan(maxLineSpan)}){CinemaNotice("فهرست حساب به‌روز نشد","ذخیره‌های دستگاه باقی مانده‌اند؛ برای دریافت فهرست حساب دوباره تلاش کن.",Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}
-            if(entries.isEmpty()&&!loading)item(span={GridItemSpan(maxLineSpan)}){CinemaNotice(if(query.isBlank())"این فهرست هنوز خالی است"else "نتیجه‌ای پیدا نشد",if(query.isBlank())"در صفحهٔ اثر، فهرست تماشا یا دیده‌ام را انتخاب کن؛ اینجا پیدایش می‌کنی."else "نام کوتاه‌تر یا نام انگلیسی را امتحان کن.",Icons.Outlined.Bookmarks)}
+            if(entries.isEmpty()&&!loading&&(!error||selected==1))item(span={GridItemSpan(maxLineSpan)}){CinemaNotice(if(query.isBlank())"این فهرست هنوز خالی است"else "نتیجه‌ای پیدا نشد",if(query.isBlank())"در صفحهٔ اثر، فهرست تماشا یا دیده‌ام را انتخاب کن؛ اینجا پیدایش می‌کنی."else "نام کوتاه‌تر یا نام انگلیسی را امتحان کن.",Icons.Outlined.Bookmarks)}
             items(entries,key=::cinemaMediaKey){media->CinemaPoster(media,{onMedia(media)},Modifier.fillMaxWidth())}
             item(span={GridItemSpan(maxLineSpan)}){TextButton({legacy=true}){Text("مجموعه‌ها و نشانک‌های حساب")}}
         }

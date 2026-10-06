@@ -692,7 +692,7 @@ fun ConnectedNotificationsScreen(
             Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
-        if(!loading && visibleItems.isEmpty()) {
+        if(!loading && error==null && visibleItems.isEmpty()) {
             PremiumEmptyState(
                 if(unreadOnlyNotifications)Icons.Default.MarkEmailRead
                 else Icons.Default.NotificationsNone,

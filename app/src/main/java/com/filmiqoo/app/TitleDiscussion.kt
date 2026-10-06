@@ -229,7 +229,7 @@ private fun DiscussionThread(key: String, parent: String?, backend: BackendRepos
         notice?.let { Text(it, color = CinemaGold, fontSize = 13.sp) }
         error?.let { CinemaNotice("ارتباط کامل نشد", it, Icons.Default.CloudOff, "بررسی دوباره", { refresh++ }) }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = CinemaAccent)
-        if (page?.items?.isEmpty() == true && !loading) Text(if (parent == null) "اولین دیدگاه این عنوان را تو بنویس." else "هنوز پاسخی ثبت نشده است.", color = CinemaSoft, modifier = Modifier.padding(vertical = 12.dp))
+        if (page?.items?.isEmpty() == true && !loading && error == null) Text(if (parent == null) "اولین دیدگاه این عنوان را تو بنویس." else "هنوز پاسخی ثبت نشده است.", color = CinemaSoft, modifier = Modifier.padding(vertical = 12.dp))
         page?.items?.forEach { comment ->
             androidx.compose.runtime.key(comment.id) {
                 var revealed by rememberSaveable(comment.id) { mutableStateOf(false) }
