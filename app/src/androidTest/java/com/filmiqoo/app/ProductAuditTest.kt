@@ -67,6 +67,15 @@ class ProductAuditTest {
         val activity=compose.activity
         auditViewport=describeViewport(activity)
         auditPhase("setup", "initial-configuration")
+        fun readImeState(): Pair<Boolean, Int> {
+            var result = false to 0
+            compose.runOnUiThread {
+                val insets=androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
+                val type=androidx.core.view.WindowInsetsCompat.Type.ime()
+                result=(insets?.isVisible(type)==true) to (insets?.getInsets(type)?.bottom?:0)
+            }
+            return result
+        }
         server.start()
         val art = Bitmap.createBitmap(720,1080,Bitmap.Config.ARGB_8888)
         Canvas(art).apply {
@@ -163,10 +172,23 @@ class ProductAuditTest {
                 auditStep(name, "episode-scroll-idle") { compose.waitForIdle() }
             }
             if(label.contains("keyboard") && name in listOf("search","auth")) {
+                auditStep(name, "keyboard-system-dialog-guard") { ensureNoSystemErrorDialog() }
                 auditStep(name, "keyboard-open") { compose.onAllNodes(hasSetTextAction()).onFirst().performClick() }
                 auditStep(name, "keyboard-open-idle") { compose.waitForIdle() }
                 auditStep(name, "keyboard-stabilization") { Thread.sleep(300) }
+                // Focus can finish before the OS shows its keyboard. Capture only the actual
+                // visible IME state, including its applied bottom inset, rather than a timed guess.
+                auditStep(name, "ime-visible-wait") {
+                    compose.waitUntil(5_000) {
+                        val ime=readImeState()
+                        ime.first && ime.second>0
+                    }
+                }
+                auditStep(name, "ime-visible-idle") { compose.waitForIdle() }
             }
+            auditStep(name, "capture-system-dialog-guard") { ensureNoSystemErrorDialog() }
+            val imeAtCapture=auditStep(name, "read-capture-ime") { readImeState() }
+            auditPhase(name, "capture-ime", "imeVisible=${imeAtCapture.first} imeBottomPx=${imeAtCapture.second}")
             val screenshot=auditStep(name, "take-screenshot") {
                 requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
             }
@@ -179,6 +201,7 @@ class ProductAuditTest {
                 val memory=android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
                 org.json.JSONObject().put("page",name).put("widthDp",config.screenWidthDp).put("heightDp",config.screenHeightDp)
                     .put("fontScale",config.fontScale).put("screenshotWidthPx",screenshot.width).put("screenshotHeightPx",screenshot.height).put("totalPssKb",memory.totalPss)
+                    .put("imeVisible",imeAtCapture.first).put("imeBottomPx",imeAtCapture.second)
             }
             metrics.put(pageMetrics)
             auditPhase(name, "capture-metrics", pageMetrics.toString())

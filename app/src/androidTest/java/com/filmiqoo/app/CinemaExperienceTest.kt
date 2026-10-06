@@ -32,6 +32,7 @@ class CinemaExperienceTest {
     @After fun screenshot() {
         compose.waitForIdle()
         InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(250, 3000)
+        ensureNoSystemErrorDialog()
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("cinema-" + testName.methodName + ".png").use { output ->
             assertTrue("Screenshot must be written to test storage", bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))

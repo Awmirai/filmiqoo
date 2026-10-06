@@ -31,6 +31,7 @@ class PreviewLaunchTest {
         compose.onNodeWithText("خوش برگشتی").assertIsDisplayed()
         compose.waitForIdle()
         InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(250, 3000)
+        ensureNoSystemErrorDialog()
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("preview-real-launch-login.png").use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))

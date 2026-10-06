@@ -35,6 +35,7 @@ class PlayerLaunchTest {
         }
         compose.onNodeWithText("تلاش دوباره").assertIsDisplayed()
         InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(250, 3000)
+        ensureNoSystemErrorDialog()
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("player-error-recovery.png").use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))

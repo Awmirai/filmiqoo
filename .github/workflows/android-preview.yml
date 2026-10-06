@@ -93,10 +93,12 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: |
-            adb shell settings put secure immersive_mode_confirmations confirmed
+            bash scripts/prepare-test-device.sh
             bash scripts/generate-player-test-fixture.sh
             gradle :app:connectedDebugAndroidTest --stacktrace
       - name: Upload device test results and screenshots

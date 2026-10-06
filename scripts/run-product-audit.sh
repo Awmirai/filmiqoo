@@ -46,6 +46,11 @@ for spec in $audit_specs; do
   adb shell wm density 160
   adb shell wm size "$size"
   adb shell settings put system font_scale "$scale"
+  if [[ "$mode" == keyboard ]]; then
+    adb shell settings put secure show_ime_with_hard_keyboard 1
+  else
+    adb shell settings put secure show_ime_with_hard_keyboard 0
+  fi
   if [[ "$mode" == threebutton ]]; then
     adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
   else

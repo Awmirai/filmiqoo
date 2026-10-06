@@ -27,8 +27,10 @@ jobs:
         if: matrix.stage == 'before'
         run: |
           cp app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt /tmp/ProductAuditTest.kt
+          cp app/src/androidTest/java/com/filmiqoo/app/NativeEvidenceGuard.kt /tmp/NativeEvidenceGuard.kt
           git restore --source=cdaa9feb816547feee90c874af6b821e445bdf33 --staged --worktree -- app
           cp /tmp/ProductAuditTest.kt app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt
+          cp /tmp/NativeEvidenceGuard.kt app/src/androidTest/java/com/filmiqoo/app/NativeEvidenceGuard.kt
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/androidTest/java/com/filmiqoo/app/ProductAuditTest.kt')
@@ -57,10 +59,12 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu lavapipe -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -camera-back none -verbose -stdouterr-file /tmp/filmiqoo-qemu.log
           script: |
-            adb shell settings put secure immersive_mode_confirmations confirmed
+            bash scripts/prepare-test-device.sh
             mkdir -p audit-evidence
             bash scripts/run-product-audit.sh "${{ matrix.batch }}"
       - uses: actions/upload-artifact@v4

@@ -68,6 +68,7 @@ class PlayerTimelineTest {
             assertTrue(seekStarts >= 2)
             assertEquals(2, seekFinishes)
         }
+        ensureNoSystemErrorDialog()
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("player-rtl-timeline.png").use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))

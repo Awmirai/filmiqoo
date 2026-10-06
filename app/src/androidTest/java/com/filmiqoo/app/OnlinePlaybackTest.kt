@@ -44,8 +44,13 @@ class OnlinePlaybackTest {
     }
 
     @After fun cleanUp() {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
-            PlatformTestStorageRegistry.getInstance().openOutputFile("player-final-state.png").use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // Cleanup evidence must not obscure a primary failure or retain a system error overlay.
+        if (runCatching { ensureNoSystemErrorDialog() }.isSuccess) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
+                try {
+                    PlatformTestStorageRegistry.getInstance().openOutputFile("player-final-state.png").use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                } finally { bitmap.recycle() }
+            }
         }
         // Dispose the player and polling effects before restoring the real endpoint.
         compose.runOnUiThread { compose.activity.setContentView(android.widget.FrameLayout(compose.activity)) }
@@ -120,9 +125,13 @@ class OnlinePlaybackTest {
         compose.waitUntil(2_500) { compose.onAllNodesWithContentDescription("پنهان‌کردن کنترل‌ها").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithContentDescription("ابزارهای پخش").onFirst().performClick()
         compose.onNodeWithContentDescription("بستن").assertIsDisplayed()
+        ensureNoSystemErrorDialog()
         androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        // Native Back injection returns before the modal's hide animation and composition removal.
+        compose.waitUntil(2_500) { compose.onAllNodesWithContentDescription("بستن").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("بستن").assertDoesNotExist()
         compose.onNodeWithContentDescription("پنهان‌کردن کنترل‌ها").performClick()
+        ensureNoSystemErrorDialog()
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         PlatformTestStorageRegistry.getInstance().openOutputFile("online-video-playing.png").use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))

@@ -29,8 +29,8 @@ class CinemaSocialExperienceTest {
     private var original: Triple<String,String?,String?>? = null
     @After fun cleanup() {
         compose.waitForIdle()
-        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
-            PlatformTestStorageRegistry.getInstance().openOutputFile("social-${testName.methodName}.png").use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+        if (runCatching { ensureNoSystemErrorDialog() }.isSuccess) InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
+            PlatformTestStorageRegistry.getInstance().openOutputFile("social-${testName.methodName}.png").use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle()
         }
         compose.runOnUiThread { compose.activity.setContentView(android.widget.FrameLayout(compose.activity)) }
         original?.let { values -> SessionStore(compose.activity).apply { baseUrl=values.first;accessToken=values.second;refreshToken=values.third } }

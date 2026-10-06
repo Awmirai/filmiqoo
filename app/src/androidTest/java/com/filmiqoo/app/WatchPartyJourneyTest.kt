@@ -52,6 +52,7 @@ class WatchPartyJourneyTest {
     }
     private fun snapshot(file:String) {
         compose.waitForIdle()
+        ensureNoSystemErrorDialog()
         val bitmap=requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         try { PlatformTestStorageRegistry.getInstance().openOutputFile(file).use{assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,it))} }
         finally { bitmap.recycle() }
