@@ -91,14 +91,32 @@ class CommunityProfileJourneyTest {
     }
     @Test fun oldServerCannotMislabelDiscoveryAsFollowingAndNullMediaIsAbsent()=kotlinx.coroutines.runBlocking {
         val backend=backend(true)
-        dispatch{json("""{"items":[{"id":"unrelated","body":"قدیمی","author":{"id":"other"},"media":{"id":null,"title":null,"posterUrl":null}}],"nextCursor":null}""")}
+        // The real unlinked-reel response has a media object whose LEFT JOIN fields are all null.
+        val absentMedia="""{"id":null,"tmdbId":null,"kind":null,"title":null,"originalTitle":null,"posterUrl":null,"backdropUrl":null,"year":null,"rating":null}"""
+        fun clipItem(media:String)="""{"id":"unrelated","body":"قدیمی","caption":"کلیپ بدون اثر پیوندشده","author":{"id":"other"},"media":$media}"""
+        fun clipDispatch(media:String){dispatch{r->
+            val item=clipItem(media)
+            if(r.requestUrl?.encodedPath=="/v1/social/reels/unrelated/viewer")json(item)
+            else json("""{"items":[$item],"nextCursor":null}""")
+        }}
+        clipDispatch(absentMedia)
         val social=SocialRepository(backend)
         val first=social.feedPage()
         assertNull(first.items.single().media);assertNull(first.nextCursor)
-        assertNull(social.reelsPage().nextCursor)
+        val reels=social.reelsPage()
+        assertNull(reels.nextCursor);assertNull(reels.items.single().media)
+        assertNull(social.reel("unrelated").media)
+        assertNull(social.mediaClips("catalog").single().media)
+        assertNull(social.savedReels().single().media)
         val failure=runCatching{social.feedPage(followingOnly=true)}.exceptionOrNull()
         assertTrue(failure is CommunityServerUpgradeRequired)
         assertTrue(failure!!.message!!.contains("ارتقای سرور"))
+        clipDispatch("""{"id":"catalog","tmdbId":77,"kind":"movie","title":"فیلم واقعی","originalTitle":null,"posterUrl":null,"backdropUrl":null,"year":2011,"rating":8.2}""")
+        val linked=requireNotNull(social.reelsPage().items.single().media)
+        assertEquals("catalog",linked.backendId);assertEquals(MediaType.MOVIE,linked.type)
+        assertEquals("فیلم واقعی",linked.asMediaItem()?.title);assertEquals(77,linked.asMediaItem()?.id)
+        assertEquals("",linked.originalTitle);assertNull(linked.posterUrl);assertNull(linked.backdropUrl)
+        assertEquals(2011,linked.year);assertEquals(8.2,requireNotNull(linked.rating),0.0)
         for(cursor in listOf("","   ","null"," NULL ")) {
             dispatch{json(JSONObject().put("items",org.json.JSONArray()).put("nextCursor",cursor).toString())}
             assertNull(social.feedPage().nextCursor)

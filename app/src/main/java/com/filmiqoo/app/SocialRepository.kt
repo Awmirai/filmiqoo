@@ -345,22 +345,7 @@ class SocialRepository(
         val items=buildList {
             if(arr!=null) for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val mediaObj=x.optJSONObject("media")
-                val kind=mediaObj?.optString("kind").orEmpty()
-                val media=mediaObj?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else ReelMediaRef(
-                        backendId=backendId,
-                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title"),
-                        originalTitle=it.optString("originalTitle"),
-                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                        year=if(it.isNull("year")) null else it.optInt("year"),
-                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
-                    )
-                }
+                val media=parseOptionalReelMedia(x.optJSONObject("media"))
                 add(
                     ReelFeedItem(
                         id=x.optString("id"),
@@ -405,22 +390,7 @@ class SocialRepository(
                 )
             }.getOrNull()
         } else null
-        val mediaObj=x.optJSONObject("media")
-        val kind=mediaObj?.optString("kind").orEmpty()
-        val media=mediaObj?.let {
-            val backendId=it.optString("id").takeIf(String::isNotBlank)
-            if(backendId==null) null else ReelMediaRef(
-                backendId=backendId,
-                tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                title=it.optString("title"),
-                originalTitle=it.optString("originalTitle"),
-                posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                year=if(it.isNull("year")) null else it.optInt("year"),
-                rating=if(it.isNull("rating")) null else it.optDouble("rating")
-            )
-        }
+        val media=parseOptionalReelMedia(x.optJSONObject("media"))
         return ReelFeedItem(
             id=x.optString("id"),
             caption=x.optString("caption"),
@@ -455,22 +425,7 @@ class SocialRepository(
         return buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val mediaObj=x.optJSONObject("media")
-                val kind=mediaObj?.optString("kind").orEmpty()
-                val media=mediaObj?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else ReelMediaRef(
-                        backendId=backendId,
-                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title"),
-                        originalTitle=it.optString("originalTitle"),
-                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                        year=if(it.isNull("year")) null else it.optInt("year"),
-                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
-                    )
-                }
+                val media=parseOptionalReelMedia(x.optJSONObject("media"))
                 add(
                     ReelFeedItem(
                         id=x.optString("id"),
@@ -619,22 +574,7 @@ class SocialRepository(
         return buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val mediaObj=x.optJSONObject("media")
-                val kind=mediaObj?.optString("kind").orEmpty()
-                val media=mediaObj?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else ReelMediaRef(
-                        backendId=backendId,
-                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title"),
-                        originalTitle=it.optString("originalTitle"),
-                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                        year=if(it.isNull("year")) null else it.optInt("year"),
-                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
-                    )
-                }
+                val media=parseOptionalReelMedia(x.optJSONObject("media"))
                 add(
                     ReelFeedItem(
                         id=x.optString("id"),
@@ -1661,6 +1601,23 @@ class SocialRepository(
         avatarUrl=o.optString("avatarUrl"),
         verified=o.optBoolean("verified")
     )
+
+    private fun parseOptionalReelMedia(o:JSONObject?):ReelMediaRef? {
+        if(o==null)return null
+        fun value(key:String)=o.optString(key).trim().takeUnless { it.isBlank()||it.equals("null",ignoreCase=true) }
+        val backendId=value("id")?:return null
+        return ReelMediaRef(
+            backendId=backendId,
+            tmdbId=if(o.isNull("tmdbId"))null else o.optInt("tmdbId"),
+            type=if(value("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+            title=value("title").orEmpty(),
+            originalTitle=value("originalTitle").orEmpty(),
+            posterUrl=value("posterUrl"),
+            backdropUrl=value("backdropUrl"),
+            year=if(o.isNull("year"))null else o.optInt("year"),
+            rating=if(o.isNull("rating"))null else o.optDouble("rating")
+        )
+    }
 
     private fun parseOptionalMedia(o:JSONObject?):SocialMediaRef? {
         if(o==null) return null
