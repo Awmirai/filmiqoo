@@ -50,7 +50,7 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
     @Composable fun Item(entry:CinemaDestination,modifier:Modifier) {
         val active=entry.id==selected
         val largeLabels=window.fontScale>=1.6f && !rail
-        val label=when {largeLabels && entry.id==3->"من";largeLabels && entry.id==4->"هم\nتماشا";else->entry.label}
+        val label=when {largeLabels && window.screenWidthDp<360 && entry.id==1->"کشف";largeLabels && entry.id==3->"من";largeLabels && entry.id==4->"هم\nتماشا";else->entry.label}
         Column(modifier.heightIn(min=72.dp).selectable(active,role=Role.Tab,onClick={onSelected(entry.id)})
             .testTag("navigation-${entry.id}").semantics { contentDescription=entry.label }.padding(horizontal=2.dp,vertical=10.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {

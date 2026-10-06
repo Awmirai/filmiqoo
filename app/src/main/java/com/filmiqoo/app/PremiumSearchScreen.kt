@@ -22,9 +22,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -237,10 +238,11 @@ fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, 
 @Composable
 private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, searching: Boolean) {
     val context = LocalContext.current
-    BoxWithConstraints(Modifier.fillMaxWidth().height(if (compact) 280.dp else 460.dp).clip(RoundedCornerShape(0.dp))
+    BoxWithConstraints(Modifier.fillMaxWidth().height(if (compact) 280.dp else 460.dp)
+        .drawWithContent { clipRect { this@drawWithContent.drawContent() } }
         .testTag(if (artwork.isEmpty()) "search-poster-empty" else "search-poster-atmosphere")) {
-        // The only transformed layer is the bounded viewport. Never measure a full-height poster
-        // column: sparse catalogs and wide tablets must not allocate a many-thousand-pixel layer.
+        // Fixed tiles draw directly into this clipped viewport. No transformed or translucent
+        // parent graphics layer is needed, including on short landscape windows.
         val wallWidth = maxWidth.coerceAtMost(760.dp)
         val columns = if (wallWidth < 480.dp) 3 else 4
         val gap = 7.dp
@@ -248,9 +250,7 @@ private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, sear
         val tileHeight = (tileWidth * 1.5f).coerceAtMost(280.dp)
         val rows = if ((tileHeight + gap) * 2 >= maxHeight) 2 else 3
         if (artwork.isNotEmpty()) Box(Modifier.width(wallWidth).height(maxHeight).align(Alignment.TopCenter)
-            .clearAndSetSemantics {}.graphicsLayer {
-                clip = true; rotationZ = -9f; scaleX = 1.1f; scaleY = 1.1f; alpha = if (searching) .24f else .72f
-            }) {
+            .clearAndSetSemantics {}) {
             repeat(columns * rows) { index ->
                 val column = index % columns
                 val row = index / columns
@@ -262,7 +262,12 @@ private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, sear
                         .size(tileWidth, tileHeight).clip(RoundedCornerShape(12.dp)).background(CinemaSurface))
             }
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .66f), CinemaInk.copy(alpha = .4f), CinemaInk.copy(alpha = .88f), CinemaInk))))
+        // Preserve the previous dimming with an ordinary foreground scrim instead of group alpha.
+        val scrim = remember(searching) {
+            val opacity = if (searching) .24f else .72f
+            listOf(.66f, .4f, .88f, 1f).map { alpha -> CinemaInk.copy(alpha = 1f - (1f - alpha) * opacity) }
+        }
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(scrim)))
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(CinemaInk.copy(alpha = .3f), Color.Transparent, CinemaInk.copy(alpha = .3f)))))
     }
 }
