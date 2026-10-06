@@ -12,7 +12,7 @@ for spec in 320x800:1.0:gesture 360x800:1.0:gesture 393x852:1.0:gesture 412x915:
   else
     adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
   fi
-  gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.filmiqoo.app.ProductAuditTest -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" --stacktrace
+  gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.filmiqoo.app.ProductAuditTest -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" -Pandroid.testInstrumentationRunnerArguments.auditStage="${FILMIQOO_AUDIT_STAGE:-after}" --stacktrace
   cp -r app/build/outputs/connected_android_test_additional_output "audit-evidence/$label"
   adb shell settings get secure navigation_mode > "audit-evidence/$label/navigation-mode.txt"
 done

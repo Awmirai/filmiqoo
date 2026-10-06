@@ -743,7 +743,7 @@ private fun WatchPartyStartScreen(
 ) {
     var visibility by rememberSaveable { mutableStateOf("invite") }
     var schedule by rememberSaveable { mutableStateOf("now") }
-    LazyColumn(Modifier.fillMaxSize().background(CinemaInk).safeDrawingPadding(),
+    LazyColumn(Modifier.fillMaxSize().background(CinemaInk).safeDrawingPadding().testTag("party-creation"),
         contentPadding=PaddingValues(bottom=28.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item { CinemaPageHeader("قرارِ تماشا","فیلم شما، دوست‌های شما",onBack) }
         item {

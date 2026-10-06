@@ -41,6 +41,7 @@ class ProductAuditTest {
             p.color=Color.WHITE; p.textSize=58f; drawText("CINEMA / TEST",55f,930f,p)
         }
         val bytes=ByteArrayOutputStream().also { art.compress(Bitmap.CompressFormat.PNG,100,it) }.toByteArray()
+        art.recycle()
         val image=server.url("/art.png").toString()
         val mediaJson="""{"id":77,"media_type":"movie","title":"جدایی نادر از سیمین","name":"My Liberation Notes","original_title":"A Separation","poster_path":"$image","backdrop_path":"$image","vote_average":8.1,"release_date":"2011-03-15"}"""
         server.dispatcher=object:Dispatcher() {
@@ -98,6 +99,12 @@ class ProductAuditTest {
             compose.runOnIdle { page=name }
             // Wait for bounded HTTP/image work and a complete frame; this is screenshot stabilization, not a benchmark.
             compose.waitForIdle(); Thread.sleep(900); compose.waitForIdle()
+            if(name=="search" && args.getString("auditStage")=="after") {
+                // Await the real fixture response rather than capture a transient empty catalog.
+                compose.waitUntil(10_000) {
+                    compose.onAllNodesWithTag("poster-MOVIE:77").fetchSemanticsNodes().isNotEmpty()
+                }
+            }
             if(name=="episodes") {
                 compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-e1"))
                 compose.waitForIdle()
@@ -130,6 +137,9 @@ class ProductAuditTest {
                 }
                 compose.waitForIdle()
             }
+            // A tablet screenshot owns several MiB of native memory; release each capture
+            // before advancing through the fourteen-page matrix.
+            screenshot.recycle()
         }
         PlatformTestStorageRegistry.getInstance().openOutputFile("audit-$label-metrics.json").use { it.write(metrics.toString(2).toByteArray()) }
     }

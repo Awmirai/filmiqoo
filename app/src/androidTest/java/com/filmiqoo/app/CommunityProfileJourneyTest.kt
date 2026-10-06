@@ -26,13 +26,22 @@ class CommunityProfileJourneyTest {
     }
     private fun dispatch(block:(RecordedRequest)->MockResponse){server.dispatcher=object:Dispatcher(){override fun dispatch(request:RecordedRequest):MockResponse{requests+=request;return block(request)}}}
     private fun json(body:String)=MockResponse().setHeader("Content-Type","application/json").setBody(body)
-    private fun scrollCommunityTo(tag:String){
-        compose.waitUntil(10000){runCatching{compose.onNodeWithTag("cinema-social").performScrollToNode(hasTestTag(tag));true}.getOrDefault(false)}
+    private fun scrollLazyTo(container:String,tag:String){
+        // Lazy items are composed on demand. Scroll the list semantics, not the outer Box.
+        var lastFailure:Throwable?=null
+        try {
+            compose.waitUntil(10000){
+                try {compose.onNodeWithTag(container).performScrollToNode(hasTestTag(tag));true}
+                catch(failure:AssertionError){lastFailure=failure;false}
+            }
+        }catch(failure:ComposeTimeoutException){throw AssertionError("Could not scroll $container to $tag",lastFailure?:failure)}
     }
+    private fun scrollCommunityTo(tag:String)=scrollLazyTo("community-scroll",tag)
     private fun post(id:String="post",author:String="owner",spoiler:Boolean=false)=
         """{"id":"$id","type":"review","body":"پایان پنهان فیلم","spoiler":$spoiler,"likes":4,"comments":0,"author":{"id":"$author","displayName":"سینمادوست","username":"fan"},"media":{"id":"catalog","title":"فیلم آزمون","kind":"movie","tmdbId":77}}"""
-    private fun community(backend:BackendRepository,logged:Boolean,onAuth:()->Unit={},onClip:(String)->Unit={},onParty:()->Unit={}) {
-        compose.setContent{FilmiqooTheme{CinemaSocialScreen(SocialRepository(backend),backend,logged,{},{onClip(it)},{},{},{},{},{},onAuth,{},{_,_->},onWatchParty=onParty)}}
+    private fun community(backend:BackendRepository,logged:Boolean,onAuth:()->Unit={},onClip:(String)->Unit={},onParty:()->Unit={},refreshInterval:Long=45_000L) {
+        val social=SocialRepository(backend)
+        compose.setContent{FilmiqooTheme{CinemaSocialScreen(social,backend,logged,{},{onClip(it)},{},{},{},{},{},onAuth,{},{_,_->},onWatchParty=onParty,foregroundRefreshIntervalMillis=refreshInterval)}}
     }
     @After fun cleanup(){
         compose.runOnUiThread{compose.activity.setContentView(android.widget.FrameLayout(compose.activity))}
@@ -62,12 +71,19 @@ class CommunityProfileJourneyTest {
     }
     @Test fun followingUsesServerScopeAndLoggedOutNeverRequestsIt(){
         val backend=backend(false);val auth=AtomicInteger()
-        dispatch{r->json("""{"items":[],"scope":"${if(r.requestUrl?.queryParameter("scope")=="following")"following"else "discovery"}"}""")}
+        dispatch{r->json("""{"items":[],"nextCursor":null,"scope":"${if(r.requestUrl?.queryParameter("scope")=="following")"following"else "discovery"}"}""")}
         community(backend,false,{auth.incrementAndGet()})
+        compose.waitUntil(10000){compose.onAllNodesWithText("اولین گفت‌وگو را تو شروع کن").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("community-scroll").performScrollToNode(hasText("لیست‌های سینمایی کاربران"))
+        compose.onNodeWithText("بیشتر ببین").assertDoesNotExist()
+        scrollCommunityTo("community-watch-together")
+        compose.onNodeWithTag("community-watch-together").performScrollTo().performClick()
+        assertEquals(1,auth.get())
+        scrollCommunityTo("community-tab-1")
         compose.onNodeWithTag("community-tab-1").performScrollTo().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("سلیقه‌های نزدیک به تو").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("ورود").performScrollTo().performClick()
-        assertEquals(1,auth.get());assertFalse(requests.any{it.requestUrl?.queryParameter("scope")=="following"})
+        assertEquals(2,auth.get());assertFalse(requests.any{it.requestUrl?.queryParameter("scope")=="following"})
         compose.runOnUiThread{backend.session.accessToken="test";backend.session.refreshToken="test"}
         // The repository's authenticated following contract is separate from discovery.
         kotlinx.coroutines.runBlocking{SocialRepository(backend).feedPage(followingOnly=true)}
@@ -75,12 +91,19 @@ class CommunityProfileJourneyTest {
     }
     @Test fun oldServerCannotMislabelDiscoveryAsFollowingAndNullMediaIsAbsent()=kotlinx.coroutines.runBlocking {
         val backend=backend(true)
-        dispatch{json("""{"items":[{"id":"unrelated","body":"قدیمی","author":{"id":"other"},"media":{"id":null,"title":null,"posterUrl":null}}]}""")}
+        dispatch{json("""{"items":[{"id":"unrelated","body":"قدیمی","author":{"id":"other"},"media":{"id":null,"title":null,"posterUrl":null}}],"nextCursor":null}""")}
         val social=SocialRepository(backend)
-        assertNull(social.feedPage().items.single().media)
+        val first=social.feedPage()
+        assertNull(first.items.single().media);assertNull(first.nextCursor)
+        assertNull(social.reelsPage().nextCursor)
         val failure=runCatching{social.feedPage(followingOnly=true)}.exceptionOrNull()
         assertTrue(failure is CommunityServerUpgradeRequired)
         assertTrue(failure!!.message!!.contains("ارتقای سرور"))
+        for(cursor in listOf("","   ","null"," NULL ")) {
+            dispatch{json(JSONObject().put("items",org.json.JSONArray()).put("nextCursor",cursor).toString())}
+            assertNull(social.feedPage().nextCursor)
+            assertNull(social.reelsPage().nextCursor)
+        }
     }
     @Test fun onlyOwnerCanSeeDeleteAndFailedRemovalKeepsPost(){
         val backend=backend(true);val removals=AtomicInteger()
@@ -123,10 +146,10 @@ class CommunityProfileJourneyTest {
         assertEquals("parent",sent[0].getString("parentCommentId"));assertEquals(sent[0].getString("body"),sent[1].getString("body"));assertEquals("parent",sent[1].getString("parentCommentId"))
     }
     @Test fun spoilerClipNeverAutoplaysAndWatchTogetherOpensRealCallback(){
-        val backend=backend(false);var opened:String?=null;val auth=AtomicInteger()
+        val backend=backend(true);var opened:String?=null;val party=AtomicInteger()
         dispatch{r->if(r.requestUrl!!.encodedPath.contains("reels"))json("""{"items":[{"id":"clip","caption":"اسپویل کلیپ پنهان","spoiler":true,"playbackUrl":"https://invalid.example/video.mp4","author":{"displayName":"سازنده"}}]}""")else json("""{"items":[]}""")}
-        community(backend,false,{auth.incrementAndGet()},{opened=it})
-        compose.onNodeWithTag("community-watch-together").performScrollTo().performClick();assertEquals(1,auth.get())
+        community(backend,true,onAuth={error("Logged-in watch together requested auth")},onClip={opened=it},onParty={party.incrementAndGet()})
+        compose.onNodeWithTag("community-watch-together").performScrollTo().performClick();assertEquals(1,party.get())
         compose.onNodeWithTag("community-tab-3").performScrollTo().performClick()
         scrollCommunityTo("community-clip-clip")
         compose.onNodeWithText("اسپویل کلیپ پنهان").assertDoesNotExist()
@@ -143,9 +166,12 @@ class CommunityProfileJourneyTest {
         compose.setContent{FilmiqooTheme{ConnectedProfileScreen(backend,TmdbRepository(compose.activity),onMedia={},onPlay={},onCommunity={},onDownloads={downloads.incrementAndGet()},onLibrary={library.incrementAndGet()},onSocialSaves={},onHistory={},onCreatorStudio={},onInbox={},onSettings={},onViewerProfiles={},onParentalControls={},onSecurity={},onSafety={},onFollowRequests={},onCloseFriends={},onEditProfile={},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={},onCreate={create.incrementAndGet()})}}
         compose.waitUntil(10000){compose.onAllNodesWithText("پروفایل آزمون").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("همگام‌سازی کامل نشد").performScrollTo().assertExists()
-        compose.onNodeWithTag("profile-library").performScrollTo().performClick()
-        compose.onNodeWithTag("profile-downloads").performScrollTo().performClick()
-        compose.onNodeWithTag("profile-create").performScrollTo().performClick()
+        scrollLazyTo("profile-scroll","profile-library")
+        compose.onNodeWithTag("profile-library").performClick()
+        scrollLazyTo("profile-scroll","profile-downloads")
+        compose.onNodeWithTag("profile-downloads").performClick()
+        scrollLazyTo("profile-scroll","profile-create")
+        compose.onNodeWithTag("profile-create").performClick()
         assertEquals(1,library.get());assertEquals(1,downloads.get());assertEquals(1,create.get())
     }
     @Test fun kidsProfileHidesAccountEditAndSettingsButKeepsSafeLibraryAndParentExit(){
@@ -160,8 +186,49 @@ class CommunityProfileJourneyTest {
         compose.onNodeWithTag("profile-more").assertDoesNotExist()
         compose.onNodeWithTag("profile-create").assertDoesNotExist()
         compose.onNodeWithTag("profile-identity-action").performScrollTo().performClick()
-        compose.onNodeWithTag("profile-library").performScrollTo().performClick()
-        compose.onNodeWithTag("profile-downloads").performScrollTo().performClick()
+        scrollLazyTo("profile-scroll","profile-library")
+        compose.onNodeWithTag("profile-library").performClick()
+        scrollLazyTo("profile-scroll","profile-downloads")
+        compose.onNodeWithTag("profile-downloads").performClick()
         assertEquals(1,parent.get());assertEquals(1,library.get());assertEquals(1,downloads.get())
+    }
+    @Test fun foregroundNewPostBannerWaitsForUserAndFailedRefreshKeepsReadableFeed(){
+        val backend=backend(false)
+        val feedCalls=AtomicInteger();val stage=AtomicInteger(0)
+        dispatch{r->
+            if(r.requestUrl!!.encodedPath.contains("/feed/")) {
+                feedCalls.incrementAndGet()
+                when(stage.get()) {
+                    0->json("""{"items":[${post("old")}],"scope":"discovery"}""")
+                    1->json("""{"items":[${post("new")},${post("old")}],"scope":"discovery"}""")
+                    2->json("{}").setResponseCode(503)
+                    else->json("""{"items":[${post("new")},${post("old")}],"scope":"discovery"}""")
+                }
+            }else json("""{"items":[]}""")
+        }
+        community(backend,false,refreshInterval=1000L)
+        scrollCommunityTo("community-post-old")
+        compose.onNodeWithTag("community-post-new").assertDoesNotExist()
+        val initialCalls=feedCalls.get()
+        stage.set(1)
+        compose.waitUntil(10000){feedCalls.get()>initialCalls}
+        scrollCommunityTo("community-new-posts")
+        compose.onNodeWithTag("community-new-posts").assertTextContains("1 پست تازه")
+        // Polling announces unseen IDs; it never injects a post while someone is reading.
+        compose.onNodeWithTag("community-post-new").assertDoesNotExist()
+        stage.set(2)
+        compose.onNodeWithTag("community-new-posts").performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithText("اتصال کامل نشد").fetchSemanticsNodes().isNotEmpty()}
+        scrollCommunityTo("community-post-old")
+        compose.onNodeWithTag("community-post-old").assertExists()
+        compose.onNodeWithTag("community-post-new").assertDoesNotExist()
+        stage.set(3)
+        scrollCommunityTo("community-new-posts")
+        compose.onNodeWithTag("community-new-posts").performClick()
+        scrollCommunityTo("community-post-new")
+        compose.onNodeWithTag("community-post-new").assertExists()
+        scrollCommunityTo("community-post-old")
+        compose.onNodeWithTag("community-post-old").assertExists()
+        compose.onNodeWithTag("community-new-posts").assertDoesNotExist()
     }
 }

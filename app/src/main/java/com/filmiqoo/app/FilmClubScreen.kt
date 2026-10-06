@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +26,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
@@ -50,7 +55,8 @@ fun CinemaSocialScreen(
     onMedia:(MediaItem)->Unit,onOpenClip:(String)->Unit,onOpenRoom:(SocialRoom)->Unit,onCreator:(Creator)->Unit,
     onSearch:()->Unit,onInbox:()->Unit,onCreate:()->Unit,onRequireAuth:()->Unit,onCollection:(String?)->Unit,
     onStories:(List<SocialStory>,Int)->Unit,initialPostId:String?=null,onFocusedPostConsumed:()->Unit={},
-    onWatchParty:()->Unit={},onNotifications:()->Unit={},onClips:()->Unit={}
+    onWatchParty:()->Unit={},onNotifications:()->Unit={},onClips:()->Unit={},
+    foregroundRefreshIntervalMillis:Long=45_000L
 ) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -64,6 +70,9 @@ fun CinemaSocialScreen(
     var loading by remember { mutableStateOf(true) }
     var appending by remember { mutableStateOf(false) }
     var loadError by remember { mutableStateOf<String?>(null) }
+    var loadedFeed by remember { mutableStateOf<Pair<Int,Boolean>?>(null) }
+    var unseenPostIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showNewestAfterRefresh by remember { mutableStateOf(false) }
     var viewerId by remember { mutableStateOf<String?>(null) }
     var activePost by remember { mutableStateOf<SocialPost?>(null) }
     var activeDiscussion by remember { mutableStateOf<TitleComment?>(null) }
@@ -71,13 +80,18 @@ fun CinemaSocialScreen(
     var removePost by remember { mutableStateOf<SocialPost?>(null) }
     val busyIds=remember { mutableStateMapOf<String,Boolean>() }
     val snackbar=remember { SnackbarHostState() }
+    val listState=rememberLazyListState()
+    val lifecycle=LocalLifecycleOwner.current.lifecycle
 
     LaunchedEffect(loggedIn) {
         viewerId=null
         if(loggedIn) try { viewerId=backend.me().id } catch(e:CancellationException){throw e} catch(_:Exception){}
     }
     LaunchedEffect(mode,refresh,loggedIn) {
-        loading=true;loadError=null;next=null;posts=emptyList();comments=emptyList();clips=emptyList();appending=false
+        val requestedFeed=mode to loggedIn
+        // A refresh keeps readable content until its replacement has arrived successfully.
+        if(loadedFeed!=requestedFeed){next=null;posts=emptyList();comments=emptyList();clips=emptyList();unseenPostIds=emptySet();showNewestAfterRefresh=false}
+        loading=true;loadError=null;appending=false
         try {
             when(mode) {
                 0,1 -> if(mode==0 || loggedIn) {
@@ -87,10 +101,32 @@ fun CinemaSocialScreen(
                 2 -> {val page=discussions.page("feed",null,null);comments=page.items;next=page.next}
                 3 -> {val page=social.reelsPage(limit=20);clips=page.items;next=page.nextCursor}
             }
+            loadedFeed=requestedFeed
+            unseenPostIds=emptySet()
+            if(showNewestAfterRefresh){listState.scrollToItem(0);showNewestAfterRefresh=false}
         } catch(e:CancellationException){throw e}
         catch(e:CommunityServerUpgradeRequired){loadError=e.message}
         catch(_:Exception){loadError="این بخش دریافت نشد. اتصال را بررسی کن و دوباره تلاش کن."}
         finally{loading=false}
+    }
+    LaunchedEffect(mode,loggedIn,social,lifecycle,foregroundRefreshIntervalMillis) {
+        if(mode !in 0..1 || (mode==1&&!loggedIn))return@LaunchedEffect
+        val requestedFeed=mode to loggedIn
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while(true) {
+                delay(foregroundRefreshIntervalMillis.coerceAtLeast(100L))
+                if(loading || loadedFeed!=requestedFeed)continue
+                try {
+                    val latest=social.feedPage(limit=20,followingOnly=requestedFeed.first==1)
+                    ensureActive()
+                    if((mode to loggedIn)==requestedFeed) {
+                        val visible=posts.mapTo(mutableSetOf()){it.id}
+                        unseenPostIds=latest.items.map{it.id}.filterNot{it in visible}.toSet()
+                    }
+                }catch(e:CancellationException){throw e}
+                catch(_:Exception){/* Keep the visible feed and an already announced update. */}
+            }
+        }
     }
     LaunchedEffect(initialPostId) {
         if(!initialPostId.isNullOrBlank()) try {
@@ -98,6 +134,11 @@ fun CinemaSocialScreen(
         } catch(e:CancellationException){throw e} catch(_:Exception){snackbar.showSnackbar("این پست در دسترس نیست.");onFocusedPostConsumed()}
     }
     fun authenticated(action:()->Unit) { if(loggedIn)action()else onRequireAuth() }
+    fun refreshFeed(showNewest:Boolean=false) {
+        if(loading||appending||busyIds.isNotEmpty())return
+        showNewestAfterRefresh=showNewest
+        refresh++
+    }
     fun mutate(id:String,action:suspend ()->Unit) {
         if(!loggedIn){onRequireAuth();return}
         if(busyIds[id]==true)return
@@ -124,7 +165,7 @@ fun CinemaSocialScreen(
         }
     }
     Box(Modifier.fillMaxSize().background(CinemaInk).testTag("cinema-social")) {
-        LazyColumn(contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        LazyColumn(state=listState,modifier=Modifier.testTag("community-scroll"),contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             item("header") {
                 Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(CinemaAccent.copy(alpha=.15f),CinemaInk)))) {
                     CinemaPageHeader("سینماکلاب","فیلم بهانهٔ آشنایی ماست") {
@@ -133,7 +174,7 @@ fun CinemaSocialScreen(
                     }
                     Row(Modifier.padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                         CinemaAction(Icons.Outlined.EditNote,"از سینما بنویس",{authenticated(onCreate)},Modifier.weight(1f),primary=true)
-                        OutlinedIconButton({refresh++},enabled=!loading,modifier=Modifier.size(52.dp)){Icon(Icons.Outlined.Refresh,"تازه‌کردن سینماکلاب")}
+                        OutlinedIconButton({refreshFeed()},enabled=!loading&&!appending&&busyIds.isEmpty(),modifier=Modifier.size(52.dp)){Icon(Icons.Outlined.Refresh,"تازه‌کردن سینماکلاب")}
                     }
                     Text("نقد کوتاه، سؤال، کلیپ و تجربهٔ تماشا؛ با آدم‌هایی که سینما را دوست دارند.",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(20.dp))
                 }
@@ -144,9 +185,16 @@ fun CinemaSocialScreen(
                     FilterChip(selected=mode==index,onClick={mode=index},label={Text(label)},modifier=Modifier.testTag("community-tab-$index"))
                 }
             } }
+            if(unseenPostIds.isNotEmpty())item("new-posts") {
+                Box(Modifier.padding(horizontal=20.dp)) {
+                    CinemaAction(Icons.Outlined.NewReleases,"${unseenPostIds.size} پست تازه · ببین",{
+                        refreshFeed(showNewest=true)
+                    },Modifier.fillMaxWidth().testTag("community-new-posts"),primary=true,enabled=!loading&&!appending&&busyIds.isEmpty())
+                }
+            }
             if(loading)item("loading"){LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=20.dp),color=CinemaAccent)}
-            loadError?.let { message->item("error"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("اتصال کامل نشد",message,Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}} }
-            if(!loading&&loadError==null) {
+            loadError?.let { message->item("error"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("اتصال کامل نشد",message,Icons.Outlined.CloudOff,"تلاش دوباره",{refreshFeed()})}} }
+            if((!loading&&loadError==null)||posts.isNotEmpty()||comments.isNotEmpty()||clips.isNotEmpty()) {
                 when(mode) {
                     0,1 -> {
                         if(mode==1&&!loggedIn)item("auth"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("سلیقه‌های نزدیک به تو","برای دیدن پست‌های آدم‌ها و کانال‌هایی که دنبال می‌کنی وارد شو.",Icons.Outlined.PeopleOutline,"ورود",onRequireAuth)}}
@@ -155,7 +203,7 @@ fun CinemaSocialScreen(
                             if(mode==1)"از بخش کشف، پروفایل آدم‌ها را باز کن و دنبالشان کن. فقط پست‌های همین آدم‌ها و کانال‌ها اینجا می‌آیند."else "یک پیشنهاد فیلم، نقد کوتاه یا سؤال بنویس. پست‌های منتشرشدهٔ کاربران اینجا دیده می‌شود.",
                             Icons.Outlined.Forum,if(mode==1)"کشف آدم‌ها"else "نوشتن پست",{if(mode==1)mode=0 else authenticated(onCreate)} )}}
                         items(posts,key={"post-${it.id}"}) { post ->
-                            CommunityPostCard(post,social,loggedIn,post.author.id==viewerId,busyIds[post.id]==true,onRequireAuth,
+                            CommunityPostCard(post,social,loggedIn,post.author.id==viewerId,busyIds[post.id]==true||loading,onRequireAuth,
                                 onMedia,onCreator,
                                 onLike={mutate(post.id){val liked=social.togglePostLike(post.id);posts=posts.map{if(it.id==post.id)it.copy(likedByMe=liked,likes=(it.likes+if(liked==it.likedByMe)0 else if(liked)1 else -1).coerceAtLeast(0))else it}}},
                                 onSave={mutate(post.id){val(saved,count)=social.togglePostSave(post.id);posts=posts.map{if(it.id==post.id)it.copy(savedByMe=saved,saves=count)else it}}},

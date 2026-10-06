@@ -386,7 +386,7 @@ class SocialRepository(
         }
         return SocialPage(
             items=items,
-            nextCursor=root.optString("nextCursor").takeIf(String::isNotBlank)
+            nextCursor=root.optString("nextCursor").trim().takeUnless { it.isBlank() || it.equals("null",ignoreCase=true) }
         )
     }
 
@@ -582,7 +582,7 @@ class SocialRepository(
         }
         return SocialPage(
             items=items,
-            nextCursor=root.optString("nextCursor").takeIf(String::isNotBlank)
+            nextCursor=root.optString("nextCursor").trim().takeUnless { it.isBlank() || it.equals("null",ignoreCase=true) }
         )
     }
 

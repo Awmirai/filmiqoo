@@ -124,7 +124,7 @@ fun PartyLobbyScreen(
                 Text("اتاق‌های عمومی",style=MaterialTheme.typography.titleLarge,color=CinemaPaper)
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(top=10.dp)) {
                     listOf("all" to "همه","live" to "در حال تماشا","scheduled" to "قرارهای بعدی").forEach{(id,label)->
-                        FilterChip(selected=filter==id,onClick={filter=id},label={Text(label)})
+                        FilterChip(selected=filter==id,onClick={filter=id},label={Text(label)},modifier=Modifier.testTag("party-filter-$id"))
                     }
                 }
                 if(loading)LinearProgressIndicator(modifier=Modifier.fillMaxWidth().padding(top=12.dp),color=CinemaAccent)

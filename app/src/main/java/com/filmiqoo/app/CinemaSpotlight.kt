@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -33,6 +34,7 @@ internal fun CinemaSpotlight(bundle:HomeBundle,onMedia:(MediaItem)->Unit,onStory
     val pager=rememberPagerState { choices.size }
     LaunchedEffect(category){if(choices.isNotEmpty())pager.scrollToPage(0)}
     val window=LocalConfiguration.current
+    val artworkFraction=if(window.screenWidthDp<360).25f else .32f
     Column(Modifier.testTag("home-spotlight")) {
         LazyRow(contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             listOf("این روزها","فیلم","سریال").forEachIndexed { i,label -> item { CinemaTag(label,category==i){category=i} } }
@@ -41,12 +43,12 @@ internal fun CinemaSpotlight(bundle:HomeBundle,onMedia:(MediaItem)->Unit,onStory
             val media=choices[index]
             Surface(shape=RoundedCornerShape(28.dp),color=CinemaSurface,border=BorderStroke(1.dp,CinemaLine),modifier=Modifier.fillMaxWidth()) {
                 Column {
-                    Box(Modifier.fillMaxWidth().height((window.screenHeightDp.dp*.32f).coerceIn(150.dp,290.dp))) {
+                    Box(Modifier.fillMaxWidth().height((window.screenHeightDp.dp*artworkFraction).coerceIn(150.dp,290.dp))) {
                         CinemaImage(media.backdropPath?:media.posterPath,Modifier.fillMaxSize(),true)
                         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha=.12f),Color.Transparent,CinemaSurface))))
                         Text(if(window.fontScale>=1.6f) listOf("این روزها","فیلم","سریال")[category] else "انتخابی از ${if(category==1)"فیلم‌ها"else if(category==2)"سریال‌ها"else "عنوان‌های پرطرفدار"}",color=CinemaPaper,style=MaterialTheme.typography.labelMedium,
                             modifier=Modifier.align(Alignment.TopStart).padding(14.dp).background(CinemaInk.copy(alpha=.8f),RoundedCornerShape(10.dp)).padding(horizontal=10.dp,vertical=8.dp))
-                        Text("${index+1} / ${choices.size}",color=CinemaPaper,style=MaterialTheme.typography.labelMedium,
+                        Text("${index+1} / ${choices.size}",color=CinemaPaper,style=MaterialTheme.typography.labelMedium.copy(textDirection=TextDirection.Ltr),
                             modifier=Modifier.align(Alignment.TopEnd).padding(14.dp).background(CinemaInk.copy(alpha=.8f),RoundedCornerShape(8.dp)).padding(8.dp))
                     }
                     Column(Modifier.padding(horizontal=18.dp).padding(bottom=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
@@ -57,7 +59,7 @@ internal fun CinemaSpotlight(bundle:HomeBundle,onMedia:(MediaItem)->Unit,onStory
                                 Text(listOf(media.year,if(media.type==MediaType.TV)"سریال" else "فیلم").filter(String::isNotBlank).joinToString(" · "),color=CinemaSoft,fontSize=13.sp)
                                 if(media.vote>0)Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
                                     Icon(Icons.Outlined.Star,null,tint=Color(0xFFEBC873),modifier=Modifier.size(16.dp))
-                                    Text("${String.format(Locale.US,"%.1f",media.vote)} / 10 · TMDB",color=Color(0xFFEBC873),style=MaterialTheme.typography.labelMedium)
+                                    Text("${String.format(Locale.US,"%.1f",media.vote)} / 10 · TMDB",color=Color(0xFFEBC873),style=MaterialTheme.typography.labelMedium.copy(textDirection=TextDirection.Ltr))
                                 }
                             }
                         }

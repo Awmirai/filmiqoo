@@ -199,6 +199,8 @@ fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, 
                         CinemaNotice("این انتخاب نتیجه‌ای ندارد", "فیلترها را بردار یا نام یک اثر را جست‌وجو کن.", Icons.Outlined.FilterAltOff, "برداشتن فیلترها", ::resetFilters)
                     } else if (catalogFailed && starters.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "catalog-error") {
                         CinemaNotice("پوسترها دریافت نشدند", "می‌توانی نام اثر را جست‌وجو کنی یا دریافت عنوان‌های این صفحه را دوباره امتحان کنی.", Icons.Outlined.CloudOff, "دریافت دوباره", { catalogRetry++ })
+                    } else if (!catalogLoading && starters.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "catalog-empty") {
+                        CinemaNotice("پیشنهادها هنوز آماده نیستند", "نام یک اثر را جست‌وجو کن؛ برای دریافت پیشنهادهای این صفحه هم می‌توانی دوباره تلاش کنی.", Icons.Outlined.Movie, "دریافت پیشنهادها", { catalogRetry++ })
                     }
                 } else if (normalized.length < 2) item(span = { GridItemSpan(maxLineSpan) }, key = "short-query") {
                     Text("حداقل دو حرف بنویس.", color = CinemaSoft, modifier = Modifier.padding(vertical = 12.dp))
@@ -235,12 +237,18 @@ fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, 
 @Composable
 private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, searching: Boolean) {
     val context = LocalContext.current
-    Box(Modifier.fillMaxWidth().height(if (compact) 280.dp else 460.dp).clip(RoundedCornerShape(0.dp)).clearAndSetSemantics {}) {
-        if (artwork.isNotEmpty()) Row(Modifier.fillMaxSize().graphicsLayer { rotationZ = -9f; scaleX = 1.15f; scaleY = 1.15f; alpha = if (searching) .24f else .56f },
+    val columns = minOf(4, artwork.size)
+    Box(Modifier.fillMaxWidth().height(if (compact) 280.dp else 460.dp).clip(RoundedCornerShape(0.dp))
+        .testTag(if (artwork.isEmpty()) "search-poster-empty" else "search-poster-atmosphere")) {
+        if (columns > 0) Row(Modifier.fillMaxSize().clearAndSetSemantics {}.graphicsLayer { rotationZ = -9f; scaleX = 1.15f; scaleY = 1.15f; alpha = if (searching) .24f else .72f },
             horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            repeat(4) { column ->
-                Column(Modifier.weight(1f).graphicsLayer { translationY = if (column % 2 == 0) -58.dp.toPx() else -20.dp.toPx() }, verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    artwork.filterIndexed { index, _ -> index % 4 == column }.forEach { url ->
+            repeat(columns) { column ->
+                val columnArtwork = artwork.filterIndexed { index, _ -> index % columns == column }
+                Column(Modifier.weight(1f).wrapContentHeight(Alignment.Top, unbounded = true)
+                    .graphicsLayer { translationY = if (column % 2 == 0) -58.dp.toPx() else -20.dp.toPx() }, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    // A small catalog still covers the viewport, using only its actual returned images.
+                    repeat(3) { row ->
+                        val url = columnArtwork[row % columnArtwork.size]
                         val request = remember(context, url) { ImageRequest.Builder(context).data(url).size(240, 360).crossfade(false).build() }
                         AsyncImage(request, contentDescription = null, contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(CinemaSurface))
@@ -248,7 +256,7 @@ private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, sear
                 }
             }
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .66f), CinemaInk.copy(alpha = .46f), CinemaInk.copy(alpha = .88f), CinemaInk))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha = .66f), CinemaInk.copy(alpha = .4f), CinemaInk.copy(alpha = .88f), CinemaInk))))
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(CinemaInk.copy(alpha = .3f), Color.Transparent, CinemaInk.copy(alpha = .3f)))))
     }
 }

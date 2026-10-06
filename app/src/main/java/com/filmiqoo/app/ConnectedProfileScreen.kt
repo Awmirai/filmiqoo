@@ -85,7 +85,7 @@ fun ConnectedProfileScreen(
         catch(e:CancellationException){throw e}catch(_:Exception){activityError=true}finally{activityLoading=false}
     }
     Box(Modifier.fillMaxSize().background(CinemaInk).testTag("cinema-profile-hub")) {
-        LazyColumn(contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        LazyColumn(modifier=Modifier.testTag("profile-scroll"),contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             item("header"){CinemaPageHeader(if(kidsMode)"پروفایل تماشا"else "فضای من","سلیقه‌ات، آدم‌هایت، سینمایت"){
                 if(!kidsMode)IconButton({accountAction(onSettings)},Modifier.testTag("profile-settings")){Icon(Icons.Outlined.Settings,"تنظیمات حساب")}
                 IconButton({refresh++},enabled=!loading){Icon(Icons.Outlined.Refresh,"تازه‌کردن پروفایل")}

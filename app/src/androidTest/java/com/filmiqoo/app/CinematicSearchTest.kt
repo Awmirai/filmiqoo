@@ -1,12 +1,15 @@
 package com.filmiqoo.app
 
+import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import okhttp3.mockwebserver.*
+import okio.Buffer
 import org.junit.*
 import org.junit.Assert.*
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -113,5 +116,52 @@ class CinematicSearchTest {
         compose.onNodeWithTag("search-results").performScrollToNode(hasText("جست‌وجوهای اخیر"))
         compose.onNodeWithText("نام محفوظ").performClick()
         compose.onNodeWithTag("search-input").assertTextContains("نام محفوظ")
+    }
+
+    @Test fun emptyStarterRetryLoadsServiceArtworkAndOpensTheReceivedTitle() {
+        val backend = backend()
+        val metadataCalls = AtomicInteger()
+        val metadataPaths = CopyOnWriteArrayList<String>()
+        val imageCalls = AtomicInteger()
+        // Test-only artwork is returned by the same HTTP service as the title, never a runtime asset.
+        val bitmap = Bitmap.createBitmap(64, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.rgb(37, 82, 88)) }
+        val png = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        bitmap.recycle()
+        val image = server.url("/received-poster.png").toString()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.requestUrl!!.encodedPath
+                if (path == "/received-poster.png") {
+                    imageCalls.incrementAndGet()
+                    return MockResponse().setHeader("Content-Type", "image/png").setBody(Buffer().write(png))
+                }
+                if (path == "/v1/tmdb") {
+                    metadataPaths += request.requestUrl!!.queryParameter("path").orEmpty()
+                    val results = if (metadataCalls.incrementAndGet() == 1) "[]" else """[{"id":77,"media_type":"movie","title":"جدایی نادر از سیمین","original_title":"A Separation","poster_path":"$image","vote_average":8.1,"release_date":"2011-03-15"}]"""
+                    return MockResponse().setHeader("Content-Type", "application/json").setBody("""{"results":$results}""")
+                }
+                return MockResponse().setHeader("Content-Type", "application/json").setBody("""{"items":[],"results":[]}""")
+            }
+        }
+        val repository = TmdbRepository(compose.activity)
+        compose.setContent { FilmiqooTheme { PremiumSearchScreen(repository, backend, {}, { opened += it }, {}, {}, {}) } }
+        compose.waitUntil(10000) { compose.onAllNodesWithText("پیشنهادها هنوز آماده نیستند").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("search-poster-empty", useUnmergedTree = true).assertExists()
+        assertEquals(1, metadataCalls.get())
+        assertEquals(0, imageCalls.get())
+        compose.onNodeWithText("دریافت پیشنهادها").performScrollTo().performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("poster-MOVIE:77").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("search-poster-atmosphere", useUnmergedTree = true).assertExists()
+        compose.waitUntil(10000) { imageCalls.get() > 0 }
+        compose.onNodeWithText("پیشنهادها هنوز آماده نیستند").assertDoesNotExist()
+        compose.onNodeWithTag("poster-MOVIE:77").performScrollTo().performClick()
+        val received = opened.single()
+        assertEquals(77, received.id)
+        assertEquals(image, received.posterPath)
+        assertEquals("A Separation", received.originalTitle)
+        assertFalse(received.streamReady)
+        assertNull(received.mediaVersionId)
+        assertEquals(2, metadataCalls.get())
+        assertEquals(listOf("trending/all/week", "trending/all/week"), metadataPaths.toList())
     }
 }

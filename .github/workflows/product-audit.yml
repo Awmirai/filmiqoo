@@ -17,6 +17,7 @@ jobs:
     env:
       FILMIQOO_DEBUG_API_BASE_URL: https://api.filmiqo.com
       FILMIQOO_LEGACY_SERVER_PREVIEW: 'true'
+      FILMIQOO_AUDIT_STAGE: ${{ matrix.stage }}
     steps:
       - uses: actions/checkout@v4
         with:
