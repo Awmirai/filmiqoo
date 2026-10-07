@@ -117,7 +117,7 @@ fun ConnectedProfileScreen(
                     Column(Modifier.weight(1f).padding(horizontal=14.dp)){
                         Text(if(kidsMode)"سینمای کودک"else"سینمای من",color=CinemaGold,fontSize=12.sp,fontWeight=FontWeight.Bold)
                         Text(if(kidsMode)viewer?.name?:"تماشاگر کودک"else account?.displayName?.takeIf(String::isNotBlank)?:account?.username?.takeIf(String::isNotBlank)?:if(!loggedIn)"تماشاگر مهمان"else if(accountError)"حساب کاربری"else"در حال دریافت حساب…",color=CinemaPaper,fontSize=21.sp,lineHeight=30.sp,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.Bold,modifier=Modifier.testTag("account-name"))
-                        if(!kidsMode)account?.username?.takeIf(String::isNotBlank)?.let{Text("@"+it,color=CinemaSoft,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis)}
+                        if(!kidsMode)account?.username?.takeIf(String::isNotBlank)?.let{Text("@"+it,color=CinemaSoft,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis,style=LocalTextStyle.current.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr))}
                     }
                     IconButton({accountAction(if(kidsMode)onViewerProfiles else onSettings)},Modifier.testTag("profile-settings")){Icon(Icons.Outlined.Settings,"تنظیمات",tint=CinemaPaper)}
                 }
