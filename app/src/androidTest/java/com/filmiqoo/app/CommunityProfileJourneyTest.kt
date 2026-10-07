@@ -174,41 +174,28 @@ class CommunityProfileJourneyTest {
         compose.onNodeWithTag("community-clip-clip").performScrollTo().performClick();assertEquals("clip",opened)
         assertFalse(requests.any{it.requestUrl?.encodedPath?.endsWith("/playback-event")==true})
     }
-    @Test fun profilePartialFailureKeepsLibraryDownloadsAndSocialRoutesAvailable(){
-        val backend=backend(true);val library=AtomicInteger();val downloads=AtomicInteger();val create=AtomicInteger()
-        dispatch{r->when(r.requestUrl!!.encodedPath){
-            "/v1/me"->json("""{"id":"owner","username":"cinema","displayName":"پروفایل آزمون","followers":12,"following":3}""")
-            "/v1/library/stats"->json("{}").setResponseCode(503)
-            else->json("""{"items":[]}""")
-        }}
-        compose.setContent{FilmiqooTheme{ConnectedProfileScreen(backend,TmdbRepository(compose.activity),onMedia={},onPlay={},onCommunity={},onDownloads={downloads.incrementAndGet()},onLibrary={library.incrementAndGet()},onSocialSaves={},onHistory={},onCreatorStudio={},onInbox={},onSettings={},onViewerProfiles={},onParentalControls={},onSecurity={},onSafety={},onFollowRequests={},onCloseFriends={},onEditProfile={},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={},onCreate={create.incrementAndGet()})}}
-        compose.waitUntil(10000){compose.onAllNodesWithText("پروفایل آزمون").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("همگام‌سازی کامل نشد").performScrollTo().assertExists()
-        scrollLazyTo("profile-scroll","profile-library")
-        compose.onNodeWithTag("profile-library").performClick()
-        scrollLazyTo("profile-scroll","profile-downloads")
-        compose.onNodeWithTag("profile-downloads").performClick()
-        scrollLazyTo("profile-scroll","profile-create")
-        compose.onNodeWithTag("profile-create").performClick()
-        assertEquals(1,library.get());assertEquals(1,downloads.get());assertEquals(1,create.get())
+
+    @Test fun profileStatsFailureKeepsPersonalListsAndDownloadsAvailable(){
+        val backend=backend(true);val oldLibrary=AtomicInteger();val downloads=AtomicInteger();val create=AtomicInteger()
+        dispatch{r->when(r.requestUrl!!.encodedPath){"/v1/me"->json("""{"id":"owner","username":"cinema","displayName":"پروفایل آزمون"}""");"/v1/library/viewing-stats"->json("{}").setResponseCode(503);else->json("""{"items":[]}""")}}
+        compose.setContent{FilmiqooTheme{ConnectedProfileScreen(backend,TmdbRepository(compose.activity),onMedia={},onPlay={},onCommunity={error("obsolete social route")},onDownloads={downloads.incrementAndGet()},onLibrary={oldLibrary.incrementAndGet()},onSocialSaves={},onHistory={},onCreatorStudio={},onInbox={},onSettings={},onViewerProfiles={},onParentalControls={},onSecurity={},onSafety={},onFollowRequests={},onCloseFriends={},onEditProfile={},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={},onCreate={create.incrementAndGet()})}}
+        compose.waitUntil(10_000){compose.onAllNodesWithText("پروفایل آزمون").fetchSemanticsNodes().isNotEmpty()};scrollLazyTo("profile-scroll","profile-stats-error");compose.onNodeWithTag("profile-watch-time").assertDoesNotExist();scrollLazyTo("profile-scroll","profile-watchlist");compose.onNodeWithTag("profile-watchlist").performClick();compose.onNodeWithTag("profile-list-tab-0").assertIsSelected()
+        scrollLazyTo("profile-scroll","profile-hub-tabs");compose.onNodeWithTag("profile-hub-tab-0").performClick();scrollLazyTo("profile-scroll","profile-downloads");compose.onNodeWithTag("profile-downloads").performClick();assertEquals(1,downloads.get());assertEquals(0,oldLibrary.get());assertEquals(0,create.get())
     }
-    @Test fun kidsProfileHidesAccountEditAndSettingsButKeepsSafeLibraryAndParentExit(){
-        val backend=backend(true);val parent=AtomicInteger();val library=AtomicInteger();val downloads=AtomicInteger()
-        originalViewer=backend.viewerProfiles.active();restoreViewer=true
+    @Test fun kidsProfileUsesChildIdentityAndParentSelectionButHidesAdultActions(){
+        val backend=backend(true);val parent=AtomicInteger();val downloads=AtomicInteger();originalViewer=backend.viewerProfiles.active();restoreViewer=true
         backend.viewerProfiles.activate(ViewerProfile("test-kid","تماشاگر کوچک","",true,"all","fa","fa",true,false))
         dispatch{r->if(r.requestUrl!!.encodedPath=="/v1/me")json("""{"id":"adult","displayName":"حساب والدین","username":"adult"}""")else json("""{"items":[]}""")}
-        compose.setContent{FilmiqooTheme{ConnectedProfileScreen(backend,TmdbRepository(compose.activity),kidsMode=true,onMedia={},onPlay={},onCommunity={error("kids social")},onDownloads={downloads.incrementAndGet()},onLibrary={library.incrementAndGet()},onSocialSaves={},onHistory={},onCreatorStudio={},onInbox={},onSettings={error("kids settings")},onViewerProfiles={parent.incrementAndGet()},onParentalControls={},onSecurity={},onSafety={},onFollowRequests={},onCloseFriends={},onEditProfile={error("kids account edit")},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={})}}
-        compose.onNodeWithText("تماشاگر کوچک").assertExists()
-        compose.onNodeWithText("ویرایش پروفایل").assertDoesNotExist()
-        compose.onNodeWithTag("profile-settings").assertDoesNotExist()
-        compose.onNodeWithTag("profile-more").assertDoesNotExist()
-        compose.onNodeWithTag("profile-create").assertDoesNotExist()
-        compose.onNodeWithTag("profile-identity-action").performScrollTo().performClick()
-        scrollLazyTo("profile-scroll","profile-library")
-        compose.onNodeWithTag("profile-library").performClick()
-        scrollLazyTo("profile-scroll","profile-downloads")
-        compose.onNodeWithTag("profile-downloads").performClick()
-        assertEquals(1,parent.get());assertEquals(1,library.get());assertEquals(1,downloads.get())
+        compose.setContent{FilmiqooTheme{ConnectedProfileScreen(backend,TmdbRepository(compose.activity),kidsMode=true,onMedia={},onPlay={},onCommunity={error("kids social")},onDownloads={downloads.incrementAndGet()},onLibrary={},onSocialSaves={},onHistory={},onCreatorStudio={},onInbox={},onSettings={error("kids settings")},onViewerProfiles={parent.incrementAndGet()},onParentalControls={error("kids parental settings")},onSecurity={error("kids security")},onSafety={},onFollowRequests={},onCloseFriends={},onEditProfile={error("kids edit")},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={error("kids logout")})}}
+        compose.onNodeWithTag("account-name").assertTextEquals("تماشاگر کوچک");compose.onNodeWithText("حساب والدین").assertDoesNotExist();compose.onNodeWithTag("profile-edit").assertDoesNotExist();compose.onNodeWithTag("profile-settings").performClick();scrollLazyTo("profile-scroll","profile-watchlist");compose.onNodeWithTag("profile-watchlist").performClick();compose.onNodeWithTag("profile-list-tab-0").assertIsSelected()
+        scrollLazyTo("profile-scroll","profile-hub-tabs");compose.onNodeWithTag("profile-hub-tab-0").performClick();scrollLazyTo("profile-scroll","profile-downloads");compose.onNodeWithTag("profile-downloads").performClick();assertEquals(1,parent.get());assertEquals(1,downloads.get())
+    }
+    @Test fun logoutDiscardsPrivateHistoryAndPendingRemovalDialog(){
+        val backend=backend(true);originalViewer=backend.viewerProfiles.active();restoreViewer=true;backend.viewerProfiles.activate(ViewerProfile("privacy-a","پروفایل خصوصی","",false,"all","fa","fa",true,false));val logged=androidx.compose.runtime.mutableStateOf(true)
+        dispatch{r->when(r.requestUrl!!.encodedPath){"/v1/me"->json("""{"id":"owner","displayName":"پروفایل خصوصی"}""");"/v1/watch/history"->json("""{"historyVersion":1,"hasMore":false,"items":[{"mediaVersionId":"private-version","positionMs":1000,"durationMs":10000,"completed":false,"streamReady":true,"media":{"id":"catalog-private","tmdbId":77,"kind":"movie","title":"سابقه خصوصی"}}]}""");"/v1/library/viewing-stats"->json("{}").setResponseCode(503);else->json("""{"items":[]}""")}}
+        compose.setContent{FilmiqooTheme{ConnectedProfileScreen(backend,TmdbRepository(compose.activity),onMedia={},onPlay={},onCommunity={},onDownloads={},onLibrary={},onSocialSaves={},onHistory={},onCreatorStudio={},onInbox={},onSettings={},onViewerProfiles={},onParentalControls={},onSecurity={},onSafety={},onFollowRequests={},onCloseFriends={},onEditProfile={},onFilmDna={},onReputation={},onSeriesCalendar={},onSocialCollections={},onLoggedOut={},loggedIn=logged.value)}}
+        compose.onNodeWithTag("profile-hub-tab-1").performClick();scrollLazyTo("profile-scroll","profile-history-private-version");compose.onNodeWithTag("profile-history-remove-private-version").performClick();compose.onNodeWithTag("profile-history-confirm").assertExists()
+        compose.runOnUiThread{backend.session.accessToken=null;backend.viewerProfiles.clear();logged.value=false};compose.waitUntil(5_000){compose.onAllNodesWithTag("profile-history-confirm").fetchSemanticsNodes().isEmpty()};compose.onNodeWithTag("profile-history-private-version").assertDoesNotExist();compose.onNodeWithText("سابقه خصوصی").assertDoesNotExist();assertFalse(requests.any{it.method=="POST"&&it.requestUrl?.encodedPath?.endsWith("/remove")==true})
     }
     @Test fun foregroundNewPostBannerWaitsForUserAndFailedRefreshKeepsReadableFeed(){
         val backend=backend(false)

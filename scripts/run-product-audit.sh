@@ -82,7 +82,7 @@ for spec in $audit_specs; do
       audit_trace_pid=$!
     fi
   fi
-  if ! gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.filmiqoo.app.ProductAuditTest -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" -Pandroid.testInstrumentationRunnerArguments.auditStage="${FILMIQOO_AUDIT_STAGE:-after}" --stacktrace; then
+  if ! gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="${FILMIQOO_AUDIT_TEST_CLASS:-com.filmiqoo.app.ProductAuditTest}" -Pandroid.testInstrumentationRunnerArguments.auditLabel="$label" -Pandroid.testInstrumentationRunnerArguments.auditStage="${FILMIQOO_AUDIT_STAGE:-after}" --stacktrace; then
     kill "$audit_monitor_pid" 2>/dev/null || true
     wait "$audit_monitor_pid" 2>/dev/null || true
     if [[ -n "$audit_trace_pid" ]]; then kill "$audit_trace_pid" 2>/dev/null || true; wait "$audit_trace_pid" 2>/dev/null || true; fi

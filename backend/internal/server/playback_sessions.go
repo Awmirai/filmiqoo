@@ -17,6 +17,7 @@ type playbackSessionStartPayload struct {
 }
 
 type playbackSessionHeartbeatPayload struct {
+    WatchedTotalMS *int64 `json:"watchedTotalMs"`
     CurrentMediaVersionID string `json:"currentMediaVersionId"`
     PositionMS int64 `json:"positionMs"`
     DurationMS int64 `json:"durationMs"`
@@ -28,6 +29,7 @@ type playbackSessionHeartbeatPayload struct {
 }
 
 type playbackSessionEndPayload struct {
+    WatchedTotalMS *int64 `json:"watchedTotalMs"`
     CurrentMediaVersionID string `json:"currentMediaVersionId"`
     PositionMS int64 `json:"positionMs"`
     DurationMS int64 `json:"durationMs"`
@@ -147,7 +149,10 @@ func (s *Server) heartbeatPlaybackSession(w http.ResponseWriter,r *http.Request)
           ),
           position_ms=$4,
           duration_ms=$5,
-          watched_ms=watched_ms+$6,
+          watched_ms=watched_ms+CASE WHEN $11::bigint IS NULL THEN $6 ELSE
+            LEAST(GREATEST($11-client_watched_ms,0),
+              GREATEST((EXTRACT(EPOCH FROM now()-last_heartbeat_at)*1000)::bigint+2000,0)) END,
+          client_watched_ms=CASE WHEN $11::bigint IS NULL THEN client_watched_ms ELSE GREATEST(client_watched_ms,$11) END,
           buffer_count=buffer_count+$7,
           buffer_ms=buffer_ms+$8,
           quality_switch_count=quality_switch_count+$9,
@@ -159,7 +164,7 @@ func (s *Server) heartbeatPlaybackSession(w http.ResponseWriter,r *http.Request)
         clampInt64(body.PositionMS,0,86_400_000),
         clampInt64(body.DurationMS,0,86_400_000),
         watched,bufferCount,bufferMS,switches,
-        cleanTelemetryText(body.NetworkType,32),
+        cleanTelemetryText(body.NetworkType,32),body.WatchedTotalMS,
     )
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     if tag.RowsAffected()==0 {
@@ -203,7 +208,10 @@ func (s *Server) endPlaybackSession(w http.ResponseWriter,r *http.Request) {
           ),
           position_ms=$4,
           duration_ms=$5,
-          watched_ms=watched_ms+$6,
+          watched_ms=watched_ms+CASE WHEN $13::bigint IS NULL THEN $6 ELSE
+            LEAST(GREATEST($13-client_watched_ms,0),
+              GREATEST((EXTRACT(EPOCH FROM now()-last_heartbeat_at)*1000)::bigint+2000,0)) END,
+          client_watched_ms=CASE WHEN $13::bigint IS NULL THEN client_watched_ms ELSE GREATEST(client_watched_ms,$13) END,
           buffer_count=buffer_count+$7,
           buffer_ms=buffer_ms+$8,
           quality_switch_count=quality_switch_count+$9,
@@ -222,7 +230,7 @@ func (s *Server) endPlaybackSession(w http.ResponseWriter,r *http.Request) {
         clampInt64(body.BufferMSDelta,0,120_000),
         clampInt(body.QualitySwitchDelta,0,10),
         cleanTelemetryText(body.NetworkType,32),
-        body.Completed,reason,
+        body.Completed,reason,body.WatchedTotalMS,
     )
     if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
     if tag.RowsAffected()==0 {

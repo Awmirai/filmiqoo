@@ -4,10 +4,15 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class CinemaUserRating(val media: MediaItem, val value: Int, val updatedAt: Long)
+
 /** Local lists also support metadata-only titles. They are explicitly separate from downloaded files. */
 class CinemaPersonalStore(context: Context, profileId: String?) {
     private val prefs = context.applicationContext.getSharedPreferences("filmiqoo_cinema_library_v1", Context.MODE_PRIVATE)
-    private val prefix = "profile:" + (profileId?.takeIf(String::isNotBlank) ?: "guest") + ":"
+    // Existing viewer IDs keep their original storage namespace; account-only and anonymous data are separate.
+    private val prefix = profileId?.takeIf(String::isNotBlank)?.let { "profile:$it:" }
+        ?: SessionStore(context.applicationContext).localAccountScope?.let { "account:$it:" }
+        ?: "profile:guest:"
 
     fun saved(): List<MediaItem> = readItems("watchlist")
     fun favorites(): List<MediaItem> = readItems("favorites")
@@ -18,9 +23,7 @@ class CinemaPersonalStore(context: Context, profileId: String?) {
         if (saved) items.add(0, media)
         val array = JSONArray()
         items.take(2000).forEach {
-            array.put(JSONObject().put("id", it.id).put("type", it.type.name).put("title", it.title)
-                .put("originalTitle", it.originalTitle).put("poster", it.posterPath).put("backdrop", it.backdropPath)
-                .put("date", it.date).put("vote", it.vote.takeIf(Double::isFinite) ?: 0.0).put("backendId", it.backendId))
+            array.put(cinemaStoredMediaJson(it))
         }
         prefs.edit().putString(prefix + bucket, array.toString()).apply()
     }
@@ -30,6 +33,27 @@ class CinemaPersonalStore(context: Context, profileId: String?) {
     fun markSeen(media: MediaItem, value: Boolean) { prefs.edit().putBoolean(prefix + "seen:" + cinemaMediaKey(media), value).apply(); setSaved("seenItems",media,value) }
     fun seenItems():List<MediaItem> = (readItems("seenItems") + saved() + favorites()).distinctBy(::cinemaMediaKey).filter(::seen)
     fun hideSpoilers(): Boolean = prefs.getBoolean(prefix + "hideSpoilers", true)
+    fun rating(media: MediaItem): Int? = prefs.getInt(prefix + "rating:" + cinemaMediaKey(media), 0).takeIf { it in 1..10 }
+    /** Explicit ratings on this device/profile, independently of cloud lists and playback history. */
+    fun setRating(media: MediaItem, value: Int?) {
+        require(value == null || value in 1..10)
+        val key = prefix + "rating:" + cinemaMediaKey(media)
+        val timeKey = prefix + "ratedAt:" + cinemaMediaKey(media)
+        val editor = prefs.edit()
+        if (value == null) editor.remove(key).remove(timeKey)
+        else editor.putInt(key, value).putLong(timeKey, System.currentTimeMillis())
+        editor.apply()
+        val items = readItems("ratedItems").filterNot { cinemaMediaKey(it) == cinemaMediaKey(media) }.toMutableList()
+        if (value != null) items.add(0, media)
+        val array = JSONArray()
+        items.take(2000).forEach { item ->
+            array.put(cinemaStoredMediaJson(item))
+        }
+        prefs.edit().putString(prefix + "ratedItems", array.toString()).apply()
+    }
+    fun ratings(): List<CinemaUserRating> = readItems("ratedItems").mapNotNull { item ->
+        rating(item)?.let { CinemaUserRating(item, it, prefs.getLong(prefix + "ratedAt:" + cinemaMediaKey(item), 0L)) }
+    }.sortedByDescending { it.updatedAt }
     fun setHideSpoilers(value: Boolean) { prefs.edit().putBoolean(prefix + "hideSpoilers", value).apply() }
 
     private fun readItems(bucket: String): List<MediaItem> {
@@ -40,11 +64,11 @@ class CinemaPersonalStore(context: Context, profileId: String?) {
                 val type = runCatching { MediaType.valueOf(o.optString("type")) }.getOrNull() ?: continue
                 val title = o.optString("title")
                 if (title.isBlank()) continue
-                add(MediaItem(o.optInt("id"), type, title, o.optString("originalTitle"),
+                add(mediaCatalogExtras(MediaItem(o.optInt("id"), type, title, o.optString("originalTitle"),
                     posterPath = o.optString("poster").takeIf { it.isNotBlank() && it != "null" },
                     backdropPath = o.optString("backdrop").takeIf { it.isNotBlank() && it != "null" },
                     vote = o.optDouble("vote", 0.0), date = o.optString("date"),
-                    backendId = o.optString("backendId").takeIf { it.isNotBlank() && it != "null" }))
+                    backendId = o.optString("backendId").takeIf { it.isNotBlank() && it != "null" }),o))
             }
         }
     }

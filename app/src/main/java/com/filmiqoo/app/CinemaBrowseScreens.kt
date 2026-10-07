@@ -188,7 +188,9 @@ fun CinemaHomeScreen(
             }
         }
         data?.let { bundle -> item("hero") { CinemaSpotlight(bundle, onMedia, onStory) } }
-        item("watch-together") { CinemaTogetherCard({onWatchParty(null)},Modifier.padding(horizontal=20.dp).fillMaxWidth()) }
+        item("cinema-destinations") {
+            CinemaDiscoveryEntrances(onClub,{onWatchParty(null)},Modifier.padding(horizontal=20.dp))
+        }
         item("discover-shortcuts") {
             CinemaHeading("حال‌وهوای امشب", "از یک مسیر روشن شروع کن")
             LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -211,7 +213,7 @@ fun CinemaHomeScreen(
         }
         item("explore-more") { Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             CinemaAction(Icons.Default.MovieFilter,"کلیپ‌ها و پیشنهادهای کوتاه",onClips,Modifier.fillMaxWidth())
-            CinemaAction(Icons.Default.Forum,"نظر فیلم‌بازها؛ شبکهٔ فیلم",onClub,Modifier.fillMaxWidth())
+            CinemaAction(Icons.Default.Movie,"کشف فیلم‌ها؛ رتبه‌ها، ژانرها و سینمای جهان",onClub,Modifier.fillMaxWidth())
             CinemaAction(Icons.Default.CalendarMonth,"تقویم قسمت‌های جدید",onReleases,Modifier.fillMaxWidth())
         } }
         item("notice") { Text("اطلاعات عنوان‌ها از بانک‌های فراداده دریافت می‌شود. امکان پخش و دانلود به موجود بودن فایل مجاز در کاتالوگ فیلمیکو بستگی دارد.", color = CinemaSoft, fontSize = 12.sp, lineHeight = 20.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) }

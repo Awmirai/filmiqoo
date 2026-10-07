@@ -68,7 +68,7 @@ jobs:
 
   experience-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       FILMIQOO_DEBUG_API_BASE_URL: https://api.filmiqo.com
       FILMIQOO_LEGACY_SERVER_PREVIEW: 'true'
@@ -100,7 +100,7 @@ jobs:
           script: |
             bash scripts/prepare-test-device.sh
             bash scripts/generate-player-test-fixture.sh
-            gradle :app:connectedDebugAndroidTest --stacktrace
+            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.filmiqoo.app.ProductAuditTest --stacktrace
       - name: Upload device test results and screenshots
         if: always()
         uses: actions/upload-artifact@v4

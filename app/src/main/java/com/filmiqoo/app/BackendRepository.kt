@@ -141,7 +141,11 @@ data class PlatformDetail(
     val backdropUrl: String,
     val rating: Double,
     val versions: List<PlatformVersion>,
-    val seasons: List<PlatformSeason>
+    val seasons: List<PlatformSeason>,
+    val hasPersianDub:Boolean=false,val hasPersianSubtitle:Boolean=false,
+    val dubbedEpisodeCount:Int?=null,val availableEpisodeCount:Int?=null,
+    val genreIds:List<Int> = emptyList(),val originalLanguage:String="",val originCountries:List<String> = emptyList(),
+    val runtimeMinutes:Int?=null,val seriesStatus:String?=null,val seriesType:String?=null,val seasonCount:Int?=null,val episodeCount:Int?=null
 ) {
     fun asMediaItem(): MediaItem = MediaItem(
         id=tmdbId ?: 0,
@@ -156,9 +160,11 @@ data class PlatformDetail(
         backendId=id,
         mediaVersionId=versions.firstOrNull { it.preferred && it.streamReady }?.id
             ?: versions.firstOrNull { it.streamReady }?.id,
-        streamReady=versions.any { it.streamReady },
+        streamReady=versions.any { it.streamReady } || seasons.any{season->season.episodes.any{it.streamReady}},
         quality=versions.firstOrNull { it.preferred }?.quality
-            ?: versions.firstOrNull()?.quality.orEmpty()
+            ?: versions.firstOrNull()?.quality.orEmpty(),
+        hasPersianDub=hasPersianDub,hasPersianSubtitle=hasPersianSubtitle,dubbedEpisodeCount=dubbedEpisodeCount,availableEpisodeCount=availableEpisodeCount,
+        genreIds=genreIds,originalLanguage=originalLanguage,originCountries=originCountries,runtimeMinutes=runtimeMinutes,seriesStatus=seriesStatus,seasonCount=seasonCount,episodeCount=episodeCount
     )
 }
 
@@ -172,7 +178,9 @@ data class PlatformVersion(
     val streamReady: Boolean,
     val preferred: Boolean,
     val audioTracks: List<String> = emptyList(),
-    val subtitleTracks: List<String> = emptyList()
+    val subtitleTracks: List<String> = emptyList(),
+    val isDubbed:Boolean=false,val isPersianDubbed:Boolean=false,val hasPersianSubtitle:Boolean=false,
+    val detectionSource:String="",val detectionConfidence:String="NONE",val detectionEvidence:List<String> = emptyList()
 )
 
 internal fun cinemaTrackLabels(array: org.json.JSONArray?): List<String> = buildList {
@@ -207,7 +215,9 @@ data class PlatformEpisode(
     val introEndMs: Long? = null,
     val recapStartMs: Long? = null,
     val recapEndMs: Long? = null,
-    val creditsStartMs: Long? = null
+    val creditsStartMs: Long? = null,
+    val isDubbed:Boolean=false,val isPersianDubbed:Boolean=false,val hasPersianSubtitle:Boolean=false,
+    val hasPersianDub:Boolean=false,val versions:List<PlatformVersion> = emptyList()
 )
 
 data class PlatformSeason(
@@ -241,6 +251,15 @@ class SessionStore(context: Context) {
         set(value) { prefs.edit().putString("display_name", value).apply() }
 
     val isLoggedIn: Boolean get() = !accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank()
+    /** Used only to isolate local preferences, never to authorize requests. */
+    val localAccountScope: String? get() {
+        if (!isLoggedIn) return null
+        return runCatching {
+            val segment=accessToken.orEmpty().split('.').getOrNull(1) ?: return@runCatching null
+            val body=String(android.util.Base64.decode(segment,android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP),Charsets.UTF_8)
+            JSONObject(body).optString("sub").takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
 
     fun save(result: AuthResult) {
         accessToken = result.accessToken
@@ -332,7 +351,7 @@ class BackendRepository(context: Context) {
             .build()
         client.newCall(req).execute().use { res ->
             val raw = res.body?.string().orEmpty()
-            if (!res.isSuccessful) throw IllegalStateException(apiError(raw, res.code))
+            if (!res.isSuccessful) throw BackendHttpException(res.code, runCatching { JSONObject(raw).optString("error") }.getOrDefault(""), apiError(raw, res.code))
             val obj = JSONObject(raw)
             val user = obj.getJSONObject("user")
             AuthResult(
@@ -374,54 +393,19 @@ class BackendRepository(context: Context) {
         executeJson(Request.Builder().url(url).get(), authorized = false)
     }
 
-    suspend fun catalogHome(): List<MediaItem> = withContext(Dispatchers.IO) {
-        val obj = getJson("/v1/catalog/home", authorized = false)
-        val arr = obj.optJSONArray("items") ?: return@withContext emptyList()
-        buildList {
-            for (i in 0 until arr.length()) {
-                val x = arr.optJSONObject(i) ?: continue
-                val tmdbId = if (x.isNull("tmdbId")) 0 else x.optInt("tmdbId")
-                add(
-                    MediaItem(
-                        id = tmdbId,
-                        type = if (x.optString("kind") == "movie") MediaType.MOVIE else MediaType.TV,
-                        title = x.optString("title").ifBlank { x.optString("originalTitle") },
-                        originalTitle = x.optString("originalTitle"),
-                        overview = x.optString("overview"),
-                        posterPath = x.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropPath = x.optString("backdropUrl").takeIf(String::isNotBlank),
-                        vote = x.optDouble("rating", 0.0),
-                        date = x.optInt("year", 0).takeIf { it > 0 }?.toString().orEmpty(),
-                        popularity = 0.0,
-                        backendId = x.optString("id"),
-                        mediaVersionId = x.optString("mediaVersionId").takeIf { it.isNotBlank() && it != "null" },
-                        streamReady = x.optBoolean("streamReady", false),
-                        quality = x.optString("quality")
-                    )
-                )
-            }
-        }
+    suspend fun catalogHome():List<MediaItem> = withContext(Dispatchers.IO) {
+        val root=getJson("/v1/catalog/home",authorized=session.isLoggedIn)
+        parseTitles(root.optJSONArray("items"),null,true).map { it.media }
     }
 
     suspend fun detail(id: String): PlatformDetail = withContext(Dispatchers.IO) {
-        val o = getJson("/v1/catalog/" + id, authorized = false)
+        val o = getJson("/v1/catalog/" + id, authorized = session.isLoggedIn)
         val versions = buildList {
             val a = o.optJSONArray("versions")
             if (a != null) for (i in 0 until a.length()) {
                 val x = a.optJSONObject(i) ?: continue
                 add(
-                    PlatformVersion(
-                        id = x.optString("id"),
-                        quality = x.optString("quality"),
-                        codec = x.optString("codec"),
-                        hdr = x.optString("hdr"),
-                        fileSizeBytes = x.optLong("fileSizeBytes"),
-                        durationMs = x.optLong("durationMs"),
-                        streamReady = x.optBoolean("streamReady"),
-                        preferred = x.optBoolean("preferred"),
-                        audioTracks = cinemaTrackLabels(x.optJSONArray("audioTracks")),
-                        subtitleTracks = cinemaTrackLabels(x.optJSONArray("subtitleTracks"))
-                    )
+                    platformVersionFromJson(x)
                 )
             }
         }
@@ -449,7 +433,8 @@ class BackendRepository(context: Context) {
                                 introEndMs = if(x.isNull("introEndMs")) null else x.optLong("introEndMs"),
                                 recapStartMs = if(x.isNull("recapStartMs")) null else x.optLong("recapStartMs"),
                                 recapEndMs = if(x.isNull("recapEndMs")) null else x.optLong("recapEndMs"),
-                                creditsStartMs = if(x.isNull("creditsStartMs")) null else x.optLong("creditsStartMs")
+                                creditsStartMs = if(x.isNull("creditsStartMs")) null else x.optLong("creditsStartMs"),
+                                isDubbed=x.optBoolean("isDubbed"),isPersianDubbed=x.optBoolean("isPersianDubbed"),hasPersianSubtitle=x.optBoolean("hasPersianSubtitle"),hasPersianDub=x.optBoolean("hasPersianDub"),versions=platformEpisodeVersions(x)
                             )
                         )
                     }
@@ -477,8 +462,10 @@ class BackendRepository(context: Context) {
             posterUrl = o.optString("posterUrl"),
             backdropUrl = o.optString("backdropUrl"),
             rating = o.optDouble("rating",0.0),
-            versions = versions,
-            seasons = seasons
+            versions = versions,seasons = seasons,
+            hasPersianDub=o.optBoolean("hasPersianDub"),hasPersianSubtitle=o.optBoolean("hasPersianSubtitle"),dubbedEpisodeCount=discoveryOptionalInt(o,"dubbedEpisodeCount"),availableEpisodeCount=discoveryOptionalInt(o,"availableEpisodeCount"),
+            genreIds=discoveryInts(o.optJSONArray("genreIds")),originalLanguage=discoveryClean(o,"originalLanguage"),originCountries=discoveryStrings(o.optJSONArray("originCountries")),runtimeMinutes=discoveryOptionalInt(o,"runtimeMinutes")?.takeIf{it>0},
+            seriesStatus=discoveryClean(o,"seriesStatus").takeIf(String::isNotBlank),seriesType=discoveryClean(o,"seriesType").takeIf(String::isNotBlank),seasonCount=discoveryOptionalInt(o,"seasonCount"),episodeCount=discoveryOptionalInt(o,"episodeCount")
         )
     }
 
@@ -1028,7 +1015,8 @@ class BackendRepository(context: Context) {
         bufferCountDelta:Int,
         bufferMsDelta:Long,
         qualitySwitchDelta:Int,
-        networkType:String
+        networkType:String,
+        watchedTotalMs:Long?=null
     ) {
         withContext(Dispatchers.IO) {
             postJson(
@@ -1038,6 +1026,7 @@ class BackendRepository(context: Context) {
                     .put("positionMs",positionMs)
                     .put("durationMs",durationMs)
                     .put("watchedDeltaMs",watchedDeltaMs)
+                    .put("watchedTotalMs",watchedTotalMs)
                     .put("bufferCountDelta",bufferCountDelta)
                     .put("bufferMsDelta",bufferMsDelta)
                     .put("qualitySwitchDelta",qualitySwitchDelta)
@@ -1058,7 +1047,8 @@ class BackendRepository(context: Context) {
         qualitySwitchDelta:Int,
         networkType:String,
         completed:Boolean,
-        exitReason:String
+        exitReason:String,
+        watchedTotalMs:Long?=null
     ) {
         withContext(Dispatchers.IO) {
             runCatching {
@@ -1069,6 +1059,7 @@ class BackendRepository(context: Context) {
                         .put("positionMs",positionMs)
                         .put("durationMs",durationMs)
                         .put("watchedDeltaMs",watchedDeltaMs)
+                    .put("watchedTotalMs",watchedTotalMs)
                         .put("bufferCountDelta",bufferCountDelta)
                         .put("bufferMsDelta",bufferMsDelta)
                         .put("qualitySwitchDelta",qualitySwitchDelta)
@@ -1129,7 +1120,8 @@ class BackendRepository(context: Context) {
 
             response.use { res ->
                 val raw = res.body?.string().orEmpty()
-                if (!res.isSuccessful) throw IllegalStateException(apiError(raw, res.code))
+                if (!res.isSuccessful) throw BackendHttpException(res.code,
+                    runCatching { JSONObject(raw).optString("error") }.getOrDefault(""), apiError(raw, res.code))
                 if (raw.isBlank()) JSONObject() else JSONObject(raw)
             }
         }
@@ -1223,3 +1215,5 @@ class BackendRepository(context: Context) {
     private fun sanitizeFileName(value: String): String =
         value.replace(Regex("[^A-Za-z0-9._ -]"), "_").take(90)
 }
+
+internal class BackendHttpException(val status:Int,val reason:String,message:String):IllegalStateException(message)

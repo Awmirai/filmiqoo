@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,194 +48,178 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, onBack: () -> Unit, onMedia: (MediaItem) -> Unit,
-    onCreator: (Creator) -> Unit, onOpenPost: (String) -> Unit, onOpenClip: (String) -> Unit, onDiscover: (() -> Unit)? = null) {
-    val context = LocalContext.current
-    val search = remember(backend) { UniversalSearchRepository(context.applicationContext, backend) }
-    val keyboard = LocalSoftwareKeyboardController.current
-    val window = LocalConfiguration.current
-    val compact = window.screenHeightDp < 480 || window.fontScale >= 1.6f
-    var query by rememberSaveable { mutableStateOf("") }
-    var filter by rememberSaveable { mutableIntStateOf(0) }
-    var playableOnly by rememberSaveable { mutableStateOf(false) }
-    var orderName by rememberSaveable { mutableStateOf(CinematicSearchOrder.RELEVANCE.name) }
-    val order = CinematicSearchOrder.entries.firstOrNull { it.name == orderName } ?: CinematicSearchOrder.RELEVANCE
-    var showFilters by rememberSaveable { mutableStateOf(false) }
-    var retry by remember { mutableIntStateOf(0) }
-    var catalogRetry by remember { mutableIntStateOf(0) }
-    var titles by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
-    var starters by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
-    var history by remember { mutableStateOf(search.history()) }
-    var loading by remember { mutableStateOf(false) }
-    var catalogLoading by remember { mutableStateOf(true) }
-    var catalogFailed by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val normalized = remember(query) { cinemaSearchKey(query) }
-    val gridState = rememberLazyGridState()
-    val listKey = listOf(normalized, filter.toString(), playableOnly.toString(), orderName).joinToString("|")
+    onCreator: (Creator) -> Unit, onOpenPost: (String) -> Unit, onOpenClip: (String) -> Unit, onDiscover: (() -> Unit)? = null,
+    onPerson: (Int, String) -> Unit = { _, _ -> }, onWorld: (() -> Unit)? = null) {
+    val context=LocalContext.current
+    val search=remember(backend){UniversalSearchRepository(context.applicationContext,backend)}
+    val discovery=remember(backend){DiscoveryRepository(context.applicationContext,backend)}
+    val keyboard=LocalSoftwareKeyboardController.current
+    val window=LocalConfiguration.current
+    val compact=window.screenHeightDp<480||window.fontScale>=1.6f
+    var query by rememberSaveable{mutableStateOf("")};var filter by rememberSaveable{mutableIntStateOf(0)}
+    var playableOnly by rememberSaveable{mutableStateOf(false)};var orderName by rememberSaveable{mutableStateOf(CinematicSearchOrder.RELEVANCE.name)}
+    var facets by rememberSaveable(stateSaver=SearchFacetsSaver) { mutableStateOf(CinematicSearchFacets()) }
+    var showFilters by rememberSaveable{mutableStateOf(false)}
+    var browseCountry by rememberSaveable{mutableStateOf("")};var browseGenre by rememberSaveable{mutableIntStateOf(0)}
+    var browseSeries by rememberSaveable{mutableStateOf(false)};var browseTitle by rememberSaveable{mutableStateOf("")}
+    val order=CinematicSearchOrder.entries.firstOrNull{it.name==orderName}?:CinematicSearchOrder.RELEVANCE
+    var catalogRetry by remember{mutableIntStateOf(0)};var metadataRetry by remember{mutableIntStateOf(0)};var starterRetry by remember{mutableIntStateOf(0)}
+    var catalog by remember{mutableStateOf<List<MediaItem>>(emptyList())};var metadata by remember{mutableStateOf<List<DiscoveryTitle>>(emptyList())}
+    var people by remember{mutableStateOf<List<DiscoveryPerson>>(emptyList())}
+    var movieStarters by remember{mutableStateOf<List<DiscoveryTitle>>(emptyList())};var seriesStarters by remember{mutableStateOf<List<DiscoveryTitle>>(emptyList())}
+    var movieGenres by remember{mutableStateOf<List<DiscoveryGenre>>(emptyList())};var seriesGenres by remember{mutableStateOf<List<DiscoveryGenre>>(emptyList())}
+    var history by remember{mutableStateOf(search.history())}
+    var catalogLoading by remember{mutableStateOf(false)};var metadataLoading by remember{mutableStateOf(false)};var startersLoading by remember{mutableStateOf(true)}
+    var catalogError by remember{mutableStateOf(false)};var metadataError by remember{mutableStateOf(false)};var startersError by remember{mutableStateOf(false)}
+    var requestedPage by remember{mutableIntStateOf(1)};var lastPage by remember{mutableIntStateOf(1)};var hasMore by remember{mutableStateOf(false)}
+    val normalized=remember(query){cinemaSearchKey(query)}
+    val merged=remember(catalog,metadata){mergeDiscoveryTitles(catalog,metadata)}
+    val visible=remember(merged,filter,playableOnly,order,facets){cinematicSearchDiscoveryTitles(merged,filter,playableOnly,order,facets)}
+    val visiblePeople=if(filter==0||filter==3)people else emptyList()
+    val starters=remember(movieStarters,seriesStarters){(movieStarters+seriesStarters).distinctBy{cinemaMediaKey(it.media)}}
+    val artwork=remember(starters){cinematicSearchArtwork(starters.map{it.media})}
+    val hasFilters=filter!=0||playableOnly||order!=CinematicSearchOrder.RELEVANCE||facets.active
+    val loading=catalogLoading||metadataLoading;val gridState=rememberLazyGridState()
+    fun changeQuery(value:String){requestedPage=1;query=value.take(120)}
+    fun resetFilters(){filter=0;playableOnly=false;orderName=CinematicSearchOrder.RELEVANCE.name;facets=CinematicSearchFacets()}
+    fun submitHistory(){if(normalized.length>=2){search.recordHistory(query.trim());history=search.history()};keyboard?.hide()}
+    fun openTitle(media:MediaItem){submitHistory();onMedia(media)}
+    if(browseCountry.isNotBlank()||browseGenre>0){
+        DiscoveryFullListScreen(repository,backend,if(browseSeries)MediaType.TV else MediaType.MOVIE,DiscoverySection.POPULAR,
+            DiscoveryFilters(country=browseCountry.takeIf(String::isNotBlank),genreId=browseGenre.takeIf{it>0}),browseTitle,{browseCountry="";browseGenre=0},onMedia)
+        return
+    }
+    BackHandler(onBack=onBack)
+    val listKey=listOf(normalized,filter,playableOnly,order,facets).joinToString("|")
     var lastListKey by rememberSaveable { mutableStateOf(listKey) }
-    val hasFilters = filter != 0 || playableOnly || order != CinematicSearchOrder.RELEVANCE
-    val visible = remember(titles, filter, playableOnly, order) { cinematicSearchTitles(titles, filter, playableOnly, order) }
-    val starterTitles = remember(starters, filter, playableOnly, order) { cinematicSearchTitles(starters, filter, playableOnly, order).take(8) }
-    val artwork = remember(starters) { cinematicSearchArtwork(starters) }
-    fun resetFilters() { filter = 0; playableOnly = false; orderName = CinematicSearchOrder.RELEVANCE.name }
-    fun openTitle(media: MediaItem) {
-        if (normalized.length >= 2) { search.recordHistory(query.trim()); history = search.history() }
-        keyboard?.hide(); onMedia(media)
+    LaunchedEffect(listKey){if(lastListKey!=listKey){gridState.scrollToItem(0);lastListKey=listKey}}
+    LaunchedEffect(discovery){
+        kotlinx.coroutines.supervisorScope{
+            launch{try{movieGenres=discovery.genres(MediaType.MOVIE)}catch(e:CancellationException){throw e}catch(_:Exception){}}
+            launch{try{seriesGenres=discovery.genres(MediaType.TV)}catch(e:CancellationException){throw e}catch(_:Exception){}}
+        }
     }
-    BackHandler(onBack = onBack)
-
-    LaunchedEffect(listKey) {
-        // Reset for an explicit query/filter change, while preserving scroll on a restored tab.
-        if (lastListKey != listKey) { gridState.scrollToItem(0); lastListKey = listKey }
+    LaunchedEffect(discovery,starterRetry){
+        startersLoading=true;startersError=false
+        kotlinx.coroutines.supervisorScope{
+            launch{try{movieStarters=discovery.popular(MediaType.MOVIE).items}catch(e:CancellationException){throw e}catch(_:Exception){startersError=true}}
+            launch{try{seriesStarters=discovery.popular(MediaType.TV).items}catch(e:CancellationException){throw e}catch(_:Exception){startersError=true}}
+        };currentCoroutineContext().ensureActive();startersLoading=false
     }
-
-    // Real service artwork stays still while typing; no invented recommendations or automatic carousel.
-    LaunchedEffect(repository, catalogRetry) {
-        catalogLoading = true; catalogFailed = false
-        try {
-            val loaded = repository.trending()
-            currentCoroutineContext().ensureActive()
-            starters = loaded.distinctBy(::cinemaMediaKey).take(24)
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { catalogFailed = true }
-        finally { currentCoroutineContext().ensureActive(); catalogLoading = false }
-    }
-    LaunchedEffect(normalized, retry) {
-        titles = emptyList(); error = null; loading = normalized.length >= 2
-        if (normalized.length < 2) return@LaunchedEffect
+    LaunchedEffect(normalized,catalogRetry){
+        catalog=emptyList();catalogError=false;catalogLoading=normalized.length>=2
+        if(normalized.length<2)return@LaunchedEffect
         delay(350)
-        try {
-            val local = search.search(normalized).media
-            val result = if (local.isNotEmpty()) local else repository.search(normalized)
-            currentCoroutineContext().ensureActive()
-            titles = result.distinctBy(::cinemaMediaKey)
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { error = "جست‌وجو انجام نشد. اتصال اینترنت را بررسی کن." }
-        finally { currentCoroutineContext().ensureActive(); loading = false }
+        try{catalog=search.search(normalized).media}catch(e:CancellationException){throw e}catch(_:Exception){catalogError=true}
+        finally{currentCoroutineContext().ensureActive();catalogLoading=false}
     }
-    Box(Modifier.fillMaxSize().background(CinemaInk).imePadding().testTag("cinema-search")) {
-        SearchPosterAtmosphere(artwork, compact, normalized.isNotEmpty())
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = if (compact) 4.dp else 10.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onBack) { Icon(Icons.Outlined.ArrowForward, "بازگشت", tint = CinemaPaper) }
-                Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                    Text("جست‌وجو", fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = CinemaPaper)
-                    if (!compact) Text("از یک اسم، به یک دنیای تازه", fontSize = 12.sp, color = CinemaSoft)
+    LaunchedEffect(normalized,metadataRetry,requestedPage){
+        if(requestedPage==1){metadata=emptyList();people=emptyList();hasMore=false}
+        metadataError=false;metadataLoading=normalized.length>=2
+        if(normalized.length<2)return@LaunchedEffect
+        if(requestedPage==1)delay(350)
+        try{
+            val result=discovery.searchMetadata(normalized,requestedPage);currentCoroutineContext().ensureActive()
+            metadata=(if(requestedPage==1)result.titles else metadata+result.titles).distinctBy{cinemaMediaKey(it.media)}
+            people=(if(requestedPage==1)result.people else people+result.people).distinctBy{it.id}
+            lastPage=result.page;hasMore=result.hasMore
+        }catch(e:CancellationException){throw e}catch(_:Exception){metadataError=true}
+        finally{currentCoroutineContext().ensureActive();metadataLoading=false}
+    }
+    DiscoveryActionScope(backend){Box(Modifier.fillMaxSize().background(CinemaInk).imePadding().testTag("cinema-search")){
+        SearchPosterAtmosphere(artwork,compact,normalized.isNotEmpty())
+        Column(Modifier.fillMaxSize()){
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=12.dp,vertical=if(compact)4.dp else 10.dp),verticalAlignment=Alignment.CenterVertically){
+                IconButton(onBack){Icon(Icons.Outlined.ArrowForward,"بازگشت",tint=CinemaPaper)}
+                Column(Modifier.weight(1f).padding(horizontal=8.dp)){
+                    if(!compact)Text("FILMIQOO / DISCOVERY",color=CinemaGold,fontSize=10.sp,fontWeight=FontWeight.Bold,letterSpacing=1.sp)
+                    Text("جست‌وجوی سینما",fontSize=if(compact)22.sp else 26.sp,lineHeight=34.sp,fontWeight=FontWeight.Bold,color=CinemaPaper)
                 }
-                IconButton({ keyboard?.hide(); showFilters = true }, modifier = Modifier.testTag("search-options")) {
-                    BadgedBox(badge = { if (hasFilters) Badge(containerColor = CinemaAccent) }) {
-                        Icon(Icons.Outlined.Tune, "تنظیم نتیجه‌ها", tint = CinemaPaper)
-                    }
-                }
-            }
-            OutlinedTextField(query, { query = it.take(120) }, singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).testTag("search-input"),
-                label = { Text("نام فیلم یا سریال") }, placeholder = { Text("فارسی یا English", color = CinemaSoft) },
-                leadingIcon = { Icon(Icons.Outlined.Search, null, tint = CinemaAccent) },
-                trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }, modifier = Modifier.testTag("search-clear")) { Icon(Icons.Outlined.Close, "پاک‌کردن جست‌وجو") } },
-                shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = CinemaSurface.copy(alpha = .96f), unfocusedContainerColor = CinemaSurface.copy(alpha = .94f),
-                    focusedBorderColor = CinemaAccent, unfocusedBorderColor = Color.White.copy(alpha = .19f), focusedTextColor = CinemaPaper, unfocusedTextColor = CinemaPaper, cursorColor = CinemaAccent),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    if (normalized.length >= 2) { search.recordHistory(query.trim()); history = search.history() }
-                    keyboard?.hide()
-                }))
-            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.testTag("search-type-filters")) {
-                listOf("همه", "فیلم", "سریال").forEachIndexed { index, label -> item(key = index) {
-                    FilterChip(filter == index, { filter = index }, label = { Text(label, fontWeight = if (filter == index) FontWeight.Bold else FontWeight.Medium) },
-                        modifier = Modifier.heightIn(min = 48.dp).testTag("search-type-$index"),
-                        colors = FilterChipDefaults.filterChipColors(containerColor = CinemaInk.copy(alpha = .76f), labelColor = CinemaSoft,
-                            selectedContainerColor = CinemaAccent.copy(alpha = .2f), selectedLabelColor = CinemaPaper))
-                } }
-                if (playableOnly) item {
-                    InputChip(true, { playableOnly = false }, label = { Text("آمادهٔ پخش") },
-                        trailingIcon = { Icon(Icons.Outlined.Close, "برداشتن فیلتر پخش", Modifier.size(16.dp)) },
-                        modifier = Modifier.heightIn(min = 48.dp).testTag("search-playable-active"))
+                IconButton({keyboard?.hide();showFilters=true},Modifier.testTag("search-options")){
+                    BadgedBox(badge={if(hasFilters)Badge(containerColor=CinemaAccent)}){Icon(Icons.Outlined.Tune,"تنظیم نتیجه‌ها",tint=CinemaPaper)}
                 }
             }
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp).testTag("search-loading"), color = CinemaAccent, trackColor = CinemaLine)
-            LazyVerticalGrid(GridCells.Adaptive(if (window.fontScale >= 1.6f) 160.dp else 136.dp),
-                state = gridState, modifier = Modifier.weight(1f).testTag("search-results"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 28.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                if (normalized.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "welcome") {
-                        Column(Modifier.padding(top = if (compact) 0.dp else 8.dp, bottom = 4.dp)) {
-                            if (!compact) Text("یک انتخاب تازه", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CinemaGold)
-                            Text("چی دوست داری ببینی؟", fontSize = if (compact) 22.sp else 30.sp, lineHeight = if (compact) 32.sp else 42.sp,
-                                fontWeight = FontWeight.Bold, color = CinemaPaper, modifier = Modifier.padding(top = 5.dp))
-                            Text("نام فارسی یا انگلیسی یک اثر را بنویس.", fontSize = 13.sp, lineHeight = 21.sp, color = CinemaSoft, modifier = Modifier.padding(top = 6.dp))
-                            if (onDiscover != null) OutlinedButton({ keyboard?.hide(); onDiscover() }, shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = .18f)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CinemaPaper, containerColor = CinemaInk.copy(alpha = .58f)),
-                                modifier = Modifier.padding(top = 14.dp).heightIn(min = 48.dp).testTag("search-discover")) {
-                                Icon(Icons.Outlined.TravelExplore, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("مرور کشور، ژانر و سال")
-                            }
+            OutlinedTextField(query,::changeQuery,singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp).testTag("search-input"),
+                label={Text("فیلم، سریال یا یک نام")},placeholder={Text("فارسی یا English",color=CinemaSoft)},leadingIcon={Icon(Icons.Outlined.Search,null,tint=CinemaAccent)},
+                trailingIcon={if(query.isNotEmpty())IconButton({changeQuery("")},Modifier.testTag("search-clear")){Icon(Icons.Outlined.Close,"پاک‌کردن جست‌وجو")}},
+                shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=CinemaSurface.copy(alpha=.96f),unfocusedContainerColor=CinemaSurface.copy(alpha=.94f),focusedBorderColor=CinemaAccent,unfocusedBorderColor=Color.White.copy(alpha=.19f),focusedTextColor=CinemaPaper,unfocusedTextColor=CinemaPaper,cursorColor=CinemaAccent),
+                keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={submitHistory()}))
+            LazyRow(contentPadding=PaddingValues(horizontal=20.dp,vertical=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.testTag("search-type-filters")){
+                listOf("همه","فیلم","سریال","هنرمندان").forEachIndexed{index,label->item(key=index){FilterChip(filter==index,{filter=index},label={Text(label,fontWeight=FontWeight.Bold)},modifier=Modifier.heightIn(min=48.dp).testTag("search-type-"+index),colors=FilterChipDefaults.filterChipColors(containerColor=CinemaInk.copy(alpha=.8f),labelColor=CinemaSoft,selectedContainerColor=CinemaAccent.copy(alpha=.23f),selectedLabelColor=CinemaPaper))}}
+                if(playableOnly)item{InputChip(true,{playableOnly=false},label={Text("آمادهٔ پخش")},trailingIcon={Icon(Icons.Outlined.Close,"برداشتن فیلتر پخش",Modifier.size(16.dp))},modifier=Modifier.heightIn(min=48.dp).testTag("search-playable-active"))}
+            }
+            if(loading)LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp).testTag("search-loading"),color=CinemaAccent,trackColor=CinemaLine)
+            LazyVerticalGrid(GridCells.Adaptive(if(window.fontScale>=1.6f)160.dp else 144.dp),state=gridState,modifier=Modifier.weight(1f).testTag("search-results"),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=8.dp,bottom=28.dp),horizontalArrangement=Arrangement.spacedBy(14.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
+                if(normalized.isEmpty()){
+                    item(span={GridItemSpan(maxLineSpan)},key="welcome"){Column{
+                        Text("داستان بعدی‌ات از اینجا شروع می‌شود",color=CinemaPaper,fontSize=if(compact)20.sp else 27.sp,lineHeight=if(compact)30.sp else 39.sp,fontWeight=FontWeight.Bold)
+                        Text("عنوان‌ها و هنرمندان را پیدا کن؛ یا از جهان سینما شروع کن.",color=CinemaSoft,fontSize=13.sp,lineHeight=22.sp,modifier=Modifier.padding(top=6.dp))
+                        if(onWorld!=null)OutlinedButton({keyboard?.hide();onWorld()},Modifier.padding(top=12.dp).heightIn(min=48.dp).testTag("search-world")){Icon(Icons.Outlined.Public,null,Modifier.size(20.dp));Spacer(Modifier.width(8.dp));Text("جهان سینما")}
+                        else if(onDiscover!=null)OutlinedButton({keyboard?.hide();onDiscover()},Modifier.padding(top=12.dp).heightIn(min=48.dp).testTag("search-discover")){Text("مرور کشور، ژانر و سال")}
+                    }}
+                    if(history.isNotEmpty())item(span={GridItemSpan(maxLineSpan)},key="history"){SearchHistory(history,::changeQuery){search.clearHistory();history=emptyList()}}
+                    item(span={GridItemSpan(maxLineSpan)},key="presets"){Column{
+                        Text("یک مسیر برای کشف",color=CinemaPaper,fontWeight=FontWeight.Bold,fontSize=16.sp)
+                        LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(top=8.dp)){
+                            item{AssistChip({keyboard?.hide();browseCountry="TR";browseSeries=false;browseTitle="فیلم‌های ترکی"},label={Text("فیلم ترکی")},modifier=Modifier.heightIn(min=48.dp).testTag("search-preset-tr"))}
+                            item{AssistChip({keyboard?.hide();browseCountry="KR";browseSeries=true;browseTitle="سریال‌های کره‌ای"},label={Text("سریال کره‌ای")},modifier=Modifier.heightIn(min=48.dp).testTag("search-preset-kr"))}
+                            item{AssistChip({keyboard?.hide();browseCountry="IR";browseGenre=35;browseSeries=false;browseTitle="کمدی ایرانی"},label={Text("کمدی ایرانی")},modifier=Modifier.heightIn(min=48.dp).testTag("search-preset-ir-comedy"))}
+                        }
+                    }}
+                    val browseGenres=if(filter==2)seriesGenres else movieGenres
+                    if(browseGenres.isNotEmpty())item(span={GridItemSpan(maxLineSpan)},key="genres"){DiscoveryGenreExplorer(browseGenres.take(8),if(filter==2)seriesStarters else movieStarters){selected->keyboard?.hide();browseGenre=selected;browseSeries=filter==2;browseTitle=browseGenres.firstOrNull{it.id==selected}?.name?:"مرور ژانر"}}
+                    if(startersLoading&&starters.isEmpty())item(span={GridItemSpan(maxLineSpan)},key="starters-loading"){Text("در حال دریافت عنوان‌ها…",color=CinemaSoft)}
+                    listOf(MediaType.MOVIE to movieStarters,MediaType.TV to seriesStarters).forEach{(kind,source)->
+                        val subset=cinematicSearchDiscoveryTitles(source,filter,playableOnly,order,facets).take(6)
+                        if(subset.isNotEmpty()){
+                            item(span={GridItemSpan(maxLineSpan)},key="starter-heading-"+kind){SearchGroupHeading(if(kind==MediaType.MOVIE)"فیلم‌های پرطرفدار"else"سریال‌های پرطرفدار","عنوان‌های دریافت‌شده از TMDB")}
+                            items(subset,key={"starter-"+cinemaMediaKey(it.media)}){title->DiscoveryPosterCard(title,backend,::openTitle,Modifier.fillMaxWidth())}
                         }
                     }
-                    if (history.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "history") {
-                        SearchHistory(history, onQuery = { query = it }, onClear = { search.clearHistory(); history = emptyList() })
+                    if(!startersLoading&&starters.isEmpty())item(span={GridItemSpan(maxLineSpan)},key="starters-empty"){CinemaNotice(if(startersError)"پوسترها دریافت نشدند"else"پیشنهادها هنوز آماده نیستند","جست‌وجو همچنان در دسترس است؛ دریافت پیشنهادهای این صفحه را دوباره امتحان کن.",Icons.Outlined.Movie,"دریافت پیشنهادها",{starterRetry++})}
+                    if(!startersLoading&&starters.isNotEmpty()&&cinematicSearchDiscoveryTitles(starters,filter,playableOnly,order,facets).isEmpty())item(span={GridItemSpan(maxLineSpan)},key="starters-filter-empty"){CinemaNotice("با این انتخاب عنوانی دیده نمی‌شود","فیلترهای عنوان‌ها را بردار یا یک نام را جست‌وجو کن.",Icons.Outlined.FilterAltOff,"برداشتن فیلترها",::resetFilters)}
+                    if(!startersLoading&&startersError&&starters.isNotEmpty())item(span={GridItemSpan(maxLineSpan)},key="starters-partial-error"){CinemaNotice("بخشی از پیشنهادها دریافت نشد","عنوان‌های موجود قابل مشاهده‌اند.",Icons.Outlined.CloudOff,"دریافت دوباره",{starterRetry++})}
+                }else if(normalized.length<2){item(span={GridItemSpan(maxLineSpan)},key="short-query"){Text("حداقل دو حرف بنویس.",color=CinemaSoft,modifier=Modifier.padding(vertical=12.dp))}}
+                else{
+                    item(span={GridItemSpan(maxLineSpan)},key="result-heading"){Column(Modifier.testTag("search-result-summary")){SearchGroupHeading("نتیجه‌های جست‌وجو",visible.size.toString()+" عنوان · "+order.label);Text("فیلتر و ترتیب روی عنوان‌های دریافت‌شده اعمال می‌شود.",color=CinemaSoft,fontSize=11.sp,lineHeight=18.sp,modifier=Modifier.padding(top=4.dp))}}
+                    if(catalogError)item(span={GridItemSpan(maxLineSpan)},key="catalog-error"){Column(Modifier.testTag("search-catalog-error")){CinemaNotice("ارتباط برقرار نشد","فهرست برنامه دریافت نشد؛ اطلاعات سینماییِ دریافت‌شده همچنان قابل مشاهده است.",Icons.Outlined.CloudOff,"تلاش دوباره",{catalogRetry++})}}
+                    if(metadataError)item(span={GridItemSpan(maxLineSpan)},key="metadata-error"){Column(Modifier.testTag("search-metadata-error")){CinemaNotice("اطلاعات سینمایی دریافت نشد","عنوان‌های فهرست برنامه حفظ شده‌اند. برای دریافت این صفحه دوباره تلاش کن.",Icons.Outlined.CloudOff,"تلاش دوباره برای اطلاعات",{metadataRetry++})}}
+                    listOf(MediaType.MOVIE,MediaType.TV).forEach{kind->val group=visible.filter{it.media.type==kind};if(group.isNotEmpty()){
+                        item(span={GridItemSpan(maxLineSpan)},key="group-"+kind){Column(Modifier.testTag(if(kind==MediaType.MOVIE)"search-movies-heading"else"search-series-heading")){SearchGroupHeading(if(kind==MediaType.MOVIE)"فیلم‌ها"else"سریال‌ها",group.size.toString()+" عنوان دریافت‌شده")}}
+                        items(group,key={cinemaMediaKey(it.media)}){title->DiscoveryPosterCard(title,backend,::openTitle,Modifier.fillMaxWidth())}
+                    }}
+                    if(visiblePeople.isNotEmpty()){
+                        item(span={GridItemSpan(maxLineSpan)},key="people-heading"){Column(Modifier.testTag("search-people-heading")){SearchGroupHeading("هنرمندان",visiblePeople.size.toString()+" نام دریافت‌شده")}}
+                        items(visiblePeople,key={"person-"+it.id},span={GridItemSpan(maxLineSpan)}){person->SearchPersonResult(person){submitHistory();onPerson(person.id,person.name)}}
                     }
-                    if (catalogLoading && starters.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "catalog-loading") {
-                        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = CinemaAccent); Spacer(Modifier.width(12.dp)); Text("در حال دریافت عنوان‌ها…", color = CinemaSoft, fontSize = 13.sp)
-                        }
-                    }
-                    if (starterTitles.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }, key = "starter-heading") {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("برای شروع", color = CinemaPaper, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                    Text("عنوان‌های دریافت‌شده از سرویس", color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
-                                }
-                                Icon(Icons.Outlined.Movie, null, tint = CinemaGold, modifier = Modifier.size(24.dp))
-                            }
-                        }
-                        items(starterTitles, key = { "starter-" + cinemaMediaKey(it) }) { media -> CinemaPoster(media, { openTitle(media) }, Modifier.fillMaxWidth()) }
-                    } else if (!catalogLoading && starters.isNotEmpty() && hasFilters) item(span = { GridItemSpan(maxLineSpan) }, key = "starter-filter-empty") {
-                        CinemaNotice("این انتخاب نتیجه‌ای ندارد", "فیلترها را بردار یا نام یک اثر را جست‌وجو کن.", Icons.Outlined.FilterAltOff, "برداشتن فیلترها", ::resetFilters)
-                    } else if (catalogFailed && starters.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "catalog-error") {
-                        CinemaNotice("پوسترها دریافت نشدند", "می‌توانی نام اثر را جست‌وجو کنی یا دریافت عنوان‌های این صفحه را دوباره امتحان کنی.", Icons.Outlined.CloudOff, "دریافت دوباره", { catalogRetry++ })
-                    } else if (!catalogLoading && starters.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "catalog-empty") {
-                        CinemaNotice("پیشنهادها هنوز آماده نیستند", "نام یک اثر را جست‌وجو کن؛ برای دریافت پیشنهادهای این صفحه هم می‌توانی دوباره تلاش کنی.", Icons.Outlined.Movie, "دریافت پیشنهادها", { catalogRetry++ })
-                    }
-                } else if (normalized.length < 2) item(span = { GridItemSpan(maxLineSpan) }, key = "short-query") {
-                    Text("حداقل دو حرف بنویس.", color = CinemaSoft, modifier = Modifier.padding(vertical = 12.dp))
-                } else {
-                    if (!loading && error == null && visible.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "result-heading") {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("نتیجه‌های جست‌وجو", color = CinemaPaper, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Text(visible.size.toString() + " عنوان · " + order.label, color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                            }
-                            TextButton({ keyboard?.hide(); showFilters = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("search-sort")) {
-                                Text("ترتیب", color = CinemaAccent); Spacer(Modifier.width(5.dp)); Icon(Icons.Outlined.Sort, null, Modifier.size(20.dp), tint = CinemaAccent)
-                            }
-                        }
-                    }
-                    error?.let { message -> item(span = { GridItemSpan(maxLineSpan) }, key = "search-error") { CinemaNotice("ارتباط برقرار نشد", message, Icons.Outlined.CloudOff, "تلاش دوباره", { retry++ }) } }
-                    if (!loading && error == null && visible.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }, key = "search-empty") {
-                        val filteredOut = titles.isNotEmpty() && hasFilters
-                        CinemaNotice(if (filteredOut) "با این فیلتر، عنوانی پیدا نشد" else "عنوانی پیدا نشد",
-                            if (filteredOut) "نتیجه‌ها دریافت شده‌اند؛ فیلتر پخش یا نوع اثر را بردار." else "نام کوتاه‌تر یا نام انگلیسی را امتحان کن.",
-                            Icons.Outlined.SearchOff, if (hasFilters) "برداشتن فیلترها" else null, if (hasFilters) (::resetFilters) else null)
-                    }
-                    items(visible, key = ::cinemaMediaKey) { media -> CinemaPoster(media, { openTitle(media) }, Modifier.fillMaxWidth()) }
+                    if(!loading&&!catalogError&&!metadataError&&visible.isEmpty()&&visiblePeople.isEmpty())item(span={GridItemSpan(maxLineSpan)},key="empty"){Column(Modifier.testTag("search-empty")){CinemaNotice(if(merged.isNotEmpty()&&hasFilters)"با این فیلتر، عنوانی پیدا نشد"else"نتیجه‌ای پیدا نشد","نام کوتاه‌تر یا نام انگلیسی را امتحان کن. فیلترها فقط اطلاعات موجود را بررسی می‌کنند.",Icons.Outlined.SearchOff,if(hasFilters)"برداشتن فیلترها"else null,if(hasFilters)(::resetFilters)else null)}}
+                    if(hasMore||metadataLoading&&requestedPage>1)item(span={GridItemSpan(maxLineSpan)},key="more"){OutlinedButton({if(metadataError)metadataRetry++ else requestedPage=lastPage+1},enabled=!metadataLoading,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("search-more")){Text(if(metadataLoading)"در حال دریافت…"else"ادامهٔ نتایج سینمایی")}}
                 }
             }
         }
-    }
-    if (showFilters) ModalBottomSheet(onDismissRequest = { showFilters = false }, containerColor = CinemaSurface, contentColor = CinemaPaper) {
-        SearchResultOptions(order, playableOnly, onOrder = { orderName = it.name }, onPlayable = { playableOnly = it }, onReset = ::resetFilters, onDone = { showFilters = false })
+    }}
+    if(showFilters)ModalBottomSheet(onDismissRequest={showFilters=false},containerColor=CinemaSurface,contentColor=CinemaPaper){
+        SearchResultOptions(order,playableOnly,{orderName=it.name},{playableOnly=it},::resetFilters,{showFilters=false},facets,
+            (movieGenres+seriesGenres).distinctBy{it.id}.filter{genre->(merged+starters).any{genre.id in it.genreIds}},
+            (merged+starters).map{it.originalLanguage}.filter(String::isNotBlank).distinct().sorted()){facets=it}
     }
 }
-
-/** Static, bounded decorative artwork. Tile decoding never allocates a full-size poster. */
+@Composable private fun SearchGroupHeading(title:String,subtitle:String){Column{Text(title,color=CinemaPaper,fontSize=18.sp,fontWeight=FontWeight.Bold);Text(subtitle,color=CinemaSoft,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))}}
+@Composable private fun SearchPersonResult(person:DiscoveryPerson,onClick:()->Unit){
+    Surface(color=CinemaSurface.copy(alpha=.96f),shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,CinemaLine),modifier=Modifier.fillMaxWidth().clickable(role=Role.Button,onClick=onClick).testTag("search-person-"+person.id)){
+        Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){
+            AsyncImage(model=cinemaImage(person.profilePath),contentDescription=person.name,contentScale=ContentScale.Crop,modifier=Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(CinemaLine))
+            Column(Modifier.weight(1f).padding(horizontal=14.dp)){Text(person.name,color=CinemaPaper,fontSize=17.sp,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis);val known=person.knownFor.take(3).joinToString(" · "){it.media.title};if(known.isNotBlank())Text(known,color=CinemaSoft,fontSize=12.sp,lineHeight=19.sp,maxLines=2,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp))}
+            Icon(Icons.Outlined.ChevronLeft,"اطلاعات هنرمند",tint=CinemaSoft,modifier=Modifier.size(20.dp))
+        }
+    }
+}
 @Composable
 private fun SearchPosterAtmosphere(artwork: List<String>, compact: Boolean, searching: Boolean) {
     val context = LocalContext.current
@@ -290,40 +275,31 @@ private fun SearchHistory(history: List<String>, onQuery: (String) -> Unit, onCl
     }
 }
 
+
 @Composable
-private fun SearchResultOptions(order: CinematicSearchOrder, playableOnly: Boolean, onOrder: (CinematicSearchOrder) -> Unit,
-    onPlayable: (Boolean) -> Unit, onReset: () -> Unit, onDone: () -> Unit) {
-    val largeText = LocalConfiguration.current.fontScale >= 1.6f
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().testTag("search-options-sheet")) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("تنظیم نتیجه‌ها", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            IconButton(onDone) { Icon(Icons.Outlined.Close, "بستن تنظیم نتیجه‌ها") }
-        }
-        Text("ترتیب عنوان‌های دریافت‌شده", color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
-        Column(Modifier.selectableGroup()) {
-            CinematicSearchOrder.entries.forEach { choice ->
-                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).selectable(order == choice, role = Role.RadioButton, onClick = { onOrder(choice) })
-                    .testTag("search-order-" + choice.name), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(order == choice, onClick = null); Text(choice.label, modifier = Modifier.padding(start = 10.dp), fontSize = 14.sp)
-                }
-            }
-        }
-        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = CinemaLine)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text("فقط آمادهٔ پخش", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("عنوان‌های دارای نسخهٔ قابل پخش در سرور", fontSize = 12.sp, lineHeight = 20.sp, color = CinemaSoft, modifier = Modifier.padding(top = 4.dp))
-            }
-            Switch(playableOnly, onPlayable, modifier = Modifier.testTag("search-playable-switch").semantics { contentDescription = "فقط عنوان‌های آمادهٔ پخش" })
-        }
-        if (largeText) Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onDone, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CinemaAccent, contentColor = Color.White)) { Text("اعمال") }
-            OutlinedButton(onReset, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) { Text("بازنشانی") }
-        } else Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) { Text("بازنشانی") }
-            Button(onDone, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CinemaAccent, contentColor = Color.White)) { Text("اعمال") }
-        }
+private fun SearchResultOptions(order:CinematicSearchOrder,playableOnly:Boolean,onOrder:(CinematicSearchOrder)->Unit,onPlayable:(Boolean)->Unit,onReset:()->Unit,onDone:()->Unit,
+    facets:CinematicSearchFacets,genres:List<DiscoveryGenre>,languages:List<String>,onFacets:(CinematicSearchFacets)->Unit){
+    val large=LocalConfiguration.current.fontScale>=1.6f
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).navigationBarsPadding().testTag("search-options-sheet")){
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("تنظیم نتیجه‌ها",fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));IconButton(onDone){Icon(Icons.Outlined.Close,"بستن تنظیم نتیجه‌ها")}}
+        Text("فیلترها فقط عنوان‌های دریافت‌شده را بررسی می‌کنند؛ اطلاعات نامشخص با فیلتر فعال تطبیق داده نمی‌شود. هنرمندان جدا هستند.",color=CinemaSoft,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(vertical=8.dp))
+        Column(Modifier.selectableGroup()){CinematicSearchOrder.entries.forEach{choice->Row(Modifier.fillMaxWidth().heightIn(min=56.dp).selectable(order==choice,role=Role.RadioButton,onClick={onOrder(choice)}).testTag("search-order-"+choice.name),verticalAlignment=Alignment.CenterVertically){RadioButton(order==choice,onClick=null);Text(choice.label,Modifier.padding(start=10.dp),fontSize=14.sp)}}}
+        HorizontalDivider(Modifier.padding(vertical=12.dp),color=CinemaLine)
+        SearchFacetChoiceRow("سال انتشار",listOf("all" to "همهٔ سال‌ها","2020" to "از ۲۰۲۰","2010" to "۲۰۱۰ تا ۲۰۱۹","classic" to "پیش از ۲۰۱۰"),when{facets.firstYear==2020->"2020";facets.firstYear==2010&&facets.lastYear==2019->"2010";facets.lastYear==2009->"classic";else->"all"},"year"){value->onFacets(facets.copy(firstYear=when(value){"2020"->2020;"2010"->2010;else->null},lastYear=when(value){"2010"->2019;"classic"->2009;else->null}))}
+        SearchFacetChoiceRow("حداقل امتیاز ثبت‌شده",listOf("0" to "بدون محدودیت","6" to "۶+","7" to "۷+","8" to "۸+"),(facets.minimumRating?.toInt()?:0).toString(),"rating"){onFacets(facets.copy(minimumRating=it.toDoubleOrNull()?.takeIf{value->value>0}))}
+        if(genres.isNotEmpty())SearchFacetChoiceRow("ژانر موجود در نتیجه‌ها",listOf("0" to "همهٔ ژانرها")+genres.map{it.id.toString() to it.name},(facets.genreId?:0).toString(),"genre"){onFacets(facets.copy(genreId=it.toIntOrNull()?.takeIf{value->value>0}))}
+        if(languages.isNotEmpty())SearchFacetChoiceRow("زبان اصلیِ ثبت‌شده",listOf("" to "همهٔ زبان‌ها")+languages.map{it to when(it){"fa"->"فارسی";"en"->"English";"ko"->"Korean";"hi"->"Hindi";"tr"->"Türkçe";"ar"->"العربية";"ja"->"日本語";else->it}},facets.originalLanguage.orEmpty(),"language"){onFacets(facets.copy(originalLanguage=it.takeIf(String::isNotBlank)))}
+        HorizontalDivider(Modifier.padding(vertical=12.dp),color=CinemaLine)
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f).padding(end=12.dp)){Text("فقط آمادهٔ پخش",fontSize=14.sp,fontWeight=FontWeight.Bold);Text("نیازمند نسخهٔ قابل پخش و شناسهٔ واقعی سرور",fontSize=12.sp,lineHeight=20.sp,color=CinemaSoft,modifier=Modifier.padding(top=4.dp))};Switch(playableOnly,onPlayable,Modifier.testTag("search-playable-switch").semantics{contentDescription="فقط عنوان‌های آمادهٔ پخش"})}
+        Row(Modifier.fillMaxWidth().heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically){Text("دوبلهٔ فارسی تأییدشده",fontSize=14.sp,modifier=Modifier.weight(1f).padding(end=12.dp));Switch(facets.persianDubbedOnly,{onFacets(facets.copy(persianDubbedOnly=it))},Modifier.testTag("search-dubbed-switch").semantics{contentDescription="فقط دوبلهٔ فارسی تأییدشده"})}
+        Row(Modifier.fillMaxWidth().heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically){Text("زیرنویس فارسی تأییدشده",fontSize=14.sp,modifier=Modifier.weight(1f).padding(end=12.dp));Switch(facets.persianSubtitleOnly,{onFacets(facets.copy(persianSubtitleOnly=it))},Modifier.testTag("search-subtitle-switch").semantics{contentDescription="فقط زیرنویس فارسی تأییدشده"})}
+        Text("زبان اصلی نشانهٔ دوبله یا زیرنویس نیست؛ این دو فیلتر فقط اطلاعات تأییدشدهٔ فایل را می‌پذیرند.",color=CinemaSoft,fontSize=12.sp,lineHeight=20.sp)
+        if(large)Column(Modifier.fillMaxWidth().padding(top=16.dp,bottom=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Button(onDone,Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("اعمال")};OutlinedButton(onReset,Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("بازنشانی")}}
+        else Row(Modifier.fillMaxWidth().padding(top=16.dp,bottom=20.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){OutlinedButton(onReset,Modifier.weight(1f).heightIn(min=48.dp)){Text("بازنشانی")};Button(onDone,Modifier.weight(1f).heightIn(min=48.dp)){Text("اعمال")}}
     }
 }
+@Composable private fun SearchFacetChoiceRow(label:String,choices:List<Pair<String,String>>,selected:String,tag:String,onSelect:(String)->Unit){
+    Text(label,fontSize=14.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=10.dp));LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(top=6.dp,bottom=10.dp)){items(choices,key={it.first}){choice->FilterChip(choice.first==selected,{onSelect(choice.first)},label={Text(choice.second)},modifier=Modifier.heightIn(min=48.dp).testTag("search-facet-"+tag+"-"+choice.first))}}
+}
+
+private val SearchFacetsSaver=listSaver<CinematicSearchFacets,Any>(save={listOf(it.firstYear?:0,it.lastYear?:0,it.minimumRating?:0.0,it.genreId?:0,it.originalLanguage.orEmpty(),it.persianDubbedOnly,it.persianSubtitleOnly)},restore={CinematicSearchFacets((it[0] as Int).takeIf{v->v>0},(it[1] as Int).takeIf{v->v>0},(it[2] as Double).takeIf{v->v>0},(it[3] as Int).takeIf{v->v>0},(it[4] as String).takeIf(String::isNotBlank),it[5] as Boolean,it[6] as Boolean)})

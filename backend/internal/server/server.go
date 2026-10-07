@@ -127,7 +127,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/logout", s.logout)
 		})
 
-		r.Get("/catalog/home", s.catalogHome)
+		r.With(s.optionalAuth).Get("/catalog/home", s.catalogHome)
 		r.Get("/discussions/{scope}", s.titleComments)
 		r.With(
 			s.authRateLimit(
@@ -137,12 +137,14 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			),
 		).Get("/tmdb", s.tmdbProxy)
 		r.Get("/releases", s.releaseCenter)
-		r.Get("/catalog/{id}", s.catalogDetail)
+		r.With(s.optionalAuth).Get("/catalog/discovery", s.catalogDiscovery)
+		r.With(s.optionalAuth).Get("/catalog/{id}", s.catalogDetail)
 		r.Get("/catalog/{id}/pulse", s.mediaPulse)
 		r.Get("/pulse/trending", s.trendingMediaPulse)
 		r.Get("/catalog/{id}/reviews", s.mediaReviews)
 		r.Get("/catalog/{id}/clips", s.mediaClips)
 		r.With(
+			s.optionalAuth,
 			s.authRateLimit(
 				"public-search",
 				s.cfg.PublicSearchRateLimit,
@@ -359,6 +361,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 			r.Post("/library/collections/{id}/items/{mediaID}/toggle", s.toggleCollectionItem)
 			r.Post("/library/collections/{id}/delete", s.deleteCollection)
 			r.Get("/library/stats", s.libraryStats)
+			r.Get("/library/viewing-stats", s.personalViewingStats)
 			r.Get("/library/scene-bookmarks", s.sceneBookmarks)
 			r.Get("/profile/film-dna", s.filmDNA)
 			r.Post("/playback/token", s.playbackToken)
@@ -424,6 +427,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 	go s.runRoomMessageScheduler(workerCtx)
 	go s.runPushDeliveryWorker(workerCtx)
 	go s.runTelegramIngestWorker(workerCtx)
+	go s.runCatalogMetadataWorker(workerCtx)
 	go s.runTelemetryMaintenanceWorker(workerCtx)
 	go s.runUploadCleanupWorker(workerCtx)
 	return s
@@ -539,49 +543,19 @@ func (s *Server) telegramStreamStatus(parent context.Context) string {
 }
 
 func (s *Server) catalogHome(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(r.Context(), `
-		SELECT mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,mt.year,
-		       mt.poster_url,mt.backdrop_url,mt.rating,
-		       mv.id::text,mv.quality_label,mv.stream_ready
-		  FROM media_titles mt
-		  LEFT JOIN LATERAL (
-			SELECT v.id,v.quality_label,v.stream_ready,MAX(v.created_at) OVER () AS latest_added_at
-			  FROM media_versions v
-			  LEFT JOIN episodes e ON e.id=v.episode_id
-			  LEFT JOIN seasons sn ON sn.id=e.season_id
-			 WHERE COALESCE(v.media_title_id,sn.media_title_id)=mt.id AND v.stream_ready=true
-			 ORDER BY sn.season_number DESC NULLS LAST,e.episode_number DESC NULLS LAST,
-			          v.preferred DESC,v.height DESC,v.file_size_bytes DESC
-			 LIMIT 1
-		  ) mv ON true
-		 WHERE mt.visibility='public'
-		 ORDER BY COALESCE(mv.latest_added_at,mt.created_at) DESC,mt.id
-		 LIMIT 60
-	`)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	defer rows.Close()
-
-	items := make([]map[string]any, 0)
-	for rows.Next() {
-		var id, kind, title, originalTitle, overview, posterURL, backdropURL string
-		var tmdbID *int64
-		var year int
-		var rating *float64
-		var versionID, quality *string
-		var ready *bool
-		if err := rows.Scan(&id, &tmdbID, &kind, &title, &originalTitle, &overview, &year, &posterURL, &backdropURL, &rating,
-			&versionID, &quality, &ready); err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
+	where := "mt.visibility='public'"
+	if userID := userIDFromContext(r.Context()); userID != "" {
+		switch s.viewerMaturityLevel(r, userID) {
+		case "kids":
+			where += " AND mt.audience_level='kids'"
+		case "teen":
+			where += " AND mt.audience_level IN ('kids','teen')"
 		}
-		items = append(items, map[string]any{
-			"id": id, "tmdbId": tmdbID, "kind": kind, "title": title, "originalTitle": originalTitle,
-			"overview": overview, "year": year, "posterUrl": posterURL, "backdropUrl": backdropURL,
-			"rating": rating, "mediaVersionId": versionID, "quality": quality, "streamReady": ready,
-		})
+	}
+	items, err := s.catalogCards(r.Context(), where, nil, "COALESCE(av.latest_added_at,mt.created_at) DESC,mt.id", 60, 0)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "catalog is unavailable"})
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }

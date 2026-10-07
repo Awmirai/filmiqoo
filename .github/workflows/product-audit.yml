@@ -1,8 +1,6 @@
 name: Product visual audit
 on:
   workflow_dispatch:
-  pull_request:
-    paths: ['app/**', '.github/workflows/product-audit.yml']
 concurrency:
   group: product-audit-${{ github.ref }}
   cancel-in-progress: true

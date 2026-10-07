@@ -16,7 +16,18 @@ data class MediaItem(
     val backendId: String? = null,
     val mediaVersionId: String? = null,
     val streamReady: Boolean = false,
-    val quality: String = ""
+    val quality: String = "",
+    val hasPersianDub: Boolean = false,
+    val hasPersianSubtitle: Boolean = false,
+    val dubbedEpisodeCount: Int? = null,
+    val availableEpisodeCount: Int? = null,
+    val genreIds: List<Int> = emptyList(),
+    val originalLanguage: String = "",
+    val originCountries: List<String> = emptyList(),
+    val runtimeMinutes: Int? = null,
+    val seriesStatus: String? = null,
+    val seasonCount: Int? = null,
+    val episodeCount: Int? = null
 ) {
     val year: String get() = date.take(4)
     val key: String get() = backendId ?: (type.name + "_" + id)
@@ -56,7 +67,9 @@ data class MediaDetail(
     val recommendations: List<MediaItem>,
     val seasons: List<SeasonInfo>,
     val directors: List<CastMember> = emptyList(),
-    val franchise: FranchiseInfo? = null
+    val franchise: FranchiseInfo? = null,
+    val logoPath: String? = null,
+    val certification: String? = null
 )
 
 data class HomeBundle(
@@ -91,6 +104,7 @@ data class Creator(
 )
 
 sealed interface OverlayRoute {
+    data class Post(val postId: String) : OverlayRoute
     data class Detail(val media: MediaItem,val discussionScope:String?=null) : OverlayRoute
     data class Story(val media: MediaItem, val index: Int = 0) : OverlayRoute
     data class SocialStories(val stories: List<SocialStory>, val index: Int = 0) : OverlayRoute

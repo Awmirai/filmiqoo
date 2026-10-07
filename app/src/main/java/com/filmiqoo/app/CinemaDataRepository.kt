@@ -75,7 +75,7 @@ class CinemaDataRepository(context: Context, private val backend: BackendReposit
         val id = platform?.tmdbId?.takeIf { it > 0 } ?: input.id
         val type = platform?.let { if (it.kind == "movie") MediaType.MOVIE else MediaType.TV } ?: input.type
         val path = (if (type == MediaType.MOVIE) "movie/" else "tv/") + id
-        val appended = "credits,videos,recommendations,similar"
+        val appended = "credits,videos,recommendations,similar,images," + if(type==MediaType.MOVIE)"release_dates"else "content_ratings"
         val localizedRequest = async {
             if (id > 0) cinemaOptional { metadata(path, mapOf("language" to "fa-IR", "append_to_response" to appended)) } else null
         }
@@ -89,13 +89,14 @@ class CinemaDataRepository(context: Context, private val backend: BackendReposit
         val english = en ?: JSONObject()
         val titleKey = if (type == MediaType.MOVIE) "title" else "name"
         val originalKey = if (type == MediaType.MOVIE) "original_title" else "original_name"
+        val platformMedia=platform?.asMediaItem()
         val origins = buildList {
             val countries = obj.optJSONArray("origin_country")
             if (countries != null) for (i in 0 until countries.length()) add(countries.optString(i))
             val production = obj.optJSONArray("production_countries")
             if (production != null) for (i in 0 until production.length()) production.optJSONObject(i)?.optString("iso_3166_1")?.let(::add)
-        }.filter(String::isNotBlank).distinct()
-        val language = obj.optString("original_language")
+        }.filter(String::isNotBlank).distinct().ifEmpty{platformMedia?.originCountries.orEmpty().ifEmpty{input.originCountries}}
+        val language = obj.optString("original_language").ifBlank{platformMedia?.originalLanguage.orEmpty().ifBlank{input.originalLanguage}}
         val title = CinemaTitlePolicy.choose(
             localized = obj.optString(titleKey).ifBlank { platform?.title ?: input.title },
             english = english.optString(titleKey),
@@ -115,7 +116,20 @@ class CinemaDataRepository(context: Context, private val backend: BackendReposit
             backendId = platform?.id ?: resolved?.backendId ?: input.backendId,
             mediaVersionId = preferred?.id,
             streamReady = preferred != null,
-            quality = preferred?.quality.orEmpty()
+            quality = preferred?.quality.orEmpty(),
+            hasPersianDub=platformMedia?.hasPersianDub ?: input.hasPersianDub,
+            hasPersianSubtitle=platformMedia?.hasPersianSubtitle ?: input.hasPersianSubtitle,
+            dubbedEpisodeCount=platformMedia?.dubbedEpisodeCount ?: input.dubbedEpisodeCount,
+            availableEpisodeCount=platformMedia?.availableEpisodeCount ?: input.availableEpisodeCount,
+            genreIds=buildList{val genres=obj.optJSONArray("genres");if(genres!=null)for(i in 0 until genres.length()){
+                val genre=genres.optJSONObject(i)?.optInt("id") ?: 0;if(genre>0)add(genre)
+            }}.ifEmpty{platformMedia?.genreIds.orEmpty().ifEmpty{input.genreIds}},
+            originCountries=origins,originalLanguage=language,
+            runtimeMinutes=(if(type==MediaType.MOVIE)obj.optInt("runtime")else obj.optJSONArray("episode_run_time")?.optInt(0) ?: 0)
+                .takeIf{it>0} ?: platformMedia?.runtimeMinutes ?: input.runtimeMinutes,
+            seriesStatus=obj.optString("status").takeIf(String::isNotBlank) ?: platformMedia?.seriesStatus ?: input.seriesStatus,
+            seasonCount=obj.optInt("number_of_seasons").takeIf{it>0} ?: platformMedia?.seasonCount ?: input.seasonCount,
+            episodeCount=obj.optInt("number_of_episodes").takeIf{it>0} ?: platformMedia?.episodeCount ?: input.episodeCount
         )
         val credits = obj.optJSONObject("credits") ?: english.optJSONObject("credits") ?: JSONObject()
         val cast = parsePeople(credits.optJSONArray("cast"), "character").take(24)
@@ -151,8 +165,25 @@ class CinemaDataRepository(context: Context, private val backend: BackendReposit
             FranchiseInfo(collectionId, collection.optString("name"), cleanImage(collection.optString("poster_path")), cleanImage(collection.optString("backdrop_path")),
                 parseList(collection.optJSONArray("parts"), MediaType.MOVIE).sortedBy { it.date.ifBlank { "9999" } })
         } else null
+        val logos=english.optJSONObject("images")?.optJSONArray("logos") ?: obj.optJSONObject("images")?.optJSONArray("logos")
+        val logo=buildList{if(logos!=null)for(i in 0 until logos.length())logos.optJSONObject(i)?.let{add(it)}}
+            .sortedByDescending{if(it.optString("iso_639_1")=="en")2 else if(it.optString("iso_639_1")=="fa")3 else 0}
+            .firstOrNull()?.optString("file_path")?.let(::cleanImage)
+        val certificate=if(type==MediaType.MOVIE){
+            val releases=obj.optJSONObject("release_dates")?.optJSONArray("results")
+            buildList{if(releases!=null)for(i in 0 until releases.length()){val country=releases.optJSONObject(i)?:continue
+                if(country.optString("iso_3166_1")!="US")continue
+                val dates=country.optJSONArray("release_dates")?:continue
+                for(j in 0 until dates.length())dates.optJSONObject(j)?.optString("certification")?.takeIf(String::isNotBlank)?.let(::add)
+            }}.firstOrNull()
+        }else{
+            val ratings=obj.optJSONObject("content_ratings")?.optJSONArray("results")
+            buildList{if(ratings!=null)for(i in 0 until ratings.length()){val rating=ratings.optJSONObject(i)?:continue
+                if(rating.optString("iso_3166_1")=="US")rating.optString("rating").takeIf(String::isNotBlank)?.let(::add)
+            }}.firstOrNull()
+        }
         val detail = MediaDetail(normalized, obj.optString("tagline"), names(obj.optJSONArray("genres")), runtime,
-            obj.optString("status"), cast, videos, recommendations, seasons, directors, franchise)
+            normalized.seriesStatus.orEmpty(), cast, videos, recommendations, seasons, directors, franchise,logo,certificate)
         CinemaTitleData(detail, platform, origins, names(obj.optJSONArray("spoken_languages")), language,
             english.optString(titleKey), fa != null || en != null)
     }

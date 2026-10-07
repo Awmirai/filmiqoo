@@ -1,11 +1,12 @@
 package com.filmiqoo.app
-
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,17 +18,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
-/** Account identity and cinema activity share a hub. Existing library/profile routes remain intact. */
 @Composable
 fun ConnectedProfileScreen(
     backend:BackendRepository,repository:TmdbRepository,kidsMode:Boolean=false,
@@ -37,201 +40,214 @@ fun ConnectedProfileScreen(
     onFollowRequests:()->Unit,onCloseFriends:()->Unit,onEditProfile:()->Unit,onFilmDna:()->Unit,
     onReputation:(String)->Unit,onSeriesCalendar:()->Unit,onSocialCollections:()->Unit,onLoggedOut:()->Unit,
     loggedIn:Boolean=true,onRequireAuth:()->Unit={},onClips:()->Unit={},onCreate:()->Unit={},
-    onNotifications:()->Unit={},onWatchParty:()->Unit={},onOpenPost:(String)->Unit={},onOpenClip:(String)->Unit={}
+    onNotifications:()->Unit={},onWatchParty:()->Unit={},onOpenPost:(String)->Unit={},onOpenClip:(String)->Unit={},onMovies:()->Unit={},onSeries:()->Unit={}
 ) {
+
     val context=LocalContext.current
-    val scope=rememberCoroutineScope()
-    val activeProfile=backend.viewerProfiles.activeId()
-    val personal=remember(activeProfile){CinemaPersonalStore(context,activeProfile)}
-    val creators=remember(backend){CreatorChannelRepository(backend)}
-    var profile by remember{mutableStateOf<AccountProfile?>(null)}
-    var stats by remember{mutableStateOf<LibraryStats?>(null)}
-    var watching by remember{mutableStateOf<List<ContinueWatchingItem>>(emptyList())}
-    var favorites by remember{mutableStateOf<List<MediaItem>>(emptyList())}
-    var posts by remember{mutableStateOf<List<SocialPost>>(emptyList())}
-    var clips by remember{mutableStateOf<List<ReelFeedItem>>(emptyList())}
-    var loading by remember{mutableStateOf(false)}
-    var activityLoading by remember{mutableStateOf(false)}
-    var accountError by remember{mutableStateOf(false)}
-    var activityError by remember{mutableStateOf(false)}
-    var refresh by remember{mutableIntStateOf(0)}
-    var tab by rememberSaveable{mutableIntStateOf(0)}
-    var more by rememberSaveable{mutableStateOf(false)}
-    var logout by remember{mutableStateOf(false)}
-    var logoutBusy by remember{mutableStateOf(false)}
-    val snackbar=remember{SnackbarHostState()}
-    fun accountAction(action:()->Unit){if(loggedIn)action()else onRequireAuth()}
-    LaunchedEffect(refresh,loggedIn,activeProfile){
-        profile=null;stats=null;watching=emptyList();favorites=emptyList();accountError=false
-        if(!loggedIn)return@LaunchedEffect
+    val activeProfile=backend.viewerProfiles.activeId();val accountScope=backend.session.localAccountScope
+    val scope=key(activeProfile,accountScope){rememberCoroutineScope()}
+    val viewer=backend.viewerProfiles.active()
+    val personal=remember(activeProfile,accountScope){CinemaPersonalStore(context,activeProfile)}
+    val library=remember(backend){LibraryRepository(backend)};val historyRepository=remember(backend){HistoryRepository(backend)}
+    val statsRepository=remember(backend){UserViewingStatsRepository(backend)}
+    var tab by rememberSaveable(activeProfile,accountScope){mutableIntStateOf(0)};var listTab by rememberSaveable(activeProfile,accountScope){mutableIntStateOf(0)}
+    var typeFilter by rememberSaveable{mutableIntStateOf(0)};var listOrder by rememberSaveable{mutableIntStateOf(0)}
+    var refresh by remember{mutableIntStateOf(0)};var revision by remember{mutableIntStateOf(0)}
+    var account by remember(activeProfile,accountScope){mutableStateOf<AccountProfile?>(null)}
+    var stats by remember(activeProfile,accountScope){mutableStateOf<UserViewingStats?>(null)}
+    var continuing by remember(activeProfile,accountScope){mutableStateOf<List<ContinueWatchingItem>>(emptyList())}
+    var cloudSaved by remember(activeProfile,accountScope){mutableStateOf<List<MediaItem>>(emptyList())}
+    var cloudFavorites by remember(activeProfile,accountScope){mutableStateOf<List<MediaItem>>(emptyList())}
+    var history by remember(activeProfile,accountScope){mutableStateOf<List<WatchHistoryItem>>(emptyList())}
+    var historyPage by remember(activeProfile,accountScope){mutableIntStateOf(1)};var historyHasMore by remember(activeProfile,accountScope){mutableStateOf(false)}
+    var loading by remember(activeProfile,accountScope){mutableStateOf(loggedIn)};var historyLoading by remember(activeProfile,accountScope){mutableStateOf(false)}
+    var accountError by remember{mutableStateOf(false)};var statsError by remember{mutableStateOf(false)};var continueError by remember{mutableStateOf(false)}
+    var savedError by remember{mutableStateOf(false)};var favoriteError by remember{mutableStateOf(false)};var historyError by remember(activeProfile,accountScope){mutableStateOf(false)}
+    var historyRetry by remember(activeProfile,accountScope){mutableIntStateOf(0)};var mutationBusy by remember(activeProfile,accountScope){mutableStateOf(false)}
+    var pendingRemoval by remember(activeProfile,accountScope){mutableStateOf<WatchHistoryItem?>(null)};var clearHistory by remember(activeProfile,accountScope){mutableStateOf(false)};var logout by remember(activeProfile,accountScope){mutableStateOf(false)}
+    var message by remember(activeProfile,accountScope){mutableStateOf<String?>(null)}
+    val saved=remember(cloudSaved,personal,revision,refresh){(cloudSaved+personal.saved()).distinctBy(::cinemaMediaKey)}
+    val favorites=remember(cloudFavorites,personal,revision,refresh){(cloudFavorites+personal.favorites()).distinctBy(::cinemaMediaKey)}
+    val ratings=remember(personal,revision,refresh){personal.ratings()}
+    val artwork=(continuing.map{it.media}+favorites+saved).firstOrNull{!it.backdropPath.isNullOrBlank()||!it.posterPath.isNullOrBlank()}
+    val listState=rememberLazyListState();val large=LocalConfiguration.current.fontScale>=1.6f
+    LaunchedEffect(tab,listTab){listState.scrollToItem(0);typeFilter=0}
+    LaunchedEffect(backend,loggedIn,refresh,activeProfile,accountScope){
+        accountError=false;statsError=false;continueError=false;savedError=false;favoriteError=false
+        if(!loggedIn){account=null;stats=null;continuing=emptyList();cloudSaved=emptyList();cloudFavorites=emptyList();history=emptyList();historyPage=1;historyHasMore=false;historyError=false;loading=false;return@LaunchedEffect}
         loading=true
-        try {
-            coroutineScope {
-                val identity=async { cinemaUiOptional{backend.me()} }
-                val totals=async { cinemaUiOptional{backend.libraryStats()} }
-                val progress=async { cinemaUiOptional{backend.continueWatching()} }
-                val saved=async { cinemaUiOptional{backend.favorites()} }
-                profile=identity.await();stats=totals.await();watching=progress.await().orEmpty();favorites=saved.await().orEmpty()
-                accountError=profile==null || stats==null
-            }
-        }finally{loading=false}
+        supervisorScope{
+            launch{try{account=backend.me()}catch(e:CancellationException){throw e}catch(_:Exception){accountError=true}}
+            launch{try{stats=statsRepository.load()}catch(e:CancellationException){throw e}catch(_:Exception){statsError=true}}
+            launch{try{continuing=backend.continueWatching()}catch(e:CancellationException){throw e}catch(_:Exception){continueError=true}}
+            launch{try{cloudSaved=library.watchlist()}catch(e:CancellationException){throw e}catch(_:Exception){savedError=true}}
+            launch{try{cloudFavorites=library.favorites()}catch(e:CancellationException){throw e}catch(_:Exception){favoriteError=true}}
+        };loading=false
     }
-    LaunchedEffect(tab,profile?.id,refresh,loggedIn){
-        posts=emptyList();clips=emptyList();activityError=false
-        val id=profile?.id
-        if(tab==0||!loggedIn||id==null)return@LaunchedEffect
-        activityLoading=true
-        try{if(tab==1)posts=creators.userPosts(id)else clips=creators.userReels(id)}
-        catch(e:CancellationException){throw e}catch(_:Exception){activityError=true}finally{activityLoading=false}
+    LaunchedEffect(loggedIn,activeProfile,accountScope,historyPage,historyRetry,refresh){
+        if(!loggedIn)return@LaunchedEffect
+        historyLoading=true;historyError=false
+        try{val page=historyRepository.historyPage(historyPage);history=(if(historyPage==1)page.items else history+page.items).distinctBy{it.target.mediaVersionId};historyHasMore=page.hasMore}
+        catch(e:CancellationException){throw e}catch(_:Exception){historyError=true}finally{historyLoading=false}
     }
-    Box(Modifier.fillMaxSize().background(CinemaInk).testTag("cinema-profile-hub")) {
-        LazyColumn(modifier=Modifier.testTag("profile-scroll"),contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            item("header"){CinemaPageHeader(if(kidsMode)"پروفایل تماشا"else "فضای من","سلیقه‌ات، آدم‌هایت، سینمایت"){
-                if(!kidsMode)IconButton({accountAction(onSettings)},Modifier.testTag("profile-settings")){Icon(Icons.Outlined.Settings,"تنظیمات حساب")}
-                IconButton({refresh++},enabled=!loading){Icon(Icons.Outlined.Refresh,"تازه‌کردن پروفایل")}
-            }}
-            item("identity"){ProfileIdentityCard(profile,loggedIn,loading,onEdit={accountAction(if(kidsMode)onViewerProfiles else onEditProfile)},onLogin=onRequireAuth,kidsMode=kidsMode,viewer=backend.viewerProfiles.active())}
-            if(accountError)item("error"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("همگام‌سازی کامل نشد","بعضی اطلاعات حساب دریافت نشد. مسیر فهرست‌ها، دانلودها و تنظیمات همچنان باز است.",Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}}
-            if(!kidsMode)item("party"){CommunityWatchTogetherCard({accountAction(onWatchParty)})}
-            item("tabs"){LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                items(if(kidsMode)listOf(0 to "تماشای من")else listOf(0 to "تماشای من",1 to "پست‌های من",2 to "کلیپ‌های من")){(id,label)->
-                    FilterChip(tab==id,{tab=id},label={Text(label)},modifier=Modifier.testTag("profile-tab-$id"))
-                }
-            }}
-            if(tab==0 || kidsMode) {
-                if(watching.isNotEmpty()) {
-                    item("continue-header"){CinemaHeading("از همان‌جا ادامه بده",action="تاریخچه",onAction={accountAction(onHistory)})}
-                    item("continue"){LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                        items(watching,key={it.target.mediaVersionId}){entry->CinemaCard(Modifier.width(250.dp).clickable{onPlay(entry.target)}){
-                            Box(Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(14.dp))){CinemaImage(entry.media.backdropPath?:entry.media.posterPath,Modifier.fillMaxSize(),true);Icon(Icons.Outlined.PlayCircleOutline,"ادامهٔ پخش",Modifier.align(Alignment.Center).size(40.dp))}
-                            Text(entry.media.title,style=MaterialTheme.typography.titleMedium,modifier=Modifier.padding(top=10.dp))
-                            if(entry.episodeLabel.isNotBlank())Text(entry.episodeLabel,color=CinemaSoft,style=MaterialTheme.typography.bodySmall)
-                            LinearProgressIndicator(progress={entry.progress.coerceIn(0f,1f)},Modifier.fillMaxWidth().padding(top=10.dp),color=CinemaAccent,trackColor=CinemaLine)
-                        }}
-                    }}
-                }
-                item("library"){CinemaCard(Modifier.padding(horizontal=20.dp).fillMaxWidth()){
-                    Text("سینمای شخصی تو",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-                    Text("فهرست تماشا، علاقه‌مندی‌ها و دیده‌شده‌ها؛ کتابخانه‌ات از اینجا در دسترس است.",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(vertical=10.dp))
-                    CinemaAction(Icons.Outlined.Bookmarks,"بازکردن کتابخانهٔ من",onLibrary,Modifier.fillMaxWidth().testTag("profile-library"),primary=true)
-                    ProfileHubAction(Icons.Outlined.Download,"دانلودهای من","صف دانلود و تماشای آفلاین",onDownloads,Modifier.testTag("profile-downloads"))
-                    ProfileHubAction(Icons.Outlined.History,"تاریخچهٔ تماشا","پیشرفت واقعی تماشای حساب",{accountAction(onHistory)})
-                    if(!kidsMode)ProfileHubAction(Icons.Outlined.Event,"تقویم سریال‌ها","قسمت‌های آثاری که دنبال می‌کنی",{accountAction(onSeriesCalendar)})
-                }}
-                val saved=(favorites+personal.favorites()).distinctBy{it.key}
-                if(saved.isNotEmpty()) {
-                    item("favorite-header"){CinemaHeading("علاقه‌مندی‌های من",action="همه",onAction=onLibrary)}
-                    item("favorites"){LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                        items(saved.take(12),key={it.key}){media->Column(Modifier.width(112.dp).clickable{onMedia(media)}){
-                            CinemaImage(media.posterPath,Modifier.fillMaxWidth().aspectRatio(2f/3f).clip(RoundedCornerShape(14.dp)))
-                            Text(media.title,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(top=8.dp))
-                        }}
-                    }}
-                }
-                stats?.let { real->item("stats"){CinemaCard(Modifier.padding(horizontal=20.dp).fillMaxWidth()){
-                    Text("رد پای تماشای تو",style=MaterialTheme.typography.titleMedium)
-                    Text("${real.distinctTitles} عنوان در تاریخچه · ${real.completedVersions} نسخهٔ کامل‌شده",color=CinemaSoft,modifier=Modifier.padding(top=8.dp))
-                    Text(profileWatchTime(real.watchTimeMinutes)+" تماشا",color=CinemaAccent,modifier=Modifier.padding(top=6.dp))
-                }} }
-            } else {
-                if(!loggedIn)item("activity-auth"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("صدای تو در سینماکلاب","برای انتشار پست و کلیپ و دیدن فعالیت حسابت وارد شو.",Icons.Outlined.PersonOutline,"ورود",onRequireAuth)}}
-                else {
-                    if(activityLoading)item("activity-loading"){LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=20.dp),color=CinemaAccent)}
-                    if(activityError || (profile==null&&accountError))item("activity-error"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice("فعالیت دریافت نشد","پست‌ها و کلیپ‌های قبلی حساب حذف نشده‌اند.",Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}}
-                    if(profile!=null&&!activityLoading&&!activityError&&(if(tab==1)posts.isEmpty()else clips.isEmpty()))item("activity-empty"){Box(Modifier.padding(horizontal=20.dp)){CinemaNotice(
-                        if(tab==1)"هنوز پستی ننوشته‌ای"else "هنوز کلیپی منتشر نکرده‌ای",
-                        if(tab==1)"از تجربهٔ تماشایت بنویس؛ پیشنهادت می‌تواند انتخاب فیلم نفر بعد باشد."else "یک کلیپ سینمایی منتشر کن. فایل‌ها پس از پردازش و انتشار اینجا دیده می‌شوند.",
-                        Icons.Outlined.EditNote,"ساخت محتوا",onCreate)}}
-                    if(tab==1)items(posts,key={it.id}){post->ProfilePostPreview(post,{onOpenPost(post.id)})}
-                    else items(clips,key={it.id}){clip->CommunityClipCard(clip,{onOpenClip(clip.id)},{})}
-                }
+    fun accountAction(action:()->Unit){if(loggedIn)action()else onRequireAuth()}
+    fun removeSaved(media:MediaItem,favorite:Boolean){if(mutationBusy)return;scope.launch{
+        mutationBusy=true;message=null
+        try{val cloud=if(favorite)cloudFavorites else cloudSaved
+            if(loggedIn&&!media.backendId.isNullOrBlank()&&cloud.any{cinemaMediaKey(it)==cinemaMediaKey(media)}){
+                if(favorite)backend.toggleFavorite(media.backendId!!)else library.toggleWatchlist(media.backendId!!)
+                if(favorite)cloudFavorites=cloudFavorites.filterNot{cinemaMediaKey(it)==cinemaMediaKey(media)}else cloudSaved=cloudSaved.filterNot{cinemaMediaKey(it)==cinemaMediaKey(media)}
             }
-            if(!kidsMode)item("connections"){CinemaCard(Modifier.padding(horizontal=20.dp).fillMaxWidth()){
-                Text("آدم‌ها و محتوا",style=MaterialTheme.typography.titleLarge)
-                ProfileHubAction(Icons.Outlined.Forum,"سینماکلاب","کشف آدم‌ها، نقدها و گفت‌وگوهای آثار",onCommunity)
-                ProfileHubAction(Icons.Outlined.EditNote,"ساخت پست و کلیپ","نظر، نظرسنجی، استوری یا ویدیو",{accountAction(onCreate)},Modifier.testTag("profile-create"))
-                ProfileHubAction(Icons.Outlined.BookmarkBorder,"پست‌ها و کلیپ‌های ذخیره‌شده","ذخیره‌های اجتماعی حساب",{accountAction(onSocialSaves)})
-                ProfileHubAction(Icons.Outlined.ChatBubbleOutline,"پیام‌های خصوصی","گفت‌وگو با دوستان",{accountAction(onInbox)})
-                ProfileHubAction(Icons.Outlined.Notifications,"اعلان‌های اجتماعی","پاسخ‌ها و تعامل‌های جدید",{accountAction(onNotifications)})
-                ProfileHubAction(Icons.Outlined.CollectionsBookmark,"مجموعه‌های من","لیست‌های سینمایی ساخته‌شده توسط تو",{accountAction(onSocialCollections)})
-            }}
-            item("account"){CinemaCard(Modifier.padding(horizontal=20.dp).fillMaxWidth()){
-                Text("حساب و تماشا",style=MaterialTheme.typography.titleLarge)
-                ProfileHubAction(Icons.Outlined.SwitchAccount,"پروفایل‌های تماشا",if(kidsMode)"بازگشت با تأیید والدین"else "انتخاب پروفایل و پروفایل کودک",{accountAction(onViewerProfiles)})
-                if(!kidsMode){
-                    ProfileHubAction(Icons.Outlined.Settings,"تنظیمات","پخش، اینترنت، اعلان‌ها و حریم خصوصی",{accountAction(onSettings)})
-                    TextButton({more=!more},Modifier.fillMaxWidth().testTag("profile-more")){Text(if(more)"بستن ابزارهای حساب"else "ابزارهای حساب و ایمنی",Modifier.weight(1f));Icon(if(more)Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,null)}
-                    if(more){
-                        ProfileHubAction(Icons.Outlined.Lock,"امنیت حساب","جلسه‌ها و دسترسی‌ها",{accountAction(onSecurity)})
-                        ProfileHubAction(Icons.Outlined.Shield,"ایمنی و مسدودسازی","مدیریت تعامل‌های ناخواسته",{accountAction(onSafety)})
-                        ProfileHubAction(Icons.Outlined.ChildCare,"کنترل والدین","دسترسی امن خانواده",{accountAction(onParentalControls)})
-                        ProfileHubAction(Icons.Outlined.PersonAdd,"درخواست‌های دنبال‌کردن","کنترل حساب خصوصی",{accountAction(onFollowRequests)})
-                        ProfileHubAction(Icons.Outlined.PeopleOutline,"دوستان نزدیک","مخاطبان استوری‌های خصوصی",{accountAction(onCloseFriends)})
-                        ProfileHubAction(Icons.Outlined.MovieCreation,"استودیوی سازنده","مدیریت محتوای منتشرشده",{accountAction(onCreatorStudio)})
-                        ProfileHubAction(Icons.Outlined.AutoAwesome,"سلیقهٔ سینمایی","Film DNA حسابت",{accountAction(onFilmDna)})
-                        profile?.id?.let{id->ProfileHubAction(Icons.Outlined.WorkspacePremium,"اعتبار اجتماعی","فعالیت و نشان‌های حساب",{onReputation(id)})}
+            personal.setSaved(if(favorite)"favorites"else"watchlist",media,false);revision++;message="فهرست به‌روز شد."
+        }catch(e:CancellationException){throw e}catch(_:Exception){message="تغییر ذخیره نشد. دوباره تلاش کن."}finally{mutationBusy=false}
+    }}
+    Box(Modifier.fillMaxSize().background(CinemaInk).testTag("cinema-profile-hub")){
+        if(artwork!=null)Box(Modifier.fillMaxWidth().height(440.dp)){
+            CinemaImage(artwork.backdropPath?:artwork.posterPath,Modifier.fillMaxSize(),true)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(CinemaInk.copy(alpha=.72f),CinemaInk.copy(alpha=.9f),CinemaInk))))
+        }
+        LazyColumn(state=listState,modifier=Modifier.fillMaxSize().testTag("profile-scroll"),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=18.dp,bottom=28.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){
+            item("identity"){Column(Modifier.statusBarsPadding()){
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                    Box(Modifier.size(64.dp).clip(CircleShape).background(CinemaSurface),contentAlignment=Alignment.Center){
+                        if(!(if(kidsMode)viewer?.avatarUrl else account?.avatarUrl).isNullOrBlank())CinemaImage(if(kidsMode)viewer?.avatarUrl else account?.avatarUrl,Modifier.fillMaxSize())else Icon(Icons.Outlined.PersonOutline,null,Modifier.size(30.dp),tint=CinemaSoft)
                     }
+                    Column(Modifier.weight(1f).padding(horizontal=14.dp)){
+                        Text(if(kidsMode)"سینمای کودک"else"سینمای من",color=CinemaGold,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                        Text(if(kidsMode)viewer?.name?:"تماشاگر کودک"else account?.displayName?.takeIf(String::isNotBlank)?:account?.username?.takeIf(String::isNotBlank)?:if(!loggedIn)"تماشاگر مهمان"else if(accountError)"حساب کاربری"else"در حال دریافت حساب…",color=CinemaPaper,fontSize=21.sp,lineHeight=30.sp,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.Bold,modifier=Modifier.testTag("account-name"))
+                        if(!kidsMode)account?.username?.takeIf(String::isNotBlank)?.let{Text("@"+it,color=CinemaSoft,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis)}
+                    }
+                    IconButton({accountAction(if(kidsMode)onViewerProfiles else onSettings)},Modifier.testTag("profile-settings")){Icon(Icons.Outlined.Settings,"تنظیمات",tint=CinemaPaper)}
                 }
+                if(loggedIn&&!kidsMode)TextButton(onEditProfile,Modifier.heightIn(min=48.dp).testTag("profile-edit")){Text("ویرایش حساب")}
             }}
-            if(loggedIn&&!kidsMode)item("logout"){TextButton({logout=true},Modifier.padding(horizontal=20.dp).testTag("profile-logout")){Icon(Icons.Outlined.Logout,null);Spacer(Modifier.width(8.dp));Text("خروج از حساب")}}
-        }
-        SnackbarHost(snackbar,Modifier.align(Alignment.BottomCenter))
-    }
-    if(logout)AlertDialog(onDismissRequest={if(!logoutBusy)logout=false},title={Text("از حساب خارج می‌شوی؟")},text={Text("فهرست‌ها، پست‌ها و پیام‌های حساب باقی می‌مانند.")},
-        confirmButton={TextButton({if(!logoutBusy){logoutBusy=true;scope.launch{try{backend.logout();logout=false;onLoggedOut()}catch(e:CancellationException){throw e}catch(_:Exception){snackbar.showSnackbar("خروج کامل نشد؛ دوباره تلاش کن.")}finally{logoutBusy=false}}}},enabled=!logoutBusy){Text("خروج")}},
-        dismissButton={TextButton({logout=false},enabled=!logoutBusy){Text("انصراف")}})
-}
-
-private fun profileWatchTime(minutes:Long):String {
-    val safe=minutes.coerceAtLeast(0)
-    return if(safe<60)"$safe دقیقه"else "${safe/60} ساعت و ${safe%60} دقیقه"
-}
-
-@Composable
-private fun ProfileIdentityCard(profile:AccountProfile?,loggedIn:Boolean,loading:Boolean,onEdit:()->Unit,onLogin:()->Unit,kidsMode:Boolean=false,viewer:ViewerProfile?=null) {
-    CinemaCard(Modifier.padding(horizontal=20.dp).fillMaxWidth().testTag("profile-identity")){
-        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
-            Box(Modifier.size(72.dp).background(Brush.linearGradient(listOf(CinemaAccent,CinemaGold)),CircleShape).padding(3.dp)){
-                val avatar=if(kidsMode)viewer?.avatarUrl else profile?.avatarUrl
-                if(avatar?.isNotBlank()==true)CinemaImage(avatar,Modifier.fillMaxSize().clip(CircleShape))
-                else Box(Modifier.fillMaxSize().background(CinemaSurface,CircleShape),contentAlignment=Alignment.Center){Icon(Icons.Outlined.PersonOutline,null,tint=CinemaAccent,modifier=Modifier.size(32.dp))}
+            item("tabs"){LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.testTag("profile-hub-tabs")){
+                listOf("سینمای من","تاریخچه","آمار تماشا","فهرست‌ها").forEachIndexed{index,label->item(key=index){FilterChip(tab==index,{tab=index},label={Text(label,fontWeight=FontWeight.Bold)},modifier=Modifier.heightIn(min=48.dp).testTag("profile-hub-tab-"+index),colors=FilterChipDefaults.filterChipColors(containerColor=CinemaSurface,selectedContainerColor=CinemaAccent.copy(alpha=.2f),selectedLabelColor=CinemaPaper,labelColor=CinemaSoft))}}
+            }}
+            message?.let{value->item("operation"){Text(value,color=CinemaSoft,fontSize=13.sp,lineHeight=21.sp,modifier=Modifier.testTag("profile-operation-message"))}}
+            if(!loggedIn)item("auth"){CinemaNotice("سینمای شخصی‌ات را بساز","آمار و ادامهٔ تماشا با حساب دریافت می‌شود. فهرست‌های محلی همین دستگاه در دسترس‌اند.",Icons.Outlined.PersonOutline,"ورود به حساب",onRequireAuth)}
+            if(accountError&&loggedIn)item("account-error"){CinemaNotice("حساب دریافت نشد","بخش‌های دریافت‌شده همچنان قابل استفاده‌اند.",Icons.Outlined.CloudOff,"دریافت دوباره",{refresh++})}
+            if(tab==0||tab==2){
+                if(loading&&stats==null)item("stats-loading"){LinearProgressIndicator(Modifier.fillMaxWidth(),color=CinemaAccent,trackColor=CinemaLine)}
+                if(statsError)item("stats-error"){Column(Modifier.testTag("profile-stats-error")){CinemaNotice("آمار دریافت نشد","دریافت آمار این پروفایل را دوباره امتحان کن.",Icons.Outlined.CloudOff,"دریافت آمار",{refresh++})}}
+                val observed=stats
+                if(observed!=null&&observed.historyTitles>0){
+                    item("time"){CinemaHubWatchTime(observed)}
+                    item("metrics"){CinemaHubMetrics(observed,large,tab==2)}
+                    if(tab==2){item("stats-rules"){CinemaCard{Text("آمار تماشای من",fontWeight=FontWeight.Bold,color=CinemaPaper);Text("زمان، مجموع پخش واقعی ثبت‌شده است؛ جلو بردن ویدیو زمان اضافه نمی‌کند. فیلم و قسمت با حداقل ۹۵٪ تکمیل، فقط یک بار شمرده می‌شوند. سریال کامل باید پایان‌یافته باشد و همهٔ قسمت‌های تأییدشده‌اش کامل شده باشند.",color=CinemaSoft,fontSize=13.sp,lineHeight=23.sp,modifier=Modifier.padding(top=8.dp));if(observed.legacyHistoryWithoutTime)Text("بخشی از تاریخچهٔ قدیمی زمان پخش ثبت‌شده ندارد و به ساعت تماشا اضافه نشده است.",color=CinemaGold,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(top=8.dp));Text("تمام زمان ثبت‌شدهٔ این پروفایل نمایش داده می‌شود.",color=CinemaSoft,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))}};item("taste"){CinemaHubTaste(observed)}}
+                }else if(!loading&&!statsError)item("onboarding"){CinemaCard(Modifier.testTag("profile-new-viewer")){Text("داستان سینمایی تو از اینجا شروع می‌شه",color=CinemaPaper,fontSize=25.sp,lineHeight=36.sp,fontWeight=FontWeight.Bold);Text("فیلم و سریال پیدا کن، برای بعد ذخیره کن و با تماشا، سینمای شخصی‌ات را بساز.",color=CinemaSoft,fontSize=13.sp,lineHeight=22.sp,modifier=Modifier.padding(top=10.dp))}}
             }
-            Column(Modifier.weight(1f)){
-                Text(if(kidsMode)viewer?.name?:"پروفایل کودک"else profile?.displayName?:if(loggedIn)"حساب من"else "سینمای تو، همین‌جا",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-                if(kidsMode)Text("پروفایل تماشای کودک",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium)
-                else profile?.let{Text("@${it.username}",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium)}
-                if(!loggedIn)Text("فهرست‌های روی دستگاه محفوظ‌اند. برای همگام‌سازی و تعامل وارد شو.",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium)
-                if(!kidsMode&&profile?.privateAccount==true)Text("حساب خصوصی",color=CinemaAccent,style=MaterialTheme.typography.labelMedium)
+            if(tab==0){
+                if(!kidsMode)item("browse"){Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){OutlinedButton(onMovies,Modifier.weight(1f).heightIn(min=52.dp).testTag("profile-movies")){Text("فیلم‌ها")};OutlinedButton(onSeries,Modifier.weight(1f).heightIn(min=52.dp).testTag("profile-series")){Text("سریال‌ها")}}}
+                if(continuing.isNotEmpty()){
+                    item("continue-header"){CinemaHubHeading("ادامهٔ تماشا","مدیریت تاریخچه"){tab=1}}
+                    items(continuing.take(3),key={"continue-"+it.target.mediaVersionId}){entry->CinemaHubContinueRow(entry,{onPlay(entry.target)},{onMedia(entry.media)})}
+                }
+                if(continueError)item("continue-error"){CinemaNotice("ادامهٔ تماشا به‌روز نشد","اتصال را بررسی کن.",Icons.Outlined.CloudOff,"تلاش دوباره",{refresh++})}
+                if(saved.isNotEmpty()){
+                    item("saved-header"){CinemaHubHeading("لیست تماشا","مشاهده همه"){tab=3;listTab=0}}
+                    items(saved.take(2),key={"overview-saved-"+cinemaMediaKey(it)}){media->CinemaHubSavedRow(media,{onMedia(media)},{removeSaved(media,false)},!mutationBusy)}
+                }
+                if(history.isNotEmpty()){
+                    item("recent-header"){CinemaHubHeading("اخیراً تماشا کردی","تاریخچه"){tab=1}}
+                    items(history.take(2),key={"recent-"+it.target.mediaVersionId}){entry->CinemaHubHistoryRow(entry,{onPlay(entry.target)},{onMedia(entry.media)},{pendingRemoval=entry},!mutationBusy)}
+                }
+                stats?.takeIf{it.historyTitles>0}?.let{observed->item("taste-snapshot"){CinemaHubTaste(observed)}}
+                item("shortcuts"){CinemaCard{
+                    CinemaHubMenuRow("فهرست‌های من",cinemaHubNumber(saved.size.toLong())+" برای تماشا · "+cinemaHubNumber(favorites.size.toLong())+" علاقه‌مندی",{tab=3;listTab=0},"profile-watchlist")
+                    CinemaHubMenuRow("علاقه‌مندی‌ها","عنوان‌هایی که دوست داری",{tab=3;listTab=1},"profile-favorites")
+                    CinemaHubMenuRow("امتیازهای من","خصوصی و ذخیره‌شده در این دستگاه",{tab=3;listTab=2},"profile-ratings")
+                    CinemaHubMenuRow("دانلودها","فایل‌های آمادهٔ تماشای آفلاین",onDownloads,"profile-downloads")
+                }}
+                item("settings-menu"){CinemaCard{
+                    CinemaHubMenuRow("پروفایل‌های تماشا","انتخاب پروفایل و حالت کودک",{accountAction(onViewerProfiles)},"profile-viewers")
+                    if(!kidsMode){CinemaHubMenuRow("تنظیمات برنامه","پخش، دانلود و اعلان‌ها",{accountAction(onSettings)},"profile-settings-menu");CinemaHubMenuRow("کنترل والدین","دسترسی کودک",{accountAction(onParentalControls)},"profile-parental");CinemaHubMenuRow("امنیت حساب","دستگاه‌ها و نشست‌ها",{accountAction(onSecurity)},"profile-security")}
+                }}
+                if(loggedIn&&!kidsMode)item("logout"){TextButton({logout=true},Modifier.heightIn(min=48.dp).testTag("profile-logout")){Text("خروج از حساب",color=CinemaSoft)}}
             }
-            if(!kidsMode&&profile?.verified==true)Icon(Icons.Outlined.Verified,"حساب تأییدشده",tint=CinemaAccent)
+            if(tab==1){
+                item("history-header"){CinemaHubHeading("تاریخچهٔ تماشا",if(loggedIn&&history.isNotEmpty())"پاک‌کردن"else null){clearHistory=true}}
+                item("history-filter"){CinemaHubTypeFilter(typeFilter,{typeFilter=it},true)}
+                if(historyError)item("history-error"){CinemaNotice("تاریخچه دریافت نشد","ردیف‌های دریافت‌شده حفظ شده‌اند.",Icons.Outlined.CloudOff,"تلاش دوباره",{historyRetry++})}
+                val rows=history.filter{typeFilter==0||(typeFilter==1&&it.media.type==MediaType.MOVIE)||(typeFilter==2&&it.media.type==MediaType.TV)||(typeFilter==3&&it.episodeId!=null)}
+                items(rows,key={"history-"+it.target.mediaVersionId}){entry->CinemaHubHistoryRow(entry,{onPlay(entry.target)},{onMedia(entry.media)},{pendingRemoval=entry},!mutationBusy)}
+                if(historyLoading)item("history-loading"){LinearProgressIndicator(Modifier.fillMaxWidth(),color=CinemaAccent)}
+                if(loggedIn&&!historyLoading&&!historyError&&rows.isEmpty())item("history-empty"){CinemaNotice("تاریخچه‌ای در این بخش ثبت نشده","با تماشای عنوان، جای ادامه و سابقهٔ آن اینجا دیده می‌شود.",Icons.Outlined.History)}
+                if(historyHasMore)item("history-more"){OutlinedButton({historyPage++},enabled=!historyLoading&&!historyError,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("profile-history-more")){Text("تاریخچهٔ بیشتر")}}
+            }
+            if(tab==3){
+                item("list-tabs"){Column{
+                    LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("برای تماشا","علاقه‌مندی‌ها","امتیازها").forEachIndexed{index,label->item(key=index){FilterChip(listTab==index,{listTab=index},label={Text(label)},modifier=Modifier.heightIn(min=48.dp).testTag("profile-list-tab-"+index))}}}
+                    CinemaHubTypeFilter(typeFilter,{typeFilter=it},false)
+                    if(listTab<2)LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("جدیدترین ذخیره","نام عنوان","امتیاز TMDB").forEachIndexed{index,label->item{FilterChip(listOrder==index,{listOrder=index},label={Text(label)},modifier=Modifier.heightIn(min=48.dp).testTag("profile-list-order-"+index))}}}
+                    Text(if(listTab==2)"امتیازهای شخصی فقط در همین دستگاه و پروفایل ذخیره می‌شوند."else"ذخیره‌کردن عنوان به معنی وجود فایل قابل پخش نیست.",color=CinemaSoft,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(top=8.dp))
+                }}
+                if(savedError||favoriteError)item("lists-error"){CinemaNotice("بخشی از فهرست آنلاین به‌روز نشد","ذخیره‌های محلی و عنوان‌های قبلاً دریافت‌شده حفظ شده‌اند.",Icons.Outlined.CloudOff,"دریافت فهرست‌ها",{refresh++})}
+                val source=if(listTab==0)saved else favorites
+                val filtered=source.filter{typeFilter==0||it.type==if(typeFilter==1)MediaType.MOVIE else MediaType.TV}
+                val entries=when(listOrder){1->filtered.sortedBy{it.title};2->filtered.sortedByDescending{it.vote};else->filtered}
+                if(listTab<2){items(entries,key={"list-"+cinemaMediaKey(it)}){entry->CinemaHubSavedRow(entry,{onMedia(entry)},{removeSaved(entry,listTab==1)},!mutationBusy)}
+                    if(!loading&&entries.isEmpty()&&!(if(listTab==0)savedError else favoriteError))item("lists-empty"){CinemaNotice("این فهرست هنوز خالی است","از صفحهٔ عنوان آن را برای تماشا یا در علاقه‌مندی‌ها ذخیره کن.",Icons.Outlined.BookmarkBorder)}
+                }else{
+                    val visibleRatings=ratings.filter{typeFilter==0||it.media.type==if(typeFilter==1)MediaType.MOVIE else MediaType.TV}
+                    items(visibleRatings,key={"rating-"+cinemaMediaKey(it.media)}){rating->CinemaHubSavedRow(rating.media,{onMedia(rating.media)},{personal.setRating(rating.media,null);revision++},true,"امتیاز شخصی: "+cinemaHubNumber(rating.value.toLong())+" از ۱۰ · محلی")}
+                    if(visibleRatings.isEmpty())item("ratings-empty"){CinemaNotice("هنوز امتیازی در این بخش نداده‌ای","از صفحهٔ عنوان امتیاز بده. امتیاز شخصی با TMDB متفاوت است.",Icons.Outlined.StarOutline)}
+                }
+            }
         }
-        if(!kidsMode)profile?.bio?.takeIf(String::isNotBlank)?.let{Text(it,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(top=14.dp))}
-        if(!kidsMode)profile?.let{Row(Modifier.fillMaxWidth().padding(top=14.dp),horizontalArrangement=Arrangement.spacedBy(16.dp)){
-            Text("${it.followers} دنبال‌کننده",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.weight(1f))
-            Text("${it.following} دنبال‌شده",color=CinemaSoft,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.weight(1f))
-        }}
-        if(loading)LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=14.dp),color=CinemaAccent)
-        CinemaAction(if(!loggedIn)Icons.Outlined.Login else if(kidsMode)Icons.Outlined.SwitchAccount else Icons.Outlined.Edit,
-            if(!loggedIn)"ورود و ساخت حساب"else if(kidsMode)"خروج با تأیید والدین"else "ویرایش پروفایل",
-            if(loggedIn)onEdit else onLogin,Modifier.fillMaxWidth().padding(top=14.dp).testTag("profile-identity-action"),primary=!loggedIn)
     }
+    val removal=pendingRemoval
+    if(removal!=null||clearHistory)AlertDialog(onDismissRequest={if(!mutationBusy){pendingRemoval=null;clearHistory=false}},title={Text(if(clearHistory)"پاک‌کردن تاریخچه؟"else"حذف این سابقه؟")},text={Text("سابقه، زمان ثبت‌شده و جای ادامهٔ این تاریخچه پاک می‌شود و آمار به‌روز خواهد شد. این کار قابل بازگشت نیست.")},
+        confirmButton={TextButton({scope.launch{mutationBusy=true
+            try{if(clearHistory)historyRepository.clear()else removal?.let{historyRepository.remove(it.target.mediaVersionId)};history=emptyList();historyPage=1;historyHasMore=false;historyRetry++;refresh++;pendingRemoval=null;clearHistory=false;message="تاریخچه به‌روز شد."}
+            catch(e:CancellationException){throw e}catch(_:Exception){message="پاک‌کردن انجام نشد. دوباره تلاش کن."}finally{mutationBusy=false}
+        }},enabled=!mutationBusy,modifier=Modifier.heightIn(min=48.dp).testTag("profile-history-confirm")){Text("پاک‌کردن")}},dismissButton={TextButton({pendingRemoval=null;clearHistory=false},enabled=!mutationBusy){Text("انصراف")}})
+    if(logout)AlertDialog(onDismissRequest={if(!mutationBusy)logout=false},title={Text("خروج از حساب؟")},text={Text("برای دریافت آمار و ادامهٔ تماشا دوباره باید وارد شوی.")},confirmButton={TextButton({scope.launch{mutationBusy=true;try{backend.logout();logout=false;onLoggedOut()}catch(e:CancellationException){throw e}catch(_:Exception){logout=false;message="خروج انجام نشد. دوباره تلاش کن."}finally{mutationBusy=false}}},enabled=!mutationBusy){Text("خروج")}},dismissButton={TextButton({logout=false},enabled=!mutationBusy){Text("انصراف")}})
 }
 
-@Composable
-private fun ProfileHubAction(icon:ImageVector,title:String,subtitle:String,onClick:()->Unit,modifier:Modifier=Modifier) {
-    Row(modifier.fillMaxWidth().heightIn(min=64.dp).clickable(onClick=onClick).padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-        Icon(icon,null,tint=CinemaAccent,modifier=Modifier.size(24.dp))
-        Column(Modifier.weight(1f)){Text(title,style=MaterialTheme.typography.titleSmall);Text(subtitle,color=CinemaSoft,style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=3.dp))}
-        Icon(Icons.Outlined.ChevronLeft,null,tint=CinemaSoft)
+@Composable private fun CinemaHubHeading(title:String,action:String?,onAction:()->Unit){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(title,color=CinemaPaper,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));if(action!=null)TextButton(onAction,Modifier.heightIn(min=48.dp)){Text(action)}}}
+@Composable private fun CinemaHubTypeFilter(selected:Int,onSelect:(Int)->Unit,episodes:Boolean){LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){(if(episodes)listOf("همه","فیلم","سریال","قسمت‌ها")else listOf("همه","فیلم","سریال")).forEachIndexed{index,label->item{FilterChip(selected==index,{onSelect(index)},label={Text(label)},modifier=Modifier.heightIn(min=48.dp).testTag("profile-type-"+index))}}}}
+@Composable private fun CinemaHubWatchTime(stats:UserViewingStats){
+    Surface(shape=RoundedCornerShape(24.dp),color=CinemaSurface.copy(alpha=.9f),border=BorderStroke(1.dp,CinemaAccent.copy(alpha=.2f)),modifier=Modifier.fillMaxWidth().testTag("profile-stats-ready")){
+        Column(Modifier.background(Brush.linearGradient(listOf(CinemaAccent.copy(alpha=.12f),Color.Transparent))).padding(22.dp)){
+            Text("PERSONAL CINEMA",color=CinemaGold,fontSize=10.sp,letterSpacing=1.sp,fontWeight=FontWeight.Bold)
+            Text("زمان تماشای ثبت‌شده",color=CinemaSoft,fontSize=13.sp,modifier=Modifier.padding(top=12.dp))
+            Text(cinemaHubWatchDuration(stats.totalWatchMs),color=CinemaPaper,fontSize=30.sp,lineHeight=43.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=4.dp).testTag("profile-watch-time"))
+            Text("مجموع پخش واقعی این پروفایل",color=CinemaSoft,fontSize=12.sp,lineHeight=20.sp,modifier=Modifier.padding(top=8.dp))
+        }
     }
 }
-
-@Composable
-private fun ProfilePostPreview(post:SocialPost,onOpen:()->Unit) {
-    CinemaCard(Modifier.fillMaxWidth().padding(horizontal=20.dp).clickable(onClick=onOpen).testTag("profile-post-${post.id}")){
-        Text(post.media?.title?:"پست سینمایی",style=MaterialTheme.typography.titleMedium,color=CinemaAccent)
-        if(post.spoiler){Row(Modifier.padding(top=10.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Outlined.VisibilityOff,null);Spacer(Modifier.width(8.dp));Text("دارای اسپویل · بازکردن پست")}}
-        else Text(post.body,style=MaterialTheme.typography.bodyLarge,modifier=Modifier.padding(top=10.dp))
-        Text("${post.likes} پسند · ${post.comments} پاسخ",color=CinemaSoft,style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=10.dp))
+@Composable private fun CinemaHubMetrics(stats:UserViewingStats,large:Boolean,full:Boolean){
+    val primary=listOf("فیلم کامل" to stats.moviesWatched,"قسمت کامل" to stats.episodesWatched,"سریال کامل" to stats.seriesWatched)
+    Column(Modifier.testTag("profile-real-metrics"),verticalArrangement=Arrangement.spacedBy(10.dp)){
+        primary.chunked(if(large)1 else 3).forEach{group->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){group.forEach{(label,count)->Column(Modifier.weight(1f).padding(vertical=8.dp)){Text(cinemaHubNumber(count.toLong()),color=CinemaPaper,fontSize=25.sp,fontWeight=FontWeight.Bold);Text(label,color=CinemaSoft,fontSize=12.sp,lineHeight=20.sp)}}}}
+        if(full){HorizontalDivider(color=CinemaLine);listOf("سریال شروع‌شده" to stats.seriesStarted,"در حال تماشا" to stats.currentlyWatching,"عنوان در تاریخچه" to stats.historyTitles).forEach{(label,count)->Row(Modifier.fillMaxWidth()){Text(label,color=CinemaSoft,modifier=Modifier.weight(1f));Text(cinemaHubNumber(count.toLong()),color=CinemaPaper)}}}
     }
 }
+@Composable private fun CinemaHubTaste(stats:UserViewingStats){CinemaCard{
+    Text("سلیقهٔ سینمایی تو",color=CinemaPaper,fontSize=18.sp,fontWeight=FontWeight.Bold)
+    if(!cinemaHubTasteAvailable(stats)){Text("با ثبت سابقهٔ حداقل ۱۰ عنوان، الگوی ژانر و کشورها شکل می‌گیرد. هنوز دادهٔ کافی برای نتیجه‌گیری وجود ندارد.",color=CinemaSoft,fontSize=13.sp,lineHeight=23.sp,modifier=Modifier.padding(top=8.dp).testTag("profile-taste-insufficient"))}
+    else{Text("براساس "+cinemaHubNumber(stats.tasteSampleSize.toLong())+" عنوان و اطلاعات ثبت‌شدهٔ آن‌ها",color=CinemaSoft,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(top=6.dp))
+        listOf("ژانرهای پررنگ‌تر" to cinemaHubTasteShares(stats.genres),"بیشتر چی می‌بینی؟" to cinemaHubTasteShares(stats.countries)).forEach{(label,shares)->if(shares.isNotEmpty()){
+            Text(label,color=CinemaPaper,fontSize=13.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=16.dp));shares.take(5).forEach{share->Row(Modifier.fillMaxWidth().padding(top=10.dp)){Text(share.label,color=CinemaSoft,fontSize=13.sp,modifier=Modifier.weight(1f));Text(cinemaHubNumber((share.fraction*100).toLong())+"٪",color=CinemaGold,fontSize=12.sp)};LinearProgressIndicator(progress={share.fraction},modifier=Modifier.fillMaxWidth().padding(top=5.dp).height(4.dp),color=CinemaAccent,trackColor=CinemaLine)}
+        }};Text("سهم عنوان‌های چندژانری یا چندکشوری تقسیم می‌شود. موجودبودن دوبله، سلیقهٔ زبان تماشا را ثابت نمی‌کند.",color=CinemaSoft,fontSize=11.sp,lineHeight=19.sp,modifier=Modifier.padding(top=14.dp))
+    }
+}}
+@Composable private fun CinemaHubMenuRow(title:String,description:String,onClick:()->Unit,tag:String){Row(Modifier.fillMaxWidth().heightIn(min=64.dp).clickable(role=Role.Button,onClick=onClick).testTag(tag).padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f).padding(end=12.dp)){Text(title,color=CinemaPaper,fontSize=15.sp,fontWeight=FontWeight.Medium);Text(description,color=CinemaSoft,fontSize=12.sp,lineHeight=20.sp,modifier=Modifier.padding(top=3.dp))};Icon(Icons.Outlined.ChevronLeft,null,tint=CinemaSoft,modifier=Modifier.size(20.dp))}}
+@Composable private fun CinemaHubPoster(media:MediaItem,modifier:Modifier){Box(modifier.clip(RoundedCornerShape(12.dp)).background(CinemaLine),contentAlignment=Alignment.Center){if(cinemaImage(media.posterPath)!=null)CinemaImage(media.posterPath,Modifier.fillMaxSize())else Icon(Icons.Outlined.Movie,null,tint=CinemaSoft)}}
+@Composable private fun CinemaHubContinueRow(entry:ContinueWatchingItem,onPlay:()->Unit,onDetails:()->Unit){Surface(color=CinemaSurface,shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,CinemaLine),modifier=Modifier.fillMaxWidth().testTag("profile-continue-"+entry.target.mediaVersionId)){
+    Row(Modifier.clickable(role=Role.Button,onClick=onPlay).padding(14.dp),verticalAlignment=Alignment.CenterVertically){CinemaHubPoster(entry.media,Modifier.width(66.dp).height(94.dp));Column(Modifier.weight(1f).padding(horizontal=12.dp)){
+        Text(entry.media.title,color=CinemaPaper,fontWeight=FontWeight.Bold,fontSize=15.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
+        if(entry.episodeLabel.isNotBlank())Text(entry.episodeLabel,color=CinemaSoft,fontSize=12.sp,lineHeight=19.sp)
+        val progress=entry.progress.takeIf(Float::isFinite)?.coerceIn(0f,1f)?:0f
+        LinearProgressIndicator(progress={progress},Modifier.fillMaxWidth().padding(top=10.dp).height(3.dp),color=CinemaAccent,trackColor=CinemaLine)
+        Text(if(entry.durationMs>entry.positionMs)cinemaHubWatchDuration(entry.durationMs-entry.positionMs)+" باقی‌مانده"else"ادامه از جای ثبت‌شده",color=CinemaSoft,fontSize=11.sp,lineHeight=18.sp,modifier=Modifier.padding(top=5.dp))
+    };IconButton(onDetails){Icon(Icons.Outlined.Info,"اطلاعات عنوان",tint=CinemaSoft)}}
+}}
+@Composable private fun CinemaHubHistoryRow(entry:WatchHistoryItem,onPlay:()->Unit,onDetails:()->Unit,onRemove:()->Unit,enabled:Boolean){Surface(color=CinemaSurface,shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,CinemaLine),modifier=Modifier.fillMaxWidth().testTag("profile-history-"+entry.target.mediaVersionId)){Column(Modifier.padding(14.dp)){
+    Row(Modifier.fillMaxWidth().clickable(role=Role.Button,onClick=onDetails),verticalAlignment=Alignment.CenterVertically){CinemaHubPoster(entry.media,Modifier.width(54.dp).height(78.dp));Column(Modifier.weight(1f).padding(horizontal=12.dp)){
+        Text(entry.media.title,color=CinemaPaper,fontWeight=FontWeight.Bold,fontSize=15.sp,maxLines=2,overflow=TextOverflow.Ellipsis);if(entry.episodeLabel.isNotBlank())Text(entry.episodeLabel,color=CinemaSoft,fontSize=12.sp,lineHeight=19.sp);Text(if(entry.completed)"این نوبت کامل شده"else"جای ادامه ثبت شده",color=if(entry.completed)CinemaGold else CinemaSoft,fontSize=11.sp,lineHeight=19.sp);if(entry.updatedAt.isNotBlank())Text(entry.updatedAt.take(10),color=CinemaSoft,fontSize=11.sp)
+    };IconButton(onRemove,enabled=enabled,modifier=Modifier.testTag("profile-history-remove-"+entry.target.mediaVersionId)){Icon(Icons.Outlined.DeleteOutline,"حذف این سابقه",tint=CinemaSoft)}}
+    OutlinedButton(onPlay,enabled=entry.media.streamReady,modifier=Modifier.fillMaxWidth().padding(top=10.dp).heightIn(min=48.dp)){Text(if(!entry.media.streamReady)"فایل فعلاً آماده نیست"else if(entry.completed)"تماشای دوباره"else"ادامهٔ تماشا")}
+}}}
+@Composable private fun CinemaHubSavedRow(media:MediaItem,onDetails:()->Unit,onRemove:()->Unit,enabled:Boolean,annotation:String?=null){Surface(color=CinemaSurface,shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,CinemaLine),modifier=Modifier.fillMaxWidth().testTag("profile-saved-"+cinemaMediaKey(media))){Row(Modifier.clickable(role=Role.Button,onClick=onDetails).padding(14.dp),verticalAlignment=Alignment.CenterVertically){CinemaHubPoster(media,Modifier.width(54.dp).height(78.dp));Column(Modifier.weight(1f).padding(horizontal=12.dp)){Text(media.title,color=CinemaPaper,fontSize=15.sp,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis);Text((if(media.type==MediaType.MOVIE)"فیلم"else"سریال")+media.year.takeIf(String::isNotBlank)?.let{" · "+it}.orEmpty(),color=CinemaSoft,fontSize=12.sp,modifier=Modifier.padding(top=4.dp));if(annotation!=null)Text(annotation,color=CinemaGold,fontSize=12.sp,lineHeight=20.sp,modifier=Modifier.padding(top=5.dp))};IconButton(onRemove,enabled=enabled,modifier=Modifier.testTag("profile-list-remove-"+cinemaMediaKey(media))){Icon(Icons.Outlined.DeleteOutline,"برداشتن از این فهرست",tint=CinemaSoft)}}}}

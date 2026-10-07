@@ -39,8 +39,10 @@ class TmdbRepository(private val context: Context) {
     val imageW1280 = "https://image.tmdb.org/t/p/w1280"
     val imageOriginal = "https://image.tmdb.org/t/p/original"
 
-    private suspend fun get(path: String, params: Map<String, String> = emptyMap()): JSONObject = withContext(Dispatchers.IO) {
-        val serverResult = runCatching { backend.tmdbMetadata(path, params) }
+    internal suspend fun discoveryMetadata(path:String,params:Map<String,String> = emptyMap(),backendOverride:BackendRepository=backend):JSONObject = get(path,params,backendOverride)
+
+    private suspend fun get(path: String, params: Map<String, String> = emptyMap(),backendOverride:BackendRepository=backend): JSONObject = withContext(Dispatchers.IO) {
+        val serverResult = runCatching { backendOverride.tmdbMetadata(path, params) }
         serverResult.exceptionOrNull()?.let {
             if (it is IranAccessDeniedException || it is kotlinx.coroutines.CancellationException) throw it
         }
@@ -70,7 +72,10 @@ class TmdbRepository(private val context: Context) {
             if (!response.isSuccessful) {
                 error("TMDB " + response.code + " for " + path)
             }
-            JSONObject(response.body?.string().orEmpty())
+            val raw=response.body?.string().orEmpty()
+            val result=if(raw.trimStart().startsWith("[")) JSONObject().put("results",JSONArray(raw)) else JSONObject(raw)
+            result.put("_filmiqooDiscovery",JSONObject().put("version",1).put("provider","tmdb_direct").put("appliedParameters",JSONObject(params)))
+            result
         }
     }
 

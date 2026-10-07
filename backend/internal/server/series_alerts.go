@@ -124,7 +124,7 @@ func (s *Server) seriesCalendar(w http.ResponseWriter,r *http.Request) {
                e.still_url,e.runtime_minutes,e.air_date,
                EXISTS(
                  SELECT 1 FROM media_versions mv
-                  WHERE mv.episode_id=e.id AND mv.playback_url<>''
+                  WHERE mv.episode_id=e.id AND mv.stream_ready=true
                ) AS stream_ready
           FROM series_subscriptions ss
           JOIN media_titles mt ON mt.id=ss.media_title_id

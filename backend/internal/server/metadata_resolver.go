@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Awmirai/filmiqoo/backend/internal/catalogindex"
 	"github.com/Awmirai/filmiqoo/backend/internal/ingest"
+	"github.com/Awmirai/filmiqoo/backend/internal/tmdb"
 	"path/filepath"
 	"strings"
 	"time"
@@ -85,6 +87,17 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 		return err
 	}
 
+	var enrichment *tmdb.TitleMetadata
+	var alreadyIndexed bool
+	_ = s.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM media_titles WHERE tmdb_id=$1 AND kind=$2 AND metadata_indexed_at IS NOT NULL)", match.TMDBID, match.Kind).Scan(&alreadyIndexed)
+	if !alreadyIndexed {
+		if meta, metadataErr := s.tmdb.Metadata(ctx, match.Kind, match.TMDBID); metadataErr == nil {
+			enrichment = &meta
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -123,6 +136,11 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 		return err
 	}
 
+	if enrichment != nil {
+		if err = catalogindex.StoreMetadata(ctx, tx, mediaTitleID, *enrichment); err != nil {
+			return fmt.Errorf("index title metadata: %w", err)
+		}
+	}
 	// Every title gets a first-class community room automatically.
 	_, _ = tx.Exec(ctx, `
 		INSERT INTO rooms (media_title_id,name,topic,room_type,visibility)
@@ -284,6 +302,11 @@ func (s *Server) resolveTelegramIngest(ctx context.Context, ingestID string) err
 		}
 	}
 
+	if mediaVersionID != "" {
+		if _, _, err = catalogindex.DetectVersion(ctx, tx, mediaVersionID, true); err != nil {
+			return fmt.Errorf("index version presentation: %w", err)
+		}
+	}
 	_, err = tx.Exec(ctx, `
 		UPDATE telegram_ingest_items
 		   SET status='ready',

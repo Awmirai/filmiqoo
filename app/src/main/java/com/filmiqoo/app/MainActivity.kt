@@ -99,9 +99,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     var handoffActionBusy by remember { mutableStateOf(false) }
     var showNotificationPrimer by rememberSaveable { mutableStateOf(false) }
     var socialBadgeRefresh by rememberSaveable { mutableIntStateOf(0) }
+    var navigationError by remember { mutableStateOf<String?>(null) }
 
     fun resetNavigation() {
-        (0..4).forEach { bottomTabStateHolder.removeState("main-tab-"+(activeViewer?.id ?: "guest")+"-"+it) }
+        (0..4).forEach { bottomTabStateHolder.removeState("cinema090-tab-"+(activeViewer?.id ?: "guest")+"-"+it) }
         (overlayBackStack.toList()+listOfNotNull(overlay)).forEach { overlayStateHolder.removeState(it.javaClass.name+":"+it.hashCode()) }
         overlayBackStack.clear();overlay=null;tab=0;showSearch=false
         deepLinkPostId=null;deepLinkReelId=null;pendingHandoff=null
@@ -328,10 +329,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
 
                     "post" -> {
                         require(id.isNotBlank())
-                        overlay=null
+                        overlay=OverlayRoute.Post(id)
                         showSearch=false
-                        deepLinkPostId=id
-                        tab=2
                     }
 
                     else -> Unit
@@ -382,9 +381,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         val mediaId=media.backendId
         val sourceRoute=overlay
         if(mediaId.isNullOrBlank()) {
-            overlayBackStack.clear()
-            overlay=null
-            tab=2
+            pushOverlay(OverlayRoute.Detail(media))
         } else {
             appScope.launch {
                 runCatching { social.roomForMedia(mediaId) }
@@ -394,17 +391,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                 sourceRoute?.let(overlayBackStack::add)
                                 overlay=OverlayRoute.Room(room.id,room.name)
                             } else {
-                                overlayBackStack.clear()
-                                overlay=null
-                                tab=2
+                                pushOverlay(OverlayRoute.Detail(media))
                             }
                         }
                     }
                     .onFailure {
                         if(overlay==sourceRoute) {
-                            overlayBackStack.clear()
-                            overlay=null
-                            tab=2
+                            navigationError="گفت‌وگو دریافت نشد؛ اتصال را بررسی کن و دوباره تلاش کن."
                         }
                     }
             }
@@ -424,6 +417,10 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     }
 
     BackHandler(enabled=overlay==null && !showSearch && tab!=0) { tab=0 }
+
+    navigationError?.let { message -> AlertDialog(onDismissRequest={navigationError=null},
+        title={Text("گفت‌وگو در دسترس نیست")},text={Text(message)},
+        confirmButton={TextButton({navigationError=null}){Text("باشه")}}) }
 
     if(showNotificationPrimer) {
         AlertDialog(
@@ -598,15 +595,18 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 onCreator={ overlay=OverlayRoute.CreatorPage(it); showSearch=false },
                 onOpenPost={ postId ->
                     showSearch=false
-                    deepLinkPostId=postId
-                    tab=2
+                    overlay=OverlayRoute.Post(postId)
                 },
                 onOpenClip={ clipId ->
                     showSearch=false
                     overlay=OverlayRoute.Clips(clipId)
-                }
+                },
+                onPerson={id,name->showSearch=false;overlay=OverlayRoute.PersonPage(id,name)}
             )
             overlay != null -> overlayStateHolder.SaveableStateProvider(overlay!!.javaClass.name+":"+overlay.hashCode()) { when(val route=overlay!!) {
+                is OverlayRoute.Post -> FocusedPostScreen(route.postId,social,backend,closeOverlay,
+                    {pushOverlay(OverlayRoute.Detail(it))},{pushOverlay(OverlayRoute.CreatorPage(it))},
+                    {pushOverlay(OverlayRoute.Auth)})
                 is OverlayRoute.Detail -> CinemaDetailScreen(
                     media=route.media,
                     initialDiscussionScope=route.discussionScope,
@@ -645,17 +645,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                                         if(room!=null) {
                                             pushOverlay(OverlayRoute.Room(room.id,room.name))
                                         } else {
-                                            overlayBackStack.clear()
-                                            overlay=null
-                                            tab=2
+                                            navigationError="برای این عنوان اتاق گفت‌وگو در دسترس نیست."
                                         }
                                     }
                                 }
                                 .onFailure {
                                     if(overlay==route) {
-                                        overlayBackStack.clear()
-                                        overlay=null
-                                        tab=2
+                                        navigationError="گفت‌وگو دریافت نشد؛ دوباره تلاش کن."
                                     }
                                 }
                         }
@@ -698,10 +694,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     onCreator={pushOverlay(OverlayRoute.CreatorPage(it))},
                     onMedia={pushOverlay(OverlayRoute.Detail(it))},
                     onOpenPost={ postId ->
-                        overlayBackStack.add(route)
-                        overlay=null
-                        deepLinkPostId=postId
-                        tab=2
+                        pushOverlay(OverlayRoute.Post(postId))
                     },
                     onOpenClip={ clipId ->
                         pushOverlay(OverlayRoute.Clips(clipId))
@@ -776,10 +769,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         pushOverlay(OverlayRoute.Clips(clipId))
                     },
                     onOpenPost={ postId ->
-                        overlayBackStack.add(route)
-                        overlay=null
-                        deepLinkPostId=postId
-                        tab=2
+                        pushOverlay(OverlayRoute.Post(postId))
                     },
                     onStartDm={userId,title->
                         if(!backend.session.isLoggedIn) {
@@ -837,62 +827,8 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     }
                 )
                 OverlayRoute.Account -> {
-                            if(backend.session.isLoggedIn) {
-                                MeScreen(
-                                    onBack=closeOverlay,
-                                    backend=backend,
-                                    repository=repository,
-                                    kidsMode=activeViewer?.kidsMode==true,
-                                    onMedia={overlay=OverlayRoute.Detail(it)},
-                                    onPlay={overlay=OverlayRoute.Player(it)},
-                                    onClips={overlay=OverlayRoute.Clips()},
-                                    onCommunity={overlay=null;tab=2},
-                                    onOpenPost={ postId ->
-                                        deepLinkPostId=postId
-                                        overlay=null;tab=2
-                                    },
-                                    onOpenClip={ clipId ->
-                                        overlay=OverlayRoute.Clips(clipId)
-                                    },
-                                    onDownloads={pushOverlay(OverlayRoute.Downloads)},
-                                    onLibrary={pushOverlay(OverlayRoute.Library)},
-                                    onSocialSaves={pushOverlay(OverlayRoute.SocialSaves)},
-                                    onHistory={pushOverlay(OverlayRoute.History)},
-                                    onCreatorStudio={pushOverlay(OverlayRoute.CreatorStudio)},
-                                    onInbox={pushOverlay(OverlayRoute.Inbox)},
-                                    onSettings={pushOverlay(OverlayRoute.Settings)},
-                                    onViewerProfiles={
-                                        overlay=if(activeViewer?.kidsMode==true)
-                                            OverlayRoute.ParentalGate
-                                        else
-                                            OverlayRoute.ViewerProfiles
-                                    },
-                                    onParentalControls={pushOverlay(OverlayRoute.ParentalControls)},
-                                    onSecurity={pushOverlay(OverlayRoute.Security)},
-                                    onSafety={pushOverlay(OverlayRoute.Safety)},
-                                    onFollowRequests={pushOverlay(OverlayRoute.FollowRequests)},
-                                    onCloseFriends={pushOverlay(OverlayRoute.CloseFriends)},
-                                    onEditProfile={pushOverlay(OverlayRoute.EditProfile)},
-                                    onFilmDna={pushOverlay(OverlayRoute.FilmDna)},
-                                    onReputation={userId->overlay=OverlayRoute.Reputation(userId)},
-                                    onSeriesCalendar={pushOverlay(OverlayRoute.SeriesCalendar)},
-                                    onSocialCollections={overlay=OverlayRoute.SocialCollections()},
-                                    onLoggedOut={
-                                        resetNavigation()
-                                        backend.viewerProfiles.clear()
-                                        activeViewer=null
-                                        authenticated=false
-                                        previewMode=false
-                                    }
-                                )
-                            } else {
-                                MeSignedOutScreen(
-                                    onLogin={pushOverlay(OverlayRoute.Auth)},
-                                    onClub={tab=2},
-                                    onClips={overlay=OverlayRoute.Clips()}
-                                )
-                            }
-                        }
+                    LaunchedEffect(Unit){overlay=null;tab=3}
+                }
                 OverlayRoute.Discover -> CinemaDiscoverScreen(repository,{pushOverlay(OverlayRoute.Detail(it))},{showSearch=true},onBack=closeOverlay)
                 OverlayRoute.Settings -> SettingsScreen(
                     backend=backend,
@@ -1002,11 +938,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     repository=repository,
                     loggedIn=backend.session.isLoggedIn,
                     onRequireAuth={pushOverlay(OverlayRoute.Auth)},
-                    onOpenClub={
-                        overlayBackStack.clear()
-                        overlay=null
-                        tab=2
-                    },
+                    onOpenClub=closeOverlay,
                     onOpenClips={
                         overlayBackStack.clear()
                         overlay=OverlayRoute.Clips()
@@ -1034,10 +966,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                     },
                     onOpenPost={ postId ->
                         socialBadgeRefresh++
-                        overlayBackStack.add(route)
-                        overlay=null
-                        deepLinkPostId=postId
-                        tab=2
+                        pushOverlay(OverlayRoute.Post(postId))
                     },
                     onOpenMedia={
                         socialBadgeRefresh++
@@ -1055,7 +984,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                 overlayBackStack.clear(); tab=index; if(index!=2)deepLinkPostId=null
             }) {
                     bottomTabStateHolder.SaveableStateProvider(
-                        key="main-tab-"+(activeViewer?.id ?: "guest")+"-"+tab
+                        key="cinema090-tab-"+(activeViewer?.id ?: "guest")+"-"+tab
                     ) {
                     when(tab) {
                         0 -> CinemaHomeScreen(
@@ -1079,30 +1008,11 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onAccount={tab=3}
                         )
                         1 -> PremiumSearchScreen(repository,backend,{tab=0},{overlay=OverlayRoute.Detail(it)},
-                            {overlay=OverlayRoute.CreatorPage(it)},{deepLinkPostId=it;tab=2},{overlay=OverlayRoute.Clips(it)},
-                            onDiscover={overlay=OverlayRoute.Discover})
-                        2 -> CinemaSocialScreen(
-                            social=social,
-                            backend=backend,
-                            loggedIn=backend.session.isLoggedIn,
-                            onMedia={overlay=OverlayRoute.Detail(it)},
-                            onOpenClip={ clipId ->
-                                overlay=OverlayRoute.Clips(clipId)
-                            },
-                            onOpenRoom={overlay=OverlayRoute.Room(it.id,it.name)},
-                            onCreator={overlay=OverlayRoute.CreatorPage(it)},
-                            onSearch={showSearch=true},
-                            onInbox={overlay=OverlayRoute.Inbox},
-                            onCreate={overlay=OverlayRoute.Create},
-                            onRequireAuth={overlay=OverlayRoute.Auth},
-                            onCollection={overlay=OverlayRoute.SocialCollections(it)},
-                            onStories={stories,index -> overlay=OverlayRoute.SocialStories(stories,index)},
-                            initialPostId=deepLinkPostId,
-                            onFocusedPostConsumed={deepLinkPostId=null},
-                            onWatchParty={tab=4},
-                            onNotifications=openNotifications,
-                            onClips={overlay=OverlayRoute.Clips()}
-                        )
+                            {overlay=OverlayRoute.CreatorPage(it)},{overlay=OverlayRoute.Post(it)},{overlay=OverlayRoute.Clips(it)},
+                            onDiscover={overlay=OverlayRoute.Discover},onPerson={id,name->overlay=OverlayRoute.PersonPage(id,name)})
+                        2 -> MoviesDiscoveryScreen(repository,backend,
+                            onMedia={overlay=OverlayRoute.Detail(it)},onSearch={tab=1},
+                            onRequireAuth={overlay=OverlayRoute.Auth})
                         3 -> ConnectedProfileScreen(
                             backend=backend,repository=repository,kidsMode=activeViewer?.kidsMode==true,
                             onMedia={overlay=OverlayRoute.Detail(it)},onPlay={overlay=OverlayRoute.Player(it)},
@@ -1119,12 +1029,13 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                             onLoggedOut={resetNavigation();backend.viewerProfiles.clear();activeViewer=null;authenticated=false;previewMode=false},
                             loggedIn=backend.session.isLoggedIn,onRequireAuth={overlay=OverlayRoute.Auth},
                             onClips={overlay=OverlayRoute.Clips()},onCreate={overlay=OverlayRoute.Create},
-                            onNotifications=openNotifications,onWatchParty={tab=4},
-                            onOpenPost={deepLinkPostId=it;tab=2},onOpenClip={overlay=OverlayRoute.Clips(it)}
+                            onNotifications=openNotifications,onMovies={tab=2},onSeries={tab=4},
+                            onOpenPost={overlay=OverlayRoute.Post(it)},onOpenClip={overlay=OverlayRoute.Clips(it)}
                         )
-                        4 -> PartyLobbyScreen(backend,
-                            onOpenParty={id,invite->pushOverlay(OverlayRoute.WatchParty(partyId=id,inviteCode=invite))},
-                            onChooseTitle={tab=1},onRequireAuth={overlay=OverlayRoute.Auth})
+                        4 -> SeriesDiscoveryScreen(repository,backend,
+                            onMedia={overlay=OverlayRoute.Detail(it)},onSearch={tab=1},
+                            onCalendar={overlay=if(backend.session.isLoggedIn)OverlayRoute.SeriesCalendar else OverlayRoute.Auth},
+                            onRequireAuth={overlay=OverlayRoute.Auth})
 
                     }
                 

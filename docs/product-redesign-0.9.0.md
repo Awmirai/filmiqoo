@@ -1,0 +1,31 @@
+# FILMIQOO 0.9 — cinema discovery and personal viewing
+
+This files-only Preview replaces the primary Network and Watch Together positions with Movies and Series. Primary navigation is Home, Movies, Series, Search and Profile. Existing title comments, moderation, playback, downloads, parental controls and ancillary shared-viewing contracts remain intact; the former social/room destinations are not exposed from these primary positions or Profile. This is not a production activation instruction.
+
+## Discovery architecture
+
+`DiscoveryData` and pure `DiscoveryRules` carry typed movie/TV filters, paging, actual metadata and capability validation. The bounded five-minute metadata cache deduplicates populated responses; empty discovery results and failures remain refreshable. Backend capability echo prevents an older TMDB proxy silently ignoring new filters. Countries/languages are registries loaded on demand. Iranian, Turkish, Korean, Indian, US and other destinations share typed filtering, preserving production-country and original-language distinctions. Korean/Indian titles use English metadata names. Indian language shortcuts explicitly distinguish Hindi, Tamil, Telugu, Malayalam, Kannada and Bengali; no arbitrary Bollywood classification is inferred.
+
+Movies combine a cinematic hero, paired trending backdrops, ranked cards, editorial discovery, genre artwork, confirmed Persian versions and actual collections. Series has its own hierarchy, known-date episode calendar, personal exploration, status/miniseries and episode availability. Ranking uses actual TMDB votes with a minimum vote count and a 250-entry cap; it is labelled TMDB and is not represented as an official IMDb list.
+
+Search independently requests the playable catalog and metadata, separates Movies/Series/People, preserves catalog playback identities while enriching metadata, and keeps catalog results usable when metadata fails. Search facets filter known fields in currently returned result pages; this limitation is explained in the sheet. Global country discovery applies country/language/genre/year/rating/runtime/status/audio filters on the server instead. Posters open real details; saved/favorite/contextual rating actions are integrated.
+
+## Personal Cinema Hub
+
+`ConnectedProfileScreen` is now Overview, History, Stats and Lists. Identity and settings are separate from cinema activity. Viewing time comes from recorded playing-time telemetry, not seek position, opened-title count or complete runtime. Client `PlaybackWatchClock` measures actual playing time monotonically; cumulative counters are idempotent server-side, capped against elapsed time, and remain compatible with the prior delta contract. Existing playback resume positions and 95% completion rules are preserved.
+
+Migration 057 retains ever-completed state across rewatches and migration 058 adds telemetry high-water marks without fabricating old time. Statistics deduplicate movies and episodes across quality versions. Series completion requires an ended series, a known positive expected regular-episode total and enough completed regular episodes; one episode never implies a completed series. Statistics, history, deletion and recommendation exclusions are scoped to account/viewer/maturity. Taste needs at least ten distinct qualifying titles; multi-country and multi-genre shares divide a title fairly. Completed movie metadata IDs exclude already completed content from personal recommendations. An absent exclusion capability hides that recommendation row rather than claiming an authoritative empty history.
+
+History removal and clearing deliberately erase the corresponding resume, sticky completion and recorded time; the confirmation explains these consequences. Saved/favorite lists remain separate. Personal ratings are actual device/account/viewer-scoped values, not a fabricated remote history. New accounts receive discovery onboarding instead of zero-filled charts. Lists and playback data remain separated by user and viewer during account changes.
+
+## Telegram and catalog changes
+
+Migration 056 stores typed title facets, audio/subtitle evidence and explicit channel source conventions. Ingestion reads both canonical filename and caption with Unicode normalization, token boundaries, negative markers and per-file evidence. Dub/subtitle availability is version-specific; a series can expose a dubbed-episode count without implying all episodes are dubbed. Reposts do not relabel an unrelated original file. Explicit manual labels are preserved. `catalogreindex` defaults to metadata-only dry run, requires explicit apply/source-convention options, validates required credentials before writes and never downloads/transcodes video. Background metadata enrichment performs bounded work outside database transactions.
+
+## Validation and remaining evidence
+
+Local main and instrumentation-source compilation, JVM discovery/search/profile/clock rules and non-E2E Go tests have passed during implementation. Final exact-source Android build/lint/native device runs, PostgreSQL migration/E2E/race/vet and screenshot review are recorded in the delivery report, not inferred from compilation. Native audit fixtures use clearly labelled synthetic artwork/accounts and do not prove live catalog completeness, live FCM, physical-device playback or production-server availability.
+
+Accurate weekly/monthly/yearly/streak analytics and playback-language preference are not exposed from incomplete historical data. No fake annual recap or dubbed preference is inferred from version availability. IMDb data requires an actual IMDb source. Server-side catalog/statistics capabilities require the accompanying backend upgrade; the current production server is unchanged. Preview retains the existing precise legacy-access-endpoint compatibility exception and does not weaken explicit regional denial.
+
+Keep the PR draft. Do not merge, deploy, migrate production, restart services or publish a public release as part of this files-only delivery.

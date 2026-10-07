@@ -50,6 +50,7 @@ fun CinemaDetailScreen(
     var hideSpoilers by remember(profileId) { mutableStateOf(personal.hideSpoilers()) }
     var hasNote by remember(media.key, profileId) { mutableStateOf(personal.note(media).isNotBlank()) }
     var noteEditor by rememberSaveable(media.key) { mutableStateOf(false) }
+    var ratingEditor by rememberSaveable(media.key) { mutableStateOf(false) }
     var noteDraft by rememberSaveable(media.key) { mutableStateOf("") }
     var collectionsOpen by remember(media.key) { mutableStateOf(false) }
     var availabilityOpen by remember(media.key) { mutableStateOf(false) }
@@ -111,6 +112,7 @@ fun CinemaDetailScreen(
             }
         } else {
             val title = current.detail.media
+            if (ratingEditor) CinemaRatingDialog(title, personal, { ratingEditor = false }, {})
             val id = current.platform?.id
             CinemaDetailContent(
                 current, saved, favorite, seen, hideSpoilers, hasNote, following, busy, progress,
@@ -118,6 +120,7 @@ fun CinemaDetailScreen(
                 allowTogether=backend.viewerProfiles.active()?.kidsMode!=true,
                 startAtDiscussion=initialDiscussionScope!=null,
                 actions = CinemaDetailActions(
+                    rate = { ratingEditor = true },
                     back = onBack,
                     share = {
                         if (id != null) FilmiqooDeepLinks.share(context, title.title, FilmiqooDeepLinks.title(id))

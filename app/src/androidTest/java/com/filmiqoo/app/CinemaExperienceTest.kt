@@ -91,8 +91,8 @@ class CinemaExperienceTest {
         compose.onNodeWithTag("navigation-3").performClick().assertIsSelected()
         compose.onNodeWithTag("navigation-3").assert(hasContentDescription("پروفایل"))
         compose.onNodeWithTag("navigation-2").performClick().assertIsSelected()
-        compose.onNodeWithTag("navigation-2").assert(hasContentDescription("شبکه"))
-        compose.onNodeWithTag("navigation-4").performClick().assertIsSelected().assert(hasContentDescription("هم‌تماشا"))
+        compose.onNodeWithTag("navigation-2").assert(hasContentDescription("فیلم"))
+        compose.onNodeWithTag("navigation-4").performClick().assertIsSelected().assert(hasContentDescription("سریال"))
     }
 
     @Test fun kidsNavigationDoesNotExposeSocialAndDiscoveryRoutes() {

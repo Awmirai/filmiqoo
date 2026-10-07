@@ -42,7 +42,7 @@ internal data class CinemaDetailActions(
     val trailer: () -> Unit = {}, val spoiler: (Boolean) -> Unit = {}, val watchParty: () -> Unit = {},
     val play: (String) -> Unit = {}, val download: (String) -> Unit = {},
     val episodeSeen: (PlatformEpisode, Boolean) -> Unit = { _, _ -> },
-    val person: (CastMember) -> Unit = {}, val media: (MediaItem) -> Unit = {}
+    val person: (CastMember) -> Unit = {}, val media: (MediaItem) -> Unit = {}, val rate: () -> Unit = {}
 )
 
 /** Stateless media data + UI-only state. This screen can be exercised with deterministic fixtures. */
@@ -138,6 +138,7 @@ internal fun CinemaDetailContent(
                     item { CinemaTag(if (favorite) "♥ محبوب من" else "♡ پسندیدم", favorite, actions.favorite) }
                     item { CinemaTag(if (seen) "✓ دیده‌ام" else "دیده‌ام", seen, actions.seen) }
                     item { CinemaTag(if (hasNote) "یادداشت من •" else "یادداشت من", hasNote, actions.notes) }
+                    item { CinemaTag("امتیاز من", false, actions.rate) }
                     if (isSeries && data.platform != null) item { CinemaTag(if (following) "✓ دنبال می‌کنم" else "خبر قسمت جدید", following, actions.follow) }
                 }
             }
@@ -215,10 +216,16 @@ internal fun CinemaDetailContent(
                         CinemaCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
                             CinemaFact("نام اصلی", media.originalTitle.ifBlank { media.title })
                             if (data.englishTitle.isNotBlank() && data.englishTitle != media.title) CinemaFact("نام انگلیسی", data.englishTitle)
-                            CinemaFact("محصول", data.originCountries.joinToString(" · ").ifBlank { "ثبت نشده" })
+                            CinemaFact("محصول", data.originCountries.joinToString(" · ",transform=::cinemaCountryLabel).ifBlank { "ثبت نشده" })
                             CinemaFact("زبان‌ها", data.languages.joinToString(" · ").ifBlank { data.originalLanguage.ifBlank { "ثبت نشده" } })
                             CinemaFact("انتشار", media.date.ifBlank { "ثبت نشده" })
                             CinemaFact("وضعیت", when (d.status) { "Ended" -> "پایان‌یافته"; "Returning Series" -> "در حال پخش"; "Released" -> "منتشرشده"; "Canceled" -> "لغوشده"; else -> d.status.ifBlank { "ثبت نشده" } })
+                            CinemaFact("نسخهٔ دوبله فارسی",if(media.hasPersianDub){
+                                if(isSeries&&media.dubbedEpisodeCount!=null) "${media.dubbedEpisodeCount} قسمت دوبله از ${media.availableEpisodeCount ?: "؟"} قسمت دارای فایل"
+                                else if(isSeries)"برای برخی قسمت‌ها موجود است"else "در فایل‌های موجود تأیید شده"
+                            }else "نسخهٔ تأییدشده‌ای ثبت نشده")
+                            CinemaFact("زیرنویس فارسی",if(media.hasPersianSubtitle)"در برخی نسخه‌های موجود تأیید شده"else "نسخهٔ تأییدشده‌ای ثبت نشده")
+                            d.certification?.let{CinemaFact("رده‌بندی سنی آمریکا",it)}
                             if (data.platform != null) TextButton(actions.collection) { Text("افزودن به کالکشن", color = CinemaAccent) }
                         }
                     }
@@ -276,9 +283,11 @@ internal fun CinemaDetailContent(
                 item { Text("کیفیت و حجم واقعی فایل‌های موجود؛ دانلود به صف اضافه می‌شود.", color = CinemaSoft, fontSize = 13.sp, lineHeight = 21.sp) }
                 items(data.playableMovies, key = { it.id }) { version ->
                     CinemaCard(Modifier.fillMaxWidth(), accent = selectedMovie?.id == version.id) {
-                        Text(version.quality.ifBlank { "نسخهٔ اصلی" }, color = CinemaPaper, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(version.quality.ifBlank { "نسخه" }, color = CinemaPaper, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text(listOf(cinemaBytes(version.fileSizeBytes), version.codec, version.hdr).filter(String::isNotBlank).joinToString(" · "),
                             color = CinemaSoft, fontSize = 13.sp, style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr))
+                        if(version.isPersianDubbed) Text("این فایل: دوبله فارسی",color=CinemaGold,fontSize=13.sp,modifier=Modifier.padding(top=8.dp))
+                        if(version.hasPersianSubtitle) Text("زیرنویس فارسی ثبت‌شده",color=CinemaSoft,fontSize=12.sp,modifier=Modifier.padding(top=6.dp))
                         if (version.audioTracks.isNotEmpty()) Text("صدا: " + version.audioTracks.joinToString(" · "), color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                         if (version.subtitleTracks.isNotEmpty()) Text("زیرنویس: " + version.subtitleTracks.joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -298,7 +307,7 @@ private fun CinemaTitleHero(data:CinemaTitleData) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val wide=maxWidth>=600.dp
         Column {
-            Box(Modifier.fillMaxWidth().height(if(wide)220.dp else 180.dp)) {
+            Box(Modifier.fillMaxWidth().height(if(wide)300.dp else 260.dp)) {
                 CinemaImage(media.backdropPath?:media.posterPath,Modifier.fillMaxSize(),true)
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent,CinemaInk))))
             }
@@ -306,9 +315,12 @@ private fun CinemaTitleHero(data:CinemaTitleData) {
                 if(wide){CinemaImage(media.posterPath,Modifier.width(100.dp).height(150.dp).clip(RoundedCornerShape(12.dp)));Spacer(Modifier.width(20.dp))}
                 Column(Modifier.weight(1f)) {
                     Text(if(media.type==MediaType.TV)"سریال" else "فیلم",color=CinemaAccent,style=MaterialTheme.typography.labelLarge)
+                    data.detail.logoPath?.let{path->coil.compose.AsyncImage(model="https://image.tmdb.org/t/p/w300$path",contentDescription=null,
+                        contentScale=androidx.compose.ui.layout.ContentScale.Fit,modifier=Modifier.widthIn(max=220.dp).heightIn(max=64.dp))}
                     Text(media.title,color=CinemaPaper,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(top=4.dp))
                     Text(listOf(media.year,if(data.detail.runtime>0)cinemaDuration(data.detail.runtime)else "").filter(String::isNotBlank).joinToString(" · "),color=CinemaSoft,modifier=Modifier.padding(top=8.dp))
                     if(media.vote>0)Text("TMDB  ★ "+String.format(Locale.US,"%.1f",media.vote),color=CinemaPaper,style=MaterialTheme.typography.labelLarge,modifier=Modifier.padding(top=8.dp))
+                    if(media.hasPersianDub)Text(if(media.type==MediaType.TV)"قسمت دارای دوبله فارسی"else "نسخهٔ دوبله فارسی",color=CinemaGold,style=MaterialTheme.typography.labelLarge,modifier=Modifier.padding(top=8.dp))
                 }
             }
             if(data.detail.genres.isNotEmpty())LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){items(data.detail.genres.distinct()){CinemaTag(it)}}
@@ -317,9 +329,15 @@ private fun CinemaTitleHero(data:CinemaTitleData) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: EpisodeWatchState?, hideSpoilers: Boolean, busy: Boolean, actions: CinemaDetailActions) {
     val ready = ep.streamReady && !ep.mediaVersionId.isNullOrBlank()
     val completed = progress?.completed == true
+    var versionsOpen by rememberSaveable(ep.id) { mutableStateOf(false) }
+    fun chooseVersion(download:Boolean=false){
+        if(ep.versions.count { it.streamReady }>1)versionsOpen=true
+        else ep.mediaVersionId?.let { if(download)actions.download(it)else actions.play(it) }
+    }
     CinemaCard(Modifier.padding(horizontal = 20.dp, vertical = 8.dp).fillMaxWidth().testTag("episode-${ep.id}"), accent = completed) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 8f).clip(RoundedCornerShape(15.dp))) {
             CinemaImage(ep.stillUrl, Modifier.fillMaxSize(), backdrop = true)
@@ -327,24 +345,43 @@ private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: Episode
             Surface(color = CinemaInk.copy(alpha = .8f), shape = RoundedCornerShape(10.dp), modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) {
                 Text(cinemaEpisodeLabel(season, ep.number), color = CinemaGold, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
             }
-            if (ready) IconButton({ ep.mediaVersionId?.let(actions.play) }, enabled = !busy, modifier = Modifier.align(Alignment.Center).size(56.dp)) {
+            if (ready) IconButton({ chooseVersion() }, enabled = !busy, modifier = Modifier.align(Alignment.Center).size(56.dp)) {
                 Icon(Icons.Default.PlayCircle, "پخش قسمت ${ep.number}", tint = Color.White, modifier = Modifier.size(48.dp))
             }
             Text(if (completed) "✓ دیده شده" else if (ready) "آمادهٔ تماشا" else "هنوز فایل پخش ندارد", color = CinemaPaper, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
         }
         Text(if (hideSpoilers) "قسمت ${ep.number}" else ep.name.ifBlank { "قسمت ${ep.number}" }, color = CinemaPaper, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 13.dp))
         Text(listOf(ep.quality.orEmpty(), if (ep.runtimeMinutes > 0) "${ep.runtimeMinutes} دقیقه" else "").filter(String::isNotBlank).joinToString(" · "), color = CinemaSoft, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        if(ep.hasPersianDub)Text("نسخهٔ دوبله فارسی موجود",color=CinemaGold,fontSize=12.sp,modifier=Modifier.padding(top=6.dp))
+        if(ep.hasPersianSubtitle)Text("زیرنویس فارسی ثبت‌شده",color=CinemaSoft,fontSize=12.sp,modifier=Modifier.padding(top=4.dp))
+        if(ep.versions.count { it.streamReady }>1)TextButton({versionsOpen=true},modifier=Modifier.heightIn(min=48.dp).testTag("episode-versions-"+ep.id)){Text("انتخاب کیفیت و صدا")}
         if (!hideSpoilers && ep.overview.isNotBlank()) Text(ep.overview, color = CinemaSoft, fontSize = 13.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 10.dp))
         if ((progress?.progress ?: 0f) > 0f) LinearProgressIndicator(progress = { progress?.progress?.coerceIn(0f,1f) ?: 0f }, color = CinemaAccent, trackColor = CinemaLine, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CinemaAction(Icons.Default.PlayArrow, if ((progress?.positionMs ?: 0) > 0 && !completed) "ادامهٔ تماشا" else "تماشا", { ep.mediaVersionId?.let(actions.play) }, Modifier.weight(1f), primary = true, enabled = ready && !busy)
-            CinemaAction(Icons.Default.Download, "دانلود", { ep.mediaVersionId?.let(actions.download) }, Modifier.weight(1f).semantics { contentDescription = "دانلود قسمت ${ep.number}" }, enabled = ready && !busy)
+            CinemaAction(Icons.Default.PlayArrow, if ((progress?.positionMs ?: 0) > 0 && !completed) "ادامهٔ تماشا" else "تماشا", { chooseVersion() }, Modifier.weight(1f), primary = true, enabled = ready && !busy)
+            CinemaAction(Icons.Default.Download, "دانلود", { chooseVersion(true) }, Modifier.weight(1f).semantics { contentDescription = "دانلود قسمت ${ep.number}" }, enabled = ready && !busy)
         }
         TextButton({ actions.episodeSeen(ep, !completed) }, enabled = !busy) {
             Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = CinemaSoft, modifier = Modifier.size(18.dp))
             Text(if (completed) "  دیده‌ام · لغو علامت" else "  این قسمت را دیده‌ام", color = CinemaSoft, fontSize = 12.sp)
         }
     }
+    if(versionsOpen)ModalBottomSheet(onDismissRequest={versionsOpen=false},containerColor=CinemaSurface,contentColor=CinemaPaper){
+        LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            item { Text("انتخاب فایل قسمت "+ep.number,color=CinemaPaper,fontWeight=FontWeight.Bold,fontSize=21.sp) }
+            items(ep.versions.filter{it.streamReady},key={it.id}){version->CinemaCard(Modifier.fillMaxWidth().testTag("episode-version-"+version.id)){
+                Text(version.quality.ifBlank{"نسخه"},color=CinemaPaper,fontWeight=FontWeight.Bold)
+                if(version.isPersianDubbed)Text("دوبله فارسی",color=CinemaGold,fontSize=13.sp)
+                else if(version.audioTracks.isNotEmpty())Text("صدا: "+version.audioTracks.joinToString(" · "),color=CinemaSoft,fontSize=12.sp)
+                if(version.hasPersianSubtitle)Text("زیرنویس فارسی ثبت‌شده",color=CinemaSoft,fontSize=12.sp)
+                Row(Modifier.fillMaxWidth().padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    CinemaAction(Icons.Default.PlayArrow,"پخش",{versionsOpen=false;actions.play(version.id)},Modifier.weight(1f).testTag("episode-version-play-"+version.id),primary=true,enabled=!busy)
+                    CinemaAction(Icons.Default.Download,"دانلود",{versionsOpen=false;actions.download(version.id)},Modifier.weight(1f).testTag("episode-version-download-"+version.id),enabled=!busy)
+                }
+            }}
+        }
+    }
+
 }
 
 @Composable

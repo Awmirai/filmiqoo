@@ -37,9 +37,9 @@ internal object CinemaTokens {
 internal data class CinemaDestination(val id:Int,val label:String,val icon:ImageVector)
 internal fun cinemaDestinations(kids:Boolean)=listOf(
     CinemaDestination(0,"خانه",Icons.Outlined.Home),
+    CinemaDestination(2,"فیلم",Icons.Outlined.Movie),
+    CinemaDestination(4,"سریال",Icons.Outlined.Tv),
     CinemaDestination(1,"جستجو",Icons.Outlined.Search),
-    CinemaDestination(2,"شبکه",Icons.Outlined.Forum),
-    CinemaDestination(4,"هم‌تماشا",Icons.Outlined.Groups),
     CinemaDestination(3,"پروفایل",Icons.Outlined.AccountCircle)
 ).filter { !kids || it.id==0 || it.id==3 }
 
@@ -50,7 +50,7 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
     @Composable fun Item(entry:CinemaDestination,modifier:Modifier) {
         val active=entry.id==selected
         val largeLabels=window.fontScale>=1.6f && !rail
-        val label=when {largeLabels && window.screenWidthDp<360 && entry.id==1->"کشف";largeLabels && entry.id==3->"من";largeLabels && entry.id==4->"هم\nتماشا";else->entry.label}
+        val label=when {largeLabels && window.screenWidthDp<360 && entry.id==1->"کشف";largeLabels && entry.id==3->"من";else->entry.label}
         Column(modifier.heightIn(min=72.dp).selectable(active,role=Role.Tab,onClick={onSelected(entry.id)})
             .testTag("navigation-${entry.id}").semantics { contentDescription=entry.label }.padding(horizontal=2.dp,vertical=10.dp),
             horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
@@ -59,7 +59,7 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
             }
             Text(label,fontSize=12.sp,lineHeight=18.sp,color=if(active)CinemaPaper else CinemaSoft,
                 fontWeight=if(active)FontWeight.Bold else FontWeight.Normal,textAlign=androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines=if(largeLabels && entry.id==4)2 else 1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier=Modifier.padding(top=4.dp))
         }
     }
@@ -72,7 +72,7 @@ internal fun CinemaNavigation(selected:Int,kids:Boolean,onSelected:(Int)->Unit,r
         Column(Modifier.navigationBarsPadding()) {
             HorizontalDivider(color=CinemaLine)
             Row(Modifier.fillMaxWidth().selectableGroup()) { entries.forEach {
-                val weight=if(window.fontScale>=1.6f && window.screenWidthDp<400 && !kids)when(it.id){0->.9f;1->1.2f;2->1.05f;4->1.25f;else->.8f}else 1f
+                val weight=if(window.fontScale>=1.6f && window.screenWidthDp<400 && !kids)when(it.id){1->1.2f;3->.85f;else->1f}else 1f
                 Item(it,Modifier.weight(weight))
             } }
         }
