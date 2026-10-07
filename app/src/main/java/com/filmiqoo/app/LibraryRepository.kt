@@ -51,7 +51,7 @@ class LibraryRepository(
                 add(parseDiscoveryTitle(row,null,true)?.media ?: error("بخشی از اطلاعات فهرست معتبر نیست؛ دوباره تلاش کن."))
             }};val before=sourceKeys.size
             parsed.forEach{sourceKeys.add(it.key)}
-            parsed.forEach{items[cinemaMediaKey(it)]=it}
+            parsed.forEach{val key=cinemaMediaKey(it);if(cinemaPreferPlayableCandidate(items[key],it))items[key]=it}
             if(!more)return items.values.toList()
             check(array.length()>0&&parsed.isNotEmpty()&&sourceKeys.size>before){"صفحهٔ بعدی فهرست معتبر نیست؛ دوباره تلاش کن."}
         }

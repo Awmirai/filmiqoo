@@ -187,4 +187,14 @@ internal fun parseDiscoveryTitle(o:JSONObject,fallback:MediaType?,local:Boolean)
         hasPersianDub=dubbed,hasPersianSubtitle=sub,dubbedEpisodeCount=dubbedCount,availableEpisodeCount=available,genreIds=genreIds,originalLanguage=language,originCountries=countries,runtimeMinutes=runtime,seriesStatus=status,seasonCount=seasons,episodeCount=episodes)
     return DiscoveryTitle(media,genreIds,o.optInt(if(local)"voteCount" else "vote_count").coerceAtLeast(0),language,countries,runtime,status,seasons,clean(o.optString(if(local)"seriesType" else "type")),episodes,dubbed,sub,dubbedCount,available)
 }
-internal fun parseTitles(arr:JSONArray?,fallback:MediaType?,local:Boolean):List<DiscoveryTitle> = buildList{if(arr!=null)for(i in 0 until arr.length())arr.optJSONObject(i)?.let{parseDiscoveryTitle(it,fallback,local)?.let(::add)}}.distinctBy{cinemaMediaKey(it.media)}
+internal fun cinemaPreferPlayableCandidate(current:MediaItem?,candidate:MediaItem):Boolean {
+    fun playable(media:MediaItem)=media.streamReady&&!media.backendId.isNullOrBlank()&&!media.mediaVersionId.isNullOrBlank()
+    return current==null||!playable(current)&&playable(candidate)
+}
+internal fun parseTitles(arr:JSONArray?,fallback:MediaType?,local:Boolean):List<DiscoveryTitle> {
+    val entries=buildList{if(arr!=null)for(i in 0 until arr.length())arr.optJSONObject(i)?.let{parseDiscoveryTitle(it,fallback,local)?.let(::add)}}
+    if(!local)return entries.distinctBy{cinemaMediaKey(it.media)}
+    val selected=LinkedHashMap<String,DiscoveryTitle>()
+    entries.forEach{entry->val key=cinemaMediaKey(entry.media);if(cinemaPreferPlayableCandidate(selected[key]?.media,entry.media))selected[key]=entry}
+    return selected.values.toList()
+}

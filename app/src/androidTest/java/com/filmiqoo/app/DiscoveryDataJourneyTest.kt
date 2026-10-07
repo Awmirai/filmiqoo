@@ -94,4 +94,13 @@ class DiscoveryDataJourneyTest {
    }
   }finally{if(originalViewer==null)backend.viewerProfiles.clear()else backend.viewerProfiles.activate(originalViewer)}
  }
+ @Test fun playableCatalogAliasSurvivesBothSearchResponseOrders()=runBlocking{
+  val unavailable=JSONObject().put("id","metadata-series").put("tmdbId",99).put("kind","series").put("title","Actual anime series").put("streamReady",false)
+  val playable=JSONObject().put("id","playable-anime").put("tmdbId",99).put("kind","anime").put("title","Actual anime series").put("streamReady",true).put("mediaVersionId","real-alias-version").put("quality","1080p").put("hasPersianDub",true)
+  for(rows in listOf(JSONArray().put(unavailable).put(playable),JSONArray().put(playable).put(unavailable))){
+   server.enqueue(MockResponse().setBody(JSONObject().put("media",rows).toString()))
+   val item=UniversalSearchRepository(context,backend).search("alias").media.single();assertEquals(MediaType.TV,item.type);assertTrue(item.streamReady);assertEquals("playable-anime",item.backendId);assertEquals("real-alias-version",item.mediaVersionId);assertEquals("1080p",item.quality);assertTrue(item.hasPersianDub)
+   val merged=mergeDiscoveryTitles(listOf(item),listOf(DiscoveryTitle(item.copy(backendId=null,mediaVersionId=null,streamReady=false,hasPersianDub=false)))).single();assertTrue(merged.media.streamReady);assertEquals("real-alias-version",merged.media.mediaVersionId);assertTrue(merged.isPersianDubbed)
+  }
+ }
 }
