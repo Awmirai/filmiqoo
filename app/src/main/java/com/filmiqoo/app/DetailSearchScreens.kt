@@ -226,7 +226,7 @@ fun DetailScreen(
                                 Modifier.padding(top=9.dp),
                                 verticalAlignment=Alignment.CenterVertically
                             ) {
-                                MetricPill(Icons.Default.Star,"IMDb "+formatVote(d.media.vote))
+                                MetricPill(Icons.Default.Star,"TMDB "+formatVote(d.media.vote))
                                 Spacer(Modifier.width(6.dp))
                                 if(d.media.year.isNotBlank()) MetricPill(Icons.Default.CalendarMonth,d.media.year)
                                 Spacer(Modifier.width(6.dp))

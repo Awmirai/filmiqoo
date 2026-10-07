@@ -755,7 +755,7 @@ private fun PremiumDetailHero(
                     )
                 }
                 if(detail.media.vote>0) {
-                    DetailMetaPill(Icons.Default.Star,"IMDb "+formatVote(detail.media.vote))
+                    DetailMetaPill(Icons.Default.Star,"TMDB "+formatVote(detail.media.vote))
                 }
                 selectedVersion?.quality?.takeIf(String::isNotBlank)?.let {
                     DetailMetaPill(Icons.Default.HighQuality,it)
