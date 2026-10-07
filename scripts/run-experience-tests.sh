@@ -41,7 +41,7 @@ from xml.etree import ElementTree as ET
 files=list(Path('app/build/outputs/androidTest-results/connected').rglob('TEST-*.xml'))
 summary={key:sum(int(ET.parse(p).getroot().get(key,'0')) for p in files) for key in ('tests','failures','errors','skipped')}
 Path('experience-evidence/inventory.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
-if summary != {'tests':87,'failures':0,'errors':0,'skipped':0}:
+if summary != {'tests':90,'failures':0,'errors':0,'skipped':0}:
     raise SystemExit('Unexpected or incomplete native test inventory: '+str(summary))
 print('Verified complete native test inventory:',summary)
 PY

@@ -1093,8 +1093,15 @@ class BackendRepository(context: Context) {
             authorized
         )
 
-    private suspend fun executeJson(builder: Request.Builder, authorized: Boolean): JSONObject =
+    internal suspend fun getJsonScoped(path:String, assertScope:()->Unit):JSONObject =
+        executeJson(Request.Builder().url(session.baseUrl+path).get(),true,assertScope)
+
+    internal suspend fun postJsonScoped(path:String,body:JSONObject,assertScope:()->Unit):JSONObject =
+        executeJson(Request.Builder().url(session.baseUrl+path).post(body.toString().toRequestBody(jsonType)),true,assertScope)
+
+    private suspend fun executeJson(builder: Request.Builder, authorized: Boolean, assertScope:(()->Unit)?=null): JSONObject =
         withContext(Dispatchers.IO) {
+            assertScope?.invoke()
             var requestBuilder = builder
             var accessUsed: String? = null
             if (authorized) {
@@ -1107,10 +1114,10 @@ class BackendRepository(context: Context) {
                     requestBuilder = requestBuilder.header("X-Filmiqoo-Viewer-Profile", it)
                 }
             }
-
+            assertScope?.invoke()
             var request = requestBuilder.build()
             var response = client.newCall(request).execute()
-            if (authorized && response.code == 401 && refreshSession(accessUsed)) {
+            if (authorized && response.code == 401 && run { try { assertScope?.invoke();refreshSession(accessUsed).also { assertScope?.invoke() } } catch(failure:Throwable) { response.close();throw failure } }) {
                 response.close()
                 request = request.newBuilder()
                     .header("Authorization", "Bearer " + session.accessToken.orEmpty())
@@ -1119,6 +1126,7 @@ class BackendRepository(context: Context) {
             }
 
             response.use { res ->
+                assertScope?.invoke()
                 val raw = res.body?.string().orEmpty()
                 if (!res.isSuccessful) throw BackendHttpException(res.code,
                     runCatching { JSONObject(raw).optString("error") }.getOrDefault(""), apiError(raw, res.code))

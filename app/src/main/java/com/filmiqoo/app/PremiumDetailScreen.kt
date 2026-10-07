@@ -1610,7 +1610,7 @@ private fun PremiumSeriesPanel(
             }
             val watchedCount=seasonStates.count { it.completed }
             val seasonTotal=selected.episodes.size
-            val allWatched=seasonTotal>0 && watchedCount>=seasonTotal
+            val allWatched=seasonTotal>0 && seasonStates.count { it.manualSeen }>=seasonTotal
 
             Surface(
                 color=FqSurface,
@@ -1805,7 +1805,7 @@ private fun PremiumSeriesPanel(
                     } else {
                         busyEpisodeId=ep.id
                         scope.launch {
-                            val watched=watchProgress?.episodes?.get(ep.id)?.completed==true
+                            val watched=watchProgress?.episodes?.get(ep.id)?.manualSeen==true
                             runCatching {
                                 progressRepo.setEpisodeWatched(ep.id,!watched)
                             }.onSuccess {

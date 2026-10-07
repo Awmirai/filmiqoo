@@ -133,7 +133,7 @@ fun ConnectedProfileScreen(
                 if(loading&&stats==null)item("stats-loading"){LinearProgressIndicator(Modifier.fillMaxWidth(),color=CinemaAccent,trackColor=CinemaLine)}
                 if(statsError)item("stats-error"){Column(Modifier.testTag("profile-stats-error")){CinemaNotice("آمار دریافت نشد","دریافت آمار این پروفایل را دوباره امتحان کن.",Icons.Outlined.CloudOff,"دریافت آمار",{refresh++})}}
                 val observed=stats
-                if(observed!=null&&observed.historyTitles>0){
+                if(observed!=null&&(observed.historyTitles>0||observed.totalWatchMs>0)){
                     item("time"){CinemaHubWatchTime(observed)}
                     item("metrics"){CinemaHubMetrics(observed,large,tab==2)}
                     if(tab==2){item("stats-rules"){CinemaCard{Text("آمار تماشای من",fontWeight=FontWeight.Bold,color=CinemaPaper);Text("زمان، مجموع پخش واقعی ثبت‌شده است؛ جلو بردن ویدیو زمان اضافه نمی‌کند. فیلم و قسمت با حداقل ۹۵٪ تکمیل، فقط یک بار شمرده می‌شوند. سریال کامل باید پایان‌یافته باشد و همهٔ قسمت‌های تأییدشده‌اش کامل شده باشند.",color=CinemaSoft,fontSize=13.sp,lineHeight=23.sp,modifier=Modifier.padding(top=8.dp));if(observed.legacyHistoryWithoutTime)Text("بخشی از تاریخچهٔ قدیمی زمان پخش ثبت‌شده ندارد و به ساعت تماشا اضافه نشده است.",color=CinemaGold,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(top=8.dp));Text("تمام زمان ثبت‌شدهٔ این پروفایل نمایش داده می‌شود.",color=CinemaSoft,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))}};item("taste"){CinemaHubTaste(observed)}}

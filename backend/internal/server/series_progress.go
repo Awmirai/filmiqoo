@@ -1,216 +1,175 @@
 package server
 
 import (
-    "encoding/json"
-    "net/http"
-
-    "github.com/go-chi/chi/v5"
+	"encoding/json"
+	"github.com/go-chi/chi/v5"
+	"net/http"
+	"strings"
 )
 
-func (s *Server) seriesProgress(w http.ResponseWriter,r *http.Request) {
-    userID:=userIDFromContext(r.Context())
-    mediaID:=chi.URLParam(r,"id")
-
-    rows,err:=s.db.Query(r.Context(),`
-        SELECT sn.id::text,sn.season_number,
-               e.id::text,e.episode_number,
-               COALESCE(p.position_ms,0),
-               COALESCE(p.duration_ms,0),
-               COALESCE(p.completed,false)
-          FROM seasons sn
-          JOIN episodes e ON e.season_id=sn.id
-          LEFT JOIN LATERAL (
-            SELECT wp.position_ms,wp.duration_ms,wp.completed
-              FROM watch_progress wp
-              JOIN media_versions watched ON watched.id=wp.media_version_id
-             WHERE wp.user_id=$1
-               AND watched.episode_id=e.id
-             ORDER BY wp.completed DESC,wp.updated_at DESC
-             LIMIT 1
-          ) p ON true
-         WHERE sn.media_title_id=$2
-         ORDER BY sn.season_number,e.episode_number
-    `,userID,mediaID)
-    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-    defer rows.Close()
-
-    items:=make([]map[string]any,0)
-    var watchedCount,totalCount int64
-
-    for rows.Next() {
-        var seasonID,episodeID string
-        var seasonNumber,episodeNumber int
-        var position,duration int64
-        var completed bool
-        if err:=rows.Scan(
-            &seasonID,&seasonNumber,&episodeID,&episodeNumber,
-            &position,&duration,&completed,
-        ); err!=nil { continue }
-
-        totalCount++
-        if completed { watchedCount++ }
-
-        progress:=0.0
-        if duration>0 {
-            progress=float64(position)/float64(duration)
-            if progress<0 { progress=0 }
-            if progress>1 { progress=1 }
-        } else if completed {
-            progress=1
-        }
-
-        items=append(items,map[string]any{
-            "seasonId":seasonID,
-            "seasonNumber":seasonNumber,
-            "episodeId":episodeID,
-            "episodeNumber":episodeNumber,
-            "positionMs":position,
-            "durationMs":duration,
-            "completed":completed,
-            "progress":progress,
-        })
-    }
-
-    overall:=0.0
-    if totalCount>0 {
-        overall=float64(watchedCount)/float64(totalCount)
-    }
-
-    writeJSON(w,http.StatusOK,map[string]any{
-        "mediaTitleId":mediaID,
-        "watchedCount":watchedCount,
-        "totalCount":totalCount,
-        "progress":overall,
-        "items":items,
-    })
+// An explicit invalid viewer must never fall back to the parent's account scope.
+func (s *Server) seriesViewingScope(w http.ResponseWriter, r *http.Request) (string, string, string, bool) {
+	user := userIDFromContext(r.Context())
+	if user == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return "", "", "", false
+	}
+	viewer := strings.TrimSpace(r.Header.Get("X-Filmiqoo-Viewer-Profile"))
+	maturity := "all"
+	if viewer != "" {
+		var owned string
+		if err := s.db.QueryRow(r.Context(), "SELECT id::text,maturity_level FROM viewer_profiles WHERE id=$1 AND user_id=$2", viewer, user).Scan(&owned, &maturity); err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "viewer unavailable"})
+			return "", "", "", false
+		}
+		viewer = owned
+		if maturity != "kids" && maturity != "teen" && maturity != "all" {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "viewer maturity unavailable"})
+			return "", "", "", false
+		}
+	}
+	return user, viewer, maturity, true
 }
 
-func (s *Server) setEpisodeWatchedStatus(w http.ResponseWriter,r *http.Request) {
-    userID:=userIDFromContext(r.Context())
-    episodeID:=chi.URLParam(r,"id")
-
-    var body struct {
-        Watched bool `json:"watched"`
-    }
-    if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-        writeError(w,http.StatusBadRequest,err); return
-    }
-
-    var exists bool
-    if err:=s.db.QueryRow(r.Context(),`
-        SELECT EXISTS(SELECT 1 FROM episodes WHERE id=$1)
-    `,episodeID).Scan(&exists); err!=nil {
-        writeError(w,http.StatusInternalServerError,err); return
-    }
-    if !exists {
-        writeJSON(w,http.StatusNotFound,map[string]string{"error":"episode not found"}); return
-    }
-
-    if !body.Watched {
-        _,err:=s.db.Exec(r.Context(),`
-            DELETE FROM watch_progress wp
-             USING media_versions mv
-             WHERE wp.media_version_id=mv.id
-               AND wp.user_id=$1
-               AND mv.episode_id=$2
-        `,userID,episodeID)
-        if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-        writeJSON(w,http.StatusOK,map[string]any{"watched":false})
-        return
-    }
-
-    var versionID string
-    var duration int64
-    err:=s.db.QueryRow(r.Context(),`
-        SELECT id::text,COALESCE(duration_ms,0)
-          FROM media_versions
-         WHERE episode_id=$1 AND stream_ready=true
-         ORDER BY preferred DESC,height DESC,file_size_bytes DESC
-         LIMIT 1
-    `,episodeID).Scan(&versionID,&duration)
-    if err!=nil {
-        writeJSON(w,http.StatusConflict,map[string]string{"error":"episode has no stream-ready version"}); return
-    }
-
-    position:=duration
-    if position<=0 { position=1 }
-
-    _,err=s.db.Exec(r.Context(),`
-        INSERT INTO watch_progress (
-            user_id,media_version_id,position_ms,duration_ms,completed,updated_at
-        ) VALUES ($1,$2,$3,$4,true,now())
-        ON CONFLICT (user_id,media_version_id)
-        DO UPDATE SET
-          position_ms=EXCLUDED.position_ms,
-          duration_ms=EXCLUDED.duration_ms,
-          completed=true,
-          updated_at=now()
-    `,userID,versionID,position,duration)
-    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-
-    writeJSON(w,http.StatusOK,map[string]any{"watched":true})
+func (s *Server) seriesTargetAllowed(w http.ResponseWriter, r *http.Request, kind, id, maturity string) bool {
+	query := "SELECT audience_level FROM media_titles WHERE id=$1 AND kind IN ('series','anime')"
+	if kind == "episode" {
+		query = "SELECT mt.audience_level FROM episodes e JOIN seasons sn ON sn.id=e.season_id JOIN media_titles mt ON mt.id=sn.media_title_id WHERE e.id=$1"
+	}
+	if kind == "season" {
+		query = "SELECT mt.audience_level FROM seasons sn JOIN media_titles mt ON mt.id=sn.media_title_id WHERE sn.id=$1"
+	}
+	var audience string
+	if err := s.db.QueryRow(r.Context(), query, id).Scan(&audience); err != nil || !viewerAllowsAudience(maturity, audience) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "series target unavailable"})
+		return false
+	}
+	return true
 }
 
-func (s *Server) setSeasonWatchedStatus(w http.ResponseWriter,r *http.Request) {
-    userID:=userIDFromContext(r.Context())
-    seasonID:=chi.URLParam(r,"id")
+func (s *Server) seriesProgress(w http.ResponseWriter, r *http.Request) {
+	user, viewer, maturity, ok := s.seriesViewingScope(w, r)
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !s.seriesTargetAllowed(w, r, "title", id, maturity) {
+		return
+	}
+	rows, err := s.db.Query(r.Context(), `
+ WITH progress AS (
+  SELECT media_version_id,position_ms,duration_ms,completed,updated_at FROM viewer_watch_progress WHERE viewer_profile_id=NULLIF($2,'')::uuid AND $2<>''
+  UNION ALL SELECT media_version_id,position_ms,duration_ms,completed,updated_at FROM watch_progress WHERE user_id=$1 AND $2=''
+ ), marks AS (
+  SELECT episode_id FROM viewer_episode_seen_marks WHERE viewer_profile_id=NULLIF($2,'')::uuid AND $2<>''
+  UNION ALL SELECT episode_id FROM episode_seen_marks WHERE user_id=$1 AND $2=''
+ )
+ SELECT sn.id::text,sn.season_number,e.id::text,e.episode_number,
+ COALESCE(p.position_ms,0),COALESCE(p.duration_ms,0),COALESCE(p.completed,false),EXISTS(SELECT 1 FROM marks m WHERE m.episode_id=e.id)
+ FROM seasons sn JOIN episodes e ON e.season_id=sn.id
+ LEFT JOIN LATERAL (
+  SELECT wp.position_ms,wp.duration_ms,wp.completed FROM progress wp JOIN media_versions mv ON mv.id=wp.media_version_id
+  WHERE mv.episode_id=e.id ORDER BY wp.completed DESC,wp.updated_at DESC LIMIT 1
+ ) p ON true WHERE sn.media_title_id=$3 ORDER BY sn.season_number,e.episode_number`, user, viewer, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer rows.Close()
+	items := []map[string]any{}
+	var watched, manual int64
+	for rows.Next() {
+		var season, episode string
+		var sn, en int
+		var position, duration int64
+		var completed, seen bool
+		if err = rows.Scan(&season, &sn, &episode, &en, &position, &duration, &completed, &seen); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		fraction := 0.0
+		if duration > 0 {
+			fraction = float64(position) / float64(duration)
+			if fraction < 0 {
+				fraction = 0
+			}
+			if fraction > 1 {
+				fraction = 1
+			}
+		} else if completed {
+			fraction = 1
+		}
+		if completed {
+			watched++
+		}
+		if seen {
+			manual++
+		}
+		items = append(items, map[string]any{"seasonId": season, "seasonNumber": sn, "episodeId": episode, "episodeNumber": en, "positionMs": position, "durationMs": duration, "completed": completed, "progress": fraction, "manualSeen": seen})
+	}
+	if err = rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	fraction := 0.0
+	if len(items) > 0 {
+		fraction = float64(watched) / float64(len(items))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"mediaTitleId": id, "watchedCount": watched, "totalCount": len(items), "progress": fraction, "items": items, "manualSeenCount": manual, "manualMarksVersion": 1})
+}
 
-    var body struct {
-        Watched bool `json:"watched"`
-    }
-    if err:=json.NewDecoder(r.Body).Decode(&body); err!=nil {
-        writeError(w,http.StatusBadRequest,err); return
-    }
+func (s *Server) setEpisodeWatchedStatus(w http.ResponseWriter, r *http.Request) {
+	s.setSeriesManualSeen(w, r, false)
+}
+func (s *Server) setSeasonWatchedStatus(w http.ResponseWriter, r *http.Request) {
+	s.setSeriesManualSeen(w, r, true)
+}
 
-    var exists bool
-    if err:=s.db.QueryRow(r.Context(),`
-        SELECT EXISTS(SELECT 1 FROM seasons WHERE id=$1)
-    `,seasonID).Scan(&exists); err!=nil {
-        writeError(w,http.StatusInternalServerError,err); return
-    }
-    if !exists {
-        writeJSON(w,http.StatusNotFound,map[string]string{"error":"season not found"}); return
-    }
-
-    if !body.Watched {
-        _,err:=s.db.Exec(r.Context(),`
-            DELETE FROM watch_progress wp
-             USING media_versions mv,episodes e
-             WHERE wp.media_version_id=mv.id
-               AND mv.episode_id=e.id
-               AND wp.user_id=$1
-               AND e.season_id=$2
-        `,userID,seasonID)
-        if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-        writeJSON(w,http.StatusOK,map[string]any{"watched":false})
-        return
-    }
-
-    _,err:=s.db.Exec(r.Context(),`
-        INSERT INTO watch_progress (
-            user_id,media_version_id,position_ms,duration_ms,completed,updated_at
-        )
-        SELECT $1,mv.id,
-               CASE WHEN COALESCE(mv.duration_ms,0)>0 THEN mv.duration_ms ELSE 1 END,
-               COALESCE(mv.duration_ms,0),
-               true,now()
-          FROM episodes e
-          JOIN LATERAL (
-            SELECT id,duration_ms
-              FROM media_versions
-             WHERE episode_id=e.id AND stream_ready=true
-             ORDER BY preferred DESC,height DESC,file_size_bytes DESC
-             LIMIT 1
-          ) mv ON true
-         WHERE e.season_id=$2
-        ON CONFLICT (user_id,media_version_id)
-        DO UPDATE SET
-          position_ms=EXCLUDED.position_ms,
-          duration_ms=EXCLUDED.duration_ms,
-          completed=true,
-          updated_at=now()
-    `,userID,seasonID)
-    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-
-    writeJSON(w,http.StatusOK,map[string]any{"watched":true})
+// Manual marks never manufacture, overwrite, or erase actual playback/resume/time.
+func (s *Server) setSeriesManualSeen(w http.ResponseWriter, r *http.Request, season bool) {
+	user, viewer, maturity, ok := s.seriesViewingScope(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Watched            bool `json:"watched"`
+		ManualMarksVersion int  `json:"manualMarksVersion"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.ManualMarksVersion != 1 {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "manual marks require an updated client"})
+		return
+	}
+	id := chi.URLParam(r, "id")
+	kind := "episode"
+	if season {
+		kind = "season"
+	}
+	if !s.seriesTargetAllowed(w, r, kind, id, maturity) {
+		return
+	}
+	table, owner, ownerID := "episode_seen_marks", "user_id", user
+	if viewer != "" {
+		table, owner, ownerID = "viewer_episode_seen_marks", "viewer_profile_id", viewer
+	}
+	// Names above are constants. A season change is one atomic SQL statement.
+	query := "DELETE FROM " + table + " WHERE " + owner + "=$1 AND episode_id=$2"
+	if season {
+		query = "DELETE FROM " + table + " m USING episodes e WHERE m.episode_id=e.id AND m." + owner + "=$1 AND e.season_id=$2"
+	}
+	if body.Watched {
+		selection := "SELECT $1::uuid,id,now() FROM episodes WHERE id=$2"
+		if season {
+			selection = "SELECT $1::uuid,id,now() FROM episodes WHERE season_id=$2"
+		}
+		query = "INSERT INTO " + table + "(" + owner + ",episode_id,updated_at) " + selection + " ON CONFLICT(" + owner + ",episode_id) DO UPDATE SET updated_at=EXCLUDED.updated_at"
+	}
+	if _, err := s.db.Exec(r.Context(), query, ownerID, id); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"watched": body.Watched, "manualMarksVersion": 1})
 }

@@ -333,6 +333,7 @@ private fun CinemaTitleHero(data:CinemaTitleData) {
 private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: EpisodeWatchState?, hideSpoilers: Boolean, busy: Boolean, actions: CinemaDetailActions) {
     val ready = ep.streamReady && !ep.mediaVersionId.isNullOrBlank()
     val completed = progress?.completed == true
+    val manualSeen = progress?.manualSeen == true
     var versionsOpen by rememberSaveable(ep.id) { mutableStateOf(false) }
     fun chooseVersion(download:Boolean=false){
         if(ep.versions.count { it.streamReady }>1)versionsOpen=true
@@ -361,9 +362,9 @@ private fun CinemaEpisodeRow(ep: PlatformEpisode, season: Int, progress: Episode
             CinemaAction(Icons.Default.PlayArrow, if ((progress?.positionMs ?: 0) > 0 && !completed) "ادامهٔ تماشا" else "تماشا", { chooseVersion() }, Modifier.weight(1f), primary = true, enabled = ready && !busy)
             CinemaAction(Icons.Default.Download, "دانلود", { chooseVersion(true) }, Modifier.weight(1f).semantics { contentDescription = "دانلود قسمت ${ep.number}" }, enabled = ready && !busy)
         }
-        TextButton({ actions.episodeSeen(ep, !completed) }, enabled = !busy) {
-            Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = CinemaSoft, modifier = Modifier.size(18.dp))
-            Text(if (completed) "  دیده‌ام · لغو علامت" else "  این قسمت را دیده‌ام", color = CinemaSoft, fontSize = 12.sp)
+        TextButton({ actions.episodeSeen(ep, !manualSeen) }, enabled = !busy, modifier=Modifier.heightIn(min=48.dp).testTag("episode-manual-seen-"+ep.id)) {
+            Icon(if (manualSeen) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = CinemaSoft, modifier = Modifier.size(18.dp))
+            Text(if (manualSeen) "  حذف علامت دستی دیده‌ام" else "  علامت دستی دیده‌ام", color = CinemaSoft, fontSize = 12.sp)
         }
     }
     if(versionsOpen)ModalBottomSheet(onDismissRequest={versionsOpen=false},containerColor=CinemaSurface,contentColor=CinemaPaper){

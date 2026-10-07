@@ -37,6 +37,10 @@ class PersonalCinemaHubTest {
   val backend=backend();fixture.intercept={r->when(r.requestUrl?.encodedPath){"/v1/library/viewing-stats"->MockResponse().setBody("""{"schemaVersion":1,"totalWatchMs":0,"moviesWatched":0,"seriesWatched":0,"episodesWatched":0,"historyTitles":0,"genres":[],"countries":[]}""");"/v1/watch/history","/v1/watch/continue"->MockResponse().setBody("{\"items\":[]}");else->null}}
   compose.setContent{FilmiqooTheme{Audit090Profile(backend,TmdbRepository(compose.activity))}};ready("profile-new-viewer");compose.onNodeWithTag("profile-watch-time").assertDoesNotExist();compose.onNodeWithTag("profile-real-metrics").assertDoesNotExist();compose.onNodeWithTag("profile-scroll").performScrollToNode(hasTestTag("profile-movies"));compose.onNodeWithTag("profile-movies").assertIsDisplayed()
  }
+ @Test fun recordedTimeWithoutProgressIsVisibleRatherThanZeroActivity(){
+  val backend=backend();fixture.intercept={r->when(r.requestUrl?.encodedPath){"/v1/library/viewing-stats"->MockResponse().setBody("""{"schemaVersion":1,"totalWatchMs":60000,"moviesWatched":0,"seriesWatched":0,"episodesWatched":0,"historyTitles":0,"genres":[],"countries":[]}""");"/v1/watch/history","/v1/watch/continue"->MockResponse().setBody("{\"items\":[]}");else->null}}
+  compose.setContent{FilmiqooTheme{Audit090Profile(backend,TmdbRepository(compose.activity))}};ready("profile-watch-time");compose.onNodeWithTag("profile-watch-time").assertTextEquals("۱ دقیقه");compose.onNodeWithTag("profile-new-viewer").assertDoesNotExist()
+ }
  @Test fun completedMovieExclusionsAreTypedScopedAndDistinguishOldCapability(){
   val backend=backend();val calls=AtomicInteger()
   fixture.intercept={request->if(request.requestUrl?.encodedPath=="/v1/library/viewing-stats"){

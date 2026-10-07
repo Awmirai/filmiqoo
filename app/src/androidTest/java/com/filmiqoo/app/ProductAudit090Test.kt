@@ -30,6 +30,7 @@ class ProductAudit090Test {
  private val fixture=ProductAudit090Fixture();private var fixtureStarted=false
  private var original:Triple<String,String?,String?>?=null;private var history:String?=null;private var historyTouched=false
  private var label="uninitialized";private val observations=JSONArray();private var phasePage="setup"
+ private var auditFocusManager:androidx.compose.ui.focus.FocusManager?=null
  private fun phase(stage:String){android.util.Log.i("FilmiqooProductAudit","label=$label page=$phasePage phase=$stage uptimeMs=${android.os.SystemClock.uptimeMillis()}")}
  private fun present(tag:String)=compose.onAllNodesWithTag(tag,useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
  private fun ready(tag:String){compose.waitUntil(12_000){check(!present("audit090-detail-error"));present(tag)};compose.waitForIdle()}
@@ -48,7 +49,7 @@ class ProductAudit090Test {
   val movie=MediaItem((('I'.code*100+'R'.code)*10+1)+500000,MediaType.MOVIE,"داستان شهر 1","داستان شهر 1")
   val series=MediaItem(('K'.code*100+'R'.code)*10+1,MediaType.TV,"KR Series 1","KR Series 1")
   phase("set-content:begin")
-  compose.setContent{FilmiqooTheme{key(page,generation){when(page){
+  compose.setContent{val focusManager=androidx.compose.ui.platform.LocalFocusManager.current;SideEffect{auditFocusManager=focusManager};FilmiqooTheme{key(page,generation){when(page){
    "movie-detail"->Audit090Detail(movie,account);"series-episodes"->Audit090Detail(series,account)
    else->CinemaAppShell(selected=when{page.startsWith("series")||page.endsWith("-tv")->4;page.startsWith("search")->1;page=="profile"->3;else->2},kids=false,onSelected={}){when(page){
     "movies","movies-slow"->MoviesDiscoveryScreen(repository,account,{},{})
@@ -63,14 +64,14 @@ class ProductAudit090Test {
   val pages=listOf("movies","series","search-default","search-results","profile","world-registry","tr-movie","tr-tv","kr-movie","kr-tv","movie-detail","series-episodes")
   for(name in pages){select(name);when(name){
    "movies"->ready("movies-discovery-hero");"series"->ready("series-discovery-hero");"search-default"->ready("search-poster-atmosphere")
-   "search-results"->{ready("search-input");compose.onNodeWithTag("search-input").performTextInput("cinema");if(!label.endsWith("keyboard"))hideIme();compose.waitUntil(12_000){fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/search")==true&&it.requestUrl?.queryParameter("q")=="cinema"}};compose.waitUntil(12_000){!present("search-loading")};phase("search-results:scroll-target");val target="poster-"+cinemaMediaKey(movie);compose.onNodeWithTag("search-results").performScrollToNode(hasTestTag(target));compose.onNodeWithTag(target).assertIsDisplayed()}
+   "search-results"->{ready("search-input");compose.onNodeWithTag("search-input").performTextInput("cinema");if(!label.endsWith("keyboard"))hideIme();compose.waitUntil(12_000){fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/search")==true&&it.requestUrl?.queryParameter("q")=="cinema"}};compose.waitUntil(12_000){!present("search-loading")};phase("search-results:scroll-target");val target="poster-"+cinemaMediaKey(movie);assertSearchTarget(target)}
    "profile"->{ready("cinema-profile-hub");compose.waitUntil(12_000){compose.onAllNodesWithText("حساب آزمایشی سینما",substring=true).fetchSemanticsNodes().isNotEmpty()};ready("profile-stats-ready")}
    "world-registry"->{ready("world-country-TR");compose.onNodeWithText("همهٔ کشورها").performScrollTo().performClick();ready("world-country-picker");ready("world-registry-ZA")}
    "movie-detail","series-episodes"->{ready("detail-scroll");if(name=="series-episodes")compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-qa-episode-1"))}
    else->ready(if(name.endsWith("-tv"))"series-discovery-hero"else"movies-discovery-hero")
   }
    if(name.startsWith("tr-")||name.startsWith("kr-")){val c=if(name.startsWith("tr-"))"TR"else"KR";val type=if(name.endsWith("-tv"))"tv"else"movie";assertTrue(fixture.requests.any{it.requestUrl?.queryParameter("path")=="discover/$type"&&it.requestUrl?.queryParameter("with_origin_country")==c})}
-   if(name.startsWith("search")){if(label.endsWith("keyboard")){compose.onNodeWithTag("search-input").performClick();compose.waitUntil(5_000){imeState().first&&imeState().second>0}}else hideIme();if(name=="search-results"){compose.onNodeWithTag("search-results").performScrollToNode(hasTestTag("poster-"+cinemaMediaKey(movie)));compose.onNodeWithTag("poster-"+cinemaMediaKey(movie)).assertIsDisplayed()}}
+   if(name.startsWith("search")){if(label.endsWith("keyboard")){compose.onNodeWithTag("search-input").performClick();compose.waitUntil(5_000){imeState().first&&imeState().second>0}}else hideIme();if(name=="search-results"){assertSearchTarget("poster-"+cinemaMediaKey(movie))}}
    if(name !in listOf("movie-detail","series-episodes")){listOf(0,2,4,1,3).forEach{compose.onNodeWithTag("navigation-$it").assertExists()};val selected=when{name.startsWith("series")||name.endsWith("-tv")->4;name.startsWith("search")->1;name=="profile"->3;else->2};compose.onNodeWithTag("navigation-$selected").assertIsSelected();compose.onNodeWithTag("party-lobby").assertDoesNotExist();compose.onNodeWithTag("cinema-social").assertDoesNotExist()}
    capture(name);if(name.startsWith("search"))hideIme()
   }
@@ -84,8 +85,16 @@ class ProductAudit090Test {
   assertFalse(fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/watch-parties")==true})
   PlatformTestStorageRegistry.getInstance().openOutputFile("audit-090-$label-metrics.json").use{it.write(observations.toString(2).toByteArray(Charsets.UTF_8))}
  }
+ private fun assertSearchTarget(target:String){
+  try{compose.onNodeWithTag("search-results").performScrollToNode(hasTestTag(target));compose.onNodeWithTag(target).assertIsDisplayed()}
+  catch(failure:Throwable){runCatching{android.util.Log.e("FilmiqooProductAudit","search grid="+compose.onNodeWithTag("search-results").fetchSemanticsNode().boundsInRoot+" target="+compose.onNodeWithTag(target).fetchSemanticsNode().boundsInRoot+" ime="+imeState());capture("search-results-failure")};throw failure}
+ }
  private fun imeState():Pair<Boolean,Int>{var value=false to 0;compose.runOnUiThread{val i=ViewCompat.getRootWindowInsets(compose.activity.window.decorView);val t=WindowInsetsCompat.Type.ime();value=(i?.isVisible(t)==true)to(i?.getInsets(t)?.bottom?:0)};return value}
- private fun hideIme(){compose.runOnUiThread{val a=compose.activity;WindowCompat.getInsetsController(a.window,a.window.decorView).hide(WindowInsetsCompat.Type.ime())};compose.waitForIdle()}
+ private fun hideIme(){
+  compose.runOnIdle{auditFocusManager?.clearFocus(force=true)}
+  compose.runOnUiThread{val a=compose.activity;WindowCompat.getInsetsController(a.window,a.window.decorView).hide(WindowInsetsCompat.Type.ime())}
+  compose.waitUntil(5_000){val ime=imeState();!ime.first&&ime.second==0};compose.waitForIdle()
+ }
  private fun completeNativeFrame(){compose.waitForIdle();val latch=CountDownLatch(1);compose.runOnUiThread{val v=compose.activity.window.decorView;check(v.isHardwareAccelerated);v.viewTreeObserver.registerFrameCommitCallback{latch.countDown()};v.invalidate()};assertTrue("Committed frame required",latch.await(4,TimeUnit.SECONDS))}
  private fun capture(name:String,extra:JSONObject=JSONObject()){
   phasePage=name;phase("frame-commit:begin");completeNativeFrame();phase("frame-commit:end");ensureNoSystemErrorDialog()

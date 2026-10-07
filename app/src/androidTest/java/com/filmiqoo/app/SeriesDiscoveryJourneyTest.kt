@@ -61,10 +61,20 @@ class SeriesDiscoveryJourneyTest {
   val id=('T'.code*100+'R'.code)*10+5;ready("poster-TV:$id");compose.onNodeWithTag("discovery-list-grid").performScrollToNode(hasTestTag("poster-TV:$id"));compose.onNodeWithTag("poster-TV:$id").performClick();compose.waitUntil(5_000){opened.isNotEmpty()};assertEquals("Ended",opened.last().seriesStatus);assertTrue("TR" in opened.last().originCountries)
  }
  @Test fun failedCountryMetadataRetriesWithoutObsoleteNavigation(){
-  val backend=setup();val failed=AtomicBoolean(false);fixture.intercept={r->if(r.requestUrl?.queryParameter("path")=="discover/tv"&&failed.compareAndSet(false,true))MockResponse().setResponseCode(503).setBody("{}")else null}
-  compose.setContent{FilmiqooTheme{CountryDiscoveryPage(TmdbRepository(compose.activity),backend,"TR",MediaType.TV,{}, {opened+=it},{})}}
-  compose.waitUntil(12_000){compose.onAllNodesWithText("تلاش دوباره").fetchSemanticsNodes().isNotEmpty()};compose.onAllNodesWithText("تلاش دوباره").onFirst().performScrollTo().performClick();ready("series-hero-details")
-  compose.onNodeWithTag("party-lobby").assertDoesNotExist();compose.onNodeWithTag("cinema-social").assertDoesNotExist()
+  val backend=setup();val recover=AtomicBoolean(false);val failedCalls=AtomicInteger();val recoveredCalls=AtomicInteger()
+  val tmdbPrefs=compose.activity.getSharedPreferences("filmiqoo_tmdb",android.content.Context.MODE_PRIVATE);val credential=tmdbPrefs.getString("credential",null);tmdbPrefs.edit().remove("credential").commit()
+  try{
+   fixture.intercept={r->val u=r.requestUrl!!;if(u.encodedPath=="/v1/tmdb"&&u.queryParameter("path")=="discover/tv"&&u.queryParameter("with_origin_country")=="TR"&&u.queryParameter("sort_by")=="popularity.desc"&&u.queryParameter("page")=="1"){
+    if(!recover.get()){failedCalls.incrementAndGet();MockResponse().setResponseCode(503).setBody("""{"error":"fixture temporary failure"}""")}else{recoveredCalls.incrementAndGet();null}
+   }else null}
+   compose.setContent{FilmiqooTheme{CountryDiscoveryPage(TmdbRepository(compose.activity),backend,"TR",MediaType.TV,{}, {opened+=it},{})}}
+   compose.waitUntil(12_000){failedCalls.get()>0&&compose.onAllNodesWithText("تلاش دوباره").fetchSemanticsNodes().isNotEmpty()}
+   compose.onNodeWithTag("country-discovery-tv-TR").performScrollToIndex(0);recover.set(true)
+   compose.onAllNodesWithText("تلاش دوباره").onFirst().performScrollTo().performClick();compose.waitUntil(12_000){recoveredCalls.get()>0&&present("series-discovery-hero")}
+   compose.onNodeWithTag("country-discovery-tv-TR").performScrollToNode(hasTestTag("series-hero-details"));compose.onNodeWithTag("series-hero-details").assertIsDisplayed().performClick()
+   compose.waitUntil(5_000){opened.isNotEmpty()};assertEquals(MediaType.TV,opened.single().type);assertTrue("TR" in opened.single().originCountries)
+   compose.onNodeWithTag("party-lobby").assertDoesNotExist();compose.onNodeWithTag("cinema-social").assertDoesNotExist()
+  }finally{tmdbPrefs.edit().apply{credential?.let{putString("credential",it)}?:remove("credential")}.commit()}
  }
  @Test fun calendarUsesActualKnownDatesAndExactTitle(){
   val backend=setup(true);fixture.intercept={r->if(r.requestUrl?.encodedPath=="/v1/series/calendar")MockResponse().setBody("""{"items":[{"media":{"id":"late-series","kind":"series","title":"late"},"episode":{"id":"late","seasonNumber":1,"episodeNumber":2,"airDate":"2026-10-11","streamReady":false}},{"media":{"id":"early-series","kind":"series","title":"early"},"episode":{"id":"early","seasonNumber":1,"episodeNumber":1,"airDate":"2026-10-08","streamReady":false}},{"media":{"id":"unknown-series","kind":"series","title":"unknown"},"episode":{"id":"unknown","airDate":""}}]}""")else null}
