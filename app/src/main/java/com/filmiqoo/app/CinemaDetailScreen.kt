@@ -32,10 +32,12 @@ fun CinemaDetailScreen(
     initialDiscussionScope:String?=null
 ) {
     val context = LocalContext.current
+    val profileId = backend.viewerProfiles.activeId()
+    val accountScope = backend.session.localAccountScope
+    key(media.key, profileId, accountScope, backend.session.isLoggedIn) {
     val scope = rememberCoroutineScope()
     val loader = remember(backend) { CinemaDataRepository(context, backend) }
-    val profileId = backend.viewerProfiles.activeId()
-    val personal = remember(profileId) { CinemaPersonalStore(context, profileId) }
+    val personal = remember(profileId, accountScope) { CinemaPersonalStore(context, profileId) }
     val library = remember(backend) { LibraryRepository(backend) }
     val series = remember(backend) { SeriesProgressRepository(backend) }
     val subscriptions = remember(backend) { SeriesAlertsRepository(backend) }
@@ -198,5 +200,6 @@ fun CinemaDetailScreen(
             if (availabilityOpen && id != null) AvailabilityAlertsSheet(id, backend) { availabilityOpen = false }
         }
         SnackbarHost(snackbars, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 85.dp))
+    }
     }
 }

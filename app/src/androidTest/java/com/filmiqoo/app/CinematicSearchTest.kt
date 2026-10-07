@@ -89,7 +89,7 @@ class CinematicSearchTest {
         val repository = TmdbRepository(compose.activity)
         val restoration = StateRestorationTester(compose)
         restoration.setContent { FilmiqooTheme { PremiumSearchScreen(repository, backend, {}, {}, {}, {}, {}) } }
-        compose.onNodeWithTag("search-input").performTextInput("عنوان من")
+        compose.onNodeWithTag("search-input").performTextInput("عنوان من");compose.onNodeWithTag("search-input").performImeAction()
         compose.waitUntil(10000) { compose.onAllNodesWithText("3 عنوان · مرتبط‌ترین").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("search-options").performClick()
         compose.onNodeWithTag("search-order-RATING").performScrollTo().performClick()
@@ -97,6 +97,8 @@ class CinematicSearchTest {
         compose.onNodeWithText("اعمال").performScrollTo().performClick()
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("search-input").assertTextContains("عنوان من")
+        compose.waitUntil(10_000){searchCalls.get()==2}
+        compose.onNodeWithTag("search-results").performScrollToIndex(0)
         compose.waitUntil(10000) { compose.onAllNodesWithText("1 عنوان · بالاترین امتیاز").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("search-options").performClick()
         compose.onNodeWithTag("search-order-RATING").assertIsSelected()
@@ -133,7 +135,7 @@ class CinematicSearchTest {
             if(r.requestUrl!!.encodedPath=="/received-poster.png"){imageCalls.incrementAndGet();return MockResponse().setHeader("Content-Type","image/png").setBody(Buffer().write(png))}
             if(r.requestUrl!!.encodedPath=="/v1/tmdb"){
                 val metadataPath=r.requestUrl!!.queryParameter("path").orEmpty();paths+=metadataPath
-                val result=if(empty.get()||metadataPath!="movie/popular")"[]"else"""[{"id":77,"media_type":"movie","title":"جدایی نادر از سیمین","original_title":"A Separation","original_language":"fa","poster_path":"$image","vote_average":8.1,"release_date":"2011-03-15"}]"""
+                val result=if(empty.get()||metadataPath!="discover/movie")"[]"else"""[{"id":77,"media_type":"movie","title":"جدایی نادر از سیمین","original_title":"A Separation","original_language":"fa","poster_path":"$image","vote_average":8.1,"release_date":"2011-03-15"}]"""
                 return MockResponse().setBody("""{"results":$result,"genres":[],"page":1,"total_pages":1}""")
             };return MockResponse().setBody("""{"items":[],"results":[]}""")
         }}
@@ -143,7 +145,7 @@ class CinematicSearchTest {
         empty.set(false);compose.onNodeWithText("دریافت پیشنهادها").performScrollTo().performClick()
         compose.waitUntil(10_000){compose.onAllNodesWithTag("poster-MOVIE:77").fetchSemanticsNodes().isNotEmpty()};compose.onNodeWithTag("search-poster-atmosphere",useUnmergedTree=true).assertExists();compose.waitUntil(10_000){imageCalls.get()>0}
         compose.onNodeWithTag("poster-MOVIE:77").performScrollTo().performClick();val received=opened.single();assertEquals(77,received.id);assertEquals(image,received.posterPath);assertEquals("A Separation",received.originalTitle);assertFalse(received.streamReady);assertNull(received.mediaVersionId)
-        assertEquals(2,paths.count{it=="movie/popular"});assertEquals(2,paths.count{it=="tv/popular"})
+        assertEquals(2,paths.count{it=="discover/movie"});assertEquals(2,paths.count{it=="discover/tv"})
     }
     @Test fun metadataRetryPreservesCatalogAndSeparatesMoviesSeriesAndPeople(){
         val backend=backend();val calls=AtomicInteger();val people=CopyOnWriteArrayList<Pair<Int,String>>()
@@ -155,8 +157,8 @@ class CinematicSearchTest {
             };return MockResponse().setBody("""{"items":[],"results":[],"genres":[]}""")
         }}
         compose.setContent{FilmiqooTheme{PremiumSearchScreen(TmdbRepository(compose.activity),backend,{}, {opened+=it},{},{},{},onPerson={id,name->people+=id to name})}}
-        compose.onNodeWithTag("search-input").performTextInput("کیان");compose.waitUntil(10_000){compose.onAllNodesWithTag("search-metadata-error").fetchSemanticsNodes().isNotEmpty()};compose.onNodeWithText("3 عنوان · مرتبط‌ترین").assertExists()
-        compose.onNodeWithText("تلاش دوباره برای اطلاعات").performScrollTo().performClick();compose.waitUntil(10_000){compose.onAllNodesWithText("4 عنوان · مرتبط‌ترین").fetchSemanticsNodes().isNotEmpty()};assertEquals(1,searchCalls.get())
+        compose.onNodeWithTag("search-input").performTextInput("کیان");compose.onNodeWithTag("search-input").performImeAction();compose.waitUntil(10_000){compose.onAllNodesWithTag("search-metadata-error").fetchSemanticsNodes().isNotEmpty()};compose.onNodeWithText("3 عنوان · مرتبط‌ترین").assertExists()
+        compose.onNodeWithText("تلاش دوباره برای اطلاعات").performScrollTo().performClick();compose.waitUntil(10_000){calls.get()==2};compose.onNodeWithTag("search-results").performScrollToIndex(0);compose.waitUntil(10_000){compose.onAllNodesWithText("4 عنوان · مرتبط‌ترین").fetchSemanticsNodes().isNotEmpty()};assertEquals(1,searchCalls.get())
         compose.onNodeWithTag("poster-MOVIE:101").performScrollTo().performClick();assertEquals("real-version",opened.single().mediaVersionId);assertEquals("movie-ready",opened.single().backendId)
         compose.onNodeWithTag("search-type-filters").performScrollToNode(hasTestTag("search-type-3"));compose.onNodeWithTag("search-type-3").performClick();compose.onNodeWithTag("search-results").performScrollToNode(hasTestTag("search-person-500"));compose.onNodeWithTag("search-person-500").performClick();assertEquals(listOf(500 to "Park Actor"),people.toList())
     }
@@ -184,8 +186,8 @@ class CinematicSearchTest {
                 if(kotlin.math.abs(dy)>.5f)compose.onNodeWithTag("search-options-sheet").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy){it(0f,dy)}
             };compose.onNodeWithTag(tag).assertIsDisplayed()
         }
-        fun choose(label:String,tag:String){scrollFacet(label,tag);compose.onNodeWithTag(tag).performClick()}
-        compose.onNodeWithTag("search-input").performTextInput("درام");awaitCount(5)
+        fun choose(label:String,tag:String){scrollFacet(label,tag);compose.onNodeWithTag(tag).performClick().assertIsSelected()}
+        compose.onNodeWithTag("search-input").performTextInput("درام");compose.onNodeWithTag("search-input").performImeAction();awaitCount(5)
         compose.onNodeWithTag("search-type-1").performClick();awaitCount(4)
         compose.onNodeWithTag("search-options").performClick();choose("ژانر موجود در نتیجه‌ها","search-facet-genre-18");compose.onNodeWithText("اعمال").performScrollTo().performClick();awaitCount(2)
         compose.onNodeWithTag("poster-MOVIE:102").assertDoesNotExist();compose.onNodeWithTag("poster-MOVIE:105").assertDoesNotExist()
@@ -193,7 +195,7 @@ class CinematicSearchTest {
         compose.onNodeWithTag("search-dubbed-switch").performScrollTo().performClick();compose.onNodeWithTag("search-subtitle-switch").performScrollTo().performClick();compose.onNodeWithText("اعمال").performScrollTo().performClick();awaitCount(1)
         compose.onNodeWithTag("poster-MOVIE:104").assertDoesNotExist();compose.onNodeWithTag("poster-MOVIE:101").performScrollTo().performClick()
         assertEquals("ready-drama",opened.single().backendId);assertEquals("drama-version",opened.single().mediaVersionId);assertTrue(opened.single().hasPersianDub);assertTrue(opened.single().hasPersianSubtitle)
-        restoration.emulateSavedInstanceStateRestore();compose.onNodeWithTag("search-input").assertTextContains("درام");awaitCount(1);compose.onNodeWithTag("search-type-1").assertIsSelected()
+        restoration.emulateSavedInstanceStateRestore();compose.onNodeWithTag("search-input").assertTextContains("درام");compose.waitUntil(10_000){searchCalls.get()==2};compose.onNodeWithTag("search-results").performScrollToIndex(0);awaitCount(1);compose.onNodeWithTag("search-type-1").assertIsSelected()
         compose.onNodeWithTag("search-options").performClick()
         listOf("سال انتشار" to "search-facet-year-2020","حداقل امتیاز ثبت‌شده" to "search-facet-rating-8","ژانر موجود در نتیجه‌ها" to "search-facet-genre-18","زبان اصلیِ ثبت‌شده" to "search-facet-language-ko").forEach{(label,tag)->compose.waitUntil(5_000){compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()};scrollFacet(label,tag);compose.onNodeWithTag(tag).assertIsSelected()}
         compose.onNodeWithTag("search-dubbed-switch").performScrollTo().assertIsOn();compose.onNodeWithTag("search-subtitle-switch").performScrollTo().assertIsOn()

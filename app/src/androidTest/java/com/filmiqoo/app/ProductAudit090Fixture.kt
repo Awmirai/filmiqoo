@@ -96,7 +96,7 @@ internal class ProductAudit090Fixture {
   if(p=="/v1/library/viewing-stats")return json(viewingStats())
   if(p=="/v1/watch/continue")return json(envelope(continueEntries()))
   if(p=="/v1/watch/history")return json(envelope(history()).put("historyVersion",1).put("page",1).put("hasMore",false))
-  if(p=="/v1/library/favorites"||p=="/v1/library/watchlist")return json(envelope(JSONArray().put(local(false,"IR",1)).put(local(true,"KR",1))))
+  if(p=="/v1/library/favorites"||p=="/v1/library/watchlist")return json(envelope(JSONArray().put(local(false,"IR",1)).put(local(true,"KR",1))).put("libraryVersion",1).put("page",r.requestUrl?.queryParameter("page")?.toIntOrNull()?:1).put("hasMore",false))
   if(p=="/v1/series/calendar")return json(envelope(JSONArray().put(JSONObject().put("media",local(true,"KR",1)).put("episode",JSONObject().put("id","qa-calendar-next").put("seasonNumber",1).put("episodeNumber",4).put("name","قسمت تازه").put("airDate","2026-10-08").put("runtimeMinutes",48).put("streamReady",false)))))
   return json(JSONObject().put("items",JSONArray()).put("results",JSONArray()).put("nextCursor",JSONObject.NULL))
  }

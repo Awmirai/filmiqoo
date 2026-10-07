@@ -9,54 +9,7 @@ import (
     "github.com/go-chi/chi/v5"
 )
 
-func (s *Server) watchlist(w http.ResponseWriter,r *http.Request) {
-    userID:=userIDFromContext(r.Context())
-    viewerID:=s.viewerProfileID(r,userID)
-    maturity:=s.viewerMaturityLevel(r,userID)
-    rows,err:=s.db.Query(r.Context(),`
-        WITH saved AS (
-            SELECT media_title_id,created_at
-              FROM viewer_watchlist
-             WHERE viewer_profile_id::text=$2 AND $2<>''
-            UNION ALL
-            SELECT media_title_id,created_at
-              FROM watchlist
-             WHERE user_id=$1 AND $2=''
-        )
-        SELECT mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,
-               mt.poster_url,mt.backdrop_url,mt.year,mt.rating,w.created_at
-          FROM saved w
-          JOIN media_titles mt ON mt.id=w.media_title_id
-         WHERE (
-           $3='all'
-           OR ($3='teen' AND mt.audience_level IN ('kids','teen'))
-           OR ($3='kids' AND mt.audience_level='kids')
-         )
-         ORDER BY w.created_at DESC
-         LIMIT 300
-    `,userID,viewerID,maturity)
-    if err!=nil { writeError(w,http.StatusInternalServerError,err); return }
-    defer rows.Close()
-
-    items:=make([]map[string]any,0)
-    for rows.Next() {
-        var id,kind,title,originalTitle,overview,poster,backdrop string
-        var tmdbID *int64
-        var year int
-        var rating *float64
-        var created time.Time
-        if err:=rows.Scan(
-            &id,&tmdbID,&kind,&title,&originalTitle,&overview,
-            &poster,&backdrop,&year,&rating,&created,
-        ); err!=nil { continue }
-        items=append(items,map[string]any{
-            "id":id,"tmdbId":tmdbID,"kind":kind,"title":title,"originalTitle":originalTitle,
-            "overview":overview,"posterUrl":poster,"backdropUrl":backdrop,
-            "year":year,"rating":rating,"savedAt":created,
-        })
-    }
-    writeJSON(w,http.StatusOK,map[string]any{"items":items})
-}
+func (s *Server) watchlist(w http.ResponseWriter, r *http.Request) { s.savedLibraryList(w, r, false) }
 
 func (s *Server) toggleWatchlist(w http.ResponseWriter,r *http.Request) {
     userID:=userIDFromContext(r.Context())

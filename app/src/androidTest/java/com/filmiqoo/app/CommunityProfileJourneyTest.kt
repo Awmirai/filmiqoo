@@ -1,6 +1,8 @@
 package com.filmiqoo.app
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import okhttp3.mockwebserver.*
@@ -11,6 +13,98 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 class CommunityProfileJourneyTest {
+    private fun identityToken(subject:String,rotation:String):String = "qa." +
+        android.util.Base64.encodeToString(JSONObject().put("sub",subject).put("jti",rotation).toString().toByteArray(Charsets.UTF_8),
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING) + ".fixture"
+    private fun requestIdentity(r:RecordedRequest):String = runCatching {
+        val segment=r.getHeader("Authorization").orEmpty().removePrefix("Bearer ").split('.')[1]
+        JSONObject(String(android.util.Base64.decode(segment,android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP),Charsets.UTF_8)).getString("sub")
+    }.getOrDefault("anonymous")
+
+    @Test fun actualMainKeepsSameAccountRefreshButDropsAnotherAccountsHistoryAndDialog(){
+        val backend=backend(true)
+        originalViewer=backend.viewerProfiles.active();restoreViewer=true;backend.viewerProfiles.clear()
+        backend.session.accessToken=identityToken("identity-A","first");backend.session.refreshToken="identity-refresh-A"
+        dispatch { r ->
+            val who=requestIdentity(r);val path=r.requestUrl!!.encodedPath
+            when(path){
+                "/v1/viewer-profiles" -> json("""{"items":[{"id":"viewer-$who","name":"viewer $who","kidsMode":false,"pinProtected":false}]}""")
+                "/v1/me" -> json("""{"id":"$who","username":"$who","displayName":"account $who"}""")
+                "/v1/watch/history" -> json("""{"historyVersion":1,"page":1,"hasMore":false,"items":[{"mediaVersionId":"history-$who","positionMs":1000,"durationMs":10000,"completed":false,"streamReady":false,"media":{"id":"media-$who","tmdbId":77,"kind":"movie","title":"private history $who"}}]}""")
+                "/v1/library/viewing-stats" -> json("{}").setResponseCode(503)
+                else -> json("""{"items":[],"results":[],"nextCursor":null}""")
+            }
+        }
+        compose.setContent { FilmiqooTheme { FilmiqooApp() } }
+        compose.waitUntil(10_000){backend.viewerProfiles.activeId()=="viewer-identity-A" && compose.onAllNodesWithTag("navigation-3").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-3").performClick()
+        compose.waitUntil(10_000){compose.onAllNodesWithText("account identity-A").fetchSemanticsNodes().isNotEmpty()}
+        scrollLazyTo("profile-scroll","profile-hub-tabs");compose.onNodeWithTag("profile-hub-tab-1").performClick()
+        scrollLazyTo("profile-scroll","profile-history-remove-history-identity-A")
+        compose.onNodeWithTag("profile-history-remove-history-identity-A").performClick()
+        compose.onNodeWithTag("profile-history-confirm").assertExists()
+        val aProfileLoads=requests.count{it.requestUrl?.encodedPath=="/v1/viewer-profiles" && requestIdentity(it)=="identity-A"}
+        compose.runOnUiThread { backend.session.accessToken=identityToken("identity-A","rotated");backend.session.refreshToken="identity-refresh-A-rotated" }
+        compose.waitForIdle()
+        assertTrue(backend.session.isLoggedIn);assertEquals("viewer-identity-A",backend.viewerProfiles.activeId())
+        compose.onNodeWithTag("navigation-3").assertIsSelected();compose.onNodeWithTag("profile-hub-tab-1").assertIsSelected()
+        compose.onNodeWithTag("profile-history-confirm").assertExists()
+        assertEquals(aProfileLoads,requests.count{it.requestUrl?.encodedPath=="/v1/viewer-profiles" && requestIdentity(it)=="identity-A"})
+        compose.runOnUiThread { backend.session.accessToken=identityToken("identity-B","first");backend.session.refreshToken="identity-refresh-B" }
+        compose.waitUntil(10_000){backend.viewerProfiles.activeId()=="viewer-identity-B" && compose.onAllNodesWithTag("navigation-0").fetchSemanticsNodes().isNotEmpty()}
+        assertTrue(backend.session.isLoggedIn);compose.onNodeWithTag("navigation-0").assertIsSelected()
+        compose.onNodeWithTag("profile-history-confirm").assertDoesNotExist();compose.onNodeWithText("account identity-A").assertDoesNotExist()
+        compose.onNodeWithTag("navigation-3").performClick()
+        compose.waitUntil(10_000){compose.onAllNodesWithText("account identity-B").fetchSemanticsNodes().isNotEmpty()}
+        scrollLazyTo("profile-scroll","profile-hub-tabs");compose.onNodeWithTag("profile-hub-tab-1").performClick()
+        scrollLazyTo("profile-scroll","profile-history-history-identity-B")
+        compose.onNodeWithTag("profile-history-history-identity-B").assertIsDisplayed()
+        compose.onNodeWithTag("profile-history-history-identity-A").assertDoesNotExist()
+        assertTrue(requests.any{it.requestUrl?.encodedPath=="/v1/watch/history" && requestIdentity(it)=="identity-B" && it.getHeader("X-Filmiqoo-Viewer-Profile")=="viewer-identity-B"})
+        assertFalse(requests.any{it.method=="DELETE" || it.requestUrl?.encodedPath?.endsWith("/remove")==true})
+    }
+
+    @Test fun actualDetailPreservesRefreshDraftButClearsDraftAndSavedStateForReplacementAccount(){
+        val backend=backend(true)
+        originalViewer=backend.viewerProfiles.active();restoreViewer=true;backend.viewerProfiles.clear()
+        backend.session.accessToken=identityToken("detail-A","first");backend.session.refreshToken="detail-refresh-A"
+        val media=MediaItem(77,MediaType.MOVIE,"identity fixture","identity fixture",backendId="identity-title")
+        dispatch { r -> when(r.requestUrl!!.encodedPath){
+            "/v1/catalog/identity-title" -> json("""{"id":"identity-title","tmdbId":77,"kind":"movie","title":"identity fixture","originalTitle":"identity fixture","versions":[],"seasons":[]}""")
+            "/v1/tmdb" -> json("""{"id":77,"title":"identity fixture","original_title":"identity fixture","original_language":"en","runtime":90,"genres":[],"production_countries":[{"iso_3166_1":"US"}],"credits":{"cast":[],"crew":[]},"videos":{"results":[]},"recommendations":{"results":[]},"similar":{"results":[]}}""")
+            "/v1/library/watchlist" -> if(requestIdentity(r)=="detail-A")json("""{"items":[{"id":"identity-title","tmdbId":77,"kind":"movie","title":"identity fixture"}]}""")else json("""{"items":[]}""")
+            else -> json("""{"items":[],"results":[]}""")
+        }}
+        var callerRevision by androidx.compose.runtime.mutableIntStateOf(0)
+        compose.setContent { FilmiqooTheme {
+            val revision=callerRevision
+            CinemaDetailScreen(media,TmdbRepository(compose.activity),backend,LocalStore(compose.activity),
+                onBack={check(revision>=0)},onMedia={},onChat={},onWatchParty={},onClip={},onPlay={},onPerson={},onRequireAuth={error("already authenticated")})
+        }}
+        fun readyDetail(){compose.waitUntil(10_000){compose.onAllNodesWithTag("detail-scroll").fetchSemanticsNodes().isNotEmpty()};compose.waitForIdle()}
+        fun openNotes(){
+            compose.waitUntil(10_000){try{compose.onNodeWithTag("detail-scroll").performScrollToNode(hasText("افزودن یادداشت خصوصی"));true}catch(_:AssertionError){false}}
+            compose.onNodeWithText("افزودن یادداشت خصوصی").assertIsDisplayed().performClick()
+        }
+        readyDetail();compose.onNodeWithTag("detail-scroll").performScrollToIndex(1)
+        compose.waitUntil(10_000){compose.onAllNodesWithText("✓ در فهرست من").fetchSemanticsNodes().isNotEmpty()}
+        openNotes()
+        val editor=hasSetTextAction() and hasAnyAncestor(isDialog())
+        compose.onNode(editor).performTextInput("unsaved secret for detail A")
+        compose.runOnUiThread{backend.session.accessToken=identityToken("detail-A","rotated");backend.session.refreshToken="detail-refresh-A-rotated";callerRevision++}
+        compose.waitForIdle();assertTrue(backend.session.isLoggedIn)
+        compose.onNodeWithText("یادداشت خصوصی من").assertExists()
+        compose.onNode(editor).assertTextContains("unsaved secret for detail A")
+        compose.runOnUiThread{backend.session.accessToken=identityToken("detail-B","first");backend.session.refreshToken="detail-refresh-B";callerRevision++}
+        compose.waitForIdle();assertTrue(backend.session.isLoggedIn)
+        compose.onNodeWithText("یادداشت خصوصی من").assertDoesNotExist()
+        compose.onNodeWithText("unsaved secret for detail A").assertDoesNotExist()
+        readyDetail();compose.onNodeWithTag("detail-scroll").performScrollToIndex(1)
+        compose.waitUntil(10_000){requests.any{it.requestUrl?.encodedPath=="/v1/library/watchlist" && requestIdentity(it)=="detail-B"}}
+        compose.onNodeWithText("✓ در فهرست من").assertDoesNotExist();compose.onNodeWithText("+ فهرست من").assertExists()
+        openNotes();assertEquals("",compose.onNode(editor).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text)
+        assertFalse(requests.any{it.method=="POST" && it.requestUrl?.encodedPath?.contains("/library/")==true})
+    }
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private val server=MockWebServer()
     private var original:Triple<String,String?,String?>?=null

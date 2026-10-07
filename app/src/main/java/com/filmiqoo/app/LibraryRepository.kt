@@ -1,6 +1,7 @@
 package com.filmiqoo.app
 
 import org.json.JSONObject
+import kotlinx.coroutines.ensureActive
 
 data class MediaCollection(
     val id: String,
@@ -20,11 +21,42 @@ data class MediaCollectionDetail(
 class LibraryRepository(
     private val backend: BackendRepository
 ) {
-    suspend fun favorites(): List<MediaItem> =
-        parseMediaList(backend.getJson("/v1/library/favorites",authorized=true))
+    var watchlistLimited:Boolean=false;private set
+    var favoritesLimited:Boolean=false;private set
+    suspend fun favorites():List<MediaItem> = completeMediaList("/v1/library/favorites",true)
+    suspend fun watchlist():List<MediaItem> = completeMediaList("/v1/library/watchlist",false)
 
-    suspend fun watchlist(): List<MediaItem> =
-        parseMediaList(backend.getJson("/v1/library/watchlist",authorized=true))
+    private suspend fun completeMediaList(path:String,favorite:Boolean):List<MediaItem> {
+        val account=backend.session.localAccountScope;val viewer=backend.viewerProfiles.activeId()
+        val maturity=backend.viewerProfiles.active()?.maturityLevel
+        fun limited(value:Boolean){if(favorite)favoritesLimited=value else watchlistLimited=value}
+        fun ensureScope(){
+            if(account!=backend.session.localAccountScope||viewer!=backend.viewerProfiles.activeId()||maturity!=backend.viewerProfiles.active()?.maturityLevel)
+                throw kotlinx.coroutines.CancellationException("library account/profile scope changed")
+        }
+        val items=LinkedHashMap<String,MediaItem>();val sourceKeys=HashSet<String>();limited(false)
+        for(page in 1..500){
+            kotlinx.coroutines.currentCoroutineContext().ensureActive();ensureScope()
+            val root=backend.getJson(path+"?page="+page,authorized=true)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive();ensureScope()
+            val array=root.optJSONArray("items") ?: error("پاسخ فهرست کامل نیست؛ دوباره تلاش کن.")
+            if(root.optInt("libraryVersion")<1){
+                check(page==1){"دریافت کامل فهرست به نسخهٔ جدید سرور نیاز دارد."}
+                limited(true);return parseMediaList(root)
+            }
+            check(root.optInt("page")==page){"صفحهٔ بعدی فهرست معتبر نیست؛ دوباره تلاش کن."}
+            val more=root.opt("hasMore") as? Boolean ?: error("وضعیت ادامهٔ فهرست دریافت نشد.")
+            val parsed=buildList{for(i in 0 until array.length()){
+                val row=array.optJSONObject(i) ?: error("بخشی از اطلاعات فهرست معتبر نیست؛ دوباره تلاش کن.")
+                add(parseDiscoveryTitle(row,null,true)?.media ?: error("بخشی از اطلاعات فهرست معتبر نیست؛ دوباره تلاش کن."))
+            }};val before=sourceKeys.size
+            parsed.forEach{sourceKeys.add(it.key)}
+            parsed.forEach{items[cinemaMediaKey(it)]=it}
+            if(!more)return items.values.toList()
+            check(array.length()>0&&parsed.isNotEmpty()&&sourceKeys.size>before){"صفحهٔ بعدی فهرست معتبر نیست؛ دوباره تلاش کن."}
+        }
+        error("فهرست از سقف دریافت یک‌باره بزرگ‌تر است؛ تمام موارد دریافت نشده‌اند.")
+    }
 
     suspend fun toggleWatchlist(mediaId:String): Boolean =
         backend.postJson(

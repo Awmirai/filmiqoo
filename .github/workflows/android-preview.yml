@@ -100,7 +100,7 @@ jobs:
           script: |
             bash scripts/prepare-test-device.sh
             bash scripts/generate-player-test-fixture.sh
-            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.filmiqoo.app.ProductAuditTest --stacktrace
+            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.filmiqoo.app.ProductAuditTest,com.filmiqoo.app.ProductAudit090Test --stacktrace
       - name: Upload device test results and screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -66,6 +66,7 @@ fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, 
     var playableOnly by rememberSaveable{mutableStateOf(false)};var orderName by rememberSaveable{mutableStateOf(CinematicSearchOrder.RELEVANCE.name)}
     var facets by rememberSaveable(stateSaver=SearchFacetsSaver) { mutableStateOf(CinematicSearchFacets()) }
     var showFilters by rememberSaveable{mutableStateOf(false)}
+    val filterSheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
     var browseCountry by rememberSaveable{mutableStateOf("")};var browseGenre by rememberSaveable{mutableIntStateOf(0)}
     var browseSeries by rememberSaveable{mutableStateOf(false)};var browseTitle by rememberSaveable{mutableStateOf("")}
     val order=CinematicSearchOrder.entries.firstOrNull{it.name==orderName}?:CinematicSearchOrder.RELEVANCE
@@ -204,7 +205,7 @@ fun PremiumSearchScreen(repository: TmdbRepository, backend: BackendRepository, 
             }
         }
     }}
-    if(showFilters)ModalBottomSheet(onDismissRequest={showFilters=false},containerColor=CinemaSurface,contentColor=CinemaPaper){
+    if(showFilters)ModalBottomSheet(onDismissRequest={showFilters=false},sheetState=filterSheetState,containerColor=CinemaSurface,contentColor=CinemaPaper){
         SearchResultOptions(order,playableOnly,{orderName=it.name},{playableOnly=it},::resetFilters,{showFilters=false},facets,
             (movieGenres+seriesGenres).distinctBy{it.id}.filter{genre->(merged+starters).any{genre.id in it.genreIds}},
             (merged+starters).map{it.originalLanguage}.filter(String::isNotBlank).distinct().sorted()){facets=it}
@@ -280,7 +281,7 @@ private fun SearchHistory(history: List<String>, onQuery: (String) -> Unit, onCl
 private fun SearchResultOptions(order:CinematicSearchOrder,playableOnly:Boolean,onOrder:(CinematicSearchOrder)->Unit,onPlayable:(Boolean)->Unit,onReset:()->Unit,onDone:()->Unit,
     facets:CinematicSearchFacets,genres:List<DiscoveryGenre>,languages:List<String>,onFacets:(CinematicSearchFacets)->Unit){
     val large=LocalConfiguration.current.fontScale>=1.6f
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).navigationBarsPadding().testTag("search-options-sheet")){
+    Column(Modifier.fillMaxWidth().testTag("search-options-sheet").verticalScroll(rememberScrollState()).padding(horizontal=20.dp).navigationBarsPadding()){
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("تنظیم نتیجه‌ها",fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));IconButton(onDone){Icon(Icons.Outlined.Close,"بستن تنظیم نتیجه‌ها")}}
         Text("فیلترها فقط عنوان‌های دریافت‌شده را بررسی می‌کنند؛ اطلاعات نامشخص با فیلتر فعال تطبیق داده نمی‌شود. هنرمندان جدا هستند.",color=CinemaSoft,fontSize=12.sp,lineHeight=21.sp,modifier=Modifier.padding(vertical=8.dp))
         Column(Modifier.selectableGroup()){CinematicSearchOrder.entries.forEach{choice->Row(Modifier.fillMaxWidth().heightIn(min=56.dp).selectable(order==choice,role=Role.RadioButton,onClick={onOrder(choice)}).testTag("search-order-"+choice.name),verticalAlignment=Alignment.CenterVertically){RadioButton(order==choice,onClick=null);Text(choice.label,Modifier.padding(start=10.dp),fontSize=14.sp)}}}

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -80,6 +81,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
     ) { }
 
     var authenticated by remember { mutableStateOf(backend.session.isLoggedIn) }
+    var observedAccountScope by remember { mutableStateOf(backend.session.localAccountScope) }
     var previewMode by remember { mutableStateOf(false) }
     var configuredPreview by remember { mutableStateOf(repository.hasApiKey()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -115,8 +117,12 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         )
         val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,key ->
             if(key=="access_token" || key=="refresh_token") {
-                if(authenticated && !backend.session.isLoggedIn) resetNavigation()
-                authenticated=backend.session.isLoggedIn
+                val nextLogged=backend.session.isLoggedIn
+                val nextScope=backend.session.localAccountScope
+                if(observedAccountScope!=nextScope || authenticated && !nextLogged) {
+                    resetNavigation();viewerStore.clear();activeViewer=null;viewerReady=!nextLogged
+                }
+                observedAccountScope=nextScope;authenticated=nextLogged
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -134,7 +140,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         )
     }
 
-    LaunchedEffect(authenticated) {
+    LaunchedEffect(authenticated,observedAccountScope) {
         if(authenticated && FilmiqooPush.initialize(context.applicationContext)) {
             runCatching {
                 FilmiqooPush.registerIfPossible(
@@ -151,13 +157,16 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
         }
 
 
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
         if(!authenticated) {
             activeViewer=null
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             viewerReady=true
         } else {
             viewerReady=false
             runCatching { viewerProfilesRepository.list() }
                 .onSuccess { profiles->
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     val currentId=viewerStore.activeId()
                     val resolved=profiles.firstOrNull { it.id==currentId }
                         ?: profiles.firstOrNull()
@@ -172,6 +181,7 @@ fun FilmiqooApp(initialDeepLink:String?=null) {
                         }
                     }
                 }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             viewerReady=true
         }
     }

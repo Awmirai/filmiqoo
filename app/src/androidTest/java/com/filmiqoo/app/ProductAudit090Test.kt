@@ -63,7 +63,7 @@ class ProductAudit090Test {
   val pages=listOf("movies","series","search-default","search-results","profile","world-registry","tr-movie","tr-tv","kr-movie","kr-tv","movie-detail","series-episodes")
   for(name in pages){select(name);when(name){
    "movies"->ready("movies-discovery-hero");"series"->ready("series-discovery-hero");"search-default"->ready("search-poster-atmosphere")
-   "search-results"->{ready("search-input");compose.onNodeWithTag("search-input").performTextInput("cinema");compose.waitUntil(12_000){fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/search")==true}};compose.waitUntil(12_000){!present("search-loading")&&present("poster-"+cinemaMediaKey(movie))}}
+   "search-results"->{ready("search-input");compose.onNodeWithTag("search-input").performTextInput("cinema");if(!label.endsWith("keyboard"))hideIme();compose.waitUntil(12_000){fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/search")==true}};compose.waitUntil(12_000){!present("search-loading")&&present("poster-"+cinemaMediaKey(movie))}}
    "profile"->{ready("cinema-profile-hub");compose.waitUntil(12_000){compose.onAllNodesWithText("حساب آزمایشی سینما",substring=true).fetchSemanticsNodes().isNotEmpty()};ready("profile-stats-ready")}
    "world-registry"->{ready("world-country-TR");compose.onNodeWithText("همهٔ کشورها").performScrollTo().performClick();ready("world-country-picker");ready("world-registry-ZA")}
    "movie-detail","series-episodes"->{ready("detail-scroll");if(name=="series-episodes")compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-qa-episode-1"))}

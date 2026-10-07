@@ -58,6 +58,8 @@ fun ConnectedProfileScreen(
     var continuing by remember(activeProfile,accountScope){mutableStateOf<List<ContinueWatchingItem>>(emptyList())}
     var cloudSaved by remember(activeProfile,accountScope){mutableStateOf<List<MediaItem>>(emptyList())}
     var cloudFavorites by remember(activeProfile,accountScope){mutableStateOf<List<MediaItem>>(emptyList())}
+    var savedLimited by remember(activeProfile,accountScope){mutableStateOf(false)}
+    var favoriteLimited by remember(activeProfile,accountScope){mutableStateOf(false)}
     var history by remember(activeProfile,accountScope){mutableStateOf<List<WatchHistoryItem>>(emptyList())}
     var historyPage by remember(activeProfile,accountScope){mutableIntStateOf(1)};var historyHasMore by remember(activeProfile,accountScope){mutableStateOf(false)}
     var loading by remember(activeProfile,accountScope){mutableStateOf(loggedIn)};var historyLoading by remember(activeProfile,accountScope){mutableStateOf(false)}
@@ -80,8 +82,8 @@ fun ConnectedProfileScreen(
             launch{try{account=backend.me()}catch(e:CancellationException){throw e}catch(_:Exception){accountError=true}}
             launch{try{stats=statsRepository.load()}catch(e:CancellationException){throw e}catch(_:Exception){statsError=true}}
             launch{try{continuing=backend.continueWatching()}catch(e:CancellationException){throw e}catch(_:Exception){continueError=true}}
-            launch{try{cloudSaved=library.watchlist()}catch(e:CancellationException){throw e}catch(_:Exception){savedError=true}}
-            launch{try{cloudFavorites=library.favorites()}catch(e:CancellationException){throw e}catch(_:Exception){favoriteError=true}}
+            launch{try{cloudSaved=library.watchlist();savedLimited=library.watchlistLimited}catch(e:CancellationException){throw e}catch(_:Exception){savedError=true}}
+            launch{try{cloudFavorites=library.favorites();favoriteLimited=library.favoritesLimited}catch(e:CancellationException){throw e}catch(_:Exception){favoriteError=true}}
         };loading=false
     }
     LaunchedEffect(loggedIn,activeProfile,accountScope,historyPage,historyRetry,refresh){
@@ -176,6 +178,9 @@ fun ConnectedProfileScreen(
                 if(historyHasMore)item("history-more"){OutlinedButton({historyPage++},enabled=!historyLoading&&!historyError,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("profile-history-more")){Text("تاریخچهٔ بیشتر")}}
             }
             if(tab==3){
+                if((listTab==0&&savedLimited)||(listTab==1&&favoriteLimited))item("limited-library"){
+                    CinemaNotice("همهٔ فهرست دریافت نشده","بخش اول فهرست در دسترس است. دریافت همهٔ موارد به نسخهٔ جدید سرویس نیاز دارد.",Icons.Outlined.Info)
+                }
                 item("list-tabs"){Column{
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("برای تماشا","علاقه‌مندی‌ها","امتیازها").forEachIndexed{index,label->item(key=index){FilterChip(listTab==index,{listTab=index},label={Text(label)},modifier=Modifier.heightIn(min=48.dp).testTag("profile-list-tab-"+index))}}}
                     CinemaHubTypeFilter(typeFilter,{typeFilter=it},false)
