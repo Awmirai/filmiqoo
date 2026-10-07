@@ -38,20 +38,28 @@ class ProductJourneyTest {
     }
     @Test fun searchNormalizesRequestAndLateResponseCannotReplaceLatest(){
         val backend=backend();val queries=CopyOnWriteArrayList<String>()
+        val releaseOld=java.util.concurrent.CountDownLatch(1);val oldReturning=java.util.concurrent.CountDownLatch(1)
         server.dispatcher=object:Dispatcher(){override fun dispatch(r:RecordedRequest):MockResponse{
+            if(r.requestUrl?.encodedPath!="/v1/search")return MockResponse().setBody("""{"page":1,"total_pages":1,"results":[],"genres":[]}""")
             val q=r.requestUrl?.queryParameter("q").orEmpty();queries+=q
-            if(q=="قدیمی")Thread.sleep(900)
+            if(q=="قدیمی"){check(releaseOld.await(20,java.util.concurrent.TimeUnit.SECONDS));oldReturning.countDown()}
             return MockResponse().setHeader("Content-Type","application/json").setBody("""{"media":[{"id":"id-$q","tmdbId":77,"kind":"movie","title":"نتیجه $q"}]}""")
         }}
         compose.setContent{FilmiqooTheme{PremiumSearchScreen(TmdbRepository(compose.activity),backend,{},{},{},{},{})}}
-        compose.onNodeWithTag("search-input").performTextInput("قدیمی")
-        compose.waitUntil(5000){queries.contains("قدیمی")}
-        compose.onNodeWithTag("search-input").performTextReplacement("كيان‌علي")
-        compose.waitUntil(10000){compose.onAllNodesWithText("نتیجه کیان علی").fetchSemanticsNodes().isNotEmpty()}
-        Thread.sleep(1200);compose.waitForIdle()
-        compose.onNodeWithText("نتیجه قدیمی").assertDoesNotExist()
-        compose.onNodeWithTag("search-input").assertTextContains("كيان‌علي")
-        assertTrue(queries.contains("کیان علی"))
+        try{
+            compose.onNodeWithTag("search-input").performTextInput("قدیمی")
+            compose.waitUntil(5000){queries.contains("قدیمی")}
+            compose.onNodeWithTag("search-input").performTextReplacement("كيان‌علي")
+            compose.onNodeWithTag("search-input").performImeAction()
+            compose.waitUntil(10000){queries.contains("کیان علی")&&compose.onAllNodesWithTag("search-loading").fetchSemanticsNodes().isEmpty()}
+            compose.onNodeWithTag("search-results").performScrollToNode(hasText("نتیجه کیان علی"))
+            compose.onNodeWithText("نتیجه کیان علی").assertIsDisplayed()
+            releaseOld.countDown();compose.waitUntil(5000){oldReturning.count==0L}
+            Thread.sleep(1200);compose.waitForIdle()
+            compose.onNodeWithText("نتیجه قدیمی").assertDoesNotExist();compose.onNodeWithText("نتیجه کیان علی").assertIsDisplayed()
+            compose.onNodeWithTag("search-input").assertTextContains("كيان‌علي")
+            assertTrue(queries.contains("کیان علی"))
+        }finally{releaseOld.countDown()}
     }
     @Test fun failedCommentKeepsDraftAndRetryIdentity(){
         val backend=backend(true);val sent=CopyOnWriteArrayList<JSONObject>()
