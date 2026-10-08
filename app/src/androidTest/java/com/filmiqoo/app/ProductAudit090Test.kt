@@ -64,7 +64,16 @@ class ProductAudit090Test {
   val pages=listOf("movies","series","search-default","search-results","profile","world-registry","tr-movie","tr-tv","kr-movie","kr-tv","movie-detail","series-episodes")
   for(name in pages){select(name);when(name){
    "movies"->ready("movies-discovery-hero");"series"->ready("series-discovery-hero");"search-default"->ready("search-poster-atmosphere")
-   "search-results"->{ready("search-input");compose.onNodeWithTag("search-input").performTextInput("cinema");if(!label.endsWith("keyboard"))hideIme();compose.waitUntil(12_000){fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/search")==true&&it.requestUrl?.queryParameter("q")=="cinema"}};compose.waitUntil(12_000){!present("search-loading")};phase("search-results:scroll-target");val target="poster-"+cinemaMediaKey(movie);assertSearchTarget(target)}
+   "search-results"->{
+    ready("search-input");compose.onNodeWithTag("search-input").performTextInput("cinema")
+    compose.waitUntil(12_000){fixture.requests.any{it.requestUrl?.encodedPath?.endsWith("/v1/search")==true&&it.requestUrl?.queryParameter("q")=="cinema"}}
+    compose.waitUntil(12_000){!present("search-loading")}
+    // A cold landscape IME can complete its queued show after an early hide has
+    // reported the previous hidden insets. Observe that native transition first.
+    if(compose.activity.resources.configuration.screenHeightDp<480){phase("search-results:await-native-ime-shown");compose.waitUntil(8_000){val ime=imeState();ime.first&&ime.second>0}}
+    if(!label.endsWith("keyboard"))hideIme()
+    completeNativeFrame();phase("search-results:scroll-target");val target="poster-"+cinemaMediaKey(movie);assertSearchTarget(target)
+   }
    "profile"->{ready("cinema-profile-hub");compose.waitUntil(12_000){compose.onAllNodesWithText("حساب آزمایشی سینما",substring=true).fetchSemanticsNodes().isNotEmpty()};ready("profile-stats-ready")}
    "world-registry"->{ready("world-country-TR");compose.onNodeWithText("همهٔ کشورها").performScrollTo().performClick();ready("world-country-picker");ready("world-registry-ZA")}
    "movie-detail","series-episodes"->{ready("detail-scroll");if(name=="series-episodes")compose.onNodeWithTag("detail-scroll").performScrollToNode(hasTestTag("episode-qa-episode-1"))}
@@ -86,7 +95,10 @@ class ProductAudit090Test {
   PlatformTestStorageRegistry.getInstance().openOutputFile("audit-090-$label-metrics.json").use{it.write(observations.toString(2).toByteArray(Charsets.UTF_8))}
  }
  private fun assertSearchTarget(target:String){
-  try{compose.onNodeWithTag("search-results").performScrollToNode(hasTestTag(target));compose.onNodeWithTag(target).assertIsDisplayed()}
+  try{
+   compose.waitUntil(5_000){val ime=imeState();val grid=compose.onNodeWithTag("search-results").fetchSemanticsNode().boundsInRoot;grid.height>0f&&(label.endsWith("keyboard")||(!ime.first&&ime.second==0))}
+   compose.onNodeWithTag("search-results").performScrollToNode(hasTestTag(target));completeNativeFrame();compose.onNodeWithTag(target).assertIsDisplayed()
+  }
   catch(failure:Throwable){runCatching{android.util.Log.e("FilmiqooProductAudit","search grid="+compose.onNodeWithTag("search-results").fetchSemanticsNode().boundsInRoot+" target="+compose.onNodeWithTag(target).fetchSemanticsNode().boundsInRoot+" ime="+imeState());capture("search-results-failure")};throw failure}
  }
  private fun imeState():Pair<Boolean,Int>{var value=false to 0;compose.runOnUiThread{val i=ViewCompat.getRootWindowInsets(compose.activity.window.decorView);val t=WindowInsetsCompat.Type.ime();value=(i?.isVisible(t)==true)to(i?.getInsets(t)?.bottom?:0)};return value}

@@ -130,7 +130,37 @@ class CommunityProfileJourneyTest {
             }
         }catch(failure:ComposeTimeoutException){throw AssertionError("Could not scroll $container to $tag",lastFailure?:failure)}
     }
-    private fun scrollCommunityTo(tag:String)=scrollLazyTo("community-scroll",tag)
+    private fun scrollCommunityTo(tag:String) {
+        val key=when {
+            tag.startsWith("community-post-")->"post-"+tag.removePrefix("community-post-")
+            tag.startsWith("community-remove-")->"post-"+tag.removePrefix("community-remove-")
+            tag.startsWith("community-clip-")->"clip-"+tag.removePrefix("community-clip-")
+            tag.startsWith("community-tab-")->"modes"
+            tag=="community-watch-together"->"party"
+            tag=="community-new-posts"->"new-posts"
+            else->error("Unknown community lazy key for $tag")
+        }
+        var lastFailure:AssertionError?=null
+        try {
+            compose.waitUntil(10_000) {
+                try {
+                    compose.onNodeWithTag("community-scroll").performScrollToKey(key)
+                    compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size==1
+                } catch(failure:AssertionError) { lastFailure=failure;false }
+            }
+        } catch(failure:ComposeTimeoutException) {
+            throw AssertionError("Could not scroll community key $key to $tag",lastFailure?:failure)
+        }
+        compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+    }
+    private fun clickNewPostsBanner() {
+        scrollCommunityTo("community-new-posts")
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("community-new-posts") and isEnabled()).fetchSemanticsNodes().size==1
+        }
+        compose.onNodeWithTag("community-new-posts")
+            .performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+    }
     private fun post(id:String="post",author:String="owner",spoiler:Boolean=false)=
         """{"id":"$id","type":"review","body":"پایان پنهان فیلم","spoiler":$spoiler,"likes":4,"comments":0,"author":{"id":"$author","displayName":"سینمادوست","username":"fan"},"media":{"id":"catalog","title":"فیلم آزمون","kind":"movie","tmdbId":77}}"""
     private fun community(backend:BackendRepository,logged:Boolean,onAuth:()->Unit={},onClip:(String)->Unit={},onParty:()->Unit={},refreshInterval:Long=45_000L) {
@@ -318,14 +348,14 @@ class CommunityProfileJourneyTest {
         // Polling announces unseen IDs; it never injects a post while someone is reading.
         compose.onNodeWithTag("community-post-new").assertDoesNotExist()
         stage.set(2)
-        compose.onNodeWithTag("community-new-posts").performClick()
+        clickNewPostsBanner()
         compose.waitUntil(10000){compose.onAllNodesWithText("اتصال کامل نشد").fetchSemanticsNodes().isNotEmpty()}
         scrollCommunityTo("community-post-old")
         compose.onNodeWithTag("community-post-old").assertExists()
         compose.onNodeWithTag("community-post-new").assertDoesNotExist()
         stage.set(3)
         scrollCommunityTo("community-new-posts")
-        compose.onNodeWithTag("community-new-posts").performClick()
+        clickNewPostsBanner()
         scrollCommunityTo("community-post-new")
         compose.onNodeWithTag("community-post-new").assertExists()
         scrollCommunityTo("community-post-old")
