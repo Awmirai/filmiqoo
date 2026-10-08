@@ -144,8 +144,13 @@ class CommunityProfileJourneyTest {
         try {
             compose.waitUntil(10_000) {
                 try {
-                    compose.onNodeWithTag("community-scroll").performScrollToKey(key)
-                    compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size==1
+                    val list=compose.onNodeWithTag("community-scroll")
+                    val node=list.fetchSemanticsNode();var hasKey=false
+                    compose.runOnUiThread { hasKey=node.config[androidx.compose.ui.semantics.SemanticsProperties.IndexForKey](key)>=0 }
+                    if(!hasKey)false else {
+                        list.performScrollToKey(key)
+                        compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size==1
+                    }
                 } catch(failure:AssertionError) { lastFailure=failure;false }
             }
         } catch(failure:ComposeTimeoutException) {
