@@ -505,8 +505,9 @@ internal fun FilmiqooCastRouteButton(
     AndroidView(
         factory={ctx->
             FrameLayout(ctx).apply {
-                val button=androidx.mediarouter.app.MediaRouteButton(ctx)
                 val child=runCatching {
+                    // Constructor/theme failures must not bring down local video playback.
+                    val button=androidx.mediarouter.app.MediaRouteButton(ctx)
                     CastButtonFactory.setUpMediaRouteButton(ctx,button)
                     button
                 }.getOrElse {

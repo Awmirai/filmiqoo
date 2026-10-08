@@ -16,12 +16,13 @@ fi
 
 SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
 SHORT_SHA="${SHA:0:12}"
-IMAGE="filmiqoo-api:${SHORT_SHA}"
+GEO_MONTH="$(date -u +%Y-%m)"
+IMAGE="filmiqoo-api:${SHORT_SHA}-geo-${GEO_MONTH}"
 VERSION="live-${SHORT_SHA}"
 
 read_env() {
   local key="$1"
-  grep -E "^${key}=" "$ENV_FILE" | tail -n1 | cut -d= -f2-
+  awk -v key="$key" 'index($0,key"=")==1 { value=substr($0,length(key)+2) } END { print value }' "$ENV_FILE"
 }
 
 write_env() {
@@ -38,21 +39,32 @@ OLD_VERSION="$(read_env FILMIQOO_VERSION)"
 OLD_COMMIT="$(read_env FILMIQOO_COMMIT)"
 DOMAIN="$(read_env FILMIQOO_DOMAIN)"
 
+# Share a private edge assertion between Caddy and the API. Never print it.
+EDGE_SECRET="$(read_env GEO_PROXY_HEADER_SECRET)"
+if [[ ${#EDGE_SECRET} -lt 32 ]]; then
+  umask 077
+  write_env GEO_PROXY_HEADER_SECRET "$(openssl rand -hex 32)"
+fi
+chmod 600 "$ENV_FILE"
+
 echo "Building $IMAGE from $SHA..."
-docker build -t "$IMAGE" "$REPO_DIR/backend"
+docker build --build-arg GEO_DATA_MONTH="$GEO_MONTH" -t "$IMAGE" "$REPO_DIR/backend"
+
+cd "$DEPLOY_DIR"
+docker compose --env-file .env.production run --rm --no-deps caddy \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 write_env FILMIQOO_API_IMAGE "$IMAGE"
 write_env FILMIQOO_VERSION "$VERSION"
 write_env FILMIQOO_COMMIT "$SHA"
 chmod 600 "$ENV_FILE"
 
-cd "$DEPLOY_DIR"
-if ! docker compose --env-file .env.production up -d --no-build api; then
+if ! docker compose --env-file .env.production up -d --no-build api caddy; then
   echo "API deployment failed; restoring previous image."
   write_env FILMIQOO_API_IMAGE "$OLD_IMAGE"
   write_env FILMIQOO_VERSION "$OLD_VERSION"
   write_env FILMIQOO_COMMIT "$OLD_COMMIT"
-  docker compose --env-file .env.production up -d --no-build api || true
+  docker compose --env-file .env.production up -d --no-build api caddy || true
   exit 1
 fi
 
@@ -70,9 +82,10 @@ if [[ "$ready" -ne 1 ]]; then
   write_env FILMIQOO_API_IMAGE "$OLD_IMAGE"
   write_env FILMIQOO_VERSION "$OLD_VERSION"
   write_env FILMIQOO_COMMIT "$OLD_COMMIT"
-  docker compose --env-file .env.production up -d --no-build api || true
+  docker compose --env-file .env.production up -d --no-build api caddy || true
   exit 1
 fi
 
+write_env GEO_DATA_MONTH "$GEO_MONTH"
 docker compose --env-file .env.production ps api
 echo "Filmiqoo API deployed: $IMAGE"

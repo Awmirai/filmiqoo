@@ -116,6 +116,7 @@ object FilmiqooPush {
             "live" -> FilmiqooDeepLinks.liveEvent(entityId)
             "reel" -> "filmiqoo://reel/$entityId"
             "post" -> "filmiqoo://post/$entityId"
+            "title_comment" -> "filmiqoo://notifications"
             "user" -> "filmiqoo://creator/$entityId"
             "channel" -> "filmiqoo://channel/$entityId"
             "collection" -> "filmiqoo://collection/$entityId"

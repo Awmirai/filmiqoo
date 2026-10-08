@@ -10,6 +10,7 @@ deploy/production/backups/
 
 # Android / Gradle
 .gradle/
+.kotlin/
 build/
 **/build/
 local.properties
@@ -22,3 +23,4 @@ captures/
 *.iml
 .DS_Store
 Thumbs.db
+fsb.env

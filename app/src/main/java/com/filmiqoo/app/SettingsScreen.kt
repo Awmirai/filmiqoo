@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @Composable
 fun SettingsScreen(
@@ -36,14 +37,16 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         if(backend.session.isLoggedIn) {
-            runCatching { repo.load() }
-                .onSuccess { settings=it }
-                .onFailure { error=it.message }
+            try { settings=repo.load() }
+            catch(cancelled:CancellationException){throw cancelled}
+            catch(failure:Exception){error=failure.message}
         }
         loading=false
     }
 
     fun persist(next: AppSettings) {
+        if(loading || saving) return
+        val previous=settings
         settings=next
         if(!backend.session.isLoggedIn) {
             settings=repo.saveLocal(next)
@@ -51,10 +54,10 @@ fun SettingsScreen(
         }
         saving=true
         scope.launch {
-            runCatching { repo.save(next) }
-                .onSuccess { settings=it;error=null }
-                .onFailure { error=it.message }
-            saving=false
+            try { settings=repo.save(next);error=null }
+            catch(cancelled:CancellationException){throw cancelled}
+            catch(failure:Exception){settings=previous;error="ذخیره نشد؛ تنظیم قبلی حفظ شد. "+failure.message.orEmpty()}
+            finally{saving=false}
         }
     }
 

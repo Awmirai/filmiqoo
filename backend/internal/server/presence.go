@@ -77,7 +77,7 @@ func (s *Server) followingWatchActivity(w http.ResponseWriter,r *http.Request) {
 		       up.position_ms,up.updated_at,
 		       mt.id::text,mt.tmdb_id,mt.kind,mt.title,mt.original_title,mt.overview,
 		       mt.poster_url,mt.backdrop_url,mt.year,mt.rating,
-		       e.id::text,e.episode_number,e.title,
+		       e.id::text,e.episode_number,e.name,
 		       sn.season_number
 		  FROM user_follows uf
 		  JOIN profiles p ON p.user_id=uf.followed_user_id

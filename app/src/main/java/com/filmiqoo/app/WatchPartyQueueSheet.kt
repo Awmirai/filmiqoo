@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,10 +72,13 @@ fun WatchPartyQueueSheet(
         }
         delay(300)
         searching=true
-        runCatching { searchRepo.search(query.trim()).media }
-            .onSuccess { results=it.take(20) }
-            .onFailure { error=it.message }
-        searching=false
+        try {
+            val fresh=searchRepo.search(query.trim()).media
+            coroutineContext.ensureActive()
+            results=fresh.filter{it.type==MediaType.MOVIE && !it.backendId.isNullOrBlank()}.take(20)
+        } catch(cancelled:CancellationException){throw cancelled}
+        catch(failure:Exception){error=failure.message}
+        finally {searching=false}
     }
 
     ModalBottomSheet(
@@ -87,7 +93,7 @@ fun WatchPartyQueueSheet(
                     Text("بعدی‌ها",fontSize=21.sp,fontWeight=FontWeight.Black)
                     Text(
                         "پیشنهاد بده، رأی بده و با Host عنوان بعدی رو انتخاب کن.",
-                        color=FqMuted,fontSize=11.sp
+                        color=FqMuted,fontSize=16.sp
                     )
                 }
                 FilledTonalIconButton(onClick={showSearch=!showSearch}) {
@@ -102,7 +108,7 @@ fun WatchPartyQueueSheet(
                 OutlinedTextField(
                     value=query,
                     onValueChange={query=it},
-                    placeholder={Text("فیلم یا سریال برای Queue...")},
+                    placeholder={Text("فیلم بعدی برای صفِ تماشا…")},
                     leadingIcon={Icon(Icons.Default.Search,null)},
                     singleLine=true,
                     shape=RoundedCornerShape(16.dp),
@@ -125,7 +131,7 @@ fun WatchPartyQueueSheet(
                             Surface(
                                 color=FqSurface2,
                                 shape=RoundedCornerShape(14.dp),
-                                modifier=Modifier.fillMaxWidth().clickable {
+                                modifier=Modifier.fillMaxWidth().clickable(enabled=busyItem==null) {
                                     val mediaId=media.backendId
                                     if(mediaId.isNullOrBlank()) {
                                         error="این عنوان هنوز به Catalog واقعی Filmiqoo متصل نیست."
@@ -158,7 +164,7 @@ fun WatchPartyQueueSheet(
                                     Column(Modifier.weight(1f)) {
                                         Text(
                                             media.title,
-                                            fontSize=11.sp,
+                                            fontSize=16.sp,
                                             fontWeight=FontWeight.Bold,
                                             maxLines=1,
                                             overflow=TextOverflow.Ellipsis
@@ -168,7 +174,7 @@ fun WatchPartyQueueSheet(
                                                 media.year,
                                                 if(media.type==MediaType.MOVIE)"فیلم" else "سریال"
                                             ).filter(String::isNotBlank).joinToString(" • "),
-                                            color=FqMuted,fontSize=11.sp
+                                            color=FqMuted,fontSize=16.sp
                                         )
                                     }
                                     Icon(Icons.Default.AddCircle,null,tint=FqGold)
@@ -244,7 +250,7 @@ fun WatchPartyQueueSheet(
                 Text(
                     it,
                     color=FqDanger,
-                    fontSize=11.sp,
+                    fontSize=16.sp,
                     modifier=Modifier.fillMaxWidth().padding(top=9.dp)
                 )
             }
@@ -304,7 +310,7 @@ private fun WatchPartyQueueRow(
                 }
                 Text(
                     "پیشنهاد @"+item.suggestedBy.username,
-                    color=FqMuted,fontSize=11.sp,modifier=Modifier.padding(top=3.dp)
+                    color=FqMuted,fontSize=16.sp,modifier=Modifier.padding(top=3.dp)
                 )
                 Row(
                     Modifier.padding(top=7.dp),
@@ -322,7 +328,7 @@ private fun WatchPartyQueueRow(
                             modifier=Modifier.size(15.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(item.votes.toString(),fontSize=11.sp)
+                        Text(item.votes.toString(),fontSize=16.sp)
                     }
 
                     if(canHostControl && item.status=="queued") {
@@ -335,7 +341,7 @@ private fun WatchPartyQueueRow(
                         ) {
                             Icon(Icons.Default.PlayArrow,null,tint=Color.Black,modifier=Modifier.size(15.dp))
                             Spacer(Modifier.width(3.dp))
-                            Text("پخش بعدی",color=Color.Black,fontSize=11.sp)
+                            Text("پخش بعدی",color=Color.Black,fontSize=16.sp)
                         }
                     }
                 }

@@ -124,16 +124,17 @@ fun AuthScreen(
         )
 
         Column(
-            Modifier.fillMaxSize()
+            Modifier.align(Alignment.TopCenter).widthIn(max=520.dp).fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal=20.dp),
             horizontalAlignment=Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(42.dp))
+            Spacer(Modifier.height(24.dp))
 
-            FilmiqooBrandMark(size=68.dp)
+            FilmiqooBrandMark(size=48.dp)
 
             Text(
                 "FILMIQOO",

@@ -23,14 +23,22 @@ git fetch --quiet origin main
 LOCAL_SHA="$(git rev-parse HEAD)"
 REMOTE_SHA="$(git rev-parse origin/main)"
 
-if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
-  exit 0
-fi
-
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Refusing auto-update: repository worktree is not clean."
   git status --short
   exit 2
+fi
+
+if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
+  # Refresh the monthly country database even when the application has no new commits.
+  # A failed download leaves the running image intact; the existing timer retries.
+  GEO_MONTH="$(date -u +%Y-%m)"
+  DEPLOYED_GEO_MONTH="$(awk -F= '$1=="GEO_DATA_MONTH" { value=$2 } END { print value }' "$DEPLOY_DIR/.env.production")"
+  if [[ "$DEPLOYED_GEO_MONTH" != "$GEO_MONTH" ]]; then
+    echo "Refreshing Iran IP country data for $GEO_MONTH..."
+    bash "$DEPLOY_DIR/update-api.sh"
+  fi
+  exit 0
 fi
 
 if ! git merge-base --is-ancestor "$LOCAL_SHA" "$REMOTE_SHA"; then
@@ -85,11 +93,11 @@ PY
 BACKEND_SHA=""
 CONTRACT_SHA=""
 if [[ "$BACKEND_CHANGED" -eq 1 ]]; then
-  BACKEND_SHA="$(git rev-list -1 "$LOCAL_SHA..$REMOTE_SHA" -- backend)"
+  BACKEND_SHA="$REMOTE_SHA"
   check_workflow "$BACKEND_SHA" "Backend CI" || exit 0
 fi
 if [[ "$BACKEND_CHANGED" -eq 1 || "$PRODUCTION_CHANGED" -eq 1 ]]; then
-  CONTRACT_SHA="$(git rev-list -1 "$LOCAL_SHA..$REMOTE_SHA" -- backend deploy/production .github/workflows/production-release.yml .github/workflows/production-contract.yml)"
+  CONTRACT_SHA="$REMOTE_SHA"
   check_workflow "$CONTRACT_SHA" "Production Contract Checks" || exit 0
 fi
 

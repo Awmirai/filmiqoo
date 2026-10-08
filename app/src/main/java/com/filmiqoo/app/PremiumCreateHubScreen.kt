@@ -127,7 +127,8 @@ fun PremiumCreateHubScreen(
     onOpenClub:()->Unit,
     onOpenClips:()->Unit,
     onOpenStudio:()->Unit,
-    onBack:()->Unit
+    onBack:()->Unit,
+    initialKind:String?=null
 ) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -136,7 +137,7 @@ fun PremiumCreateHubScreen(
 
     var kind by remember {
         mutableStateOf(
-            runCatching { CreateKind.valueOf(savedDraft.kind) }
+            runCatching { CreateKind.valueOf(initialKind ?: savedDraft.kind) }
                 .getOrDefault(CreateKind.POST)
         )
     }

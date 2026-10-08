@@ -8,6 +8,8 @@ import java.io.File
 import java.time.Instant
 import java.time.Duration
 
+internal class CommunityServerUpgradeRequired(message:String):IllegalStateException(message)
+
 data class SocialAuthor(
     val id: String,
     val username: String,
@@ -343,22 +345,7 @@ class SocialRepository(
         val items=buildList {
             if(arr!=null) for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val mediaObj=x.optJSONObject("media")
-                val kind=mediaObj?.optString("kind").orEmpty()
-                val media=mediaObj?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else ReelMediaRef(
-                        backendId=backendId,
-                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title"),
-                        originalTitle=it.optString("originalTitle"),
-                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                        year=if(it.isNull("year")) null else it.optInt("year"),
-                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
-                    )
-                }
+                val media=parseOptionalReelMedia(x.optJSONObject("media"))
                 add(
                     ReelFeedItem(
                         id=x.optString("id"),
@@ -384,7 +371,7 @@ class SocialRepository(
         }
         return SocialPage(
             items=items,
-            nextCursor=root.optString("nextCursor").takeIf(String::isNotBlank)
+            nextCursor=root.optString("nextCursor").trim().takeUnless { it.isBlank() || it.equals("null",ignoreCase=true) }
         )
     }
 
@@ -403,22 +390,7 @@ class SocialRepository(
                 )
             }.getOrNull()
         } else null
-        val mediaObj=x.optJSONObject("media")
-        val kind=mediaObj?.optString("kind").orEmpty()
-        val media=mediaObj?.let {
-            val backendId=it.optString("id").takeIf(String::isNotBlank)
-            if(backendId==null) null else ReelMediaRef(
-                backendId=backendId,
-                tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                title=it.optString("title"),
-                originalTitle=it.optString("originalTitle"),
-                posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                year=if(it.isNull("year")) null else it.optInt("year"),
-                rating=if(it.isNull("rating")) null else it.optDouble("rating")
-            )
-        }
+        val media=parseOptionalReelMedia(x.optJSONObject("media"))
         return ReelFeedItem(
             id=x.optString("id"),
             caption=x.optString("caption"),
@@ -453,22 +425,7 @@ class SocialRepository(
         return buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val mediaObj=x.optJSONObject("media")
-                val kind=mediaObj?.optString("kind").orEmpty()
-                val media=mediaObj?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else ReelMediaRef(
-                        backendId=backendId,
-                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title"),
-                        originalTitle=it.optString("originalTitle"),
-                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                        year=if(it.isNull("year")) null else it.optInt("year"),
-                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
-                    )
-                }
+                val media=parseOptionalReelMedia(x.optJSONObject("media"))
                 add(
                     ReelFeedItem(
                         id=x.optString("id"),
@@ -535,12 +492,15 @@ class SocialRepository(
 
     suspend fun feedPage(
         cursor:String?=null,
-        limit:Int=30
+        limit:Int=30,
+        followingOnly:Boolean=false
     ):SocialPage<SocialPost> {
         val loggedIn=backend.session.isLoggedIn
+        require(!followingOnly || loggedIn) { "Following feed requires an account" }
         val query=buildString {
             append("?limit=")
             append(limit.coerceIn(1,50))
+            if(followingOnly) append("&scope=following")
             if(!cursor.isNullOrBlank()) {
                 append("&cursor=")
                 append(java.net.URLEncoder.encode(cursor,"UTF-8"))
@@ -550,6 +510,8 @@ class SocialRepository(
             (if(loggedIn)"/v1/social/feed/personalized" else "/v1/social/feed")+query,
             authorized=loggedIn
         )
+        if(followingOnly && root.optString("scope")!="following")
+            throw CommunityServerUpgradeRequired("نمایش فقط دنبال‌شده‌ها به ارتقای سرور نیاز دارد. فعلاً پست‌ها را در بخش کشف ببین.")
         val arr=root.optJSONArray("items")
         val items=buildList {
             if(arr!=null) for(i in 0 until arr.length()) {
@@ -575,7 +537,7 @@ class SocialRepository(
         }
         return SocialPage(
             items=items,
-            nextCursor=root.optString("nextCursor").takeIf(String::isNotBlank)
+            nextCursor=root.optString("nextCursor").trim().takeUnless { it.isBlank() || it.equals("null",ignoreCase=true) }
         )
     }
 
@@ -612,22 +574,7 @@ class SocialRepository(
         return buildList {
             for(i in 0 until arr.length()) {
                 val x=arr.optJSONObject(i) ?: continue
-                val mediaObj=x.optJSONObject("media")
-                val kind=mediaObj?.optString("kind").orEmpty()
-                val media=mediaObj?.let {
-                    val backendId=it.optString("id").takeIf(String::isNotBlank)
-                    if(backendId==null) null else ReelMediaRef(
-                        backendId=backendId,
-                        tmdbId=if(it.isNull("tmdbId")) null else it.optInt("tmdbId"),
-                        type=if(kind=="movie") MediaType.MOVIE else MediaType.TV,
-                        title=it.optString("title"),
-                        originalTitle=it.optString("originalTitle"),
-                        posterUrl=it.optString("posterUrl").takeIf(String::isNotBlank),
-                        backdropUrl=it.optString("backdropUrl").takeIf(String::isNotBlank),
-                        year=if(it.isNull("year")) null else it.optInt("year"),
-                        rating=if(it.isNull("rating")) null else it.optDouble("rating")
-                    )
-                }
+                val media=parseOptionalReelMedia(x.optJSONObject("media"))
                 add(
                     ReelFeedItem(
                         id=x.optString("id"),
@@ -878,7 +825,8 @@ class SocialRepository(
     }
 
     suspend fun comments(postId: String): List<SocialComment> {
-        val root=backend.getJson("/v1/social/posts/"+postId+"/comments",authorized=false)
+        val loggedIn=backend.session.isLoggedIn
+        val root=backend.getJson("/v1/social/posts/"+postId+"/comments"+(if(loggedIn)"/viewer"else ""),authorized=loggedIn)
         val arr=root.optJSONArray("items") ?: return emptyList()
         val base=buildList {
             for(i in 0 until arr.length()) {
@@ -1118,7 +1066,7 @@ class SocialRepository(
         }
 
     suspend fun roomMessages(roomId: String): List<RoomMessageItem> {
-        val root=backend.getJson("/v1/rooms/"+roomId+"/messages",authorized=false)
+        val root=backend.getJson("/v1/rooms/"+roomId+"/messages",authorized=backend.session.isLoggedIn)
         val arr=root.optJSONArray("items") ?: return emptyList()
         return buildList {
             for(i in 0 until arr.length()) {
@@ -1654,10 +1602,27 @@ class SocialRepository(
         verified=o.optBoolean("verified")
     )
 
+    private fun parseOptionalReelMedia(o:JSONObject?):ReelMediaRef? {
+        if(o==null)return null
+        fun value(key:String)=o.optString(key).trim().takeUnless { it.isBlank()||it.equals("null",ignoreCase=true) }
+        val backendId=value("id")?:return null
+        return ReelMediaRef(
+            backendId=backendId,
+            tmdbId=if(o.isNull("tmdbId"))null else o.optInt("tmdbId"),
+            type=if(value("kind")=="movie")MediaType.MOVIE else MediaType.TV,
+            title=value("title").orEmpty(),
+            originalTitle=value("originalTitle").orEmpty(),
+            posterUrl=value("posterUrl"),
+            backdropUrl=value("backdropUrl"),
+            year=if(o.isNull("year"))null else o.optInt("year"),
+            rating=if(o.isNull("rating"))null else o.optDouble("rating")
+        )
+    }
+
     private fun parseOptionalMedia(o:JSONObject?):SocialMediaRef? {
         if(o==null) return null
-        val id=o.optString("id")
-        val title=o.optString("title")
+        val id=o.optString("id").takeUnless { it=="null" }.orEmpty()
+        val title=o.optString("title").takeUnless { it=="null" }.orEmpty()
         if(id.isBlank() && title.isBlank()) return null
         return parseMedia(o)
     }
@@ -1665,13 +1630,13 @@ class SocialRepository(
     private fun parseMedia(o: JSONObject): SocialMediaRef {
         val kind=o.optString("kind")
         return SocialMediaRef(
-            id=o.optString("id").takeIf(String::isNotBlank),
-            title=o.optString("title").takeIf(String::isNotBlank),
-            posterUrl=o.optString("posterUrl").takeIf(String::isNotBlank),
+            id=o.optString("id").takeIf { it.isNotBlank() && it!="null" },
+            title=o.optString("title").takeIf { it.isNotBlank() && it!="null" },
+            posterUrl=o.optString("posterUrl").takeIf { it.isNotBlank() && it!="null" },
             tmdbId=if(o.isNull("tmdbId")) null else o.optInt("tmdbId"),
             type=when(kind) {
                 "movie" -> MediaType.MOVIE
-                "tv" -> MediaType.TV
+                "tv", "series" -> MediaType.TV
                 else -> null
             },
             originalTitle=o.optString("originalTitle").takeIf(String::isNotBlank),

@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -55,9 +56,11 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -169,7 +172,7 @@ fun FilmiqooPlayerScreen(
     var telemetryBufferCountPending by remember { mutableIntStateOf(0) }
     var telemetryBufferMsPending by remember { mutableLongStateOf(0L) }
     var telemetryQualitySwitchPending by remember { mutableIntStateOf(0) }
-    var telemetryLastHeartbeatAt by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    val watchClock=remember{PlaybackWatchClock()}
     var recoveryAttempts by remember { mutableIntStateOf(0) }
     var recoveryMessage by remember { mutableStateOf<String?>(null) }
     var castConnected by remember { mutableStateOf(false) }
@@ -410,7 +413,7 @@ fun FilmiqooPlayerScreen(
         versionId: String,
         startPosition: Long,
         preserveTarget: Boolean = true
-    ) {
+    ) = withContext(Dispatchers.Main.immediate) {
         loading=true
         error=null
         ended=false
@@ -423,8 +426,8 @@ fun FilmiqooPlayerScreen(
             }
         }
 
-        runCatching { backend.playbackUrl(versionId) }
-            .onSuccess { url ->
+        try {
+                val url = backend.playbackUrl(versionId)
                 playUrl=url
                 currentVersionId=versionId
                 selectedVariantId=versionId
@@ -443,11 +446,13 @@ fun FilmiqooPlayerScreen(
                 if(!preserveTarget) {
                     currentTarget=currentTarget.copy(mediaVersionId=versionId)
                 }
-            }
-            .onFailure {
-                error=it.message ?: "خطا در دریافت لینک پخش"
-            }
-        loading=false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error=failure.message ?: "خطا در دریافت لینک پخش"
+        } finally {
+            loading=false
+        }
         bumpControls()
     }
 
@@ -499,6 +504,7 @@ fun FilmiqooPlayerScreen(
     DisposableEffect(player) {
         val listener=object:Player.Listener {
             override fun onIsPlayingChanged(value: Boolean) {
+                watchClock.observe(SystemClock.elapsedRealtime(),value)
                 isPlaying=value
             }
 
@@ -573,9 +579,9 @@ fun FilmiqooPlayerScreen(
                 val sid=playbackSessionId
                 if(sid!=null) {
                     val now=SystemClock.elapsedRealtime()
-                    val watched=if(player.isPlaying)
-                        (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
-                    else 0L
+                    watchClock.observe(now,activeIsPlaying())
+            val watched=watchClock.pendingMs.coerceAtMost(30_000L)
+            val totalWatched=watchClock.totalMs
                     val bufferCount=telemetryBufferCountPending
                     val bufferMs=telemetryBufferMsPending
                     val switches=telemetryQualitySwitchPending
@@ -587,6 +593,7 @@ fun FilmiqooPlayerScreen(
                             positionMs=player.currentPosition.coerceAtLeast(0L),
                             durationMs=player.duration.coerceAtLeast(0L),
                             watchedDeltaMs=watched,
+                            watchedTotalMs=totalWatched,
                             bufferCountDelta=bufferCount,
                             bufferMsDelta=bufferMs,
                             qualitySwitchDelta=switches,
@@ -626,19 +633,22 @@ fun FilmiqooPlayerScreen(
                 val activeBufferMs=if(telemetryBufferStartedAt>0L)
                     (now-telemetryBufferStartedAt).coerceAtLeast(0L)
                 else 0L
-                val watched=if(player.isPlaying)
-                    (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
-                else 0L
+                watchClock.observe(now,activeIsPlaying())
+            val watched=watchClock.pendingMs.coerceAtMost(30_000L)
+            val totalWatched=watchClock.totalMs
                 val bufferCount=telemetryBufferCountPending
                 val bufferMs=telemetryBufferMsPending+activeBufferMs
                 val switches=telemetryQualitySwitchPending
+                val versionAtExit=currentVersionId
                 CoroutineScope(Dispatchers.IO).launch {
+                  runCatching {
                     backend.endPlaybackSession(
                         sessionId=sid,
-                        currentMediaVersionId=currentVersionId,
+                        currentMediaVersionId=versionAtExit,
                         positionMs=position,
                         durationMs=duration,
                         watchedDeltaMs=watched,
+                            watchedTotalMs=totalWatched,
                         bufferCountDelta=bufferCount,
                         bufferMsDelta=bufferMs,
                         qualitySwitchDelta=switches,
@@ -646,6 +656,7 @@ fun FilmiqooPlayerScreen(
                         completed=false,
                         exitReason="back"
                     )
+                  }
                 }
             }
             activity?.requestedOrientation=
@@ -661,9 +672,9 @@ fun FilmiqooPlayerScreen(
         val previousSession=playbackSessionId
         if(previousSession!=null) {
             val now=SystemClock.elapsedRealtime()
-            val watched=if(player.isPlaying)
-                (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
-            else 0L
+            watchClock.observe(now,activeIsPlaying())
+            val watched=watchClock.pendingMs.coerceAtMost(30_000L)
+            val totalWatched=watchClock.totalMs
             runCatching {
                 backend.endPlaybackSession(
                     sessionId=previousSession,
@@ -671,6 +682,7 @@ fun FilmiqooPlayerScreen(
                     positionMs=activePositionMs(),
                     durationMs=activeDurationMs(),
                     watchedDeltaMs=watched,
+                            watchedTotalMs=totalWatched,
                     bufferCountDelta=telemetryBufferCountPending,
                     bufferMsDelta=telemetryBufferMsPending,
                     qualitySwitchDelta=telemetryQualitySwitchPending,
@@ -686,7 +698,7 @@ fun FilmiqooPlayerScreen(
         telemetryBufferCountPending=0
         telemetryBufferMsPending=0L
         telemetryQualitySwitchPending=0
-        telemetryLastHeartbeatAt=SystemClock.elapsedRealtime()
+        watchClock.reset(SystemClock.elapsedRealtime())
         externalSubtitleUri=null
         externalSubtitleMime=null
         externalSubtitleLabel=null
@@ -731,7 +743,7 @@ fun FilmiqooPlayerScreen(
                         appVersion=BuildConfig.VERSION_NAME
                     )
                 }.getOrNull()
-                telemetryLastHeartbeatAt=SystemClock.elapsedRealtime()
+                watchClock.reset(SystemClock.elapsedRealtime())
             }
 
             val enriched=runCatching {
@@ -784,6 +796,7 @@ fun FilmiqooPlayerScreen(
             positionMs=activePositionMs()
             durationMs=activeDurationMs()
             isPlaying=activeIsPlaying()
+            watchClock.observe(SystemClock.elapsedRealtime(),isPlaying)
             if(castConnected) {
                 lastCastPositionMs=positionMs
                 ended=durationMs>0L &&
@@ -848,9 +861,9 @@ fun FilmiqooPlayerScreen(
             val activeBufferMs=if(telemetryBufferStartedAt>0L)
                 (now-telemetryBufferStartedAt).coerceAtLeast(0L)
             else 0L
-            val watched=if(player.isPlaying)
-                (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
-            else 0L
+            watchClock.observe(now,activeIsPlaying())
+            val watched=watchClock.pendingMs.coerceAtMost(30_000L)
+            val totalWatched=watchClock.totalMs
             val bufferCount=telemetryBufferCountPending
             val bufferMs=telemetryBufferMsPending+activeBufferMs
             val switches=telemetryQualitySwitchPending
@@ -862,13 +875,14 @@ fun FilmiqooPlayerScreen(
                     positionMs=player.currentPosition.coerceAtLeast(0L),
                     durationMs=player.duration.coerceAtLeast(0L),
                     watchedDeltaMs=watched,
+                            watchedTotalMs=totalWatched,
                     bufferCountDelta=bufferCount,
                     bufferMsDelta=bufferMs,
                     qualitySwitchDelta=switches,
                     networkType=playerNetworkLabel(context)
                 )
             }.onSuccess {
-                telemetryLastHeartbeatAt=now
+                watchClock.acknowledged(watched)
                 telemetryBufferCountPending=0
                 telemetryBufferMsPending=0L
                 telemetryQualitySwitchPending=0
@@ -886,9 +900,9 @@ fun FilmiqooPlayerScreen(
             val activeBufferMs=if(telemetryBufferStartedAt>0L)
                 (now-telemetryBufferStartedAt).coerceAtLeast(0L)
             else 0L
-            val watched=if(player.isPlaying)
-                (now-telemetryLastHeartbeatAt).coerceIn(0L,30_000L)
-            else 0L
+            watchClock.observe(now,activeIsPlaying())
+            val watched=watchClock.pendingMs.coerceAtMost(30_000L)
+            val totalWatched=watchClock.totalMs
             runCatching {
                 backend.endPlaybackSession(
                     sessionId=sid,
@@ -896,6 +910,7 @@ fun FilmiqooPlayerScreen(
                     positionMs=player.currentPosition.coerceAtLeast(0L),
                     durationMs=player.duration.coerceAtLeast(0L),
                     watchedDeltaMs=watched,
+                            watchedTotalMs=totalWatched,
                     bufferCountDelta=telemetryBufferCountPending,
                     bufferMsDelta=telemetryBufferMsPending+activeBufferMs,
                     qualitySwitchDelta=telemetryQualitySwitchPending,
@@ -922,6 +937,7 @@ fun FilmiqooPlayerScreen(
         }
     }
 
+    val accessibilityTimeout=androidx.compose.ui.platform.LocalAccessibilityManager.current
     LaunchedEffect(
         controlsVisible,
         isPlaying,
@@ -933,12 +949,13 @@ fun FilmiqooPlayerScreen(
         bookmarksOpen,
         handoffOpen,
         dialogueSearchOpen,
-        queueOpen
+        queueOpen,
+        isScrubbing
     ) {
         val overlayOpen=toolsOpen || settingsOpen || momentsOpen || bookmarksOpen ||
             handoffOpen || dialogueSearchOpen || queueOpen
-        if(controlsVisible && isPlaying && !locked && !overlayOpen) {
-            delay(3_500)
+        if(controlsVisible && isPlaying && !locked && !overlayOpen && !isScrubbing) {
+            delay(accessibilityTimeout?.calculateRecommendedTimeoutMillis(3_500,containsIcons=true,containsText=true,containsControls=true) ?: 3_500)
             controlsVisible=false
         }
     }
@@ -986,6 +1003,8 @@ fun FilmiqooPlayerScreen(
             dialogueSearchOpen -> dialogueSearchOpen=false
             momentsOpen -> momentsOpen=false
             queueOpen -> queueOpen=false
+            bookmarksOpen -> bookmarksOpen=false
+            handoffOpen -> handoffOpen=false
             toolsOpen -> toolsOpen=false
             settingsOpen -> settingsOpen=false
             locked -> {
@@ -1003,9 +1022,7 @@ fun FilmiqooPlayerScreen(
         playerTrackChoices(player,C.TRACK_TYPE_TEXT)
     }
 
-    Box(
-        Modifier.fillMaxSize()
-            .background(Color.Black)
+    val videoGestures = Modifier.fillMaxSize()
             .pointerInput(locked,currentVersionId) {
                 detectTapGestures(
                     onTap={
@@ -1109,7 +1126,7 @@ fun FilmiqooPlayerScreen(
                     )
                 }
             }
-    ) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         if(playUrl!=null) {
             AndroidView(
                 factory={ ctx ->
@@ -1144,6 +1161,8 @@ fun FilmiqooPlayerScreen(
                 modifier=Modifier.fillMaxSize()
             )
         }
+
+        Box(videoGestures.then(Modifier.testTag("player-video-gestures")))
 
         if(loading || buffering) {
             PlayerBufferingOverlay(
@@ -1246,6 +1265,7 @@ fun FilmiqooPlayerScreen(
             )
 
             PlayerChromeTopBarV2(
+                onHide={ controlsVisible=false },
                 target=currentTarget,
                 currentVariant=currentTarget.variants.firstOrNull {
                     it.mediaVersionId==selectedVariantId
@@ -1520,7 +1540,7 @@ fun FilmiqooPlayerScreen(
             autoSubtitleBusy=autoSubtitleBusy,
             autoSubtitleStatus=autoSubtitleStatus,
             activeSubtitleLabel=externalSubtitleLabel,
-            onDismiss={toolsOpen=false},
+            onDismiss={toolsOpen=false; bumpControls()},
             onAutoPersianSubtitle={ enabled ->
                 if(!enabled) {
                     autoPersianSubtitleEnabled=false
@@ -1710,7 +1730,7 @@ fun FilmiqooPlayerScreen(
             diagnosticsEnabled=diagnosticsEnabled,
             orientationMode=orientationMode,
             currentPositionMs=positionMs,
-            onDismiss={settingsOpen=false},
+            onDismiss={settingsOpen=false; bumpControls()},
             onVariant={ variant ->
                 val position=player.currentPosition.coerceAtLeast(0L)
                 if(variant.mediaVersionId!=currentVersionId) {

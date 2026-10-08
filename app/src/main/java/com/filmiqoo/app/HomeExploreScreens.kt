@@ -157,7 +157,7 @@ private fun HeroCarousel(
                     Modifier.align(Alignment.BottomStart).padding(20.dp)
                 ) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        MetricPill(Icons.Default.Star,"IMDb " + formatVote(media.vote))
+                        MetricPill(Icons.Default.Star,"TMDB " + formatVote(media.vote))
                         Spacer(Modifier.width(7.dp))
                         MetricPill(Icons.Default.HighQuality,"HD / 4K")
                     }
@@ -510,7 +510,7 @@ private fun ExploreReel(
                     Spacer(Modifier.width(7.dp))
                     Column(Modifier.weight(1f)) {
                         Text(media.title,fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        Text("IMDb " + formatVote(media.vote) + " • " + media.year,color=FqMuted,fontSize=9.sp)
+                        Text("TMDB " + formatVote(media.vote) + " • " + media.year,color=FqMuted,fontSize=9.sp)
                     }
                     Icon(Icons.Default.ChevronLeft,null,tint=FqGold)
                 }

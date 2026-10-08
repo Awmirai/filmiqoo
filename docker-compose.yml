@@ -10,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U filmiqoo -d filmiqoo"]
       interval: 5s
@@ -30,7 +29,7 @@ services:
       timeout: 3s
       retries: 20
   minio:
-    image: quay.io/minio/minio:latest
+    image: filmiqoo-minio:RELEASE.2025-10-15T17-29-55Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -41,6 +40,17 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+  telegram-stream:
+    container_name: filmiqoo-fsb
+    restart: unless-stopped
+    build:
+      context: ./deploy/tgfsb
+    image: filmiqoo-fsb-internal:6273377
+    env_file:
+      - ./fsb.env
+    ports:
+      - "127.0.0.1:8081:8081"
+
   api:
     restart: unless-stopped
     build:
@@ -54,6 +64,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      telegram-stream:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
       interval: 30s

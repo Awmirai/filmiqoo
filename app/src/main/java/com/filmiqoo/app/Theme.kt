@@ -11,20 +11,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val FqBg = Color(0xFF070708)
-val FqSurface = Color(0xFF111113)
-val FqSurface2 = Color(0xFF18181B)
-val FqSurface3 = Color(0xFF202024)
-val FqSurface4 = Color(0xFF29292E)
-val FqGold = Color(0xFFE50914)
+val FqBg = Color(0xFF090B10)
+val FqSurface = Color(0xFF131720)
+val FqSurface2 = Color(0xFF1A202B)
+val FqSurface3 = Color(0xFF232C38)
+val FqSurface4 = Color(0xFF303B49)
+val FqGold = Color(0xFFFF4155)
 val FqGoldSoft = Color(0xFFFF5660)
 val FqText = Color(0xFFF7F8FA)
-val FqMuted = Color(0xFFADB5C2)
+val FqMuted = Color(0xFFA8B2C4)
 val FqMutedStrong = Color(0xFFC8CDD5)
 val FqDanger = Color(0xFFFF4757)
 val FqGreen = Color(0xFF47D18C)
@@ -33,7 +34,14 @@ val FqPurple = Color(0xFFA98BFF)
 
 @Composable
 fun FilmiqooTheme(content:@Composable ()->Unit) {
-    val family=FontFamily.SansSerif
+    val family=remember {
+        FontFamily(
+            Font(R.font.vazirmatn_regular, FontWeight.Normal),
+            Font(R.font.vazirmatn_medium, FontWeight.Medium),
+            Font(R.font.vazirmatn_bold, FontWeight.Bold),
+            Font(R.font.vazirmatn_black, FontWeight.Black)
+        )
+    }
 
     val typography=remember {
         Typography(
@@ -132,7 +140,7 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
 
     val colors=darkColorScheme(
         primary=FqGold,
-        onPrimary=Color.White,
+        onPrimary=FqBg,
         primaryContainer=Color(0xFF4A070B),
         onPrimaryContainer=FqGoldSoft,
         secondary=FqBlue,
@@ -160,7 +168,8 @@ fun FilmiqooTheme(content:@Composable ()->Unit) {
         )
     }
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl,
+        androidx.compose.material3.LocalContentColor provides FqText) {
         MaterialTheme(
             colorScheme=colors,
             typography=typography,

@@ -44,6 +44,11 @@ class SafetyRepository(
             authorized=true
         ).optBoolean("blocked")
 
+    /** Retrying a failed block action must not unblock a user after a lost response. */
+    suspend fun ensureBlocked(userId:String) {
+        if(state().blocked.none{it.id==userId}) check(toggleBlock(userId)) { "مسدودسازی تأیید نشد؛ دوباره تلاش کن." }
+    }
+
     suspend fun toggleMute(userId:String):Boolean =
         backend.postJson(
             "/v1/social/users/"+userId+"/mute",

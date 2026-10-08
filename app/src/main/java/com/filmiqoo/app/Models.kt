@@ -16,7 +16,18 @@ data class MediaItem(
     val backendId: String? = null,
     val mediaVersionId: String? = null,
     val streamReady: Boolean = false,
-    val quality: String = ""
+    val quality: String = "",
+    val hasPersianDub: Boolean = false,
+    val hasPersianSubtitle: Boolean = false,
+    val dubbedEpisodeCount: Int? = null,
+    val availableEpisodeCount: Int? = null,
+    val genreIds: List<Int> = emptyList(),
+    val originalLanguage: String = "",
+    val originCountries: List<String> = emptyList(),
+    val runtimeMinutes: Int? = null,
+    val seriesStatus: String? = null,
+    val seasonCount: Int? = null,
+    val episodeCount: Int? = null
 ) {
     val year: String get() = date.take(4)
     val key: String get() = backendId ?: (type.name + "_" + id)
@@ -56,7 +67,9 @@ data class MediaDetail(
     val recommendations: List<MediaItem>,
     val seasons: List<SeasonInfo>,
     val directors: List<CastMember> = emptyList(),
-    val franchise: FranchiseInfo? = null
+    val franchise: FranchiseInfo? = null,
+    val logoPath: String? = null,
+    val certification: String? = null
 )
 
 data class HomeBundle(
@@ -91,7 +104,8 @@ data class Creator(
 )
 
 sealed interface OverlayRoute {
-    data class Detail(val media: MediaItem) : OverlayRoute
+    data class Post(val postId: String) : OverlayRoute
+    data class Detail(val media: MediaItem,val discussionScope:String?=null) : OverlayRoute
     data class Story(val media: MediaItem, val index: Int = 0) : OverlayRoute
     data class SocialStories(val stories: List<SocialStory>, val index: Int = 0) : OverlayRoute
     data class CreatorPage(val creator: Creator) : OverlayRoute
@@ -108,6 +122,8 @@ sealed interface OverlayRoute {
     data object Library : OverlayRoute
     data object SocialSaves : OverlayRoute
     data object History : OverlayRoute
+    data object Account : OverlayRoute
+    data object Discover : OverlayRoute
     data object Inbox : OverlayRoute
     data object Settings : OverlayRoute
     data object ViewerProfiles : OverlayRoute
@@ -130,4 +146,12 @@ sealed interface OverlayRoute {
     data object Auth : OverlayRoute
     data object Create : OverlayRoute
     data object Notifications : OverlayRoute
+}
+
+/** A title appears in one catalogue shelf; featured picks remain a separate entry point. */
+internal fun HomeBundle.withUniqueHomeShelves(recent:List<MediaItem>):HomeBundle {
+    val used=recent.map(::cinemaMediaKey).toMutableSet()
+    fun unique(items:List<MediaItem>)=items.filter { used.add(cinemaMediaKey(it)) }
+    return copy(iranian=unique(iranian),korean=unique(korean),bollywood=unique(bollywood),
+        popularMovies=unique(popularMovies),popularTv=unique(popularTv),anime=unique(anime))
 }

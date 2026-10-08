@@ -1,4 +1,5 @@
 package com.filmiqoo.app
+import androidx.compose.material.icons.filled.VisibilityOff
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -74,6 +75,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -94,16 +97,18 @@ internal fun PlayerChromeTopBarV2(
     onBack: () -> Unit,
     onShare: () -> Unit,
     onMore: () -> Unit,
+    onHide: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Row(
         modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal=14.dp, vertical=10.dp)
+            .padding(horizontal=14.dp, vertical=10.dp),
+        verticalAlignment=Alignment.CenterVertically
     ) {
         Row(
-            modifier=Modifier.align(Alignment.CenterStart),
+            modifier=Modifier,
             horizontalArrangement=Arrangement.spacedBy(8.dp),
             verticalAlignment=Alignment.CenterVertically
         ) {
@@ -113,13 +118,18 @@ internal fun PlayerChromeTopBarV2(
                 onClick=onMore
             )
             FilmiqooCastRouteButton()
+            PlayerRoundAction(
+                icon=Icons.Default.VisibilityOff,
+                contentDescription="پنهان‌کردن کنترل‌ها",
+                onClick=onHide
+            )
 
         }
 
         Column(
             modifier=Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(.55f),
+                .weight(1f)
+                .padding(horizontal=8.dp),
             horizontalAlignment=Alignment.CenterHorizontally
         ) {
             Text(
@@ -150,7 +160,7 @@ internal fun PlayerChromeTopBarV2(
             icon=Icons.Default.ArrowBack,
             contentDescription="بازگشت",
             onClick=onBack,
-            modifier=Modifier.align(Alignment.CenterEnd)
+            modifier=Modifier
         )
     }
 }
@@ -195,43 +205,46 @@ internal fun PlayerCenterControlsV2(
         val seekSize=if(compact)48.dp else 54.dp
         val gap=if(compact)18.dp else 26.dp
 
-        Row(
-            modifier=Modifier.align(Alignment.Center),
-            verticalAlignment=Alignment.CenterVertically,
-            horizontalArrangement=Arrangement.spacedBy(gap)
-        ) {
-            PlayerSeekAction(
-                icon=Icons.Default.Replay10,
-                size=seekSize,
-                contentDescription="۱۰ ثانیه عقب",
-                onClick=onBack10
-            )
-
-            Surface(
-                color=Color(0xE61B1B20),
-                contentColor=Color.White,
-                shape=CircleShape,
-                border=BorderStroke(1.25.dp,FqGold.copy(alpha=.86f)),
-                shadowElevation=12.dp,
-                modifier=Modifier
-                    .size(playSize)
-                    .clickable(onClick=onPlayPause)
+        // Playback moves forward to the right even when surrounding text is Persian.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(
+                modifier=Modifier.align(Alignment.Center),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(gap)
             ) {
-                Box(contentAlignment=Alignment.Center) {
-                    Icon(
-                        if(isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription=if(isPlaying)"توقف" else "پخش",
-                        modifier=Modifier.size(if(compact)30.dp else 36.dp)
-                    )
-                }
-            }
+                PlayerSeekAction(
+                    icon=Icons.Default.Replay10,
+                    size=seekSize,
+                    contentDescription="۱۰ ثانیه عقب",
+                    onClick=onBack10
+                )
 
-            PlayerSeekAction(
-                icon=Icons.Default.Forward10,
-                size=seekSize,
-                contentDescription="۱۰ ثانیه جلو",
-                onClick=onForward10
-            )
+                Surface(
+                    color=Color(0xE61B1B20),
+                    contentColor=Color.White,
+                    shape=CircleShape,
+                    border=BorderStroke(1.25.dp,FqGold.copy(alpha=.86f)),
+                    shadowElevation=12.dp,
+                    modifier=Modifier
+                        .size(playSize)
+                        .clickable(onClick=onPlayPause)
+                ) {
+                    Box(contentAlignment=Alignment.Center) {
+                        Icon(
+                            if(isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription=if(isPlaying)"توقف" else "پخش",
+                            modifier=Modifier.size(if(compact)30.dp else 36.dp)
+                        )
+                    }
+                }
+
+                PlayerSeekAction(
+                    icon=Icons.Default.Forward10,
+                    size=seekSize,
+                    contentDescription="۱۰ ثانیه جلو",
+                    onClick=onForward10
+                )
+            }
         }
     }
 }
@@ -284,38 +297,40 @@ internal fun PlayerBottomControlsV2(
             .padding(horizontal=16.dp)
             .padding(bottom=14.dp)
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Slider(
-                value=fraction.coerceIn(0f,1f),
-                onValueChange={
-                    onSeekStart()
-                    onFractionChanged(it)
-                },
-                onValueChangeFinished=onSeekFinished,
-                colors=SliderDefaults.colors(
-                    thumbColor=FqGold,
-                    activeTrackColor=FqGold,
-                    inactiveTrackColor=Color.White.copy(alpha=.24f)
-                ),
-                modifier=Modifier.fillMaxWidth()
-            )
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                Slider(
+                    value=fraction.coerceIn(0f,1f),
+                    onValueChange={
+                        onSeekStart()
+                        onFractionChanged(it)
+                    },
+                    onValueChangeFinished=onSeekFinished,
+                    colors=SliderDefaults.colors(
+                        thumbColor=FqGold,
+                        activeTrackColor=FqGold,
+                        inactiveTrackColor=Color.White.copy(alpha=.24f)
+                    ),
+                    modifier=Modifier.fillMaxWidth().semantics { contentDescription="زمان پخش" }
+                )
 
-            if(durationMs>0L) {
-                hotMoments
-                    .filter { it.positionMs in 1 until durationMs }
-                    .take(5)
-                    .forEach { moment ->
-                        val f=(moment.positionMs.toFloat()/durationMs.toFloat())
-                            .coerceIn(0f,1f)
-                        Box(
-                            modifier=Modifier
-                                .align(Alignment.CenterStart)
-                                .offset(x=(maxWidth-10.dp)*f)
-                                .size(10.dp)
-                                .background(FqGold,CircleShape)
-                                .clickable { onHotMoment(moment) }
-                        )
-                    }
+                if(durationMs>0L) {
+                    hotMoments
+                        .filter { it.positionMs in 1 until durationMs }
+                        .take(5)
+                        .forEach { moment ->
+                            val f=(moment.positionMs.toFloat()/durationMs.toFloat())
+                                .coerceIn(0f,1f)
+                            Box(
+                                modifier=Modifier
+                                    .align(Alignment.CenterStart)
+                                    .offset(x=(maxWidth-10.dp)*f)
+                                    .size(10.dp)
+                                    .background(FqGold,CircleShape)
+                                    .clickable { onHotMoment(moment) }
+                            )
+                        }
+                }
             }
         }
 
@@ -433,15 +448,12 @@ internal fun PlayerToolsSheetV2(
     onPip: () -> Unit,
     onLock: () -> Unit
 ) {
-    val sheetState=rememberModalBottomSheetState(
-        skipPartiallyExpanded=true,
-        confirmValueChange={ it!=SheetValue.Hidden }
-    )
+    val sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
 
     BackHandler(onBack=onDismiss)
 
     ModalBottomSheet(
-        onDismissRequest={},
+        onDismissRequest=onDismiss,
         sheetState=sheetState,
         containerColor=PlayerPanel,
         contentColor=Color.White,

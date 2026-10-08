@@ -21,6 +21,8 @@ val releaseKeyPassword =
     System.getenv("FILMIQOO_KEY_PASSWORD").orEmpty()
 val requireReleaseSigning =
     System.getenv("FILMIQOO_REQUIRE_SIGNING")?.equals("true",ignoreCase=true)==true
+val legacyServerPreview =
+    System.getenv("FILMIQOO_LEGACY_SERVER_PREVIEW")?.equals("true", ignoreCase = true) == true
 
 android {
     namespace = "com.filmiqoo.app"
@@ -31,8 +33,10 @@ android {
             System.getenv("FILMIQOO_APPLICATION_ID") ?: "com.filmiqoo.previewfix"
         minSdk = 26
         targetSdk = 35
-        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 4
-        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.4-connected-preview"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = System.getenv("FILMIQOO_VERSION_CODE")?.toIntOrNull() ?: 12
+        versionName = System.getenv("FILMIQOO_VERSION_NAME") ?: "0.9.0-cinema-preview"
+        manifestPlaceholders["appLabel"] = "Filmiqoo"
         buildConfigField(
             "String",
             "FIREBASE_API_KEY",
@@ -68,6 +72,11 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "LEGACY_SERVER_PREVIEW", legacyServerPreview.toString())
+            if (legacyServerPreview) {
+                applicationIdSuffix = ".preview"
+                manifestPlaceholders["appLabel"] = "Filmiqoo Preview"
+            }
             buildConfigField(
                 "String",
                 "FILMIQOO_API_BASE_URL",
@@ -75,6 +84,8 @@ android {
             )
         }
         release {
+            // Compatibility with an old server must never weaken a production release.
+            buildConfigField("boolean", "LEGACY_SERVER_PREVIEW", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField(
@@ -140,6 +151,15 @@ tasks.matching { it.name=="preReleaseBuild" }.configureEach {
 }
 
 dependencies {
+    implementation("io.coil-kt:coil-gif:2.7.0")
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.fragment:fragment-ktx:1.8.5")

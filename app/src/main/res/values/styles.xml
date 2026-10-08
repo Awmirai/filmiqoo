@@ -1,5 +1,10 @@
 <resources>
-    <style name="Theme.Filmiqoo" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.Filmiqoo" parent="Theme.AppCompat.NoActionBar">
+        <!-- Cast/MediaRouter reads AppCompat colors while constructing its native button. -->
+        <item name="colorPrimary">#FF3A57</item>
+        <item name="colorPrimaryDark">#07080B</item>
+        <item name="colorAccent">#FF3A57</item>
+        <item name="android:colorBackground">#07080B</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">#07080B</item>

@@ -59,22 +59,26 @@ JWT_SECRET="$(randhex 48)"
 TELEGRAM_INGEST_SECRET="$(randhex 48)"
 PLAYBACK_SIGNING_SECRET="$(randhex 48)"
 OPS_SECRET="$(randhex 48)"
+GEO_PROXY_HEADER_SECRET="$(randhex 32)"
 MINIO_ROOT_USER="fq$(randhex 12)"
 MINIO_ROOT_PASSWORD="$(randhex 32)"
 BACKUP_PASSWORD="$(randhex 32)"
 
 SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
 SHORT_SHA="${SHA:0:12}"
-IMAGE="filmiqoo-api:${SHORT_SHA}"
+GEO_MONTH="$(date -u +%Y-%m)"
+IMAGE="filmiqoo-api:${SHORT_SHA}-geo-${GEO_MONTH}"
 
 echo "Building backend image ${IMAGE}..."
-docker build -t "$IMAGE" "$REPO_DIR/backend"
+docker build --build-arg GEO_DATA_MONTH="$GEO_MONTH" -t "$IMAGE" "$REPO_DIR/backend"
 
 cat > "$DEPLOY_DIR/.env.production" <<EOF
 FILMIQOO_API_IMAGE=$IMAGE
 FILMIQOO_API_ENV_FILE=.env.production
 FILMIQOO_VERSION=bootstrap-$SHORT_SHA
 FILMIQOO_COMMIT=$SHA
+GEO_PROXY_HEADER_SECRET=$GEO_PROXY_HEADER_SECRET
+GEO_DATA_MONTH=$GEO_MONTH
 FILMIQOO_DOMAIN=$API_DOMAIN
 FILMIQOO_MEDIA_DOMAIN=$MEDIA_DOMAIN
 FILMIQOO_TLS_EMAIL=$TLS_EMAIL

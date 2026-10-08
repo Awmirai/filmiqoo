@@ -58,6 +58,10 @@ func (s *Server) presignUpload(w http.ResponseWriter,r *http.Request) {
 	max:=int64(500*1024*1024)
 	if body.Kind=="story" { max=150*1024*1024 }
 	if body.Kind=="image" { max=25*1024*1024 }
+	if body.Kind=="title-comment" {
+		max=10*1024*1024
+		if body.MimeType!="image/gif" {writeJSON(w,400,map[string]string{"error":"comments accept GIF files"});return}
+	}
 	if body.Kind=="document" { max=100*1024*1024 }
 	if body.SizeBytes<=0 || body.SizeBytes>max {
 		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"file size is outside allowed range"}); return
@@ -128,13 +132,13 @@ func (s *Server) completeUpload(w http.ResponseWriter,r *http.Request) {
 	userID:=userIDFromContext(r.Context())
 	id:=chi.URLParam(r,"id")
 
-	var key,mime,status string
+	var key,mime,status,kind string
 	var expectedSize int64
 	err:=s.db.QueryRow(r.Context(),`
-		SELECT object_key,mime_type,size_bytes,status
+		SELECT object_key,mime_type,size_bytes,status,kind
 		  FROM ugc_uploads
 		 WHERE id=$1 AND user_id=$2
-	`,id,userID).Scan(&key,&mime,&expectedSize,&status)
+	`,id,userID).Scan(&key,&mime,&expectedSize,&status,&kind)
 	if err!=nil || status!="presigned" {
 		writeJSON(w,http.StatusNotFound,map[string]string{
 			"error":"upload not found or already completed",
@@ -181,6 +185,9 @@ func (s *Server) completeUpload(w http.ResponseWriter,r *http.Request) {
 		return
 	}
 
+	if kind=="title-comment" {
+		if err=s.objects.ValidateGIF(verifyCtx,key);err!=nil {writeJSON(w,422,map[string]string{"error":"GIF is invalid or larger than 2048 pixels"});return}
+	}
 	tag,err:=s.db.Exec(r.Context(),`
 		UPDATE ugc_uploads
 		   SET status='uploaded',uploaded_at=now()

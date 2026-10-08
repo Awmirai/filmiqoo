@@ -25,6 +25,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.time.Instant
 import java.time.Duration
 
@@ -63,13 +68,13 @@ fun InboxScreen(
     LaunchedEffect(refresh,archivedView) {
         loading=true
         error=null
-        runCatching { repo.inbox(archived=archivedView) }
-            .onSuccess { items=it }
-            .onFailure { error=it.message ?: "خطا در دریافت پیام‌ها" }
-        loading=false
+        try { items=repo.inbox(archived=archivedView) }
+        catch(cancelled:CancellationException){throw cancelled}
+        catch(failure:Exception){error=failure.message ?: "خطا در دریافت پیام‌ها"}
+        finally{loading=false}
     }
 
-    Column(Modifier.fillMaxSize().background(FqBg)) {
+    Column(Modifier.fillMaxSize().background(CinemaInk).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).navigationBarsPadding().imePadding()) {
         Column(
             Modifier.fillMaxWidth()
                 .background(
@@ -91,7 +96,7 @@ fun InboxScreen(
                 )
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "پیام‌ها",
+                        "پیام‌های خصوصی",
                         fontSize=26.sp,
                         fontWeight=FontWeight.Black
                     )
@@ -130,7 +135,7 @@ fun InboxScreen(
                         contentColor=if(active) Color.Black else FqMuted,
                         shape=RoundedCornerShape(13.dp),
                         modifier=Modifier.weight(1f)
-                            .height(38.dp)
+                            .heightIn(min=48.dp)
                             .clickable { archivedView=archived }
                     ) {
                         Box(contentAlignment=Alignment.Center) {
@@ -155,7 +160,7 @@ fun InboxScreen(
                 trailingIcon={
                     if(query.isNotBlank()) {
                         IconButton(onClick={query=""}) {
-                            Icon(Icons.Default.Close,null,modifier=Modifier.size(18.dp))
+                            Icon(Icons.Default.Close,"پاک‌کردن جستجو",modifier=Modifier.size(18.dp))
                         }
                     }
                 },
@@ -224,7 +229,7 @@ fun InboxScreen(
 
         if(initialLoading) {
             InboxLoadingState()
-        } else if(filteredItems.isEmpty()) {
+        } else if(filteredItems.isEmpty() && error==null) {
             val searching=query.isNotBlank()
             val filteringUnread=unreadOnly && !searching
             PremiumEmptyState(
@@ -579,8 +584,10 @@ fun ConnectedNotificationsScreen(
     onOpenCollection: (String) -> Unit,
     onOpenWatchParty: (String) -> Unit,
     onOpenLive: (String) -> Unit,
-    onFollowRequests: () -> Unit
+    onFollowRequests: () -> Unit,
+    onOpenDiscussion:(MediaItem,String)->Unit={media,_->onOpenMedia(media)}
 ) {
+    val lifecycleOwner=LocalLifecycleOwner.current
     val repo=remember { MessagingRepository(backend) }
     val scope=rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
@@ -590,79 +597,39 @@ fun ConnectedNotificationsScreen(
     var items by remember { mutableStateOf<List<FilmiqooNotification>>(emptyList()) }
     var filterName by rememberSaveable { mutableStateOf(NotificationFilter.ALL.name) }
     var unreadOnlyNotifications by rememberSaveable { mutableStateOf(false) }
+    var unavailableTarget by remember { mutableStateOf(false) }
     val filter=runCatching { NotificationFilter.valueOf(filterName) }
         .getOrDefault(NotificationFilter.ALL)
 
     BackHandler { onBack() }
 
-    LaunchedEffect(refresh) {
-        loading=true
-        error=null
-        runCatching { repo.notifications() }
-            .onSuccess {
-                items=it.first
-                unread=it.second
-            }
-            .onFailure { error=it.message ?: "خطا در دریافت اعلان‌ها" }
-        loading=false
-    }
-
-    Column(Modifier.fillMaxSize().background(FqBg)) {
-        Box(
-            Modifier.fillMaxWidth().height(170.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF220609),Color(0xFF100708),FqBg)
-                    )
-                )
-        ) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal=10.dp,vertical=8.dp),
-                verticalAlignment=Alignment.CenterVertically
-            ) {
-                FqIconButton(
-                    icon=Icons.Default.ArrowBack,
-                    contentDescription="بازگشت",
-                    onClick=onBack
-                )
-                Spacer(Modifier.weight(1f))
-                if(unread>0) {
-                    TextButton(onClick={
-                        scope.launch {
-                            runCatching { repo.markAllNotificationsRead() }
-                                .onSuccess { refresh++ }
-                        }
-                    }) {
-                        Text("خواندن همه",fontSize=10.sp)
-                    }
-                }
-                FqIconButton(
-                    icon=Icons.Default.Refresh,
-                    contentDescription="تازه‌سازی",
-                    onClick={refresh++}
-                )
-            }
-
-            Column(
-                Modifier.align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(horizontal=18.dp)
-                    .padding(bottom=18.dp)
-            ) {
-                Text("اعلان‌ها",fontSize=30.sp,fontWeight=FontWeight.Black)
-                Text(
-                    if(unread>0)
-                        compactInboxCount(unread)+" اعلان خوانده‌نشده"
-                    else
-                        "چیزی از دست ندادی",
-                    color=if(unread>0)FqGoldSoft else FqMuted,
-                    fontSize=10.sp,
-                    modifier=Modifier.padding(top=3.dp)
-                )
+    LaunchedEffect(refresh,lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            loading=items.isEmpty()
+            while(true) {
+                try { val result=repo.notifications();items=result.first;unread=result.second;error=null }
+                catch(cancelled:CancellationException){throw cancelled}
+                catch(failure:Exception){error=failure.message ?: "خطا در دریافت اعلان‌ها"}
+                finally{loading=false}
+                delay(20_000)
             }
         }
+    }
+
+    if(unavailableTarget)AlertDialog(onDismissRequest={unavailableTarget=false},
+        title={Text("محتوا در دسترس نیست")},
+        text={Text("محتوای این اعلان حذف شده یا دسترسی به آن تغییر کرده است.")},
+        confirmButton={TextButton({unavailableTarget=false}){Text("متوجه شدم")}})
+
+    Column(Modifier.fillMaxSize().background(CinemaInk).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).navigationBarsPadding().imePadding()) {
+        CinemaPageHeader("اعلان‌ها",if(loading)"در حال دریافت…" else if(error!=null)"دریافت اعلان‌ها کامل نشد" else if(unread>0)"$unread اعلان خوانده‌نشده" else "اعلان‌های حساب و انتشار قسمت‌ها",onBack) {
+            IconButton({refresh++},enabled=!loading){Icon(Icons.Default.Refresh,"تازه‌سازی")}
+        }
+        if(unread>0)TextButton({scope.launch {
+            try{repo.markAllNotificationsRead();refresh++}
+            catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){error="علامت خوانده‌شده ثبت نشد؛ دوباره تلاش کن."}
+        }},modifier=Modifier.padding(horizontal=20.dp)){Text("علامت‌زدن همه به‌عنوان خوانده‌شده")}
 
         LazyRow(
             contentPadding=PaddingValues(horizontal=12.dp),
@@ -679,7 +646,7 @@ fun ConnectedNotificationsScreen(
                 FilterChip(
                     selected=filter==NotificationFilter.SOCIAL,
                     onClick={filterName=NotificationFilter.SOCIAL.name},
-                    label={Text("نبض",fontSize=10.sp)}
+                    label={Text("اجتماعی",fontSize=12.sp)}
                 )
             }
             item {
@@ -725,7 +692,7 @@ fun ConnectedNotificationsScreen(
             Text(it,color=FqDanger,fontSize=11.sp,modifier=Modifier.padding(12.dp))
         }
 
-        if(!loading && visibleItems.isEmpty()) {
+        if(!loading && error==null && visibleItems.isEmpty()) {
             PremiumEmptyState(
                 if(unreadOnlyNotifications)Icons.Default.MarkEmailRead
                 else Icons.Default.NotificationsNone,
@@ -773,6 +740,8 @@ fun ConnectedNotificationsScreen(
 
                             when {
                                 item.type=="follow_request" -> onFollowRequests()
+                                item.entityType=="title_comment" && item.media!=null && !item.discussionScope.isNullOrBlank() ->
+                                    onOpenDiscussion(item.media,item.discussionScope)
                                 item.entityType=="collection" && !item.entityId.isNullOrBlank() ->
                                     onOpenCollection(item.entityId)
                                 item.entityType=="watch_party" && !item.entityId.isNullOrBlank() ->
@@ -801,7 +770,7 @@ fun ConnectedNotificationsScreen(
                                             avatarUrl=item.actor.avatarUrl
                                         )
                                     )
-                                else -> refresh++
+                                else -> unavailableTarget=true
                             }
 
                             if(wasUnread) {
@@ -895,6 +864,7 @@ private fun notificationMatchesFilter(
         type.startsWith("post_") ||
         type.startsWith("reel_") ||
         type.startsWith("review_") ||
+        type.startsWith("discussion_") ||
         type.startsWith("live_") ||
         type=="comment_like" ||
         type=="collection_update"
@@ -912,6 +882,9 @@ private fun notificationMatchesFilter(
 }
 
 private fun notificationIcon(type:String)=when(type) {
+    "post_published","reel_published" -> Icons.Default.NewReleases
+    "discussion_reply" -> Icons.Default.Reply
+    "discussion_like" -> Icons.Default.Favorite
     "follow" -> Icons.Default.PersonAdd
     "follow_request" -> Icons.Default.PersonAddAlt1
     "follow_accepted" -> Icons.Default.HowToReg
@@ -941,6 +914,10 @@ private fun notificationIcon(type:String)=when(type) {
 }
 
 private fun notificationTypeLabel(type:String)=when(type) {
+    "post_published" -> "پست تازه"
+    "reel_published" -> "کلیپ تازه"
+    "discussion_reply" -> "پاسخ به دیدگاه"
+    "discussion_like" -> "پسندیدن دیدگاه"
     "follow" -> "دنبال‌کردن"
     "follow_request" -> "درخواست دنبال‌کردن"
     "follow_accepted" -> "درخواست پذیرفته شد"

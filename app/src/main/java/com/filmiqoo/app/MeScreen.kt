@@ -48,7 +48,7 @@ private sealed interface MeLoad {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MeScreen(
+internal fun LegacyMeScreen(
     backend:BackendRepository,
     repository:TmdbRepository,
     kidsMode:Boolean=false,

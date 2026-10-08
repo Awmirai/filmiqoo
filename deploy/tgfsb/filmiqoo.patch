@@ -1,0 +1,83 @@
+diff --git a/internal/routes/filmiqoo_internal.go b/internal/routes/filmiqoo_internal.go
+new file mode 100644
+index 0000000..e54d9c4
+--- /dev/null
++++ b/internal/routes/filmiqoo_internal.go
+@@ -0,0 +1,77 @@
++package routes
++
++import (
++	"crypto/subtle"
++	"net/http"
++	"os"
++	"strconv"
++
++	"EverythingSuckz/fsb/internal/bot"
++	"EverythingSuckz/fsb/internal/types"
++	"EverythingSuckz/fsb/internal/utils"
++
++	"github.com/gin-gonic/gin"
++)
++
++func (e *allRoutes) LoadFilmiqooInternal(r *Route) {
++	r.Engine.GET("/internal/filmiqoo/file/:messageID", getFilmiqooFileMetadata)
++}
++
++func getFilmiqooFileMetadata(ctx *gin.Context) {
++	expectedSecret := os.Getenv("FILMIQOO_INTERNAL_SECRET")
++	if expectedSecret == "" {
++		ctx.JSON(http.StatusServiceUnavailable, gin.H{
++			"error": "internal endpoint disabled",
++		})
++		return
++	}
++
++	providedSecret := ctx.GetHeader("X-Filmiqoo-Internal-Secret")
++	if len(providedSecret) != len(expectedSecret) ||
++		subtle.ConstantTimeCompare([]byte(providedSecret), []byte(expectedSecret)) != 1 {
++		ctx.JSON(http.StatusUnauthorized, gin.H{
++			"error": "unauthorized",
++		})
++		return
++	}
++
++	messageID, err := strconv.Atoi(ctx.Param("messageID"))
++	if err != nil || messageID <= 0 {
++		ctx.JSON(http.StatusBadRequest, gin.H{
++			"error": "invalid message id",
++		})
++		return
++	}
++
++	worker := bot.GetNextWorker()
++
++	file, err := utils.TimeFuncWithResult(
++		log,
++		"FilmiqooFileFromMessage",
++		func() (*types.File, error) {
++			return utils.FileFromMessage(ctx, worker.Client, messageID)
++		},
++	)
++	if err != nil {
++		ctx.JSON(http.StatusNotFound, gin.H{
++			"error": "file not found",
++		})
++		return
++	}
++
++	fullHash := utils.PackFile(
++		file.FileName,
++		file.FileSize,
++		file.MimeType,
++		file.ID,
++	)
++
++	ctx.JSON(http.StatusOK, gin.H{
++		"messageId": messageID,
++		"fileName":  file.FileName,
++		"fileSize":  file.FileSize,
++		"mimeType":  file.MimeType,
++		"fileId":    file.ID,
++		"hash":      utils.GetShortHash(fullHash),
++	})
++}

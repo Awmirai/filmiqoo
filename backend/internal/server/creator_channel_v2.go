@@ -23,15 +23,15 @@ func (s *Server) canViewUserSocialContent(
 		         WHEN $1='' THEN false
 		         ELSE EXISTS(
 		           SELECT 1 FROM blocks b
-		            WHERE (b.blocker_user_id=$1 AND b.blocked_user_id=$2)
-		               OR (b.blocker_user_id=$2 AND b.blocked_user_id=$1)
+		            WHERE (b.blocker_user_id=NULLIF($1,'')::uuid AND b.blocked_user_id=$2)
+		               OR (b.blocker_user_id=$2 AND b.blocked_user_id=NULLIF($1,'')::uuid)
 		         )
 		       END,
 		       CASE
 		         WHEN $1='' THEN false
 		         ELSE EXISTS(
 		           SELECT 1 FROM user_follows uf
-		            WHERE uf.follower_user_id=$1
+		            WHERE uf.follower_user_id=NULLIF($1,'')::uuid
 		              AND uf.followed_user_id=$2
 		         )
 		       END
@@ -64,7 +64,7 @@ func (s *Server) canViewChannelSocialContent(
 		         WHEN $1='' THEN false
 		         ELSE EXISTS(
 		           SELECT 1 FROM channel_members cm
-		            WHERE cm.channel_id=c.id AND cm.user_id=$1
+		            WHERE cm.channel_id=c.id AND cm.user_id=NULLIF($1,'')::uuid
 		         )
 		       END
 		  FROM channels c

@@ -25,17 +25,46 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.testTag
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.WebSocket
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import kotlin.math.abs
+
+private sealed interface PartySocketSignal {
+    data object Connected:PartySocketSignal
+    data class Message(val raw:String):PartySocketSignal
+    data object Disconnected:PartySocketSignal
+}
+
+@Composable
+private fun WatchPartyMainEffect(vararg keys:Any?,block:suspend CoroutineScope.()->Unit) {
+    LaunchedEffect(*keys) { withContext(Dispatchers.Main.immediate,block) }
+}
+
+private inline fun <T> watchPartyAttempt(block:()->T):Result<T> = try {
+    Result.success(block())
+} catch(cancelled:CancellationException) {
+    throw cancelled
+} catch(failure:Throwable) {
+    Result.failure(failure)
+}
 
 @Composable
 fun ConnectedWatchPartyScreen(
@@ -77,6 +106,11 @@ fun ConnectedWatchPartyScreen(
     var joinRequestPending by remember { mutableStateOf(false) }
     var lobbyBusy by remember { mutableStateOf(false) }
     var realtimeConnected by remember { mutableStateOf(false) }
+    var partyReceivedAt by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+    var joinSucceeded by remember(partyId) { mutableStateOf(false) }
+    var retryConnection by remember { mutableIntStateOf(0) }
+    var stateWriteBusy by remember { mutableStateOf(false) }
+    var playbackError by remember { mutableStateOf<String?>(null) }
     var resolvedStartMedia by remember(media?.key) {
         mutableStateOf(media?.takeIf { !it.backendId.isNullOrBlank() })
     }
@@ -87,112 +121,152 @@ fun ConnectedWatchPartyScreen(
     var selectedEpisodeId by rememberSaveable(media?.key) { mutableStateOf<String?>(null) }
 
     val player=remember {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context).setLooper(android.os.Looper.getMainLooper()).build().apply {
             repeatMode=Player.REPEAT_MODE_OFF
             playWhenReady=false
         }
     }
 
     DisposableEffect(Unit) {
-        onDispose { player.release() }
+        val listener=object:Player.Listener {
+            override fun onPlayerError(playerError:PlaybackException) { playbackError="پخش ویدیو قطع شد؛ دوباره اتصال پخش را امتحان کن." }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener);player.release() }
     }
 
-    DisposableEffect(partyId,lobby?.myRole,privateJoinRequired) {
-        val id=partyId
-        var socket:WebSocket?=null
-        if(
-            id!=null &&
-            backend.session.isLoggedIn &&
-            lobby!=null &&
-            !privateJoinRequired
-        ) {
-            socket=realtime.connect(
+    WatchPartyMainEffect(partyId,lobby!=null,privateJoinRequired,backend.session.isLoggedIn,party?.state,party?.serverTimed) {
+        val id=partyId ?: return@WatchPartyMainEffect
+        if(!backend.session.isLoggedIn || lobby==null || privateJoinRequired || party?.serverTimed!=true || party?.state in setOf("ended","cancelled"))return@WatchPartyMainEffect
+        var retryMs=1000L
+        try { while(isActive) {
+            // Intermediate packets may coalesce; polling supplies an authoritative
+            // snapshot. Terminal signals are separate and cannot be dropped.
+            val messages=Channel<String>(64,BufferOverflow.DROP_OLDEST)
+            val connected=CompletableDeferred<Unit>()
+            val disconnected=CompletableDeferred<Unit>()
+            var reactionRefresh:Job?=null
+            var queueRefresh:Job?=null
+            var reactionsDirty=false
+            var queueDirty=false
+            val socket=realtime.connect(
                 partyId=id,
-                onConnected={
-                    scope.launch { realtimeConnected=true }
-                },
-                onEvent={raw->
-                    scope.launch {
-                        val event=runCatching { JSONObject(raw) }.getOrNull() ?: return@launch
+                onConnected={connected.complete(Unit)},
+                onEvent={raw->messages.trySend(raw)},
+                onDisconnected={disconnected.complete(Unit)}
+            )
+            if(socket==null) { messages.cancel();break }
+            try {
+                var opened=false
+                signalLoop@ while(isActive) {
+                val signal=select<PartySocketSignal> {
+                    // Biased select gives a ready terminal event priority over packets.
+                    disconnected.onAwait { PartySocketSignal.Disconnected }
+                    if(!opened)connected.onAwait { PartySocketSignal.Connected }
+                    messages.onReceive { PartySocketSignal.Message(it) }
+                }
+                when(signal) {
+                    PartySocketSignal.Connected -> { opened=true;realtimeConnected=true;retryMs=1000L }
+                    PartySocketSignal.Disconnected -> break@signalLoop
+                    is PartySocketSignal.Message -> {
+                        val event=watchPartyAttempt { JSONObject(signal.raw) }.getOrNull() ?: continue@signalLoop
                         when(event.optString("type")) {
                             "watchparty.state" -> {
                                 val position=event.optLong("positionMs")
                                 val playing=event.optBoolean("isPlaying")
                                 val state=event.optString("state").ifBlank { "live" }
+                                val revision=event.optLong("revision")
+                                if(revision>0 && revision<(party?.revision ?: 0))continue@signalLoop
+                                val controller=event.optString("controllerUserId").takeIf{it.isNotBlank() && it!="null"}
+                                partyReceivedAt=android.os.SystemClock.elapsedRealtime()
                                 party=party?.copy(
                                     positionMs=position,
                                     isPlaying=playing,
-                                    state=state
+                                    state=state,
+                                    revision=revision,
+                                    controllerUserId=controller,
+                                    serverTimed=event.has("serverTime")
                                 )
-                                val hostControl=
-                                    party?.host?.id==meId || lobby?.myRole=="cohost"
-                                if(!hostControl) {
+                                if(controller!=meId || state=="ended" || state=="cancelled") {
                                     val drift=abs(player.currentPosition-position)
                                     if(drift>1200) player.seekTo(position)
-                                    if(playing && !player.isPlaying) player.play()
-                                    if(!playing && player.isPlaying) player.pause()
+                                    player.playWhenReady=playing && state=="live"
                                 }
                             }
                             "watchparty.reaction" -> {
-                                reactions=runCatching {
-                                    partyRepo.reactions(id)
-                                }.getOrDefault(reactions)
+                                reactionsDirty=true
+                                if(reactionRefresh?.isActive!=true)reactionRefresh=launch(Dispatchers.Main.immediate) {
+                                    while(reactionsDirty && !disconnected.isCompleted) {
+                                        reactionsDirty=false
+                                        val fresh=watchPartyAttempt { partyRepo.reactions(id) }.getOrNull()
+                                        if(fresh!=null && !disconnected.isCompleted)reactions=fresh
+                                    }
+                                }
                             }
                             "watchparty.queue.play" -> {
-                                runCatching { partyRepo.detail(id) }
-                                    .onSuccess { fresh->
-                                        party=fresh
-                                        val version=fresh.media.mediaVersionId
-                                        if(!version.isNullOrBlank() && loadedVersion!=version) {
-                                            runCatching { backend.playbackUrl(version) }
-                                                .onSuccess { url->
-                                                    loadedVersion=version
-                                                    player.setMediaItem(ExoMediaItem.fromUri(url))
-                                                    player.prepare()
-                                                    player.seekTo(fresh.positionMs)
-                                                    if(fresh.isPlaying) player.play() else player.pause()
+                                queueDirty=true
+                                if(queueRefresh?.isActive!=true)queueRefresh=launch(Dispatchers.Main.immediate) {
+                                    while(queueDirty && !disconnected.isCompleted) {
+                                        queueDirty=false
+                                        watchPartyAttempt { partyRepo.detail(id) }
+                                            .onSuccess { fresh->
+                                                if(disconnected.isCompleted || fresh.revision<(party?.revision ?: 0))return@onSuccess
+                                                party=fresh;partyReceivedAt=android.os.SystemClock.elapsedRealtime()
+                                                val version=fresh.media.mediaVersionId
+                                                if(!version.isNullOrBlank() && loadedVersion!=version) {
+                                                    val url=watchPartyAttempt { backend.playbackUrl(version) }.getOrNull()
+                                                    val current=party
+                                                    if(url!=null && !disconnected.isCompleted && current!=null && current.media.mediaVersionId==version) {
+                                                        loadedVersion=version
+                                                        player.setMediaItem(ExoMediaItem.fromUri(url))
+                                                        player.prepare()
+                                                        player.seekTo(watchPartyTargetPosition(current,partyReceivedAt,android.os.SystemClock.elapsedRealtime()))
+                                                        player.playWhenReady=current.isPlaying && current.state=="live"
+                                                    }
                                                 }
-                                        }
+                                            }
                                     }
+                                }
                             }
                         }
                     }
-                },
-                onDisconnected={
-                    scope.launch { realtimeConnected=false }
                 }
-            )
-        } else {
-            realtimeConnected=false
-        }
-        onDispose {
-            socket?.close(1000,"watch party screen closed")
+            } } finally {
+                // Cancelling before the socket discards already queued/late callbacks
+                // and prevents slow HTTP refresh work from updating the next attempt.
+                messages.cancel()
+                reactionRefresh?.cancel();queueRefresh?.cancel()
+                socket.cancel()
+                realtimeConnected=false
+            }
+            delay(retryMs);retryMs=(retryMs*2).coerceAtMost(15_000L)
+        } } finally {
             realtimeConnected=false
         }
     }
 
     BackHandler { onBack() }
 
-    LaunchedEffect(media?.key,partyId) {
-        if(partyId!=null) return@LaunchedEffect
+    WatchPartyMainEffect(media?.key,partyId) {
+        if(partyId!=null) return@WatchPartyMainEffect
         val source=media
         if(source==null) {
             resolvingStartMedia=false
             resolvedStartMedia=null
             startPlatformDetail=null
             selectedEpisodeId=null
-            return@LaunchedEffect
+            return@WatchPartyMainEffect
         }
 
         resolvingStartMedia=true
-        val resolved=runCatching { repository.resolveCatalogMedia(source) }.getOrNull()
+        val resolved=watchPartyAttempt { repository.resolveCatalogMedia(source) }.getOrNull()
         resolvedStartMedia=resolved
         startPlatformDetail=null
         selectedEpisodeId=null
 
         val backendId=resolved?.backendId
         if(!backendId.isNullOrBlank()) {
-            val detail=runCatching { backend.detail(backendId) }.getOrNull()
+            val detail=watchPartyAttempt { backend.detail(backendId) }.getOrNull()
             startPlatformDetail=detail
             if(detail!=null) {
                 resolvedStartMedia=detail.asMediaItem()
@@ -208,20 +282,20 @@ fun ConnectedWatchPartyScreen(
         resolvingStartMedia=false
     }
 
-    LaunchedEffect(Unit) {
+    WatchPartyMainEffect(Unit) {
         if(backend.session.isLoggedIn) {
-            meId=runCatching { backend.me().id }.getOrNull()
+            meId=watchPartyAttempt { backend.me().id }.getOrNull()
         }
     }
 
 
-    LaunchedEffect(partyId,party?.state,party?.host?.id,meId,lobby?.myRole) {
-        val id=partyId ?: return@LaunchedEffect
-        val p=party ?: return@LaunchedEffect
-        if(!backend.session.isLoggedIn) return@LaunchedEffect
+    WatchPartyMainEffect(partyId,party?.state,party?.host?.id,meId,lobby?.myRole) {
+        val id=partyId ?: return@WatchPartyMainEffect
+        val p=party ?: return@WatchPartyMainEffect
+        if(!backend.session.isLoggedIn) return@WatchPartyMainEffect
 
         if(p.state=="scheduled") {
-            reminderEnabled=runCatching {
+            reminderEnabled=watchPartyAttempt {
                 partyRepo.reminderEnabled(id)
             }.getOrDefault(false)
         } else {
@@ -229,15 +303,16 @@ fun ConnectedWatchPartyScreen(
         }
 
         inviteInfo=if(p.host.id==meId || lobby?.myRole=="cohost") {
-            runCatching { partyRepo.inviteInfo(id) }.getOrNull()
+            watchPartyAttempt { partyRepo.inviteInfo(id) }.getOrNull()
         } else null
     }
 
-    LaunchedEffect(partyId) {
-        val id=partyId ?: return@LaunchedEffect
+    WatchPartyMainEffect(partyId,retryConnection) {
+        val id=partyId ?: return@WatchPartyMainEffect
         if(backend.session.isLoggedIn) {
-            runCatching { partyRepo.join(id,initialInviteCode) }
+            watchPartyAttempt { partyRepo.join(id,initialInviteCode) }
                 .onSuccess {
+                    joinSucceeded=true
                     privateJoinRequired=false
                     joinRequestPending=false
                 }
@@ -248,40 +323,44 @@ fun ConnectedWatchPartyScreen(
                 }
         }
         while(isActive && partyId==id) {
-            val fresh=runCatching { partyRepo.detail(id) }
+            val fresh=watchPartyAttempt { partyRepo.detail(id) }
                 .onFailure { error=it.message }
                 .getOrNull()
             if(fresh!=null) {
+                if(fresh.revision<(party?.revision ?: 0)) { delay(2000);continue }
                 party=fresh
-                error=null
+                partyReceivedAt=android.os.SystemClock.elapsedRealtime()
+                if(joinSucceeded)error=null
                 val version=fresh.media.mediaVersionId
-                if(!version.isNullOrBlank() && loadedVersion!=version) {
-                    runCatching { backend.playbackUrl(version) }
+                if(joinSucceeded && fresh.serverTimed && !version.isNullOrBlank() && loadedVersion!=version) {
+                    watchPartyAttempt { backend.playbackUrl(version) }
                         .onSuccess { url ->
                             loadedVersion=version
+                            playbackError=null
                             player.setMediaItem(ExoMediaItem.fromUri(url))
                             player.prepare()
-                            player.seekTo(fresh.positionMs)
-                            if(fresh.isPlaying) player.play() else player.pause()
+                            player.seekTo(watchPartyTargetPosition(fresh,partyReceivedAt,android.os.SystemClock.elapsedRealtime()))
+                            player.playWhenReady=fresh.isPlaying && fresh.state=="live"
                         }
                         .onFailure { error=it.message }
                 }
 
-                val host=fresh.host.id==meId
-                if(!host && loadedVersion==version) {
+                val controller=(fresh.controllerUserId ?: fresh.host.id)==meId
+                if(joinSucceeded && fresh.serverTimed && !controller && loadedVersion==version) {
                     val drift=abs(player.currentPosition-fresh.positionMs)
                     if(drift>1500) player.seekTo(fresh.positionMs)
-                    if(fresh.isPlaying && !player.isPlaying) player.play()
-                    if(!fresh.isPlaying && player.isPlaying) player.pause()
+                    player.playWhenReady=fresh.isPlaying && fresh.state=="live"
                 }
 
-                if(fresh.roomId.isNotBlank()) {
-                    runCatching { social.roomMessages(fresh.roomId) }
+                if(fresh.state=="ended" || fresh.state=="cancelled")player.pause()
+                if(joinSucceeded && fresh.roomId.isNotBlank()) {
+                    watchPartyAttempt { social.roomMessages(fresh.roomId) }
                         .onSuccess {
-                            val changed=it.size!=messages.size
+                            val changed=it.size!=messages.size && messages.isNotEmpty() &&
+                                (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0)>=messages.size
                             messages=it
                             if(changed && it.isNotEmpty()) {
-                                scope.launch { listState.animateScrollToItem(it.lastIndex) }
+                                scope.launch(Dispatchers.Main.immediate) { listState.animateScrollToItem(it.size) }
                             }
                         }
                 }
@@ -290,34 +369,39 @@ fun ConnectedWatchPartyScreen(
         }
     }
 
-    LaunchedEffect(partyId,backend.session.isLoggedIn) {
-        val id=partyId ?: return@LaunchedEffect
-        if(!backend.session.isLoggedIn) return@LaunchedEffect
+    WatchPartyMainEffect(partyId,backend.session.isLoggedIn) {
+        val id=partyId ?: return@WatchPartyMainEffect
+        if(!backend.session.isLoggedIn) return@WatchPartyMainEffect
         while(isActive && partyId==id) {
-            runCatching { partyRepo.lobby(id) }
+            watchPartyAttempt { partyRepo.lobby(id) }
                 .onSuccess {
                     lobby=it
+                    joinSucceeded=true
                     privateJoinRequired=false
                 }
-            reactions=runCatching { partyRepo.reactions(id) }.getOrDefault(emptyList())
+            reactions=watchPartyAttempt { partyRepo.reactions(id) }.getOrDefault(emptyList())
             delay(2000)
         }
     }
 
-    LaunchedEffect(partyId,party?.host?.id,meId,lobby?.myRole) {
-        val id=partyId ?: return@LaunchedEffect
+    WatchPartyMainEffect(partyId,party?.host?.id,meId,lobby?.myRole) {
+        val id=partyId ?: return@WatchPartyMainEffect
         while(isActive && partyId==id) {
             delay(1000)
             val p=party ?: continue
-            if((p.host.id==meId || lobby?.myRole=="cohost") && p.state=="live" && player.duration>0) {
+            if(p.serverTimed && (p.controllerUserId ?: p.host.id)==meId && p.state=="live" && player.duration>0 && !stateWriteBusy) {
                 syncing=true
-                runCatching {
-                    partyRepo.updateState(
+                watchPartyAttempt {
+                    val event=partyRepo.updateState(
                         id=id,
                         positionMs=player.currentPosition.coerceAtLeast(0),
-                        isPlaying=player.isPlaying,
-                        state="live"
+                        isPlaying=player.playWhenReady,
+                        state="live",
+                        expectedRevision=p.revision.takeIf{p.serverTimed}
                     )
+                    partyReceivedAt=android.os.SystemClock.elapsedRealtime()
+                    party=party?.copy(revision=event.optLong("revision",p.revision),positionMs=player.currentPosition,
+                        isPlaying=player.playWhenReady,controllerUserId=meId)
                 }.onFailure { error=it.message }
                 syncing=false
             }
@@ -375,8 +459,8 @@ fun ConnectedWatchPartyScreen(
                         "نسخه قابل پخش این فیلم هنوز آماده نشده."
                 } else {
                     creating=true
-                    scope.launch {
-                        runCatching {
+                    scope.launch(Dispatchers.Main.immediate) {
+                        watchPartyAttempt {
                             partyRepo.create(
                                 mediaTitleId=backendId,
                                 title="Watch Party • "+(resolved?.title ?: media?.title.orEmpty()),
@@ -408,12 +492,41 @@ fun ConnectedWatchPartyScreen(
 
     val p=party
     if(p==null) {
-        LoadingPage("در حال اتصال به تماشای گروهی...")
+        if(error==null)LoadingPage("در حال اتصال به تماشای گروهی...")
+        else Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center) {
+            Text("اتصال به اتاق انجام نشد",style=MaterialTheme.typography.headlineSmall)
+            Text(error.orEmpty(),color=FqMuted,modifier=Modifier.padding(vertical=16.dp))
+            Button(onClick={error=null;retryConnection++}){Text("تلاش دوباره")}
+            TextButton(onClick=onBack){Text("بازگشت")}
+        }
         return
     }
 
     val isHost=p.host.id==meId
-    val canHostControl=isHost || lobby?.myRole=="cohost"
+    val canHostControl=isHost || lobby?.myRole in setOf("host","cohost")
+    fun publishControl(position:Long,playing:Boolean,state:String="live") {
+        if(!p.serverTimed || !canHostControl || stateWriteBusy || p.state in setOf("ended","cancelled"))return
+        val previousPosition=player.currentPosition
+        val previousPlaying=player.playWhenReady
+        stateWriteBusy=true
+        player.seekTo(position.coerceAtLeast(0));player.playWhenReady=playing
+        scope.launch(Dispatchers.Main.immediate) {
+            try {
+                val event=partyRepo.updateState(p.id,position.coerceAtLeast(0),playing,state,p.revision.takeIf{p.serverTimed})
+                partyReceivedAt=android.os.SystemClock.elapsedRealtime()
+                party=party?.copy(positionMs=position.coerceAtLeast(0),isPlaying=playing,state=state,
+                    controllerUserId=meId,revision=event.optLong("revision",p.revision))
+                error=null
+            } catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception) {
+                player.seekTo(previousPosition);player.playWhenReady=previousPlaying
+                error="کنترل پخش ثبت نشد؛ وضعیت اتاق دوباره دریافت می‌شود."
+                try { party=partyRepo.detail(p.id);partyReceivedAt=android.os.SystemClock.elapsedRealtime() }
+                catch(cancelled:CancellationException){throw cancelled}
+                catch(_:Exception) { /* Keep previous snapshot and polling fallback. */ }
+            } finally { stateWriteBusy=false }
+        }
+    }
 
     PremiumWatchPartyStage(
         party=p,
@@ -422,7 +535,7 @@ fun ConnectedWatchPartyScreen(
         myUserId=meId,
         canHostControl=canHostControl,
         realtimeConnected=realtimeConnected,
-        syncing=syncing,
+        syncing=syncing || stateWriteBusy,
         privateJoinRequired=privateJoinRequired,
         joinRequestPending=joinRequestPending,
         lobbyBusy=lobbyBusy,
@@ -432,35 +545,12 @@ fun ConnectedWatchPartyScreen(
         messages=messages,
         messageText=text,
         sendingMessage=sendingMessage,
-        error=error,
+        error=playbackError ?: error,
         listState=listState,
         onBack=onBack,
-        onPrimaryControl={
-            if(p.state=="scheduled") {
-                player.play()
-                scope.launch {
-                    runCatching {
-                        partyRepo.updateState(
-                            p.id,
-                            player.currentPosition.coerceAtLeast(0),
-                            true,
-                            state="live"
-                        )
-                    }.onFailure { error=it.message }
-                }
-            } else {
-                if(player.isPlaying) player.pause() else player.play()
-                scope.launch {
-                    runCatching {
-                        partyRepo.updateState(
-                            p.id,
-                            player.currentPosition.coerceAtLeast(0),
-                            player.isPlaying
-                        )
-                    }.onFailure { error=it.message }
-                }
-            }
-        },
+        onPrimaryControl={publishControl(player.currentPosition,if(p.state=="scheduled")true else !player.playWhenReady)},
+        onSeek={publishControl(it,player.playWhenReady)},
+        onRetryPlayback={playbackError=null;loadedVersion=null;error=null;retryConnection++},
         onInvite={showInviteDialog=true},
         onQueue={showQueue=true},
         onShare={
@@ -480,8 +570,8 @@ fun ConnectedWatchPartyScreen(
                 onRequireAuth()
             } else {
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.requestJoin(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.requestJoin(p.id) }
                         .onSuccess { joinRequestPending=it=="pending" }
                         .onFailure { error=it.message }
                     lobbyBusy=false
@@ -493,8 +583,8 @@ fun ConnectedWatchPartyScreen(
                 onRequireAuth()
             } else {
                 reminderBusy=true
-                scope.launch {
-                    runCatching { partyRepo.toggleReminder(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.toggleReminder(p.id) }
                         .onSuccess { reminderEnabled=it }
                         .onFailure { error=it.message }
                     reminderBusy=false
@@ -503,8 +593,8 @@ fun ConnectedWatchPartyScreen(
         },
         onToggleReady={
             lobbyBusy=true
-            scope.launch {
-                runCatching { partyRepo.toggleReady(p.id) }
+            scope.launch(Dispatchers.Main.immediate) {
+                watchPartyAttempt { partyRepo.toggleReady(p.id) }
                     .onSuccess { ready->
                         val before=lobby?.myReady ?: false
                         val delta=when {
@@ -522,8 +612,8 @@ fun ConnectedWatchPartyScreen(
             }
         },
         onReact={emoji->
-            scope.launch {
-                runCatching { partyRepo.react(p.id,emoji) }
+            scope.launch(Dispatchers.Main.immediate) {
+                watchPartyAttempt { partyRepo.react(p.id,emoji) }
                     .onFailure { error=it.message }
             }
         },
@@ -540,8 +630,8 @@ fun ConnectedWatchPartyScreen(
                 val sending=text.trim()
                 text=""
                 sendingMessage=true
-                scope.launch {
-                    runCatching { social.sendMessage(p.roomId,sending,false) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { social.sendMessage(p.roomId,sending,false) }
                         .onFailure {
                             error=it.message
                             if(text.isBlank()) text=sending
@@ -557,8 +647,8 @@ fun ConnectedWatchPartyScreen(
             busy=lobbyBusy,
             onToggleReadyCheck={enabled->
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.setReadyCheck(p.id,enabled) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.setReadyCheck(p.id,enabled) }
                         .onSuccess {
                             lobby=lobby?.copy(readyCheckEnabled=it)
                         }
@@ -568,8 +658,8 @@ fun ConnectedWatchPartyScreen(
             },
             onReady={
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.toggleReady(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.toggleReady(p.id) }
                         .onSuccess { ready->
                             val before=lobby?.myReady ?: false
                             val delta=when {
@@ -588,10 +678,10 @@ fun ConnectedWatchPartyScreen(
             },
             onResolve={userId,accept->
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.resolveJoinRequest(p.id,userId,accept) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.resolveJoinRequest(p.id,userId,accept) }
                         .onSuccess {
-                            lobby=runCatching { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
+                            lobby=watchPartyAttempt { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
                         }
                         .onFailure { error=it.message }
                     lobbyBusy=false
@@ -599,10 +689,10 @@ fun ConnectedWatchPartyScreen(
             },
             onRole={userId,role->
                 lobbyBusy=true
-                scope.launch {
-                    runCatching { partyRepo.setMemberRole(p.id,userId,role) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.setMemberRole(p.id,userId,role) }
                         .onSuccess {
-                            lobby=runCatching { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
+                            lobby=watchPartyAttempt { partyRepo.lobby(p.id) }.getOrNull() ?: lobby
                         }
                         .onFailure { error=it.message }
                     lobbyBusy=false
@@ -610,9 +700,9 @@ fun ConnectedWatchPartyScreen(
             },
             onLeaveOrEnd={
                 lobbyBusy=true
-                scope.launch {
+                scope.launch(Dispatchers.Main.immediate) {
                     if(canHostControl) {
-                        runCatching {
+                        watchPartyAttempt {
                             partyRepo.updateState(
                                 p.id,
                                 player.currentPosition.coerceAtLeast(0),
@@ -624,7 +714,7 @@ fun ConnectedWatchPartyScreen(
                             onBack()
                         }.onFailure { error=it.message }
                     } else {
-                        runCatching { partyRepo.leave(p.id) }
+                        watchPartyAttempt { partyRepo.leave(p.id) }
                             .onSuccess {
                                 showLobby=false
                                 onBack()
@@ -676,8 +766,8 @@ fun ConnectedWatchPartyScreen(
             },
             onRegenerate={
                 reminderBusy=true
-                scope.launch {
-                    runCatching { partyRepo.regenerateInvite(p.id) }
+                scope.launch(Dispatchers.Main.immediate) {
+                    watchPartyAttempt { partyRepo.regenerateInvite(p.id) }
                         .onSuccess { code->
                             inviteInfo=inviteInfo?.copy(inviteCode=code)
                         }
@@ -700,344 +790,79 @@ data class WatchPartyEpisodeOption(
 
 @Composable
 private fun WatchPartyStartScreen(
-    media: MediaItem?,
-    repository: TmdbRepository,
-    loggedIn: Boolean,
-    creating: Boolean,
-    resolvingCatalog: Boolean,
-    catalogConnected: Boolean,
-    playable: Boolean,
-    episodes: List<WatchPartyEpisodeOption>,
-    selectedEpisodeId: String?,
-    error: String?,
-    onBack: () -> Unit,
-    onEpisodeSelected: (String) -> Unit,
-    onStart: (String,String?,String?) -> Unit
+    media:MediaItem?,repository:TmdbRepository,loggedIn:Boolean,creating:Boolean,
+    resolvingCatalog:Boolean,catalogConnected:Boolean,playable:Boolean,
+    episodes:List<WatchPartyEpisodeOption>,selectedEpisodeId:String?,error:String?,
+    onBack:()->Unit,onEpisodeSelected:(String)->Unit,onStart:(String,String?,String?)->Unit
 ) {
-    var visibility by remember { mutableStateOf("public") }
-    var schedule by remember { mutableStateOf("now") }
-
-    val scheduledAt=when(schedule) {
-        "30m" -> java.time.Instant.now().plusSeconds(30*60L).toString()
-        "1h" -> java.time.Instant.now().plusSeconds(60*60L).toString()
-        "tomorrow" -> java.time.Instant.now().plusSeconds(24*60*60L).toString()
-        else -> null
-    }
-
-    Box(Modifier.fillMaxSize().background(FqBg)) {
-        RemoteImage(
-            repository.backdrop(media?.backdropPath ?: media?.posterPath),
-            Modifier.fillMaxSize(),
-            ContentScale.Crop
-        )
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha=.28f),
-                        Color.Black.copy(alpha=.68f),
-                        FqBg.copy(alpha=.94f),
-                        FqBg
-                    )
-                )
-            )
-        )
-
-        IconButton(
-            onClick=onBack,
-            modifier=Modifier
-                .align(Alignment.TopStart)
-                .padding(14.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha=.42f))
-        ) {
-            Icon(Icons.Default.Close,null)
-        }
-
-        Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal=18.dp,vertical=24.dp)
-        ) {
-            Surface(
-                color=FqGold.copy(alpha=.16f),
-                shape=RoundedCornerShape(99.dp)
-            ) {
-                Row(
-                    Modifier.padding(horizontal=10.dp,vertical=6.dp),
-                    verticalAlignment=Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Groups,null,tint=FqGold,modifier=Modifier.size(16.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("FILMIQOO TOGETHER",color=FqGold,fontSize=9.sp,fontWeight=FontWeight.Black)
-                }
-            }
-
-            Text(
-                "با هم ببینید، دقیقاً همزمان",
-                fontSize=31.sp,
-                lineHeight=35.sp,
-                fontWeight=FontWeight.Black,
-                modifier=Modifier.padding(top=14.dp)
-            )
-            Text(
-                media?.title ?: "یک فیلم یا سریال انتخاب کن",
-                color=Color.White.copy(alpha=.78f),
-                fontSize=13.sp,
-                modifier=Modifier.padding(top=6.dp)
-            )
-
-            Row(
-                Modifier.fillMaxWidth().padding(top=14.dp),
-                horizontalArrangement=Arrangement.spacedBy(7.dp)
-            ) {
-                listOf(
-                    Icons.Default.Sync to "Live Sync",
-                    Icons.Default.Chat to "چت زنده",
-                    Icons.Default.EmojiEmotions to "واکنش"
-                ).forEach { feature->
-                    Surface(
-                        color=Color.White.copy(alpha=.075f),
-                        shape=RoundedCornerShape(13.dp),
-                        modifier=Modifier.weight(1f)
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal=8.dp,vertical=9.dp),
-                            verticalAlignment=Alignment.CenterVertically,
-                            horizontalArrangement=Arrangement.Center
-                        ) {
-                            Icon(feature.first,null,tint=FqGold,modifier=Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(feature.second,fontSize=8.sp,fontWeight=FontWeight.Bold)
-                        }
+    var visibility by rememberSaveable { mutableStateOf("invite") }
+    var schedule by rememberSaveable { mutableStateOf("now") }
+    LazyColumn(Modifier.fillMaxSize().background(CinemaInk).safeDrawingPadding().testTag("party-creation"),
+        contentPadding=PaddingValues(bottom=28.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+        item { CinemaPageHeader("قرارِ تماشا","فیلم شما، دوست‌های شما",onBack) }
+        item {
+            Surface(color=CinemaSurface,shape=RoundedCornerShape(26.dp),modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp)) {
+                Column {
+                    RemoteImage(repository.backdrop(media?.backdropPath ?: media?.posterPath),
+                        Modifier.fillMaxWidth().heightIn(min=120.dp,max=210.dp).aspectRatio(2f),ContentScale.Crop)
+                    Column(Modifier.padding(20.dp)) {
+                        Text("باهم ببینیم",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=CinemaPaper)
+                        Text(media?.title ?: "یک عنوانِ قابل پخش انتخاب کن",style=MaterialTheme.typography.titleLarge,color=CinemaAccent,modifier=Modifier.padding(top=8.dp))
+                        Text("پخش هماهنگ، گفتگوی اعضا و واکنش به لحظه‌های فیلم. کنترل پخش با میزبان و هم‌میزبان است.",
+                            style=MaterialTheme.typography.bodyLarge,color=CinemaSoft,modifier=Modifier.padding(top=10.dp))
+                        Text(when { resolvingCatalog->"در حال بررسی نسخهٔ پخش…";catalogConnected && playable->"نسخهٔ پخش آماده است";!catalogConnected->"این عنوان هنوز نسخهٔ پخش ندارد";else->"نسخهٔ پخش هنوز آماده نیست" },
+                            style=MaterialTheme.typography.bodyMedium,color=if(catalogConnected && playable)FqGreen else CinemaSoft,modifier=Modifier.padding(top=14.dp))
+                        if(resolvingCatalog)LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=10.dp))
                     }
-                }
-            }
-
-            Surface(
-                color=FqSurface.copy(alpha=.94f),
-                shape=RoundedCornerShape(24.dp),
-                modifier=Modifier.fillMaxWidth().padding(top=16.dp)
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Surface(
-                        color=when {
-                            resolvingCatalog -> FqGold.copy(alpha=.10f)
-                            catalogConnected && playable -> FqGreen.copy(alpha=.10f)
-                            else -> FqDanger.copy(alpha=.10f)
-                        },
-                        shape=RoundedCornerShape(14.dp),
-                        modifier=Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal=10.dp,vertical=9.dp),
-                            verticalAlignment=Alignment.CenterVertically
-                        ) {
-                            if(resolvingCatalog) {
-                                CircularProgressIndicator(
-                                    color=FqGold,
-                                    strokeWidth=2.dp,
-                                    modifier=Modifier.size(17.dp)
-                                )
-                            } else {
-                                Icon(
-                                    if(catalogConnected && playable)Icons.Default.CheckCircle
-                                    else Icons.Default.CloudOff,
-                                    null,
-                                    tint=if(catalogConnected && playable)FqGreen else FqDanger,
-                                    modifier=Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(7.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    when {
-                                        resolvingCatalog -> "در حال اتصال به Catalog…"
-                                        catalogConnected && playable -> "آماده برای Watch Party"
-                                        !catalogConnected -> "این عنوان هنوز در Catalog پخش نیست"
-                                        else -> "نسخه قابل پخش هنوز آماده نیست"
-                                    },
-                                    fontSize=9.sp,
-                                    fontWeight=FontWeight.Black
-                                )
-                                Text(
-                                    when {
-                                        resolvingCatalog -> "نسخه واقعی Filmiqoo را پیدا می‌کنیم."
-                                        catalogConnected && playable -> "پخش و Sync به نسخه واقعی سرور متصل است."
-                                        !catalogConnected -> "فقط عناوین دارای فایل واقعی می‌توانند Party بسازند."
-                                        else -> "بعد از آماده شدن فایل پخش، Party فعال می‌شود."
-                                    },
-                                    color=FqMuted,
-                                    fontSize=7.sp,
-                                    modifier=Modifier.padding(top=2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if(episodes.isNotEmpty()) {
-                        Text(
-                            "قسمت برای Watch Party",
-                            fontSize=11.sp,
-                            fontWeight=FontWeight.Black,
-                            modifier=Modifier.padding(top=12.dp)
-                        )
-                        LazyRow(
-                            modifier=Modifier.fillMaxWidth().padding(top=7.dp),
-                            horizontalArrangement=Arrangement.spacedBy(6.dp)
-                        ) {
-                            items(episodes,key={it.id}) { option->
-                                FilterChip(
-                                    selected=selectedEpisodeId==option.id,
-                                    onClick={onEpisodeSelected(option.id)},
-                                    label={
-                                        Text(
-                                            "ف"+option.season+" • ق"+option.episode+
-                                                option.quality?.takeIf(String::isNotBlank)?.let{" • "+it}.orEmpty(),
-                                            fontSize=8.sp
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(
-                        color=FqSurface3,
-                        modifier=Modifier.padding(vertical=13.dp)
-                    )
-
-                    Row(verticalAlignment=Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("چه کسانی وارد شوند؟",fontSize=12.sp,fontWeight=FontWeight.Black)
-                            Text(
-                                when(visibility) {
-                                    "public" -> "همه می‌توانند Party را پیدا کنند و وارد شوند."
-                                    "invite" -> "ورود فقط با لینک و کد دعوت."
-                                    else -> "فقط با تأیید میزبان وارد می‌شوند."
-                                },
-                                color=FqMuted,fontSize=9.sp,modifier=Modifier.padding(top=3.dp)
-                            )
-                        }
-                        Icon(
-                            when(visibility) {
-                                "public" -> Icons.Default.Public
-                                "invite" -> Icons.Default.VpnKey
-                                else -> Icons.Default.Lock
-                            },
-                            null,
-                            tint=FqGold
-                        )
-                    }
-
-                    Row(
-                        Modifier.fillMaxWidth().padding(top=11.dp),
-                        horizontalArrangement=Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(
-                            "public" to "عمومی",
-                            "invite" to "با دعوت",
-                            "private" to "خصوصی"
-                        ).forEach { option->
-                            FilterChip(
-                                selected=visibility==option.first,
-                                onClick={visibility=option.first},
-                                label={Text(option.second,fontSize=9.sp)},
-                                modifier=Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(
-                        color=FqSurface3,
-                        modifier=Modifier.padding(vertical=13.dp)
-                    )
-
-                    Text("زمان شروع",fontSize=12.sp,fontWeight=FontWeight.Black)
-                    Row(
-                        Modifier.fillMaxWidth().padding(top=8.dp),
-                        horizontalArrangement=Arrangement.spacedBy(5.dp)
-                    ) {
-                        listOf(
-                            "now" to "الان",
-                            "30m" to "۳۰ دقیقه",
-                            "1h" to "۱ ساعت",
-                            "tomorrow" to "فردا"
-                        ).forEach { option->
-                            FilterChip(
-                                selected=schedule==option.first,
-                                onClick={schedule=option.first},
-                                label={Text(option.second,fontSize=8.sp)}
-                            )
-                        }
-                    }
-
-                    if(scheduledAt!=null) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(top=8.dp),
-                            verticalAlignment=Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Event,null,tint=FqGold,modifier=Modifier.size(16.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text(
-                                "شروع "+formatPartySchedule(scheduledAt),
-                                color=FqGold,
-                                fontSize=9.sp,
-                                fontWeight=FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick={onStart(visibility,scheduledAt,selectedEpisodeId)},
-                        enabled=!creating && !resolvingCatalog && media!=null && catalogConnected && playable,
-                        colors=ButtonDefaults.buttonColors(containerColor=FqGold),
-                        shape=RoundedCornerShape(16.dp),
-                        contentPadding=PaddingValues(vertical=13.dp),
-                        modifier=Modifier.fillMaxWidth().padding(top=15.dp)
-                    ) {
-                        if(creating) {
-                            CircularProgressIndicator(
-                                color=Color.Black,
-                                strokeWidth=2.dp,
-                                modifier=Modifier.size(19.dp)
-                            )
-                        } else {
-                            Icon(
-                                if(scheduledAt==null)Icons.Default.PlayArrow else Icons.Default.Event,
-                                null,
-                                tint=Color.Black
-                            )
-                        }
-                        Spacer(Modifier.width(7.dp))
-                        Text(
-                            when {
-                                !loggedIn -> "ورود و ساخت Watch Party"
-                                scheduledAt==null -> "شروع Watch Party"
-                                else -> "زمان‌بندی Watch Party"
-                            },
-                            color=Color.Black,
-                            fontSize=12.sp,
-                            fontWeight=FontWeight.Black
-                        )
-                    }
-                }
-            }
-
-            error?.let {
-                Surface(
-                    color=FqDanger.copy(alpha=.12f),
-                    shape=RoundedCornerShape(13.dp),
-                    modifier=Modifier.fillMaxWidth().padding(top=9.dp)
-                ) {
-                    Text(it,color=FqDanger,fontSize=9.sp,modifier=Modifier.padding(10.dp))
                 }
             }
         }
+        if(episodes.isNotEmpty()) item {
+            Column(Modifier.padding(horizontal=20.dp)) {
+                Text("کدام قسمت؟",style=MaterialTheme.typography.titleLarge,color=CinemaPaper)
+                LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(top=10.dp)) {
+                    items(episodes,key={it.id}){episode->FilterChip(selected=selectedEpisodeId==episode.id,
+                        onClick={onEpisodeSelected(episode.id)},label={Text("فصل ${episode.season} · قسمت ${episode.episode}")})}
+                }
+            }
+        }
+        item {
+            Surface(color=CinemaSurface,shape=RoundedCornerShape(22.dp),modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("چه کسانی وارد شوند؟",style=MaterialTheme.typography.titleLarge,color=CinemaPaper)
+                    listOf("invite" to "با لینک دعوت","private" to "با تأیید میزبان","public" to "اتاق عمومی").forEach{(id,label)->
+                        Row(Modifier.fillMaxWidth().clickable(enabled=!creating){visibility=id}.heightIn(min=52.dp),verticalAlignment=Alignment.CenterVertically) {
+                            RadioButton(selected=visibility==id,onClick={visibility=id},enabled=!creating)
+                            Text(label,style=MaterialTheme.typography.bodyLarge,color=CinemaPaper)
+                        }
+                    }
+                    Text(when(visibility){"public"->"اتاق در فهرست عمومی دیده می‌شود.";"private"->"لینک را بفرست؛ ورود هر عضو باید تأیید شود.";else->"کد داخل لینک دعوت، کلید ورود دوست‌هاست."},
+                        style=MaterialTheme.typography.bodyMedium,color=CinemaSoft,modifier=Modifier.padding(top=4.dp))
+                    HorizontalDivider(color=CinemaLine,modifier=Modifier.padding(vertical=18.dp))
+                    Text("چه زمانی؟",style=MaterialTheme.typography.titleLarge,color=CinemaPaper)
+                    listOf("now" to "همین حالا","30m" to "۳۰ دقیقهٔ دیگر","1h" to "یک ساعت دیگر","tomorrow" to "فردا همین ساعت").forEach{(id,label)->
+                        Row(Modifier.fillMaxWidth().clickable(enabled=!creating){schedule=id}.heightIn(min=52.dp),verticalAlignment=Alignment.CenterVertically) {
+                            RadioButton(selected=schedule==id,onClick={schedule=id},enabled=!creating)
+                            Text(label,style=MaterialTheme.typography.bodyLarge,color=CinemaPaper)
+                        }
+                    }
+                    Button(onClick={
+                        val seconds=when(schedule){"30m"->1800L;"1h"->3600L;"tomorrow"->86400L;else->0L}
+                        val at=if(seconds==0L)null else java.time.Instant.now().plusSeconds(seconds).toString()
+                        onStart(visibility,at,selectedEpisodeId)
+                    },enabled=!creating && !resolvingCatalog && media!=null && catalogConnected && playable,
+                        colors=ButtonDefaults.buttonColors(containerColor=CinemaAccent,contentColor=CinemaInk),
+                        modifier=Modifier.fillMaxWidth().padding(top=20.dp).heightIn(min=52.dp).testTag("party-confirm-create")) {
+                        if(creating)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
+                        else Icon(if(schedule=="now")Icons.Default.Groups else Icons.Default.Event,null)
+                        Spacer(Modifier.width(8.dp));Text(if(!loggedIn)"ورود و ساخت اتاق" else if(schedule=="now")"ساخت و ورود به اتاق" else "ثبتِ قرارِ تماشا")
+                    }
+                }
+            }
+        }
+        error?.let{item { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.padding(horizontal=24.dp)) }}
     }
 }
-
 @Composable
 private fun WatchPartyInviteDialog(
     party:WatchPartyInfo,
@@ -1061,7 +886,7 @@ private fun WatchPartyInviteDialog(
                         else -> "این Party عمومی است."
                     },
                     color=FqMuted,
-                    fontSize=9.sp,
+                    fontSize=14.sp,
                     lineHeight=15.sp
                 )
                 if(info.inviteCode.isNotBlank()) {
@@ -1071,7 +896,7 @@ private fun WatchPartyInviteDialog(
                         modifier=Modifier.fillMaxWidth().padding(top=12.dp)
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Invite Code",color=FqMuted,fontSize=7.sp)
+                            Text("Invite Code",color=FqMuted,fontSize=12.sp)
                             Text(
                                 info.inviteCode.uppercase(),
                                 color=FqGold,
@@ -1084,7 +909,7 @@ private fun WatchPartyInviteDialog(
                 }
                 Text(
                     party.title,
-                    fontSize=9.sp,
+                    fontSize=14.sp,
                     modifier=Modifier.padding(top=10.dp)
                 )
             }
@@ -1094,7 +919,7 @@ private fun WatchPartyInviteDialog(
                 OutlinedButton(onClick=onInviteFriends) {
                     Icon(Icons.Default.GroupAdd,null,modifier=Modifier.size(17.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("دعوت دوست‌ها",fontSize=8.sp)
+                    Text("دعوت دوست‌ها",fontSize=12.sp)
                 }
                 Button(
                     onClick=onShare,
@@ -1102,7 +927,7 @@ private fun WatchPartyInviteDialog(
                 ) {
                     Icon(Icons.Default.Share,null,tint=Color.Black)
                     Spacer(Modifier.width(5.dp))
-                    Text("اشتراک لینک",color=Color.Black,fontSize=8.sp)
+                    Text("اشتراک لینک",color=Color.Black,fontSize=12.sp)
                 }
             }
         },
@@ -1115,7 +940,7 @@ private fun WatchPartyInviteDialog(
                     ) {
                         Icon(Icons.Default.Refresh,null)
                         Spacer(Modifier.width(3.dp))
-                        Text("کد جدید",fontSize=8.sp)
+                        Text("کد جدید",fontSize=12.sp)
                     }
                 }
                 TextButton(onClick=onDismiss){Text("بستن")}
@@ -1198,15 +1023,15 @@ private fun WatchPartyLobbySheet(
                     Text("اتاق انتظار",fontSize=20.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.Black)
                     Text(
                         lobby.participantCount.toString()+" نفر • "+
-                            lobby.readyCount+" آماده",
-                        color=FqMuted,fontSize=8.sp
+                            lobby.readyCount.toString()+" آماده"+(if(lobby.presenceKnown)" • "+lobby.onlineCount+" آنلاین" else ""),
+                        color=FqMuted,fontSize=12.sp
                     )
                 }
                 if(lobby.myRole=="host" || lobby.myRole=="cohost") {
                     FilterChip(
                         selected=lobby.readyCheckEnabled,
                         onClick={onToggleReadyCheck(!lobby.readyCheckEnabled)},
-                        label={Text("بررسی آمادگی",fontSize=7.sp)},
+                        label={Text("بررسی آمادگی",fontSize=12.sp)},
                         leadingIcon={
                             Icon(Icons.Default.HowToReg,null,modifier=Modifier.size(15.dp))
                         }
@@ -1236,7 +1061,7 @@ private fun WatchPartyLobbySheet(
             if(lobby.requests.isNotEmpty() && (lobby.myRole=="host" || lobby.myRole=="cohost")) {
                 Text(
                     "درخواست‌های ورود",
-                    fontSize=11.sp,
+                    fontSize=16.sp,
                     fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier=Modifier.padding(top=14.dp,bottom=6.dp)
                 )
@@ -1251,8 +1076,8 @@ private fun WatchPartyLobbySheet(
                         )
                         Spacer(Modifier.width(7.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(request.displayName,fontSize=9.sp)
-                            Text("@"+request.username,color=FqMuted,fontSize=7.sp)
+                            Text(request.displayName,fontSize=14.sp)
+                            Text("@"+request.username,color=FqMuted,fontSize=12.sp)
                         }
                         IconButton(
                             enabled=!busy,
@@ -1268,7 +1093,7 @@ private fun WatchPartyLobbySheet(
 
             Text(
                 "اعضا",
-                fontSize=11.sp,
+                fontSize=16.sp,
                 fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
                 modifier=Modifier.padding(top=14.dp,bottom=5.dp)
             )
@@ -1294,7 +1119,7 @@ private fun WatchPartyLobbySheet(
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                    Text(member.displayName,fontSize=9.sp)
+                                    Text(member.displayName,fontSize=14.sp)
                                     if(member.verified) {
                                         Spacer(Modifier.width(3.dp))
                                         Icon(Icons.Default.Verified,null,tint=Color(0xFF4AB7FF),modifier=Modifier.size(12.dp))
@@ -1306,8 +1131,8 @@ private fun WatchPartyLobbySheet(
                                         "cohost" -> "هم‌میزبان"
                                         "moderator" -> "مدیر"
                                         else -> "بیننده"
-                                    }+" • @"+member.username,
-                                    color=FqMuted,fontSize=7.sp
+                                    }+(if(lobby.presenceKnown)" • "+(if(member.online)"آنلاین" else "آفلاین")else "")+" • @"+member.username,
+                                    color=FqMuted,fontSize=12.sp
                                 )
                             }
                             if(lobby.readyCheckEnabled) {
@@ -1331,7 +1156,7 @@ private fun WatchPartyLobbySheet(
                                 ) {
                                     Text(
                                         if(member.role=="cohost")"بیننده" else "هم‌میزبان",
-                                        fontSize=7.sp
+                                        fontSize=12.sp
                                     )
                                 }
                             }
@@ -1414,7 +1239,7 @@ private fun partyStateLabel(state:String):String=when(state.lowercase()) {
 }
 
 private fun formatPartySchedule(value:String):String =
-    runCatching {
+    watchPartyAttempt {
         val instant=java.time.Instant.parse(value)
         val formatter=java.time.format.DateTimeFormatter.ofPattern(
             "yyyy/MM/dd • HH:mm",
